@@ -62,26 +62,33 @@ func (c *Command) ExecuteContext(ctx context.Context) int {
 	if closeErr != nil {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
-	return c.render(scenario, runner.New(c.executor).Run(ctx, scenario))
+	result := runner.New(c.executor, c.renderEntry).Run(ctx, scenario)
+	return c.renderSummary(scenario, result)
 }
 
-func (c *Command) render(scenario parser.Scenario, result runner.Result) int {
-	for _, entry := range result.Entries {
-		pos := entry.Entry.Position
-		line := fmt.Sprintf("%q:%d:%d: GET %s: %s", pos.File, pos.Line, pos.Column, displayURL(entry.Entry.URL), entry.Outcome)
-		switch entry.Outcome {
-		case runner.Passed, runner.Mismatch:
-			line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
-		case runner.Unvalidated:
-			line += fmt.Sprintf(" (recebido %d)", entry.Status)
-		case runner.Failed:
-			// Headers alone are not a completed response: never invent a status.
-		default:
-			return c.fail("resultado de execução desconhecido")
-		}
-		if c.writeText(line+"\n") != 0 {
-			return 2
-		}
+func (c *Command) renderEntry(entry runner.EntryResult) error {
+	pos := entry.Entry.Position
+	line := fmt.Sprintf("%q:%d:%d: GET %s: %s", pos.File, pos.Line, pos.Column, displayURL(entry.Entry.URL), entry.Outcome)
+	switch entry.Outcome {
+	case runner.Passed, runner.Mismatch:
+		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
+	case runner.Unvalidated:
+		line += fmt.Sprintf(" (recebido %d)", entry.Status)
+	case runner.Failed:
+		// Headers alone are not a completed response: never invent a status.
+	default:
+		return fmt.Errorf("resultado de execução desconhecido")
+	}
+	if _, err := io.WriteString(c.out, line+"\n"); err != nil {
+		return fmt.Errorf("escrever resultado da requisição: %w", err)
+	}
+	return nil
+}
+
+func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) int {
+	if result.ReportErr != nil {
+		pos := result.ErrorPosition
+		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
 	}
 	s := result.Summary
 	if c.writeText(fmt.Sprintf("resumo %q: total=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d\n", scenario.File, s.Total, s.Started, s.Completed, s.Validated, s.WithoutValidation, s.NotStarted)) != 0 {
@@ -162,6 +169,7 @@ Exemplo: salve health.hurl e execute httpgo test health.hurl
 
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
 status é aceito e informado como sem validação. A primeira falha interrompe.
+Cada resultado é exibido ao terminar o GET, antes do próximo; resumo ao final.
 Timeout total: 10 segundos por GET. Até 10 redirects na mesma origem.
 Códigos: 0 sucesso, 1 status divergente, 2 entrada/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.

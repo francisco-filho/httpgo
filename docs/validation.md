@@ -47,6 +47,23 @@ Na verificação manual, os dois cenários existentes passaram contra ele, e
 Ctrl+C encerrou o processo e liberou a porta. O servidor temporário anterior
 foi encerrado; o utilitário não ficou em background.
 
+## Saída incremental
+
+Os resultados agora são emitidos durante a execução: cada linha é escrita antes
+do próximo GET, e o resumo aparece somente ao final, sem duplicar resultados.
+O formato das linhas, as categorias e os exit codes permanecem inalterados.
+
+- Runner: callback síncrono testado em validação aprovada, ausência de expectativa,
+  divergência, falha de transporte e erro de apresentação. Falhar ao apresentar um
+  resultado impede todas as chamadas posteriores e preserva causa/posição.
+- CLI: quarenta entradas comprovam resultado visível antes da próxima execução,
+  sanitização e resumo único; falha no primeiro resultado, posterior ou resumo
+  produz exit 2, sem expor erros brutos.
+- E2E: binário real escrevendo em pipe; o servidor bloqueia a segunda requisição
+  por canal até o teste observar a primeira linha no stdout. Só depois a resposta
+  é liberada, em variantes de sucesso, divergência e body incompleto. Não há sleep
+  nem dependência de tempo de resposta para sincronização.
+
 ## Evidências iniciais nesta sandbox (sem CGO)
 
 Antes da correção do ambiente, com `CGO_ENABLED=0` e as ferramentas Go no PATH:

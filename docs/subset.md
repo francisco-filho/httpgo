@@ -82,6 +82,16 @@ URL segura e uma classificação: `status validado`, `sem validação de status`
 `status divergente` ou `erro de transporte`. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status.
 
+A linha de cada resultado é escrita **assim que a requisição termina, antes de
+iniciar a próxima**, sem esperar o arquivo inteiro terminar. O parsing completo
+continua ocorrendo antes de qualquer rede ou resultado. Uma resposta só está
+concluída depois de consumir e fechar o body; receber headers não basta para
+exibir validação aprovada. As requisições continuam sequenciais, sem goroutines
+adicionais para apresentar os resultados. O texto e os códigos de saída são os
+mesmos: mudou o momento de emissão, não o formato das linhas.
+
+O resumo é escrito uma única vez ao final da execução, inclusive quando uma
+requisição interrompe a sequência por divergência, transporte ou cancelamento.
 O resumo em stdout informa:
 
 - `total`: entradas validadas pelo parser;
@@ -102,7 +112,10 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 | 2 | uso, arquivo, parsing, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
-em sucesso. A apresentação usa sempre texto simples sem cores/animações,
+em sucesso. Falha na escrita de um resultado interrompe o arquivo antes do GET
+seguinte, preserva o que já foi escrito e não tenta emitir resumo no stdout que
+falhou. O erro é diagnosticado de forma segura em stderr, sem ecoar a causa bruta.
+A apresentação usa sempre texto simples sem cores/animações,
 independentemente de TTY e NO_COLOR: não há detecção de terminal nem formato
 alternativo dependente do ambiente. O E2E comprova pipe e PTY Linux real.
 

@@ -32,14 +32,24 @@ func TestSequence(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			scenario := parser.Scenario{Entries: []parser.Entry{{URL: "http://example.test/first", ExpectedStatus: tc.expected[0]}, {URL: "http://example.test/second", ExpectedStatus: tc.expected[1]}}}
 			var calls []string
+			var reports []EntryResult
 			executor := executorFunc(func(ctx context.Context, req Request) (Response, error) {
 				if ctx == nil {
 					t.Fatal("missing context")
 				}
+				if len(reports) != len(calls) {
+					t.Fatalf("next request started before reporting the previous result: calls=%v reports=%v", calls, reports)
+				}
 				calls = append(calls, req.URL)
 				return Response{tc.statuses[len(calls)-1]}, tc.err
 			})
-			got := New(executor).Run(context.Background(), scenario)
+			got := New(executor, func(entry EntryResult) error {
+				reports = append(reports, entry)
+				return nil
+			}).Run(context.Background(), scenario)
+			if !reflect.DeepEqual(reports, got.Entries) || got.ReportErr != nil {
+				t.Fatalf("reports=%+v, result=%+v", reports, got)
+			}
 			if got.Summary != tc.summary || got.Diverged != tc.diverged || !errors.Is(got.Err, tc.err) {
 				t.Fatalf("result = %+v; want summary %+v, diverged %v, err %v", got, tc.summary, tc.diverged, tc.err)
 			}
@@ -77,7 +87,7 @@ func TestCancellation(t *testing.T) {
 				cancel()
 				return Response{}, received.Err()
 			})
-			got := New(executor).Run(ctx, parser.Scenario{Entries: []parser.Entry{{}, {}}})
+			got := New(executor, nil).Run(ctx, parser.Scenario{Entries: []parser.Entry{{}, {}}})
 			wantCalls := 1
 			if before {
 				wantCalls = 0
@@ -98,7 +108,7 @@ func TestCancellationBetweenEntries(t *testing.T) {
 		cancel()
 		return Response{Status: 200}, nil
 	})
-	got := New(executor).Run(ctx, parser.Scenario{Entries: []parser.Entry{{ExpectedStatus: intPointer(200)}, {}}})
+	got := New(executor, nil).Run(ctx, parser.Scenario{Entries: []parser.Entry{{ExpectedStatus: intPointer(200)}, {}}})
 	if !errors.Is(got.Err, context.Canceled) || calls != 1 || got.Summary != (Summary{2, 1, 1, 1, 0, 1}) || len(got.Entries) != 1 {
 		t.Fatalf("result=%+v,calls=%d", got, calls)
 	}

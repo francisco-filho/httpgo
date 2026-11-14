@@ -59,7 +59,8 @@ com indicação explícita de **sem validação de status**.
 - `0`: sucesso; `1`: status divergente; `2`: demais erros.
 - Timeout total de 10 segundos por GET, incluindo redirects e leitura do body.
 - TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
-- Resultados e resumo em stdout; diagnósticos em stderr. Sempre texto sem cores.
+- Cada resultado é emitido em stdout assim que o GET termina, antes do próximo;
+  resumo ao final e diagnósticos em stderr. Sempre texto sem cores.
 - Credenciais, query inteira e fragmento da URL não são exibidos.
   **Não coloque segredos no path: ele permanece visível.**
 

@@ -39,13 +39,21 @@ type Result struct {
 	Entries       []EntryResult
 	Summary       Summary
 	Err           error
+	ReportErr     error
 	ErrorPosition parser.Position
 	Diverged      bool
 }
 
-type Runner struct{ executor HTTPExecutor }
+type Runner struct {
+	executor HTTPExecutor
+	report   func(EntryResult) error
+}
 
-func New(executor HTTPExecutor) *Runner { return &Runner{executor: executor} }
+// New accepts an optional synchronous reporter, called before the next entry.
+// A reporting error stops execution; nil collects results without reporting.
+func New(executor HTTPExecutor, report func(EntryResult) error) *Runner {
+	return &Runner{executor: executor, report: report}
+}
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
@@ -60,23 +68,28 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 		current := EntryResult{Entry: entry, Status: response.Status}
 		if err != nil {
 			current.Outcome, current.Status = Failed, 0
-			result.Entries = append(result.Entries, current)
 			result.Err, result.ErrorPosition = err, entry.Position
-			return result
-		}
-		result.Summary.Completed++
-		if entry.ExpectedStatus == nil {
-			current.Outcome = Unvalidated
-			result.Summary.WithoutValidation++
-		} else if assertion.Status(*entry.ExpectedStatus, response.Status) {
-			current.Outcome = Passed
-			result.Summary.Validated++
 		} else {
-			current.Outcome = Mismatch
-			result.Diverged = true
+			result.Summary.Completed++
+			if entry.ExpectedStatus == nil {
+				current.Outcome = Unvalidated
+				result.Summary.WithoutValidation++
+			} else if assertion.Status(*entry.ExpectedStatus, response.Status) {
+				current.Outcome = Passed
+				result.Summary.Validated++
+			} else {
+				current.Outcome = Mismatch
+				result.Diverged = true
+			}
 		}
 		result.Entries = append(result.Entries, current)
-		if result.Diverged {
+		if r.report != nil {
+			if err := r.report(current); err != nil {
+				result.ReportErr, result.ErrorPosition = err, entry.Position
+				return result
+			}
+		}
+		if result.Err != nil || result.Diverged {
 			return result
 		}
 	}

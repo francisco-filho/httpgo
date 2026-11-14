@@ -95,7 +95,7 @@ func TestForbiddenRedirectNeverContactsTarget(t *testing.T) {
 				w.WriteHeader(302)
 			}))
 			defer source.Close()
-			result := runner.New(NewNetHTTPExecutor()).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: source.URL}, {URL: source.URL + "/next"}}})
+			result := runner.New(NewNetHTTPExecutor(), nil).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: source.URL}, {URL: source.URL + "/next"}}})
 			requireKind(t, result.Err, Redirect)
 			if strings.Contains(result.Err.Error(), "destination-secret") || contacts.Load() != 0 || subsequent.Load() != 0 || result.Summary.Started != 1 {
 				t.Fatalf("unsafe redirect: %+v, target=%d,next=%d", result, contacts.Load(), subsequent.Load())
@@ -155,7 +155,7 @@ func TestTotalDeadlineIncludesRedirectsAndBody(t *testing.T) {
 				deadlines = append(deadlines, deadline)
 				return nil, nil
 			}
-			result := runner.New(executor).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: server.URL + "/start"}, {URL: server.URL + "/next"}}})
+			result := runner.New(executor, nil).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: server.URL + "/start"}, {URL: server.URL + "/next"}}})
 			requireKind(t, result.Err, Timeout)
 			if !errors.Is(result.Err, context.DeadlineExceeded) || result.Summary.Completed != 0 || result.Summary.Started != 1 {
 				t.Fatalf("result = %+v", result)
@@ -224,7 +224,7 @@ func TestNoImplicitRetryAfterWarmup(t *testing.T) {
 	if _, err := executor.Execute(context.Background(), runner.Request{URL: server.URL}); err != nil {
 		t.Fatal(err)
 	}
-	result := runner.New(executor).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: server.URL}, {URL: server.URL + "/next"}}})
+	result := runner.New(executor, nil).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: server.URL}, {URL: server.URL + "/next"}}})
 	requireKind(t, result.Err, Network)
 	mu.Lock()
 	defer mu.Unlock()
