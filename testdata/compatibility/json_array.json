@@ -1,0 +1,31 @@
+{
+  "classification": "shared: array bytes; difference: Hurl infers Content-Type",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "PATCH",
+        "body": "[\n 1, true, null, \"HTTP 200 #\"\n]",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "PATCH",
+        "body": "[\n 1, true, null, \"HTTP 200 #\"\n]",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

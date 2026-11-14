@@ -166,6 +166,18 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 					return fail("construção não suportada", "variáveis no header")
 				}
 				switch strings.ToLower(name) {
+				case "host":
+					host := strings.Trim(value, " \t")
+					u, err := parseURL("http://" + host)
+					if err != nil || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(host, " \t/?#") {
+						return fail("sintaxe inválida", "valor de Host inválido")
+					}
+					for _, header := range entry.Headers {
+						if strings.EqualFold(header.Name, name) {
+							return fail("sintaxe inválida", "Host duplicado")
+						}
+					}
+					entry.Headers = append(entry.Headers, Header{Name: name, Value: host})
 				case "content-length", "transfer-encoding", "trailer":
 					return fail("construção não suportada", "header de enquadramento HTTP; o transporte calcula o tamanho do body")
 				default:

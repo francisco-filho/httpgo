@@ -1,0 +1,45 @@
+{
+  "classification": "shared: POST redirect method, body bytes and declared headers",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/redirect303",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"a\":1}",
+        "content_type": "application/json",
+        "probe": "redirect"
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "application/json",
+        "probe": "redirect"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/redirect303",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"a\":1}",
+        "content_type": "application/json",
+        "probe": "redirect"
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "application/json",
+        "probe": "redirect"
+      }
+    ]
+  }
+}

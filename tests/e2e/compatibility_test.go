@@ -6,11 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,9 +25,17 @@ const hurlVersion = "8.0.0"
 
 var updateCompatibility = flag.Bool("update", false, "update compatibility observations; review contract changes")
 
+type wireRequest struct {
+	Method      string `json:"method"`
+	Body        string `json:"body"`
+	ContentType string `json:"content_type"`
+	Probe       string `json:"probe"`
+}
+
 type observation struct {
-	Exit  int      `json:"exit"`
-	Paths []string `json:"paths"`
+	Exit     int           `json:"exit"`
+	Paths    []string      `json:"paths"`
+	Requests []wireRequest `json:"requests,omitempty"`
 }
 
 type comparison struct {
@@ -69,11 +79,21 @@ func TestCompatibility(t *testing.T) {
 			}
 			var mu sync.Mutex
 			var paths []string
+			var requests []wireRequest
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Error(err)
+				}
 				mu.Lock()
 				paths = append(paths, r.URL.Path)
+				requests = append(requests, wireRequest{r.Method, string(body), r.Header.Get("Content-Type"), r.Header.Get("X-Probe")})
 				mu.Unlock()
 				switch r.URL.Path {
+				case "/redirect301", "/redirect302", "/redirect303", "/redirect307", "/redirect308":
+					status, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/redirect"))
+					w.Header().Set("Location", "/health")
+					w.WriteHeader(status)
 				case "/health":
 					w.WriteHeader(200)
 				case "/missing":
@@ -99,7 +119,8 @@ func TestCompatibility(t *testing.T) {
 			code, out, stderr := run(t, "test", generated)
 			mu.Lock()
 			httpgoPaths := slices.Clone(paths)
-			paths = nil
+			httpgoRequests := slices.Clone(requests)
+			paths, requests = nil, nil
 			mu.Unlock()
 			hurlContext, hurlCancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer hurlCancel()
@@ -117,8 +138,17 @@ func TestCompatibility(t *testing.T) {
 			}
 			mu.Lock()
 			hurlPaths := slices.Clone(paths)
+			hurlRequests := slices.Clone(requests)
 			mu.Unlock()
-			got := comparison{Classification: expected.Classification, HTTPGo: observation{code, httpgoPaths}, Hurl: observation{hurlCode, hurlPaths}}
+			// Legacy pairs assert paths only; US-02 pairs also assert the wire
+			// method, headers and exact JSON bytes for both executables.
+			if expected.HTTPGo.Requests == nil {
+				httpgoRequests = nil
+			}
+			if expected.Hurl.Requests == nil {
+				hurlRequests = nil
+			}
+			got := comparison{Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {
@@ -130,7 +160,7 @@ func TestCompatibility(t *testing.T) {
 				t.Logf("updated %s; review compatibility contract change", expectedPath)
 				return
 			}
-			if got.HTTPGo.Exit != expected.HTTPGo.Exit || !slices.Equal(got.HTTPGo.Paths, expected.HTTPGo.Paths) || got.Hurl.Exit != expected.Hurl.Exit || !slices.Equal(got.Hurl.Paths, expected.Hurl.Paths) {
+			if got.HTTPGo.Exit != expected.HTTPGo.Exit || !slices.Equal(got.HTTPGo.Paths, expected.HTTPGo.Paths) || got.Hurl.Exit != expected.Hurl.Exit || !slices.Equal(got.Hurl.Paths, expected.Hurl.Paths) || !reflect.DeepEqual(got.HTTPGo.Requests, expected.HTTPGo.Requests) || !reflect.DeepEqual(got.Hurl.Requests, expected.Hurl.Requests) {
 				t.Fatalf("observed=%+v,expected=%+v\nhttpgo out=%q,err=%q\nhurl=%q", got, expected, out, stderr, hurlOutput)
 			}
 			t.Logf("%s: httpgo=%s %v; Hurl %s=%s %v", got.Classification, strconv.Itoa(code), httpgoPaths, hurlVersion, strconv.Itoa(hurlCode), hurlPaths)

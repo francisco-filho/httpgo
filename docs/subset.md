@@ -1,16 +1,18 @@
-# Subconjunto suportado — US-01 (história #4)
+# Subconjunto suportado — US-01 e US-02 (issues #4 e #6)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
 
 ## Gramática
 
-Um arquivo UTF-8 contém ao menos um `GET <URL absoluta HTTP/HTTPS>`.
-A expectativa opcional `HTTP <status>` associa-se ao GET anterior, uma única vez.
+Um arquivo UTF-8 contém ao menos uma request-line
+`<método> <URL absoluta HTTP/HTTPS>`. Métodos aceitos (em maiúsculas):
+`GET`, `POST`, `PUT`, `PATCH` e `DELETE`, combináveis em sequência.
+A expectativa opcional `HTTP <status>` associa-se à requisição anterior, uma única vez.
 O status tem exatamente três dígitos ASCII, entre 100 e 599.
 São aceitos espaços/tabs de indentação, linhas vazias, LF/CRLF e comentários em
 linha própria iniciados por `#`. Comentários e linhas vazias não desfazem a
-associação entre GET e HTTP. O GET seguinte inicia outra entrada.
+associação entre requisição e HTTP. A request-line seguinte inicia outra entrada.
 
 ```hurl
 # A expectativa pertence ao GET anterior.
@@ -31,24 +33,65 @@ Arquivo vazio/com só comentários, URL inválida, status inválido, expectativa
 órfã/duplicada e instrução desconhecida são erros de entrada. Nada do arquivo é
 enviado nesses casos, mesmo quando o erro aparece depois de GETs válidos.
 
+### Headers e JSON inline
+
+Depois da request-line, podem ser declarados headers `Nome: valor`, antes do
+body e da expectativa. Nomes usam os tokens ASCII de HTTP (sem espaço antes de
+`:`); valores têm espaços/tabs externos removidos e não podem conter CR, LF ou
+outros controles, salvo tab. LF/CRLF delimitam linhas do arquivo, não fazem parte
+do valor. Continuação de header em outra linha não é suportada. Headers repetidos
+são enviados como valores repetidos; `Host` deve ser único e um host/porta válido,
+definindo o host HTTP sem alterar a URL operacional nem a política de origem. Headers de enquadramento `Content-Length`,
+`Transfer-Encoding` e `Trailer` são explicitamente não suportados: o transporte
+calcula o tamanho do body. Não há autenticação ou cookie jar implícito.
+
+`POST`, `PUT`, `PATCH` e `DELETE` aceitam **nenhum body ou um único valor JSON**:
+objeto, array, string, número, booleano ou `null`, inclusive multilinha. `GET`
+permanece sem body. O valor começa no primeiro caractere JSON e termina no último.
+Espaços/linhas separadores externos não são enviados; todos os bytes internos,
+inclusive indentação, escapes e LF/CRLF, são preservados, sem nova serialização.
+Na última linha do valor só pode haver whitespace após ele. A expectativa e a
+próxima request-line devem começar em outra linha. Texto dentro de strings JSON
+(como `HTTP 200`, `GET`, `#` e `[Asserts]`) não é delimitador externo.
+
+```hurl
+POST http://localhost:8080/products
+Content-Type: application/json
+{"name":"Pizza","price":4500}
+
+HTTP 201
+
+DELETE http://localhost:8080/products/1
+HTTP 204
+```
+
+Declare `Content-Type: application/json` quando a API exigir: httpgo não o infere.
+Body duplicado, JSON inválido, header inválido ou header após o body/expectativa
+rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
+
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
-sintaxe inválida. Não são aceitos: outros métodos, headers/bodies do usuário,
-variáveis, `[Captures]`, `[Asserts]` e demais seções, `file,...;`, versões como
-`HTTP/1.1` na expectativa ou comentários após uma instrução. O texto bruto
-não é ecoado. O corpus negativo está em `testdata/scenarios/unsupported_*.hurl`.
+sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
+variáveis/templates (inclusive em headers/JSON), `[Captures]`, `[Asserts]` e demais
+seções, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
+não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
+O texto bruto não é ecoado. O corpus negativo está em
+`testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
 
 ## Execução HTTP
 
-- Cada GET é iniciado em ordem. Não há paralelismo ou retry, inclusive retry
+- Cada requisição é iniciada em ordem. Não há paralelismo ou retry, inclusive retry
   implícito do transporte. HTTP/1.1 sem conexão persistente evita o replay de
   requisições em conexão reutilizada. HTTP/2 não é habilitado nesta história.
-- Timeout total **fixo de 10 segundos** por GET, contado uma vez e compartilhado
+- Timeout total **fixo de 10 segundos** por requisição, contado uma vez e compartilhado
   por conexão/TLS, redirects e consumo de todos os bodies. Não há flag de ajuste.
 - TLS é verificado; não há opção para ignorar certificados.
 - Redirects 301/302/303/307/308 com Location são seguidos até **10 saltos**.
   O 11º salto é bloqueado antes de enviar ao próximo destino. Resposta sem
   Location não causa redirect e seu status é o resultado.
-- Apenas a mesma origem do GET inicial: scheme e hostname sem distinção de caixa,
+- 301/302/303 convertem POST/PUT/PATCH/DELETE em GET **sem body**; GET continua GET.
+  307/308 preservam método e bytes do body. Headers declarados são mantidos em
+  redirects permitidos. O reenvio de um body em 307/308 não é retry após falha.
+- Apenas a mesma origem da requisição inicial: scheme e hostname sem distinção de caixa,
   porta efetiva numérica (80 para HTTP e 443 para HTTPS, quando omitida).
   Não se usa DNS para equiparar hosts: localhost não equivale a 127.0.0.1.
   Mudar scheme/host/porta é erro de transporte, sem contato ao destino proibido.
@@ -77,10 +120,10 @@ múltiplos arquivos, entrada de cenário/segredos por stdin nem flags adicionais
 `--output`, `--output-file`, `--var`, `--secret`, `check` e configurações futuras
 não estão implementados ou anunciados como disponíveis.
 
-Cada entrada iniciada tem uma linha de resultado com `GET`, URL segura e uma
+Cada entrada iniciada tem uma linha de resultado com o método declarado, URL segura e uma
 classificação: `status validado`, `sem validação de status`, `status divergente`
 ou `erro de transporte`. Em sucesso, inclusive sem expectativa, a linha começa
-diretamente com `GET`, sem prefixo de arquivo/linha/coluna. Apenas divergências
+diretamente com o método, sem prefixo de arquivo/linha/coluna. Apenas divergências
 e erros de transporte incluem esse prefixo. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status.
 
@@ -122,7 +165,7 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 | 2 | uso, arquivo, parsing, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
-em sucesso. Falha na escrita de um resultado interrompe o arquivo antes do GET
+em sucesso. Falha na escrita de um resultado interrompe o arquivo antes da requisição
 seguinte, preserva o que já foi escrito e não tenta emitir resumo no stdout que
 falhou. O erro é diagnosticado de forma segura em stderr, sem ecoar a causa bruta.
 A apresentação usa sempre texto simples sem cores/animações,
@@ -145,6 +188,12 @@ query continuam disponíveis para a requisição. URL inválida recebe diagnóst
 controlado sem expor o token malformado. O caminho do arquivo é exibido com
 quoting para escapar caracteres de controle.
 
+Nenhum valor de header é apresentado, incluindo `Authorization`,
+`Proxy-Authorization`, `Cookie` e `Set-Cookie`, independentemente da caixa do nome.
+Bodies de requisição/resposta também não são impressos. JSON/header malformado
+recebe diagnóstico controlado com arquivo/linha/coluna, sem ecoar entrada ou erro
+bruto do decoder/transporte. Isso evita vazamento também de credenciais em bodies.
+
 **O path da URL permanece visível: não coloque segredos nele.** Não é possível
 detectar qualquer segredo arbitrário embutido no path/hostname/nome de arquivo,
 nem proteger o conteúdo do arquivo em disco ou argumentos no histórico/processos.
@@ -152,8 +201,11 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 
 ## Diferenças em relação ao Hurl
 
-- O subconjunto é menor: comentários inline, respostas com versão e outros
-  métodos/seções são rejeitados, não ignorados.
+- O subconjunto é menor: comentários inline, respostas com versão, body em GET,
+  headers de enquadramento e demais métodos/seções são rejeitados, não ignorados.
+- Hurl 8.0.0 infere `Content-Type: application/json` para JSON inline; httpgo só
+  envia esse header se for declarado. Valores e delimitação JSON são compartilhados
+  no corpus, não uma promessa de equivalência de todos os headers implícitos.
 - Códigos de saída, resultados/resumo e mensagens pertencem ao contrato httpgo,
   não ao Hurl. Ex.: divergência é 1 aqui e 4 no Hurl 8.0.0 usado no corpus.
 - Redirects são automáticos mas limitados à mesma origem; o diferencial usa

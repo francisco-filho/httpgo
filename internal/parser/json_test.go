@@ -31,7 +31,7 @@ func TestJSONBytesAndBoundaries(t *testing.T) {
 
 func TestRejectInvalidJSONAndHeadersSafely(t *testing.T) {
 	for _, suffix := range []string{
-		`{"password":"body-secret",}`, `{"password":"body-secret"`, `"body-secret`, `true false`, `01`, `null # body-secret`, "[1,\nHTTP 200", "{\"a\":\"bad\nbody-secret\"}", `{"a":1} HTTP 200`, "{}\n[]", "HTTP 200\n{}", "{}\nX-After: header-secret", "Bad Name: header-secret", ": header-secret", "X-Test : header-secret", "Authorization: header-secret\rInjected: body-secret", "Cookie: header-secret\x00", "Cookie: header-secret\x7f", "Cookie: header-secret\n injected", "X-Test: {{header-secret}}", `{"a":"{{body-secret}}"}`, "HTTP 200\nAuthorization: header-secret", "\"\xff\"",
+		`{"password":"body-secret",}`, `{"password":"body-secret"`, `"body-secret`, `true false`, `01`, `null # body-secret`, "[1,\nHTTP 200", "{\"a\":\"bad\nbody-secret\"}", `{"a":1} HTTP 200`, "{}\n[]", "HTTP 200\n{}", "{}\nX-After: header-secret", "Bad Name: header-secret", ": header-secret", "X-Test : header-secret", "Authorization: header-secret\rInjected: body-secret", "Cookie: header-secret\x00", "Cookie: header-secret\x7f", "Cookie: header-secret\n injected", "X-Test: {{header-secret}}", `{"a":"{{body-secret}}"}`, "HTTP 200\nAuthorization: header-secret", "\"\xff\"", "Host: bad host", "Host: user:header-secret@example.test", "Host: example.test/path", "Host: example.test\nhost: example.test",
 	} {
 		t.Run(fmt.Sprintf("%q", suffix), func(t *testing.T) {
 			input := "GET http://example.test/first\nPOST http://example.test/last\n" + suffix
@@ -51,8 +51,8 @@ func TestRejectInvalidJSONAndHeadersSafely(t *testing.T) {
 
 func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
-		got, err := Parse("headers.hurl", strings.NewReader(method+" http://example.test\nAuthorization: Bearer value\nProxy-Authorization: x\nCookie: y\nSet-Cookie: z\nHTTP 404"))
-		if err != nil || got.Entries[0].Method != method || len(got.Entries[0].Headers) != 4 || got.Entries[0].Body != nil {
+		got, err := Parse("headers.hurl", strings.NewReader(method+" http://example.test\nAuthorization: Bearer value\nProxy-Authorization: x\nCookie: y\nSet-Cookie: z\nHost: example.test:8080\nHTTP 404"))
+		if err != nil || got.Entries[0].Method != method || len(got.Entries[0].Headers) != 5 || got.Entries[0].Body != nil {
 			t.Fatalf("scenario=%+v,error=%v", got, err)
 		}
 	}

@@ -1,0 +1,45 @@
+{
+  "classification": "shared scalar JSON bytes and boundaries; difference: Hurl infers Content-Type",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "null",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "null",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

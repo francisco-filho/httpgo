@@ -1,0 +1,31 @@
+{
+  "classification": "shared: object bytes, method and explicit headers",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"name\":\"Pizza\",\"price\":4500}",
+        "content_type": "application/json",
+        "probe": "demo"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"name\":\"Pizza\",\"price\":4500}",
+        "content_type": "application/json",
+        "probe": "demo"
+      }
+    ]
+  }
+}

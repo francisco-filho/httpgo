@@ -1,0 +1,11 @@
+{
+  "classification": "shared rejection: invalid JSON prevents earlier sends",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}
