@@ -59,7 +59,7 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
-	for _, seed := range []string{"POST http://example.test\n{\"a\":1}\nHTTP 201", "GET http://example.test\nHTTP 200", "PATCH http://example.test\n[true,null]", "DELETE http://example.test\nAuthorization: x\rInjected: y", "POST http://example.test\n\"HTTP 200\""} {
+	for _, seed := range []string{"POST http://example.test\n{\"a\":1}\nHTTP 201", "GET http://example.test\nHTTP 200", "PATCH http://example.test\n[true,null]", "DELETE http://example.test\nAuthorization: x\rInjected: y", "POST http://example.test\n\"HTTP 200\"", "GET {{ api.baseUrl }}/{{id}}\nX-Probe: {{ value }}", "GET http://example.test/\nPOST {{base}}\n{\"a\":\"{{body}}\"}"} {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, input string) {
