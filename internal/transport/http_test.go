@@ -147,14 +147,12 @@ func TestTotalDeadlineIncludesRedirectsAndBody(t *testing.T) {
 			defer server.Close()
 			executor := NewNetHTTPExecutor()
 			executor.timeout = 150 * time.Millisecond
-			var mu sync.Mutex
 			var deadlines []time.Time
-			executor.transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-				deadline, _ := ctx.Deadline()
-				mu.Lock()
+			// Observe real requests without introducing a fake HTTP transport.
+			executor.transport.Proxy = func(req *http.Request) (*url.URL, error) {
+				deadline, _ := req.Context().Deadline()
 				deadlines = append(deadlines, deadline)
-				mu.Unlock()
-				return (&net.Dialer{}).DialContext(ctx, network, address)
+				return nil, nil
 			}
 			result := runner.New(executor).Run(context.Background(), parser.Scenario{Entries: []parser.Entry{{URL: server.URL + "/start"}, {URL: server.URL + "/next"}}})
 			requireKind(t, result.Err, Timeout)
@@ -168,12 +166,13 @@ func TestTotalDeadlineIncludesRedirectsAndBody(t *testing.T) {
 			if hits.Load() != wantHits {
 				t.Fatalf("hits=%d,want %d", hits.Load(), wantHits)
 			}
-			mu.Lock()
-			defer mu.Unlock()
-			// Transport detaches dialing from the request deadline for pooling.
-			// The end-to-end deadline is instead enforced by RoundTrip's context.
 			if len(deadlines) != int(wantHits) {
-				t.Fatalf("dials=%d,want %d", len(deadlines), wantHits)
+				t.Fatalf("requests=%d,want %d", len(deadlines), wantHits)
+			}
+			for _, deadline := range deadlines {
+				if deadline.IsZero() || !deadline.Equal(deadlines[0]) {
+					t.Fatalf("deadline renewed across redirects: %v", deadlines)
+				}
 			}
 		})
 	}
