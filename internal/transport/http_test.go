@@ -55,6 +55,7 @@ func TestOrigin(t *testing.T) {
 		want bool
 	}{
 		{"http://EXAMPLE.test", "HTTP://example.TEST:80/next", true},
+		{"http://example.test:080", "http://example.test:80/next", true},
 		{"https://example.test", "https://example.test:443/next", true},
 		{"http://example.test", "https://example.test:80", false},
 		{"http://example.test", "http://other.test", false},

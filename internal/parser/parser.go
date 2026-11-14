@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -153,8 +153,11 @@ func parseURL(token string) (*url.URL, error) {
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Opaque != "" || u.Hostname() == "" || strings.ContainsAny(u.Host, "{}\\") {
 		return nil, fmt.Errorf("invalid url")
 	}
-	if strings.HasPrefix(u.Host, "[") && net.ParseIP(u.Hostname()) == nil {
-		return nil, fmt.Errorf("invalid ip")
+	if strings.HasPrefix(u.Host, "[") {
+		address, err := netip.ParseAddr(u.Hostname())
+		if err != nil || !address.Is6() {
+			return nil, fmt.Errorf("invalid ipv6")
+		}
 	}
 	if strings.Contains(u.Hostname(), ":") && !strings.HasPrefix(u.Host, "[") {
 		return nil, fmt.Errorf("unbracketed ip")

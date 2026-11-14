@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,6 +66,7 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 	if err != nil {
 		return runner.Response{}, &Error{Kind: Network, cause: err}
 	}
+	current.Scheme = strings.ToLower(current.Scheme)
 	origin := current
 	for hops := 0; ; hops++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, current.String(), nil)
@@ -93,6 +95,7 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		if err != nil {
 			return runner.Response{}, &Error{Kind: Redirect, cause: err}
 		}
+		next.Scheme = strings.ToLower(next.Scheme)
 		if hops >= 10 || !sameOrigin(origin, next) {
 			return runner.Response{}, &Error{Kind: Redirect}
 		}
@@ -115,6 +118,9 @@ func sameOrigin(a, b *url.URL) bool {
 
 func effectivePort(u *url.URL) string {
 	if port := u.Port(); port != "" {
+		if number, err := strconv.ParseUint(port, 10, 16); err == nil {
+			return strconv.FormatUint(number, 10)
+		}
 		return port
 	}
 	if strings.EqualFold(u.Scheme, "https") {
