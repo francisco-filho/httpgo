@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -9,11 +11,17 @@ import (
 	"capimgrosso.com/httpgo/internal/template"
 )
 
-func renderFailure(pos parser.Position, err error) *RenderError {
+func renderFailure(pos parser.Position, source string, err error) *RenderError {
 	detail := "não foi possível resolver o texto"
 	var located *template.Error
 	if errors.As(err, &located) {
-		pos.Column += located.Offset
+		prefix := source[:min(max(located.Offset, 0), len(source))]
+		if lines := strings.Count(prefix, "\n"); lines > 0 {
+			pos.Line += lines
+			pos.Column = len(prefix) - strings.LastIndexByte(prefix, '\n')
+		} else {
+			pos.Column += len(prefix)
+		}
 		detail = located.Detail
 	}
 	return &RenderError{Position: pos, Detail: detail, cause: err}
@@ -26,7 +34,7 @@ func (r *Runner) render(entry parser.Entry) (Request, string, *RenderError) {
 	}
 	url, err := r.renderer.Render(entry.URL)
 	if err != nil {
-		return Request{}, "", renderFailure(pos, err)
+		return Request{}, "", renderFailure(pos, entry.URL, err)
 	}
 	// Static URLs were fully checked by the parser; stricter URI byte checks
 	// prevent implicit percent-encoding of newly inserted values.
@@ -43,12 +51,26 @@ func (r *Runner) render(entry parser.Entry) (Request, string, *RenderError) {
 		}
 		text, err := r.renderer.Render(headers[i].Value)
 		if err != nil {
-			return Request{}, "", renderFailure(pos, err)
+			return Request{}, "", renderFailure(pos, headers[i].Value, err)
 		}
 		if err := parser.ValidateHeader(headers[i].Name, text.Value); err != nil {
 			return Request{}, "", &RenderError{Position: pos, Detail: err.Error(), cause: err}
 		}
 		headers[i].Value = text.Value
 	}
-	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: slices.Clone(entry.Body)}, url.Display, nil
+	body := bytes.Clone(entry.Body)
+	if entry.Body != nil {
+		pos = entry.BodyPosition
+		if pos.Line == 0 {
+			pos = entry.Position
+		}
+		body, err = r.renderer.RenderJSON(body)
+		if err != nil {
+			return Request{}, "", renderFailure(pos, string(entry.Body), err)
+		}
+		if !json.Valid(body) {
+			return Request{}, "", &RenderError{Position: pos, Detail: "body JSON renderizado inválido"}
+		}
+	}
+	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body}, url.Display, nil
 }

@@ -53,9 +53,10 @@ type Result struct {
 	Diverged      bool
 }
 
-// Renderer is the textual rendering contract consumed before each request.
+// Renderer resolves textual and JSON contexts before each request.
 type Renderer interface {
 	Render(string) (template.Text, error)
+	RenderJSON([]byte) ([]byte, error)
 }
 
 type RenderError struct {

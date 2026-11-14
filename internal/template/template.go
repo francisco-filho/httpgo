@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -159,18 +158,13 @@ func (c *Context) Render(source string) (Text, error) {
 	return Text{Value: value.String(), Display: c.Sanitize(display.String())}, nil
 }
 
-// Sanitize protects known nonempty values before URL escaping/normalization.
-// Longest matches first avoid exposing suffixes of overlapping secret values.
+// Sanitize protects known representations as well as provenance-based display.
 func (c *Context) Sanitize(text string) string {
 	var values []string
 	for name := range c.secrets {
-		if value, ok := c.values[name]; ok && value.text != "" {
-			values = append(values, value.text)
+		if value, ok := c.values[name]; ok {
+			values = append(values, SecretVariants(value.original)...)
 		}
 	}
-	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
-	for _, value := range values {
-		text = strings.ReplaceAll(text, value, "[oculto]")
-	}
-	return text
+	return Protector(values)(text)
 }

@@ -201,7 +201,7 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
   HTTP 201
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
-Headers e um valor JSON inline são opcionais; bytes do JSON são preservados.
+Headers e um valor JSON inline são opcionais; JSON estático preserva seus bytes.
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
 status é aceito e informado como sem validação. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
@@ -212,18 +212,29 @@ Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Valores de headers e bodies não são impressos, nem em erros de entrada.
 
-Variáveis textuais (flags repetíveis):
+Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
   httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
   GET {{ api.baseUrl }}/products
   Authorization: Bearer {{token}}
   HTTP 200
---var nome=valor: somente texto; vazio e sinais = adicionais são preservados.
-Nomes ASCII com segmentos separados por ponto; duplicação/conflito é erro.
-URL e valores de headers aceitam placeholders, sem recursão ou encoding automático.
+--var nome=valor: literal JSON válido preserva tipo; caso contrário é texto,
+inclusive vazio. Sinais = após o primeiro são preservados. Para forçar string:
+  --var 'product.code="001"'
+  httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var product.name=Pizza --var product.price=4500 --var product.active=true --var 'product.code="001"'
+  POST {{api.baseUrl}}/products
+  Content-Type: application/json
+  {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}},"code":{{product.code}}}
+  HTTP 201
+Nomes ASCII pontuados são exatos: objetos são opacos, sem acesso a propriedades.
+Duplicação e ancestral/descendente são erros, sem merge nem sobrescrita.
+Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
+JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
+Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
 --secret nome: protege uma variável, sem fornecer valor; pode ainda estar ausente.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas
 valores não sigilosos ou fictícios. A proteção não cobre histórico/processos.
-Ambiente do processo, stdin, capturas e templates no body não estão disponíveis.
+Ambiente do processo, stdin, capturas e templates de arquivos externos indisponíveis.
+Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.
 `
 }

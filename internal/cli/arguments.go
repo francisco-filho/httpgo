@@ -3,10 +3,9 @@ package cli
 import (
 	"fmt"
 	"io"
-	"net/url"
-	"sort"
-	"strconv"
 	"strings"
+
+	"capimgrosso.com/httpgo/internal/template"
 )
 
 type arguments struct {
@@ -75,18 +74,9 @@ func argumentProtection(args []string) func(string) string {
 		if !ok || value == "" || !protected[name] {
 			continue
 		}
-		// Escape variants protect diagnostics such as quoted filenames as well as
-		// already encoded static paths. Provenance protects interpolated URLs first.
-		quoted := strconv.Quote(value)
-		values = append(values, value, quoted[1:len(quoted)-1], url.PathEscape(value), url.QueryEscape(value))
+		values = append(values, template.SecretVariants(value)...)
 	}
-	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
-	pairs := make([]string, 0, 2*len(values))
-	for _, value := range values {
-		pairs = append(pairs, value, "[oculto]")
-	}
-	replacer := strings.NewReplacer(pairs...)
-	return replacer.Replace
+	return template.Protector(values)
 }
 
 type protectedWriter struct {
