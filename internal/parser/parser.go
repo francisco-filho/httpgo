@@ -3,7 +3,6 @@ package parser
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/netip"
@@ -29,6 +28,8 @@ type Entry struct {
 	URL              string
 	Headers          []Header
 	Body             []byte
+	BodyPosition     Position
+	BodyPlan         template.JSONPlan
 	Position         Position
 	ExpectedStatus   *int
 	ExpectedPosition Position
@@ -141,23 +142,19 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				if entry.Method == "GET" {
 					return fail("construção não suportada", "body em GET")
 				}
-				decoder := json.NewDecoder(bytes.NewReader(data[start:]))
-				var value json.RawMessage
-				if err := decoder.Decode(&value); err != nil {
-					if syntax, ok := err.(*json.SyntaxError); ok {
-						pos = position(file, data, start+int(syntax.Offset)-1)
+				plan, err := template.ParseJSON(data[start:])
+				if err != nil {
+					if located, ok := err.(*template.Error); ok {
+						pos = position(file, data, start+located.Offset)
 					}
-					return fail("sintaxe inválida", "body JSON inválido; declare um único valor JSON")
+					category := "sintaxe inválida"
+					if strings.Contains(err.Error(), "não são suportadas") {
+						category = "construção não suportada"
+					}
+					return fail(category, err.Error())
 				}
-				finish := start + int(decoder.InputOffset())
+				finish := start + plan.End
 				body := data[start:finish]
-				if !utf8.Valid(body) {
-					return fail("sintaxe inválida", "body JSON deve usar UTF-8 válido")
-				}
-				if bytes.Contains(body, []byte("{{")) {
-					pos = position(file, data, start)
-					return fail("construção não suportada", "variáveis no body")
-				}
 				// Only whitespace may follow a value on its last line. Never absorb
 				// a second value, an expectation, a comment or the following request.
 				tailEnd := bytes.IndexByte(data[finish:], '\n')
@@ -171,6 +168,8 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 					return fail("sintaxe inválida", "conteúdo após o valor JSON; use uma nova linha")
 				}
 				entry.Body = bytes.Clone(body)
+				entry.BodyPosition = position(file, data, start)
+				entry.BodyPlan = plan
 				offset = tailEnd + 1
 				continue
 			}
@@ -276,8 +275,6 @@ func unsupported(token string) string {
 			return "versão HTTP na resposta esperada"
 		case strings.HasPrefix(token, "file,"):
 			return "body externo"
-		case strings.HasPrefix(token, "{{"):
-			return "variáveis"
 		case strings.HasPrefix(token, "```"):
 			return "body binário ou string multilinha"
 		case strings.HasPrefix(token, "[") && len(token) > 1 && ((token[1] >= 'A' && token[1] <= 'Z') || (token[1] >= 'a' && token[1] <= 'z' && token[1] != 't' && token[1] != 'f' && token[1] != 'n')):

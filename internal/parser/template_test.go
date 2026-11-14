@@ -20,7 +20,7 @@ func TestTemplateSourcesAndPositions(t *testing.T) {
 }
 
 func TestLateTemplateErrors(t *testing.T) {
-	for _, suffix := range []string{"GET {{bad-name}}", "GET {{ name", "GET http://example.test/}}", "GET {{name}} trailing", "GET {{name}}\nX-Test: {{a b}}", "POST {{name}}\n{\"a\":\"{{value}}\"}", "GET {{name}}\nX-{{name}}: value"} {
+	for _, suffix := range []string{"GET {{bad-name}}", "GET {{ name", "GET http://example.test/}}", "GET {{name}} trailing", "GET {{name}}\nX-Test: {{a b}}", "POST {{name}}\n{\"{{value}}\":1}", "GET {{name}}\nX-{{name}}: value"} {
 		got, err := Parse("safe.hurl", strings.NewReader("GET http://example.test/\n"+suffix))
 		var located *Error
 		if !errors.As(err, &located) || len(got.Entries) != 0 || located.Position.Line < 2 {

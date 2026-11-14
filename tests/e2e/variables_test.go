@@ -84,7 +84,7 @@ func TestVariablesInvalidInputBeforeNetwork(t *testing.T) {
 		suffix string
 		flags  []string
 	}{
-		{suffix: "GET {{bad-name}}"}, {suffix: "GET {{ name"}, {suffix: "GET {{base}} trailing"}, {suffix: "POST {{base}}\n{\"a\":\"{{token}}\"}"}, {suffix: "GET {{base}}\nX-{{name}}: value"},
+		{suffix: "GET {{bad-name}}"}, {suffix: "GET {{ name"}, {suffix: "GET {{base}} trailing"}, {suffix: "POST {{base}}\n{\"{{token}}\":1}"}, {suffix: "GET {{base}}\nX-{{name}}: value"},
 		{flags: []string{"--var", "noEquals"}}, {flags: []string{"--var", "bad-name=fictitious"}}, {flags: []string{"--var", "x=a", "--var", "x=a"}}, {flags: []string{"--var", "x=a", "--var", "x=b"}}, {flags: []string{"--var", "x=a", "--var", "x.y=b"}}, {flags: []string{"--var", "x.y=b", "--var", "x=a"}}, {flags: []string{"--var"}}, {flags: []string{"--secret"}}, {flags: []string{"--unknown=fictitious"}},
 	}
 	for i, tc := range cases {

@@ -42,7 +42,7 @@ func TestInvalidFlagsAndSyntaxPreventAllSends(t *testing.T) {
 			t.Fatalf("flags=%q code=%d out=%q err=%q", flags, code, out, stderr)
 		}
 	}
-	for _, suffix := range []string{"GET {{bad-name}}", "GET {{ missing", "GET {{base}}\nX-{{name}}: foo", "POST {{base}}\n{\"password\":\"{{token}}\"}"} {
+	for _, suffix := range []string{"GET {{bad-name}}", "GET {{ missing", "GET {{base}}\nX-{{name}}: foo", "POST {{base}}\n{\"{{token}}\":\"static\"}"} {
 		fake := &fakeExecutor{}
 		file := writeScenario(t, "GET http://example.test/first\n"+suffix)
 		code, out, stderr := execute(t, context.Background(), fake, "test", file, "--var", "base=http://example.test", "--var", "token=fake-token", "--secret", "token")
