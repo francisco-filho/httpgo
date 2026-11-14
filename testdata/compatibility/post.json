@@ -1,0 +1,13 @@
+{
+  "classification": "restriction: other methods",
+  "httpgo": {
+    "exit": 2,
+    "paths": []
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ]
+  }
+}

@@ -89,4 +89,19 @@ func TestCancellation(t *testing.T) {
 	}
 }
 
+func TestCancellationBetweenEntries(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	executor := executorFunc(func(context.Context, Request) (Response, error) {
+		calls++
+		cancel()
+		return Response{Status: 200}, nil
+	})
+	got := New(executor).Run(ctx, parser.Scenario{Entries: []parser.Entry{{ExpectedStatus: intPointer(200)}, {}}})
+	if !errors.Is(got.Err, context.Canceled) || calls != 1 || got.Summary != (Summary{2, 1, 1, 1, 0, 1}) || len(got.Entries) != 1 {
+		t.Fatalf("result=%+v,calls=%d", got, calls)
+	}
+}
+
 func intPointer(value int) *int { return &value }

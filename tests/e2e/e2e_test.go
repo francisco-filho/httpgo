@@ -103,7 +103,11 @@ func TestGetSequence(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			file := scenario(t, fmt.Sprintf("GET %s/health\nHTTP 200\nGET %s/inexistente\nHTTP 404\n", server.URL, server.URL))
+			example, err := os.ReadFile("../../testdata/scenarios/scenario_get_status.hurl")
+			if err != nil {
+				t.Fatal(err)
+			}
+			file := scenario(t, strings.ReplaceAll(string(example), "http://localhost:8080", server.URL))
 			code, out, stderr := run(t, "test", file)
 			wantCode, wantCalls := 0, 2
 			if first == 503 {

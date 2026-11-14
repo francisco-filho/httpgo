@@ -73,6 +73,26 @@ func TestReadErrorSafeAndWrapped(t *testing.T) {
 	}
 }
 
+func TestInvalidFixtures(t *testing.T) {
+	paths, err := filepath.Glob("../../testdata/scenarios/invalid_*.hurl")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("fixtures = %v, %v", paths, err)
+	}
+	for _, path := range paths {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			scenario, err := Parse(path, strings.NewReader(string(data)))
+			var diagnostic *Error
+			if !errors.As(err, &diagnostic) || diagnostic.Category != "sintaxe inválida" || len(scenario.Entries) != 0 {
+				t.Fatalf("scenario = %+v, fixture error = %v", scenario, err)
+			}
+		})
+	}
+}
+
 func TestUnsupportedFixtures(t *testing.T) {
 	paths, err := filepath.Glob("../../testdata/scenarios/unsupported_*.hurl")
 	if err != nil || len(paths) == 0 {

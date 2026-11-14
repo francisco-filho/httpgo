@@ -1,0 +1,17 @@
+{
+  "classification": "shared",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ]
+  }
+}

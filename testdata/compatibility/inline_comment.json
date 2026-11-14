@@ -1,0 +1,13 @@
+{
+  "classification": "restriction: inline comments",
+  "httpgo": {
+    "exit": 2,
+    "paths": []
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ]
+  }
+}
