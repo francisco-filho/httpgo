@@ -60,6 +60,7 @@ Fluxo: `cli` → `config` → `parser` → `runner` → (`template`, `transport`
 
 Regras de dependência:
 - Sem ciclos. Pacotes folha (`template`, `query`, `assertion`, `transport`) não importam `runner`, `cli` nem `report`.
+  - Exceção autorizada para a história 4: `transport` pode importar apenas os tipos do contrato `HTTPExecutor` definido em `runner` (requisição/resposta), para implementar o adapter sem criar pacote ou camada adicional. `runner` continua sem importar o transporte concreto.
 - Só `cli` conhece `cobra`/flags; só `transport` conhece `net/http`.
 - `runner` depende de interfaces próprias (`Transport`, `Renderer`...), implementadas pelos demais pacotes e montadas em `main`/`cli`.
 - `query` extrai valores; **quem decide sucesso/falha é `assertion`**. `report` apenas renderiza, não reavalia.
