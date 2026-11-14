@@ -23,18 +23,28 @@ make serve
 Ele escuta somente em `http://127.0.0.1:8080` (também acessível via localhost),
 em primeiro plano. Ctrl+C encerra o servidor. A porta precisa estar livre.
 
-| GET | Status |
-|---|---|
-| `/health` | 200 |
-| `/inexistente` | 404 |
-| `/error` | 500 |
-| Outros caminhos | 404 |
+| Método | Caminho | Status |
+|---|---|---|
+| GET | `/health` | 200 |
+| GET | `/inexistente` | 404 |
+| GET | `/error` | 500 |
+| POST | `/products` | 201 |
+| GET / PUT / PATCH | `/products/1` | 200 |
+| DELETE | `/products/1` | 204 |
+| GET / POST / PUT / PATCH / DELETE | `/echo` | 200 |
+
+Os produtos são demonstrativos, **sem persistência**. `/echo` devolve os bytes do
+JSON e os headers de resposta `X-Dummy-Method` e `X-Dummy-Body-Bytes`, sem ecoar
+headers de autenticação/cookies. Use apenas dados fictícios.
 
 O cenário `scenario_get_status.hurl` executa `/health`, `/inexistente` e repete
 `/health`, validando três respostas em sequência. Também é possível executar:
 
 ```sh
 bin/httpgo test testdata/scenarios/scenario_unvalidated_status.hurl
+# POST de demonstração e sequência de métodos da US-02:
+bin/httpgo test testdata/scenarios/scenario_json_inline.hurl
+bin/httpgo test testdata/scenarios/scenario_dummy_methods.hurl
 ```
 
 Esse cenário recebe 500 e informa explicitamente que não validou status.
@@ -66,8 +76,8 @@ HTTP 201
 
 Salve como `products.hurl` e execute `bin/httpgo test products.hurl`. O mesmo
 exemplo está em `testdata/scenarios/scenario_json_inline.hurl` e é exercitado
-pelo binário nos E2E. O dummy manual **não** implementa `/products`; use sua API
-local. Headers e JSON são validados antes de qualquer envio, e os bytes do valor
+pelo binário nos E2E. O dummy manual também implementa essa demonstração: basta
+iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e os bytes do valor
 JSON são preservados, sem serialização. Declare Content-Type quando necessário;
 não há inferência automática desse header.
 

@@ -43,7 +43,11 @@ Validações da implementação:
 - `gofmt -l` nos Go alterados e `git diff --check`: sem pendências.
 
 Os testes locais não dependem do dummy nem de serviço fixo na porta 8080.
-O exemplo de POST exige uma API de produtos, não o dummy GET manual.
+Por solicitação posterior, o dummy manual passou a aceitar a demonstração POST
+em `/products`, operações em `/products/1` e `/echo`, sem persistência. O cenário
+`scenario_dummy_methods.hurl` permite verificar os métodos com `make serve`.
+Os testes opt-in do utilitário exercitam HTTP local e os quatro cenários
+publicados pelo binário real, sem ocupar 8080; comandos em `dev-server.md`.
 Não foi executado SonarQube (exclusivo do QA). Builds cruzados, se executados,
 continuam sendo apenas evidência de compilação; não se declara execução US-02
 em macOS/Windows. As limitações nativas herdadas da US-01 estão descritas abaixo.
