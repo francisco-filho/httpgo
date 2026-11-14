@@ -42,6 +42,8 @@ Somente o código de produção em `transport` importa `net/http`.
 A CLI monta `runner.New(executor, c.renderEntry)`. Após classificar cada resposta
 ou falha, o runner chama o callback **sincronamente, antes de iniciar a próxima
 entrada**. `renderEntry` escreve uma linha sanitizada, sem reavaliar assertions.
+Sucessos, inclusive sem expectativa, começam com `GET`; arquivo/linha/coluna
+prefixam somente divergências e falhas. O resumo continua identificando o arquivo.
 Não há goroutine, fila de eventos ou espera pelo fim do arquivo para apresentar
 um resultado. Callback `nil` permite coletar resultados sem apresentação.
 

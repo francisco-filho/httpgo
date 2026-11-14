@@ -77,18 +77,28 @@ múltiplos arquivos, entrada de cenário/segredos por stdin nem flags adicionais
 `--output`, `--output-file`, `--var`, `--secret`, `check` e configurações futuras
 não estão implementados ou anunciados como disponíveis.
 
-Cada entrada iniciada tem uma linha de resultado com arquivo/linha/coluna,
-URL segura e uma classificação: `status validado`, `sem validação de status`,
-`status divergente` ou `erro de transporte`. Divergências mostram esperado e
+Cada entrada iniciada tem uma linha de resultado com `GET`, URL segura e uma
+classificação: `status validado`, `sem validação de status`, `status divergente`
+ou `erro de transporte`. Em sucesso, inclusive sem expectativa, a linha começa
+diretamente com `GET`, sem prefixo de arquivo/linha/coluna. Apenas divergências
+e erros de transporte incluem esse prefixo. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status.
+
+```text
+GET http://localhost:8080/health: status validado (esperado 200, recebido 200)
+GET http://localhost:8080/error: sem validação de status (recebido 500)
+"health.hurl":1:1: GET http://localhost:8080/health: status divergente (esperado 200, recebido 503)
+```
+
+O resumo continua identificando o arquivo, sem linha/coluna.
 
 A linha de cada resultado é escrita **assim que a requisição termina, antes de
 iniciar a próxima**, sem esperar o arquivo inteiro terminar. O parsing completo
 continua ocorrendo antes de qualquer rede ou resultado. Uma resposta só está
 concluída depois de consumir e fechar o body; receber headers não basta para
 exibir validação aprovada. As requisições continuam sequenciais, sem goroutines
-adicionais para apresentar os resultados. O texto e os códigos de saída são os
-mesmos: mudou o momento de emissão, não o formato das linhas.
+adicionais para apresentar os resultados. Os códigos de saída são preservados.
+A apresentação incremental não reimprime resultados no final.
 
 O resumo é escrito uma única vez ao final da execução, inclusive quando uma
 requisição interrompe a sequência por divergência, transporte ou cancelamento.

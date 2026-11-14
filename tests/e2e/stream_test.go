@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -88,7 +89,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			var first string
 			select {
 			case first = <-lines:
-				if !strings.Contains(first, "/first?[oculta]: status validado") {
+				if !strings.HasPrefix(first, "GET ") || !strings.Contains(first, "/first?[oculta]: status validado") {
 					t.Fatalf("first result = %q", first)
 				}
 			case <-ctx.Done():
@@ -120,6 +121,13 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}
 			if len(remaining) != 2 || !strings.Contains(remaining[0], "/second: "+tc.outcome) || !strings.HasPrefix(remaining[1], "resumo ") || !strings.Contains(remaining[1], tc.completed) {
 				t.Fatalf("remaining output = %q", remaining)
+			}
+			prefix := "GET "
+			if tc.code != 0 {
+				prefix = fmt.Sprintf("%q:3:1: GET ", file)
+			}
+			if !strings.HasPrefix(remaining[0], prefix) {
+				t.Fatalf("second result = %q; want prefix %q", remaining[0], prefix)
 			}
 			if tc.code == 0 && stderr.Len() != 0 || tc.code != 0 && stderr.Len() == 0 {
 				t.Fatalf("stderr = %q", stderr.String())

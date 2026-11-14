@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -99,6 +100,18 @@ func TestResultsAndSecretRedaction(t *testing.T) {
 			code, out, err := execute(t, context.Background(), fake, "test", file)
 			if code != tc.code || len(fake.calls) != tc.calls {
 				t.Fatalf("code=%d,out=%q,err=%q,calls=%v", code, out, err, fake.calls)
+			}
+			for _, line := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
+				if strings.HasPrefix(line, "resumo ") {
+					continue
+				}
+				prefix := "GET "
+				if tc.code != 0 {
+					prefix = fmt.Sprintf("%q:1:1: GET ", file)
+				}
+				if !strings.HasPrefix(line, prefix) {
+					t.Errorf("result line = %q; want prefix %q", line, prefix)
+				}
 			}
 			for _, want := range tc.wantOut {
 				if !strings.Contains(out, want) {

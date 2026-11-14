@@ -67,8 +67,7 @@ func (c *Command) ExecuteContext(ctx context.Context) int {
 }
 
 func (c *Command) renderEntry(entry runner.EntryResult) error {
-	pos := entry.Entry.Position
-	line := fmt.Sprintf("%q:%d:%d: GET %s: %s", pos.File, pos.Line, pos.Column, displayURL(entry.Entry.URL), entry.Outcome)
+	line := fmt.Sprintf("GET %s: %s", displayURL(entry.Entry.URL), entry.Outcome)
 	switch entry.Outcome {
 	case runner.Passed, runner.Mismatch:
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
@@ -78,6 +77,10 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		// Headers alone are not a completed response: never invent a status.
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
+	}
+	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed {
+		pos := entry.Entry.Position
+		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
 	if _, err := io.WriteString(c.out, line+"\n"); err != nil {
 		return fmt.Errorf("escrever resultado da requisição: %w", err)

@@ -29,7 +29,7 @@ func TestResultsAreWrittenBeforeTheNextRequest(t *testing.T) {
 	var out, stderr bytes.Buffer
 	calls := 0
 	executor := executorFunc(func(_ context.Context, request runner.Request) (runner.Response, error) {
-		if got := strings.Count(out.String(), ": GET "); got != calls {
+		if got := strings.Count(out.String(), "GET "); got != calls {
 			t.Fatalf("request %d started with only %d results visible: %q", calls+1, got, out.String())
 		}
 		if strings.Contains(out.String(), "resumo") {
@@ -52,7 +52,7 @@ func TestResultsAreWrittenBeforeTheNextRequest(t *testing.T) {
 	if code := command.ExecuteContext(context.Background()); code != 0 || calls != total || stderr.Len() != 0 {
 		t.Fatalf("code=%d,calls=%d,stdout=%q,stderr=%q", code, calls, out.String(), stderr.String())
 	}
-	if strings.Count(out.String(), ": GET ") != total || strings.Count(out.String(), "resumo ") != 1 || !strings.Contains(out.String(), "validadas=20 sem_validação=20 não_iniciadas=0") {
+	if strings.Count(out.String(), "GET ") != total || strings.Count(out.String(), "resumo ") != 1 || !strings.Contains(out.String(), "validadas=20 sem_validação=20 não_iniciadas=0") {
 		t.Fatalf("incorrect results or final summary: %q", out.String())
 	}
 	for _, secret := range []string{"url-user", "url-password", "query-secret", "fragment-secret"} {
@@ -109,7 +109,7 @@ func TestStreamingWriteFailureStopsRequests(t *testing.T) {
 			if code != 2 || calls != tc.wantCalls || out.calls != tc.successfulWrites+1 || !strings.Contains(stderr.String(), "escrever o resultado") {
 				t.Fatalf("code=%d,requests=%d,writes=%d,stdout=%q,stderr=%q", code, calls, out.calls, out.String(), stderr.String())
 			}
-			if strings.Contains(out.String(), "resumo") || strings.Count(out.String(), ": GET ") != tc.successfulWrites {
+			if strings.Contains(out.String(), "resumo") || strings.Count(out.String(), "GET ") != tc.successfulWrites {
 				t.Fatalf("unexpected output after write failure: %q", out.String())
 			}
 			if tc.name != "summary" && !strings.Contains(stderr.String(), fmt.Sprintf(":%d:1:", 2*(calls-1)+1)) {
