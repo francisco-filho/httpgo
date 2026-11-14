@@ -1,0 +1,27 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "api=x",
+    "api.baseUrl=y"
+  ],
+  "classification": "intentional restriction: scalar and descendant conflict",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

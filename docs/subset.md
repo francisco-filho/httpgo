@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 e US-02 (issues #4 e #6)
+# Subconjunto suportado — US-01 a US-03 (issues #4, #6 e #11)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -71,11 +71,73 @@ rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
 
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
 sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
-variáveis/templates (inclusive em headers/JSON), `[Captures]`, `[Asserts]` e demais
+templates no body e em nomes de headers, `[Captures]`, `[Asserts]` e demais
 seções, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
 não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
+
+## Variáveis textuais e templates — US-03
+
+`--var nome=valor` e `--secret nome` são repetíveis (também aceitam
+`--var=nome=valor` e `--secret=nome`). Flags podem vir antes/depois do único
+arquivo, após `test`. Cada execução cria contexto novo, sem estado compartilhado.
+O primeiro `=` de uma atribuição separa nome e valor; os demais pertencem ao
+valor. Texto vazio é definido e difere de ausência. Valores são **somente texto**:
+números, booleanos, `null`, aspas e conteúdo parecido com JSON não são convertidos.
+Essa limitação temporária não anuncia a interpolação JSON da US-04.
+
+Cada segmento do nome corresponde a `[A-Za-z_][A-Za-z0-9_]*`; pontos separam
+segmentos hierárquicos (`api.baseUrl`). Segmento vazio, nome inválido, atribuição
+sem `=`, repetição (mesmo valor idêntico) ou conflito escalar/descendente em qualquer
+ordem impede todos os envios. Nunca há sobrescrita silenciosa.
+
+URL e **valores** de headers aceitam `{{nome}}` e `{{ nome }}`, com espaços/tabs
+internos opcionais e múltiplas referências combinadas com texto. O conteúdo
+inserido não é interpretado novamente como template. Nomes de headers são
+estáticos; body inline permanece sem interpolação, inclusive em strings JSON.
+
+```hurl
+GET {{ api.baseUrl }}/products/{{id}}
+Authorization: Bearer {{token}}
+X-Probe: prefix-{{id}}-{{empty}}
+HTTP 200
+```
+
+```sh
+httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+  --var id=1 --var empty= --var token=ficticio --secret token
+```
+
+Sintaxe de placeholders, nomes e estrutura do **arquivo completo** são validados
+antes da rede, com posições de origem. Espaços na request-line só são aceitos
+na separação método/URL e dentro de placeholders; comentários inline continuam
+inválidos. URLs e headers estáticos mantêm as validações anteriores. Os templates
+originais são conservados e resolvidos imediatamente antes da requisição.
+
+Variável ausente, URL final inválida ou header final inválido gera **erro de
+renderização**, código 2, preserva resultados anteriores e impede a requisição
+afetada e as seguintes. A entrada afetada é apresentada sem status e com URL
+não renderizada; não é chamada de erro de transporte nem contada como iniciada.
+A URL final deve ser absoluta HTTP/HTTPS, com host/porta/encoding válidos; não
+há percent-encoding automático, inclusive para espaços, Unicode ou controles.
+Forneça o encoding necessário no cenário/valor (por exemplo `a%2Fb`); ele não é
+duplicado. Caracteres reservados já válidos conservam sua função, não são
+transformados em dados de path/query automaticamente. Valores finais de headers
+não podem conter CR/LF ou controles indevidos; `Host` mantém suas restrições.
+Os bytes do JSON estático não são alterados pela renderização de URL/headers.
+
+`--secret nome` marca proteção sem fornecer valor. A declaração pode preceder ou
+seguir a atribuição e pode marcar um nome ainda ausente para futuras capturas
+(**não implementadas**); usar esse nome ainda ausente continua falhando. Um valor
+vazio explicitamente fornecido existe e sua proteção não substitui texto vazio
+globalmente. Valores derivados conservam proteção, inclusive path e header comum.
+
+**Credenciais reais em argumentos são proibidas, inclusive em `--var`.** Apenas
+valores não sigilosos/fictícios são adequados aqui. A fonte segura pelo ambiente
+do processo chega na US-13; não há entrada de segredos por stdin, configuração
+YAML ou capturas nesta entrega. Proteção de streams não protege histórico do shell,
+listagem de processos, arquivos em disco nem segredos arbitrários não marcados.
 
 ## Execução HTTP
 
@@ -100,7 +162,7 @@ O texto bruto não é ecoado. O corpus negativo está em
   a expectativa só porque os headers já chegaram. Não há body em relatório.
 - Sem expectativa, inclusive 4xx/5xx é sucesso **sem validação de status**.
   Com expectativa, a comparação é de igualdade com o status final recebido.
-- Divergência, falha de transporte ou cancelamento interrompe as próximas entradas.
+- Divergência, falha de renderização/transporte ou cancelamento interrompe as próximas entradas.
   Ctrl+C cancela a requisição em andamento. Evidência de sinal real: Linux;
   macOS/Windows ainda não têm aceite nativo (ver `validation.md`).
 - Não há cookie jar, proxy configurável, configuração YAML ou leitura automática
@@ -109,22 +171,24 @@ O texto bruto não é ecoado. O corpus negativo está em
 ## CLI e saída
 
 ```text
-httpgo test <arquivo>
+httpgo test <arquivo> [--var nome=valor] [--secret nome]
 httpgo --help
 httpgo test --help
 httpgo --version
 ```
 
 `test` exige exatamente um arquivo regular legível. Não aceita diretórios,
-múltiplos arquivos, entrada de cenário/segredos por stdin nem flags adicionais.
-`--output`, `--output-file`, `--var`, `--secret`, `check` e configurações futuras
+múltiplos arquivos, entrada de cenário/segredos por stdin nem outras flags.
+`--output`, `--output-file`, `check` e configurações futuras
 não estão implementados ou anunciados como disponíveis.
 
-Cada entrada iniciada tem uma linha de resultado com o método declarado, URL segura e uma
+Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
+resultado com o método declarado, URL segura e uma
 classificação: `status validado`, `sem validação de status`, `status divergente`
-ou `erro de transporte`. Em sucesso, inclusive sem expectativa, a linha começa
+ou `erro de transporte`; uma entrada que falha antes do envio recebe
+`erro de renderização`. Em sucesso, inclusive sem expectativa, a linha começa
 diretamente com o método, sem prefixo de arquivo/linha/coluna. Apenas divergências
-e erros de transporte incluem esse prefixo. Divergências mostram esperado e
+e erros de transporte/renderização incluem esse prefixo. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status.
 
 ```text
@@ -144,7 +208,7 @@ adicionais para apresentar os resultados. Os códigos de saída são preservados
 A apresentação incremental não reimprime resultados no final.
 
 O resumo é escrito uma única vez ao final da execução, inclusive quando uma
-requisição interrompe a sequência por divergência, transporte ou cancelamento.
+requisição interrompe a sequência por divergência, renderização, transporte ou cancelamento.
 O resumo em stdout informa:
 
 - `total`: entradas validadas pelo parser;
@@ -162,7 +226,7 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 |---|---|
 | 0 | todas as entradas concluídas sem divergência; inclui sem expectativa |
 | 1 | primeira divergência de status |
-| 2 | uso, arquivo, parsing, transporte, TLS, timeout, cancelamento ou escrita |
+| 2 | uso, arquivo, parsing, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
 em sucesso. Falha na escrita de um resultado interrompe o arquivo antes da requisição
@@ -194,7 +258,14 @@ Bodies de requisição/resposta também não são impressos. JSON/header malform
 recebe diagnóstico controlado com arquivo/linha/coluna, sem ecoar entrada ou erro
 bruto do decoder/transporte. Isso evita vazamento também de credenciais em bodies.
 
-**O path da URL permanece visível: não coloque segredos nele.** Não é possível
+Valores marcados com `--secret` são removidos da representação exibível **antes**
+de normalizações/escapes de URL, inclusive no path. Valores operacionais seguem
+intactos para o executor; a representação protegida é separada. Essa proteção
+vale também em sucesso, divergência, erros de uso/parsing/renderização/transporte
+e falhas de escrita. Declarações são consolidadas independentemente da ordem das
+flags. Headers/bodies permanecem ausentes das saídas.
+
+**O restante do path permanece visível: não coloque segredos arbitrários nele.** Não é possível
 detectar qualquer segredo arbitrário embutido no path/hostname/nome de arquivo,
 nem proteger o conteúdo do arquivo em disco ou argumentos no histórico/processos.
 Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
@@ -211,6 +282,10 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 - Redirects são automáticos mas limitados à mesma origem; o diferencial usa
   `--location --max-redirs 10 --max-time 10 --retry 0` no Hurl para aproximar as
   políticas compartilhadas. Essa aproximação não torna os motores equivalentes.
+- Variáveis iniciais são textuais, sem recursão; nomes hierárquicos pontuados são
+  aceitos aqui, mas o exemplo `api.baseUrl` falhou na resolução do Hurl 8.0.0.
+  Duplicações e conflitos são erros no httpgo; Hurl permite sobrescrita no corpus.
+  Hurl aceita templates em JSON e nomes de headers; esta entrega não.
 - Configuração YAML hierárquica e interpolação externa, quando implementadas,
   serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
 

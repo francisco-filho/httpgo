@@ -295,11 +295,37 @@ func ValidateURL(raw string) error {
 			return fmt.Errorf("URL absoluta HTTP/HTTPS inválida; forneça o encoding necessário")
 		}
 	}
-	if _, err := parseURL(raw); err != nil {
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '%' {
+			continue
+		}
+		if i+2 >= len(raw) || !isHex(raw[i+1]) || !isHex(raw[i+2]) {
+			return fmt.Errorf("encoding de URL inválido")
+		}
+		i += 2
+	}
+	u, err := parseURL(raw)
+	if err != nil {
 		return fmt.Errorf("URL absoluta HTTP/HTTPS inválida")
+	}
+	// Compare the actual request target with the supplied bytes, not URL.String:
+	// the latter may legitimately canonicalize percent-encoded userinfo.
+	authority := raw[strings.Index(raw, "://")+3:]
+	target := ""
+	if start := strings.IndexAny(authority, "/?#"); start >= 0 {
+		target = authority[start:]
+	}
+	target, _, _ = strings.Cut(target, "#")
+	if target == "" || target[0] == '?' {
+		target = "/" + target
+	}
+	if u.RequestURI() != target {
+		return fmt.Errorf("URL exige encoding explícito")
 	}
 	return nil
 }
+
+func isHex(c byte) bool { return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' }
 
 // ValidateHeader applies the same value and Host rules to static and final values.
 func ValidateHeader(name, value string) error {

@@ -5,10 +5,9 @@ import (
 	"context"
 	"fmt"
 
-	"capimgrosso.com/httpgo/internal/template"
-
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/parser"
+	"capimgrosso.com/httpgo/internal/template"
 )
 
 type Request struct {

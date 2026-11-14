@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/url"
 	"strings"
 	"testing"
@@ -159,6 +160,17 @@ func TestSecretDeclarationDoesNotDefineValue(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("help lacks %q", want)
 		}
+	}
+}
+
+type shortWriter struct{}
+
+func (shortWriter) Write(data []byte) (int, error) { return len(data) / 2, nil }
+
+func TestProtectedWriterDetectsShortWrite(t *testing.T) {
+	writer := protectedWriter{writer: shortWriter{}, protect: func(string) string { return "[oculto]" }}
+	if _, err := writer.Write([]byte("fake")); !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("write error=%v", err)
 	}
 }
 

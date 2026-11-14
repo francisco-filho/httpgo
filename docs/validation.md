@@ -1,4 +1,71 @@
-# Validação — US-01 e US-02
+# Validação — US-01 a US-03
+
+## US-03 — issue #11 / história 003
+
+Plano executado diretamente da issue #11, sem planner, somente backend. Quatro
+tasks registradas e autoaprovadas na fila 003. Tasks 1–3 implementadas, validadas
+e commitadas (`3900179`, `8330558`, `ed8523e`); implementação e validação local da
+task 4 estão registradas nesta alteração. Nenhum frontend/estático, dependência,
+versão de Go ou configuração CI/lint foi alterado.
+
+Ambiente efetivamente usado: Linux amd64, Go `go1.26.10-X:nodwarf5`, CGO/GCC
+para race, ferramentas goimports/golangci-lint já disponíveis, Hurl
+8.0.0/libcurl 8.18.0. Não foi necessário instalar ferramentas. Não foi executado
+SonarQube (exclusivo do agente QA).
+
+### Evidência local executada
+
+- `go test ./internal/parser ./internal/template`: nomes, valores textuais,
+  conflitos em qualquer ordem, vazio versus ausência, `=`, offsets, substituição
+  não recursiva, proveniência e rejeição integral de sintaxe inválida/body.
+- `go test ./internal/runner ./internal/parser ./internal/transport`: executor
+  falso sem rede e HTTP real local; URL/header final, Host, preservação de bytes
+  e cenário original, erro pré-envio localizado sem incrementar Started,
+  resultados anteriores e callback síncrono, interrupção de todas as seguintes.
+- `go test ./internal/cli ./internal/runner ./internal/template`: flags repetíveis,
+  contexto novo por execução, ordem de declarações, ajuda e diagnósticos seguros,
+  proteção inclusive antes de construir contexto e prioridade de falhas de escrita.
+- `go test ./tests/e2e -count=1`: binário real compilado uma vez por suíte,
+  demonstração em dois destinos sem alterar arquivo, headers confirmados pelo
+  servidor, valores fictícios protegidos inclusive no path, texto vazio, números/
+  booleanos, `=`, não recursão e JSON estático. Erros de flags/estrutura impedem
+  todos os envios; erro de resolução/validação conserva primeira resposta,
+  não conta a entrada afetada e interrompe as demais. Encoding inválido inclusive
+  em query e CR/LF/control em header são recusados antes da rede.
+- Regressões E2E passaram também com URL/headers parametrizados: redirects
+  301/302/303/307/308, bytes e métodos, TLS inválido, conexão, origem/limite,
+  resposta incompleta, ausência de retry, timeout público de 10 segundos
+  incluindo body, Ctrl+C real Linux e stdout incremental enquanto a próxima
+  requisição está bloqueada. Pipe, arquivo, PTY Linux e NO_COLOR passam.
+- `make compatibility`: **35 pares** contra Hurl **8.0.0**, sem skip. Dez pares
+  novos sinalizam ampliação intencional do contrato; os 25 antigos não mudaram.
+  Variáveis são fornecidas às duas ferramentas pelo harness, sem editar o cenário
+  parametrizado; RequestURI comprova encoding explícito. Diferenças observadas
+  (nomes pontuados, sobrescrita, body e header dinâmico) em `compatibility.md`.
+- `make fmt lint test`: passou com 0 issues de lint e `go test ./... -race -cover`.
+- `go vet ./...`, `go build ./...`, `make build`: passaram.
+- `make portable`: passou, sem CGO, linux/darwin/windows amd64; **somente build**.
+- Fuzzing separado (20 segundos, duas workers por alvo):
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    passou; 8.809 execuções na rodada, sem falha encontrada.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`:
+    passou; 1.199.362 execuções, sem falha encontrada.
+- `gofmt -l` nos Go alterados e `git diff --check`: sem pendências.
+
+### Bloqueio de aceite nativo / handoff final
+
+Não há runtime nativo macOS/Windows nesta sessão. A task 4 exige E2E nativo por
+plataforma antes de declarar seu aceite. **Cross-build não resolve essa lacuna.**
+Logo a task 4 não deve receber `done`, nem disparar revisão final/conclusão da
+issue #11, até disponibilizar os ambientes/evidências requeridos. Essa pendência
+não foi convertida em skip ou removida do plano. As tasks anteriores permanecem
+concluídas; o código local passa, mas a história não está declarada pronta.
+
+Próximas validações necessárias, não executadas aqui: suíte
+`go test ./tests/e2e -count=1` nativa em macOS e Windows, com comprovação dos
+contratos de streams/códigos/contatos. O harness de sinal atual é linux/darwin,
+e o de PTY é Linux-only; não há alegação de sinal/TTY nativos Windows/macOS.
+A matriz histórica de runtime abaixo continua pendente nessas plataformas.
 
 ## US-02 — issue #6 / história 002
 

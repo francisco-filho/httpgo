@@ -1,0 +1,15 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "path=not encoded"
+  ],
+  "classification": "shared restriction: space in rendered URL rejected without implicit percent-encoding; own exit codes",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": null
+  }
+}

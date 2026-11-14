@@ -1,0 +1,27 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "probe=first",
+    "probe=second"
+  ],
+  "classification": "intentional restriction: duplicate variables rejected before any send",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "second"
+      }
+    ]
+  }
+}
