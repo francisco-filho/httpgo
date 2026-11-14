@@ -49,7 +49,7 @@ internal/
   template/    # resolução de variáveis/interpolação
   query/       # extração de valores das respostas
   assertion/   # avaliação de asserções
-  config/      # carga e validação (flags > env > arquivo YAML > defaults)
+  config/      # carga e validação (flags > HTTPGO_* > ambiente YAML > YAML base > defaults)
   report/      # renderização dos resultados (texto, JSON, ...)
 testdata/
   scenarios/ payloads/ compatibility/
@@ -60,6 +60,7 @@ Fluxo: `cli` → `config` → `parser` → `runner` → (`template`, `transport`
 
 Regras de dependência:
 - Sem ciclos. Pacotes folha (`template`, `query`, `assertion`, `transport`) não importam `runner`, `cli` nem `report`.
+  - Exceção autorizada para a história 4: `transport` pode importar apenas os tipos do contrato `HTTPExecutor` definido em `runner` (requisição/resposta), para implementar o adapter sem criar pacote ou camada adicional. `runner` continua sem importar o transporte concreto.
 - Só `cli` conhece `cobra`/flags; só `transport` conhece `net/http`.
 - `runner` depende de interfaces próprias (`Transport`, `Renderer`...), implementadas pelos demais pacotes e montadas em `main`/`cli`.
 - `query` extrai valores; **quem decide sucesso/falha é `assertion`**. `report` apenas renderiza, não reavalia.
@@ -76,7 +77,7 @@ make fmt     # gofmt -s -w . && goimports -w .
 go mod tidy  # após mudar dependências
 ```
 
-Antes de finalizar qualquer tarefa, rode `make fmt lint test`. Não entregue código que não compila ou com testes falhando.
+Antes de finalizar qualquer tarefa, rode `make fmt lint test`. Em cada entrega com alteração de código, `go vet ./...` também é obrigatório: execute-o explicitamente, salvo se estiver comprovadamente coberto pelo lint. Não entregue código que não compila ou com testes falhando.
 
 ## 4. Convenções de código
 
@@ -93,11 +94,12 @@ Siga *Effective Go*, *Go Code Review Comments* e o *Google Go Style Guide*. Pont
 ## 5. Contrato da CLI
 
 - **stdout** = resultado (parseável); **stderr** = mensagens, progresso, erros e logs.
-- Saída legível por máquina via `--output` (ex.: `json`); formatos publicados são contrato estável.
+- `--output` seleciona o formato do resultado (ex.: `json` ou `junit`, quando implementados); `--output-file` seleciona o arquivo de destino. Sem arquivo de destino, o resultado vai para stdout. Formatos publicados são contrato estável.
 - Respeite `NO_COLOR`; sem cores/animações quando stdout não for TTY. Injete `io.Reader`/`io.Writer` nos comandos.
 - Flags longas sempre; `--help` com exemplos reais; `--version` (versão/commit/data via `-ldflags`).
-- Precedência de configuração: **flags > env (`HTTPGO_*`) > arquivo YAML > defaults**. Segredos por env/stdin, nunca por flag. Valide tudo na inicialização e falhe rápido.
-- Exit codes: `0` sucesso; `1` falha (erro de execução ou asserção falhou); `2` uso incorreto/arquivo inválido. Documente qualquer código adicional. `os.Exit` só em `main` (ele não executa `defer`).
+- Precedência de configuração: **flags > env (`HTTPGO_*`) > ambiente YAML selecionado > YAML base > defaults**. `HTTPGO_*` se limita a opções explicitamente documentadas; não há mapeamento indiscriminado do ambiente do processo. Referências explícitas `${NOME}` são resolvidas nos valores efetivos após merge e overrides, não constituem uma camada adicional de precedência. Valide tudo na inicialização e falhe rápido.
+- Valores secretos devem vir do ambiente do processo ou de stdin, nunca de flags, inclusive `--var`. `--secret <nome>` apenas marca um nome como protegido, sem fornecer seu valor. A entrada de segredos por stdin precisa ser especificada, implementada, testada e documentada antes de ser anunciada como suportada. Documente os limites de detecção de segredos arbitrários.
+- Exit codes: `0` sucesso; `1` somente falha de asserção; `2` demais erros, incluindo uso, entrada, configuração, captura, renderização, transporte e escrita de relatório. Em uma suíte, `2` prevalece sobre `1`. Documente qualquer código adicional. `os.Exit` só em `main` (ele não executa `defer`).
 - Erros dizem **o quê**, **por quê** e, se possível, **como resolver**; sem *stack trace* fora de `--debug`.
 - Funcione em Linux, macOS e Windows: `filepath`, `os.UserConfigDir()`, sem suposições de shell.
 
@@ -145,7 +147,7 @@ Uma história só está pronta quando **todos** os itens são cumpridos:
 - [ ] **Testes**: unitários, e2e/golden e casos negativos (inválido e não suportado)
 - [ ] **Documentação**: `docs/` atualizado (o que passou a ser suportado, exemplo mínimo, o que continua não suportado; extensões marcadas como tal)
 - [ ] Nenhuma construção reconhecida é ignorada em silêncio
-- [ ] `make fmt lint test` passam; `go mod tidy` se as dependências mudaram
+- [ ] `make fmt lint test` passam, com testes usando `-race -cover`; `go vet ./...` passa explicitamente ou está comprovadamente coberto pelo lint; `go mod tidy` se as dependências mudaram
 - [ ] Contrato (flags, formato de saída, exit codes) inalterado, ou sinalizado como *breaking*
 
 ## 9. Segurança

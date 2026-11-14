@@ -1,0 +1,15 @@
+{
+  "classification": "shared",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/boundary"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/boundary"
+    ]
+  }
+}

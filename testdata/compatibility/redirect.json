@@ -1,0 +1,17 @@
+{
+  "classification": "shared with aligned redirect flags",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/redirect",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/redirect",
+      "/health"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "classification": "policy: same-origin redirects only",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/cross"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/cross",
+      "/health"
+    ]
+  }
+}

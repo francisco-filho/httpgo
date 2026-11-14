@@ -1,0 +1,15 @@
+{
+  "classification": "shared; exit-code difference",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/unavailable"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/unavailable"
+    ]
+  }
+}
