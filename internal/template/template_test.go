@@ -56,6 +56,9 @@ func FuzzRender(f *testing.F) {
 	for _, seed := range []string{"{{ x }}", "{{x}}{{x}}", "{{", "}}", "{{invalid-name}}", "plain"} {
 		f.Add(seed, "{{notRecursive}}")
 	}
+	for _, value := range []string{`"001"`, `"line\n雪"`, `null`, `true`, `9007199254740993123456789`, `[]`, `{"x":1}`} {
+		f.Add("{{x}}", value)
+	}
 	f.Fuzz(func(t *testing.T, source, value string) {
 		c, err := New([]string{"x=" + value}, []string{"x"})
 		if err != nil {

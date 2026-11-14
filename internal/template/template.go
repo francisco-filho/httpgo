@@ -1,7 +1,9 @@
-// Package template resolves textual variables without recursive interpretation.
+// Package template resolves typed variables without recursive interpretation.
 package template
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -65,13 +67,41 @@ func Parse(source string) ([]Reference, error) {
 // Text keeps operational content separate from a provenance-protected display.
 type Text struct{ Value, Display string }
 
+type variable struct {
+	raw       json.RawMessage
+	text      string
+	composite bool
+	original  string
+}
+
+// parseVariable retains JSON number spelling, including nested large numbers.
+// Only strings need decoding; objects and arrays remain opaque JSON values.
+func parseVariable(source string) variable {
+	v := variable{text: source, original: source}
+	if !json.Valid([]byte(source)) {
+		v.raw, _ = json.Marshal(source)
+		return v
+	}
+	var compact bytes.Buffer
+	_ = json.Compact(&compact, []byte(source))
+	v.raw = compact.Bytes()
+	v.text = string(v.raw)
+	switch v.raw[0] {
+	case '"':
+		_ = json.Unmarshal(v.raw, &v.text)
+	case '{', '[':
+		v.composite = true
+	}
+	return v
+}
+
 type Context struct {
-	values  map[string]string
+	values  map[string]variable
 	secrets map[string]bool
 }
 
 func New(assignments, secrets []string) (*Context, error) {
-	c := &Context{values: make(map[string]string), secrets: make(map[string]bool)}
+	c := &Context{values: make(map[string]variable), secrets: make(map[string]bool)}
 	for _, name := range secrets {
 		if !ValidName(name) {
 			return nil, fmt.Errorf("nome inválido em --secret")
@@ -91,10 +121,10 @@ func New(assignments, secrets []string) (*Context, error) {
 				return nil, fmt.Errorf("variável repetida em --var")
 			}
 			if strings.HasPrefix(name, existing+".") || strings.HasPrefix(existing, name+".") {
-				return nil, fmt.Errorf("conflito entre variável escalar e descendente")
+				return nil, fmt.Errorf("conflito entre variável ancestral e descendente")
 			}
 		}
-		c.values[name] = value
+		c.values[name] = parseVariable(value)
 	}
 	return c, nil
 }
@@ -111,13 +141,16 @@ func (c *Context) Render(source string) (Text, error) {
 		if !ok {
 			return Text{}, &Error{ref.Start, "variável ausente; forneça seu valor com --var"}
 		}
+		if text.composite {
+			return Text{}, &Error{ref.Start, "array ou objeto exige posição de valor JSON completo"}
+		}
 		value.WriteString(source[last:ref.Start])
-		value.WriteString(text)
+		value.WriteString(text.text)
 		display.WriteString(source[last:ref.Start])
 		if c.secrets[ref.Name] {
 			display.WriteString("[oculto]")
 		} else {
-			display.WriteString(text)
+			display.WriteString(text.text)
 		}
 		last = ref.End
 	}
@@ -131,8 +164,8 @@ func (c *Context) Render(source string) (Text, error) {
 func (c *Context) Sanitize(text string) string {
 	var values []string
 	for name := range c.secrets {
-		if value := c.values[name]; value != "" {
-			values = append(values, value)
+		if value, ok := c.values[name]; ok && value.text != "" {
+			values = append(values, value.text)
 		}
 	}
 	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
