@@ -109,7 +109,7 @@ func TestGetSequence(t *testing.T) {
 			}
 			file := scenario(t, strings.ReplaceAll(string(example), "http://localhost:8080", server.URL))
 			code, out, stderr := run(t, "test", file)
-			wantCode, wantCalls := 0, 2
+			wantCode, wantCalls := 0, 3
 			if first == 503 {
 				wantCode, wantCalls = 1, 1
 			}
@@ -119,10 +119,10 @@ func TestGetSequence(t *testing.T) {
 				t.Fatalf("code=%d,out=%q,err=%q,paths=%v", code, out, stderr, paths)
 			}
 			if first == 200 {
-				if stderr != "" || paths[1] != "/inexistente" || !strings.Contains(out, "validadas=2") {
+				if stderr != "" || paths[1] != "/inexistente" || paths[2] != "/health" || !strings.Contains(out, "validadas=3") {
 					t.Fatalf("out=%q,err=%q,paths=%v", out, stderr, paths)
 				}
-			} else if !strings.Contains(stderr, "esperado 200, recebido 503") || !strings.Contains(out, "não_iniciadas=1") {
+			} else if !strings.Contains(stderr, "esperado 200, recebido 503") || !strings.Contains(out, "não_iniciadas=2") {
 				t.Fatalf("out=%q,err=%q", out, stderr)
 			}
 		})

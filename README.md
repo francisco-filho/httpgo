@@ -13,9 +13,36 @@ bin/httpgo --help
 bin/httpgo test testdata/scenarios/scenario_get_status.hurl
 ```
 
-O exemplo precisa de uma API local na porta 8080 com `/health` retornando 200 e
-`/inexistente` retornando 404. Os testes E2E fornecem servidores locais isolados;
-não precisam dessa API externa.
+Para usar o servidor dummy do projeto, execute em outro terminal:
+
+```sh
+make serve
+# Alias equivalente: make dummy
+```
+
+Ele escuta somente em `http://127.0.0.1:8080` (também acessível via localhost),
+em primeiro plano. Ctrl+C encerra o servidor. A porta precisa estar livre.
+
+| GET | Status |
+|---|---|
+| `/health` | 200 |
+| `/inexistente` | 404 |
+| `/error` | 500 |
+| Outros caminhos | 404 |
+
+O cenário `scenario_get_status.hurl` executa `/health`, `/inexistente` e repete
+`/health`, validando três respostas em sequência. Também é possível executar:
+
+```sh
+bin/httpgo test testdata/scenarios/scenario_unvalidated_status.hurl
+```
+
+Esse cenário recebe 500 e informa explicitamente que não validou status.
+O dummy em `tools/dummy/main.go` é um utilitário **exclusivamente manual** de
+desenvolvimento, sem dependências novas. Não integra o binário httpgo nem os
+pacotes do build, lint ou testes automáticos. Os testes continuam usando seus
+próprios servidores isolados em portas dinâmicas: **não precisam de `make serve`**.
+Veja [servidor dummy](docs/dev-server.md) para os detalhes.
 
 ```hurl
 GET http://localhost:8080/health
@@ -40,6 +67,7 @@ com indicação explícita de **sem validação de status**.
 
 - [Subconjunto e contratos da CLI](docs/subset.md)
 - [Arquitetura e ciclo de vida](docs/architecture.md)
+- [Servidor dummy para desenvolvimento](docs/dev-server.md)
 - [Compatibilidade diferencial com Hurl 8.0.0](docs/compatibility.md)
 - [Comandos, evidências e bloqueios de validação](docs/validation.md)
 - [Regras do repositório](AGENTS.md)
@@ -54,6 +82,6 @@ make portable
 ```
 
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
-**desenvolvimento**, não no binário entregue. A limitação da sandbox e o aceite
-nativo pendente em macOS/Windows estão registrados em `docs/validation.md`;
-a história não está declarada concluída.
+**desenvolvimento**, não no binário entregue. O gate local com race já passou;
+o aceite nativo pendente em macOS/Windows está registrado em
+`docs/validation.md`. A história não está declarada concluída.

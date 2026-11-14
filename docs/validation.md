@@ -3,8 +3,8 @@
 ## Estado
 
 **Implementação local disponível; entrega NÃO concluída e sem handoff final.**
-O gate com race está bloqueado pela sandbox, e runtime macOS/Windows ainda não
-foi executado. Não há skip silencioso, retirada de checks ou redução de cobertura
+O gate local com race passou após disponibilizar os pré-requisitos C na sandbox.
+O runtime macOS/Windows ainda não foi executado. Não há skip silencioso, retirada de checks ou redução de cobertura
 para declarar sucesso. Não foi executada análise SonarQube (responsabilidade QA).
 
 ## Ambiente e ferramentas
@@ -16,8 +16,9 @@ para declarar sucesso. Não foi executada análise SonarQube (responsabilidade Q
   `goimports` de `golang.org/x/tools v0.52.0` e `golangci-lint v2.15.0`, compilados
   com o Go existente. Acrescente `$(go env GOPATH)/bin` ao PATH para usá-las.
 - Referência diferencial: Hurl `8.0.0`, libcurl `8.18.0` já disponível na sandbox.
-- GCC presente mas sem `cc1`; Clang presente, porém sem headers libc/pthread.
-  Não foram instalados pré-requisitos C, conforme orientação do responsável.
+- GCC e headers C agora estão acessíveis na sandbox, inclusive `/usr/include`
+  e `/usr/libexec/gcc/x86_64-redhat-linux/16/cc1`. O bloqueio inicial de
+  visibilidade dessas dependências foi resolvido.
 
 Em ambiente novo com ferramentas C disponíveis, os comandos de instalação das
 ferramentas Go de desenvolvimento são:
@@ -29,9 +30,26 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 
 A instalação dessas ferramentas não altera dependências do produto.
 
-## Evidências executadas nesta sandbox
+## Revalidação com race
 
-Com `CGO_ENABLED=0` e as ferramentas Go no PATH:
+Após disponibilizar os pré-requisitos C, a validação foi repetida com
+`CGO_ENABLED=1`, `CC=gcc` e as ferramentas Go no PATH:
+
+- `make fmt lint test`: passou integralmente, incluindo `go test ./... -race -cover`;
+- `go vet ./...`: passou explicitamente;
+- `make build compatibility portable`: passou, incluindo os nove cenários Hurl.
+
+O utilitário `tools/dummy/main.go` é exclusivamente para uso manual em
+desenvolvimento (`make serve` ou `make dummy`), documentado em `dev-server.md`.
+Ele é excluído por build tag do build, lint e testes automáticos; não há testes
+do dummy integrados à suíte, nem dependência de um serviço na porta 8080.
+Na verificação manual, os dois cenários existentes passaram contra ele, e
+Ctrl+C encerrou o processo e liberou a porta. O servidor temporário anterior
+foi encerrado; o utilitário não ficou em background.
+
+## Evidências iniciais nesta sandbox (sem CGO)
+
+Antes da correção do ambiente, com `CGO_ENABLED=0` e as ferramentas Go no PATH:
 
 | Comando/cenário | Resultado |
 |---|---|
@@ -73,27 +91,18 @@ Os testes internos de transporte observam o mesmo deadline nos redirects reais,
 com timeout menor apenas nesses testes, e não usam sleep para sincronização.
 O teste de retry inclui warm-up e falha de conexão posterior.
 
-## Bloqueio: gate obrigatório com race
+## Bloqueio inicial com race — resolvido
 
-`make test` continua executando `go test ./... -race -cover`, sem fallback.
+O ambiente inicialmente não expunha `cc1` nem os headers C, embora os pacotes
+constassem instalados. A tentativa sem CGO também falhava, porque `-race` exige
+CGO. Esse bloqueio foi resolvido ao disponibilizar os arquivos na sandbox, e o
+gate completo passou na revalidação registrada acima.
 
-- Com CGO desabilitado: `go: -race requires cgo; enable cgo by setting CGO_ENABLED=1`.
-- Com CGO habilitado, GCC falha por ausência de `cc1`; Clang falha por ausência
-  de `stdio.h`, `stdlib.h`, `pthread.h` e demais headers C.
-
-Assim, `make fmt lint test` **não passou integralmente**. Os resultados sem CGO
-acima são evidência parcial útil e não equivalem a sucesso desse gate. Nenhuma
-task foi marcada `done` na fila em consequência dessa validação parcial.
-
-O responsável informou que a preparação C ficará para a próxima história. Este
-registro preserva a pendência; **não cria outra task nem transfere ou remove o gate
-exigido pela história #4**. Quando um ambiente com C estiver disponível, executar:
-
-```sh
-make fmt lint test
-go vet ./...
-make build compatibility portable
-```
+`make test` continua executando `go test ./... -race -cover`, sem fallback,
+remoção de verificações ou transferência da exigência para outra história.
+Os resultados iniciais sem CGO foram preservados como histórico, não como
+substituto da validação com race. Nenhuma task foi marcada `done` com base
+somente na validação parcial.
 
 Não é necessário CGO para o binário httpgo; o compilador C é necessário para o
 race detector do ambiente de testes.
@@ -102,7 +111,7 @@ race detector do ambiente de testes.
 
 | Plataforma/arquitetura | Build CGO=0 | Execução nativa E2E | Ctrl+C real | TTY real |
 |---|---|---|---|---|
-| Linux amd64 | passou | passou, sem race | passou | passou via PTY |
+| Linux amd64 | passou | passou, suíte também validada com race | passou | passou via PTY |
 | macOS amd64 | passou, cross-build em Linux | **pendente** | **pendente** | **pendente** |
 | Windows amd64 | passou, cross-build em Linux | **pendente** | **pendente** | **pendente** |
 
@@ -120,4 +129,5 @@ Linux-only. Um teste de contexto ou cross-build **não** preenche essas lacunas.
 Plano: issue #4, tasks back:1 a back:5, sem frontend/estáticos. Os commits locais
 são consultáveis com `git log --oneline`; o corpo identifica a validação parcial.
 A fila não recebeu done final, portanto não disparou review nem comentário de
-conclusão na issue. Faltam resolver os bloqueios acima antes da entrega.
+conclusão na issue. O bloqueio local com race foi resolvido; ainda faltam as
+validações nativas de macOS/Windows antes do aceite nessas plataformas.

@@ -1,7 +1,13 @@
-.PHONY: build fmt lint test e2e compatibility portable
+.PHONY: build fmt lint test e2e compatibility portable serve dummy
 
 build:
 	go build -trimpath -o bin/httpgo ./cmd/httpgo
+
+# Manual development utility, excluded from package builds and automated tests.
+serve:
+	go run ./tools/dummy/main.go
+
+dummy: serve
 
 fmt:
 	gofmt -s -w .
