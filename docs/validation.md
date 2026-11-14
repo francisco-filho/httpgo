@@ -1,11 +1,64 @@
-# Validação — história #4 / US-01
+# Validação — US-01 e US-02
 
-## Estado
+## US-02 — issue #6 / história 002
 
-**Implementação local disponível; entrega NÃO concluída e sem handoff final.**
-O gate local com race passou após disponibilizar os pré-requisitos C na sandbox.
-O runtime macOS/Windows ainda não foi executado. Não há skip silencioso, retirada de checks ou redução de cobertura
-para declarar sucesso. Não foi executada análise SonarQube (responsabilidade QA).
+Escopo somente backend, seguindo as três tasks da issue #6. Nenhuma dependência
+de produto, versão de Go, configuração CI/lint ou frontend/estático foi alterado.
+A aprovação final é responsabilidade do reviewer; esta seção registra evidência
+local, não aprovação ou aceite nativo de outras plataformas.
+
+Ambiente: Linux amd64; Go `go1.26.10-X:nodwarf5`, CGO habilitado para race, GCC e
+headers C disponíveis. Hurl 8.0.0/libcurl 8.18.0. `goimports v0.52.0` e
+`golangci-lint v2.15.0` foram instalados com autorização nesta sessão, sem alterar
+`go.mod`. Comandos de desenvolvimento usam `$(go env GOPATH)/bin` no PATH.
+
+Validações da implementação:
+
+- `go test ./internal/parser`: bytes exatos de objetos/arrays/escalares, LF/CRLF,
+  limites de body, headers, erros seguros e rejeição integral.
+- `go test ./internal/runner ./internal/transport`: fake de orquestração e HTTP/TLS
+  reais; métodos, headers repetidos/Host, bytes, sequência, sem expectativa,
+  interrupção, redirects 301/302/303/307/308, limite exato 10/11 e origem bloqueada;
+  timeout único entre redirects/body, cancelamento, TLS inválido e sem retry.
+- `go test ./internal/cli ./tests/e2e`: método correto nos resultados, códigos
+  0/1/2, exemplo JSON versionado contra servidor local e binário real, sequência
+  mista, JSON escalar/multilinha, falha tardia com zero envios e proteção de valores
+  em Authorization/Proxy-Authorization/Cookie/Set-Cookie/body em sucesso e erros.
+- E2E de transporte cobre GET/POST/PUT/PATCH/DELETE em falha, TLS, origem, limite,
+  protocolo/body incompleto e sem retry; timeout público real de **10 segundos**
+  comprovado para GET e POST, incluindo redirect 307 e leitura do body.
+- Ctrl+C real no Linux para os cinco métodos; próximas entradas não iniciadas.
+  Regressões de ajuda, versão, stdout incremental, falha de escrita, NO_COLOR,
+  pipe/arquivo/PTY Linux continuam presentes.
+- `make fmt lint test`: passa, incluindo `go test ./... -race -cover`.
+- `go vet ./...`, `go build ./...`, `make build`: passam.
+- `make portable`: compila sem CGO para linux/darwin/windows amd64; somente build,
+  não execução nativa de macOS/Windows.
+- `make compatibility`: passa contra Hurl 8.0.0, **25 pares**, sem skip;
+  novos pares comparam método, bytes e headers no servidor. Mudança intencional
+  de contrato: `post.json` agora espera POST aceito. Os demais pares US-01 não
+  mudam. Diferença de Content-Type automático documentada em `compatibility.md`.
+- `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+  passa, aproximadamente 798 mil execuções nesta sessão, sem falha encontrada.
+- `gofmt -l` nos Go alterados e `git diff --check`: sem pendências.
+
+Os testes locais não dependem do dummy nem de serviço fixo na porta 8080.
+Por solicitação posterior, o dummy manual passou a aceitar a demonstração POST
+em `/products`, operações em `/products/1` e `/echo`, sem persistência. O cenário
+`scenario_dummy_methods.hurl` permite verificar os métodos com `make serve`.
+Os testes opt-in do utilitário exercitam HTTP local e os quatro cenários
+publicados pelo binário real, sem ocupar 8080; comandos em `dev-server.md`.
+Não foi executado SonarQube (exclusivo do QA). Builds cruzados, se executados,
+continuam sendo apenas evidência de compilação; não se declara execução US-02
+em macOS/Windows. As limitações nativas herdadas da US-01 estão descritas abaixo.
+
+## Histórico US-01 — issue #4
+
+O texto abaixo preserva a evidência e o estado registrados na entrega anterior.
+O gate local com race passou após disponibilizar os pré-requisitos C na sandbox;
+naquele registro não havia handoff final e o runtime macOS/Windows estava pendente.
+Não há skip silencioso, retirada de checks ou redução de cobertura para declarar
+sucesso. Não foi executada análise SonarQube (responsabilidade QA).
 
 ## Ambiente e ferramentas
 

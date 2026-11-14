@@ -1,0 +1,45 @@
+{
+  "classification": "shared: multiline JSON delimiters and following entry; difference: Hurl infers Content-Type",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "method": "PUT",
+        "body": "{\n \"nested\": {\"value\": [true, null]},\n \"text\": \"HTTP 404 POST [Asserts] # \\\"\"\n}",
+        "content_type": "",
+        "probe": "multiline"
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "method": "PUT",
+        "body": "{\n \"nested\": {\"value\": [true, null]},\n \"text\": \"HTTP 404 POST [Asserts] # \\\"\"\n}",
+        "content_type": "application/json",
+        "probe": "multiline"
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

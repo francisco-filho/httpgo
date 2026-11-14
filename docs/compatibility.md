@@ -1,10 +1,12 @@
-# Matriz de compatibilidade — US-01
+# Matriz de compatibilidade — US-01 e US-02
 
 ## Escopo da evidência
 
 Referência fixada: **Hurl 8.0.0**. O diferencial executa o binário, não importa nem
 lê seu código-fonte. `testdata/compatibility/` é contrato versionado: cada `.hurl`
 tem um `.json` com classificação, exit code e paths observados em cada ferramenta.
+Os pares novos da US-02 também registram método, bytes do body, `Content-Type` e
+`X-Probe` recebidos pelo servidor para cada entrada e cada redirect.
 Alterar esses arquivos em entregas futuras é mudança de contrato a sinalizar no PR.
 
 ```sh
@@ -21,7 +23,8 @@ não baixa ou instala Hurl automaticamente. O teste substitui a origem absoluta
 Os comandos Hurl usam `--no-color --no-output --location --max-redirs 10
 --max-time 10 --retry 0 --no-cookie-store --no-proxy '*'`. Não se compara texto
 bruto de saída nem assume igualdade de códigos: a comparação observa aceitação,
-falha, ordem e contatos efetivos, conforme cada par esperado. Os testes próprios
+falha, ordem, contatos efetivos e, nos pares US-02, dados efetivamente enviados,
+conforme cada par esperado. Os testes próprios
 httpgo verificam conteúdo informativo e sanitização em ambos os streams.
 
 ## Matriz observada (Linux amd64)
@@ -35,14 +38,39 @@ httpgo verificam conteúdo informativo e sanitização em ambos os streams.
 | `redirect` | 0; /redirect, /health | 0; mesmos paths com flags alinhadas | compartilhado: status final validado |
 | `inline_comment` | 2; zero envios | 0; /health | restrição intencional: comentário inline rejeitado |
 | `http_version` | 2; zero envios | 0; /health | restrição intencional: resposta versionada rejeitada |
-| `post` | 2; zero envios | 0; /health | restrição intencional: somente GET nesta história |
+| `post` | 0; /health | 0; mesmo path | compartilhado: POST sem body (contrato ampliado na US-02) |
 | `cross_origin` | 2; somente /cross | 0; /cross, /health | política intencional: localhost difere de 127.0.0.1, mesmo que resolva igual |
+
+### Ampliação US-02 — mudança de contrato sinalizada
+
+`post.json` deixa de esperar rejeição e passa a esperar sucesso: **mudança
+intencional do contrato de compatibilidade**, autorizada pelo escopo da issue #6.
+Os demais pares US-01 permanecem com as mesmas observações.
+
+| Corpus novo | Resultado observado nas duas ferramentas | Diferenças |
+|---|---|---|
+| `json_object` | POST, header declarado e bytes exatos; exit 0 | nenhuma nos campos observados |
+| `json_multiline` | PUT com objeto multilinha/escapes/delimitadores em string, seguido de GET 404; exit 0 | Hurl infere Content-Type; httpgo não |
+| `json_array` | PATCH com array multilinha e bytes exatos; exit 0 | Hurl infere Content-Type; httpgo não |
+| `json_string`, `json_number`, `json_true`, `json_false`, `json_null` | valor escalar preservado e GET seguinte separado; exit 0 | Hurl infere Content-Type; httpgo não |
+| `method_sequence` | POST → PUT → PATCH (500 sem expectativa) → DELETE sem body → GET 404; exit 0 | Hurl infere Content-Type nos bodies; httpgo não |
+| `post_redirect_301`, `_302`, `_303` | POST inicial, destino GET sem body; headers declarados mantidos; exit 0 | nenhuma nos campos observados |
+| `post_redirect_307`, `_308` | POST e bytes preservados no destino; exit 0 | nenhuma nos campos observados |
+| `json_invalid_late` | exit 2, zero envios, inclusive GET anterior | rejeição integral compartilhada |
+| `get_body` | httpgo exit 2 sem envio; Hurl exit 0 com GET e JSON | restrição intencional: GET sem body |
+
+A ausência de `Content-Type` automático é uma diferença explícita: para obter
+esse comportamento compartilhado, declare `Content-Type: application/json`, como
+na demonstração. A matriz não generaliza a política de redirects para todos os
+métodos do Hurl: o diferencial fixa POST; os testes próprios httpgo também cobrem
+PUT/PATCH/DELETE conforme a semântica definida na US-02.
 
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. As demais garantias httpgo são verificadas nos
-testes próprios. Headers/bodies, variáveis, capturas, seções e demais construções
-fora de escopo continuam explicitamente não suportadas.
+testes próprios. Variáveis, capturas, seções, bodies externos/binários/multipart,
+headers de enquadramento e demais construções fora de escopo continuam
+explicitamente não suportadas.
 
 ## Extensões e restrições
 

@@ -1,6 +1,6 @@
-# Arquitetura implementada — história #4
+# Arquitetura implementada — US-01 e US-02
 
-Referência de aceite: issue GitHub #4 (US-01) e plano v4 referenciado nela.
+Referência de aceite: issues GitHub #4 (US-01) e #6 (US-02) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
 
@@ -24,8 +24,8 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 
 | Pacote/tipos | Responsabilidade |
 |---|---|
-| `parser.Position`, `Entry`, `Scenario`, `Error` | Modelo ordenado e posições de GET/expectativa; parsing por estado (última entrada disponível/expectativa já definida); validação completa; zero cenário parcial em erro |
-| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)` |
+| `parser.Position`, `Header`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, bytes do body e posições; parsing por estado (request-line/headers/body/expectativa); validação completa; zero cenário parcial em erro |
+| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`) e Body (`[]byte`), sem conversão pelo runner |
 | `runner.Runner`, `EntryResult`, `Outcome`, `Summary`, `Result` | Ordem, contexto antes de cada chamada, comparação delegada e interrupção; resultado estruturado e notificação síncrona por entrada, sem escrever em streams nem chamar os.Exit |
 | `assertion.Status` | Somente igualdade esperado/recebido; não conhece runner, HTTP ou apresentação |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
@@ -42,7 +42,7 @@ Somente o código de produção em `transport` importa `net/http`.
 A CLI monta `runner.New(executor, c.renderEntry)`. Após classificar cada resposta
 ou falha, o runner chama o callback **sincronamente, antes de iniciar a próxima
 entrada**. `renderEntry` escreve uma linha sanitizada, sem reavaliar assertions.
-Sucessos, inclusive sem expectativa, começam com `GET`; arquivo/linha/coluna
+Sucessos, inclusive sem expectativa, começam com o método declarado; arquivo/linha/coluna
 prefixam somente divergências e falhas. O resumo continua identificando o arquivo.
 Não há goroutine, fila de eventos ou espera pelo fim do arquivo para apresentar
 um resultado. Callback `nil` permite coletar resultados sem apresentação.
@@ -52,7 +52,7 @@ vez e apresenta o diagnóstico/exit code. Resultados já emitidos não são reim
 O resultado estruturado e suas contagens continuam disponíveis no retorno do runner.
 
 Se o callback falhar, `Result.ReportErr` preserva a causa e o runner não inicia o
-GET seguinte. A CLI diagnostica a falha de escrita em stderr com texto controlado,
+envio seguinte. A CLI diagnostica a falha de escrita em stderr com texto controlado,
 retorna 2 (também se houve divergência) e não tenta escrever o resumo no stdout
 que falhou. `Result.Err` continua reservado a transporte/cancelamento.
 
@@ -63,6 +63,22 @@ que falhou. `Result.Err` continua reservado a transporte/cancelamento.
 consumir e fechar também respostas intermediárias, verificar limite/origem antes
 do próximo envio e manter o mesmo deadline. O teste observa os deadlines nas
 requisições reais e comprova que não são renovados entre redirects.
+
+O adapter cria cada request com o método recebido, headers explícitos e um reader
+dos bytes do JSON. `Host` é convertido para `http.Request.Host`; headers repetidos
+mantêm seus valores. O parser rejeita Host inválido/duplicado e headers explícitos
+de enquadramento, evitando que net/http os ignore ou reinterprete silenciosamente.
+301/302/303 convertem métodos diferentes de GET/HEAD em GET sem body, enquanto
+307/308 criam outro reader dos mesmos bytes. Os headers declarados são mantidos;
+a próxima origem e o limite são verificados **antes** do envio. Isso preserva as
+políticas US-01 sem delegar redirects/retries a `http.Client`.
+
+O parser usa `encoding/json.Decoder` apenas para validar e encontrar o intervalo
+exato do valor; não decodifica em modelos nem serializa novamente. Lê o arquivo
+completo antes da rede, calcula posições sobre os bytes originais e conserva
+inclusive whitespace/escapes internos e CRLF. Nenhum erro bruto do decoder é
+concatenado ao diagnóstico. Arrays/escalares e texto parecido com instruções dentro
+de strings não são confundidos com delimitadores externos.
 
 A conexão não é reutilizada (`DisableKeepAlives`) e HTTP/2 não é habilitado
 (`ForceAttemptHTTP2=false`, `TLSNextProto` vazio não nulo). A decisão sacrifica
@@ -77,12 +93,16 @@ pendente. O runner não conhece response body ou tipos net/http.
 Causas sensíveis são preservadas para `errors.Is/As`, mas jamais concatenadas à
 mensagem exibida. A CLI usa categoria controlada ou diagnóstico genérico seguro;
 URL inválida não é renderizada. `displayURL` centraliza remoção de userinfo/query/
-fragmento. stdout e stderr têm papéis distintos e falhas de escrita geram código 2.
+fragmento. Headers e bodies não são apresentados, incluindo em erros, portanto
+Authorization/Proxy-Authorization/Cookie/Set-Cookie e credenciais do JSON ficam
+fora de ambos os streams. stdout e stderr têm papéis distintos e falhas de escrita
+geram código 2.
 
 ## Testes e evidência
 
-- `internal/parser`: readers em memória, fronteiras, URLs, posições, falha de
-  leitura com causa preservada e fixtures de construções não suportadas.
+- `internal/parser`: readers em memória, fronteiras/bytes JSON, headers, URLs,
+  posições, falha de leitura com causa preservada, corpus inválido/não suportado e
+  `FuzzParse` com seeds de métodos, JSON e headers.
 - `internal/assertion` / `internal/runner`: table-driven; fake HTTP sem rede,
   ausência de chamadas posteriores, resumo e contexto propagado.
 - `internal/transport`: httptest HTTP/TLS, contadores de acesso e conexões,
@@ -96,7 +116,8 @@ fragmento. stdout e stderr têm papéis distintos e falhas de escrita geram cód
   stdout comprova o primeiro resultado já visível enquanto o servidor mantém a
   segunda requisição bloqueada, em sucesso, divergência e body incompleto.
 - `tests/e2e/compatibility_test.go`: alvo explícito com tag `compatibility`, Hurl
-  8.0.0 exigido e corpus/observações versionados. Não há skip em versão ausente/errada.
+  8.0.0 exigido e 25 pares/observações versionados, incluindo bytes/métodos/headers
+  efetivamente recebidos no corpus US-02. Não há skip em versão ausente/errada.
 
 Saída é deliberadamente sempre plain-text: os testes usam streams, arquivo, pipe e
 PTY real para verificar o contrato, sem criar detector de TTY ou dependência

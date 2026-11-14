@@ -1,0 +1,21 @@
+{
+  "classification": "restriction: GET body rejected by httpgo",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "{\"value\":1}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

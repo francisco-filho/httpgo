@@ -67,7 +67,7 @@ func (c *Command) ExecuteContext(ctx context.Context) int {
 }
 
 func (c *Command) renderEntry(entry runner.EntryResult) error {
-	line := fmt.Sprintf("GET %s: %s", displayURL(entry.Entry.URL), entry.Outcome)
+	line := fmt.Sprintf("%s %s: %s", entry.Entry.Method, displayURL(entry.Entry.URL), entry.Outcome)
 	switch entry.Outcome {
 	case runner.Passed, runner.Mismatch:
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
@@ -155,7 +155,7 @@ func (c *Command) fail(message string) int {
 }
 
 func help() string {
-	return `httpgo — executa GETs e valida status
+	return `httpgo — executa requisições HTTP e valida status
 
 Uso:
   httpgo test <arquivo>
@@ -170,13 +170,24 @@ Exemplo: salve health.hurl e execute httpgo test health.hurl
   GET http://localhost:8080/inexistente
   HTTP 404
 
+Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
+  POST http://localhost:8080/products
+  Content-Type: application/json
+  {"name":"Pizza","price":4500}
+
+  HTTP 201
+
+Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
+Headers e um valor JSON inline são opcionais; bytes do JSON são preservados.
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
 status é aceito e informado como sem validação. A primeira falha interrompe.
-Cada resultado é exibido ao terminar o GET, antes do próximo; resumo ao final.
-Timeout total: 10 segundos por GET. Até 10 redirects na mesma origem.
+Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
+Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
+301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
 Códigos: 0 sucesso, 1 status divergente, 2 entrada/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
+Valores de headers e bodies não são impressos, nem em erros de entrada.
 Atenção: o path permanece visível; não coloque segredos no caminho da URL.
 `
 }

@@ -1,0 +1,87 @@
+{
+  "classification": "shared: mixed methods, optional status, bodyless DELETE and GET 404; difference: Hurl infers Content-Type",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/health",
+      "/error",
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{}",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "PUT",
+        "body": "{\"a\":1}",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "PATCH",
+        "body": "[1,2]",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "DELETE",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/health",
+      "/error",
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{}",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "method": "PUT",
+        "body": "{\"a\":1}",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "method": "PATCH",
+        "body": "[1,2]",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "method": "DELETE",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

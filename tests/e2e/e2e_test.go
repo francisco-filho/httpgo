@@ -144,7 +144,7 @@ func TestInputAndUsageNeverSend(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
 	defer server.Close()
-	for _, suffix := range []string{"POST " + server.URL, "GET http://username-secret:password-secret@bad%zz/?token=query-secret", "HTTP 999", "HTTP 200 # comment", "[Asserts]"} {
+	for _, suffix := range []string{"HEAD " + server.URL, "GET http://username-secret:password-secret@bad%zz/?token=query-secret", "HTTP 999", "HTTP 200 # comment", "[Asserts]"} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"\n"+suffix))
 		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("code=%d,out=%q,err=%q,hits=%d", code, out, stderr, hits.Load())
@@ -182,104 +182,120 @@ func TestHelpAndBuildMetadata(t *testing.T) {
 }
 
 func TestTransportFailuresStopSequence(t *testing.T) {
-	for _, mode := range []string{"redirect limit", "cross origin", "invalid location", "TLS", "connection", "incomplete", "no retry"} {
-		t.Run(mode, func(t *testing.T) {
-			var hits, next, targetHits atomic.Int32
-			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { targetHits.Add(1); w.WriteHeader(200) }))
-			defer target.Close()
-			source := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/next" {
-					next.Add(1)
-					w.WriteHeader(200)
-					return
-				}
-				hits.Add(1)
-				switch mode {
-				case "redirect limit":
-					n, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/"))
-					w.Header().Set("Location", fmt.Sprintf("/%d?token=query-secret", n+1))
-					w.WriteHeader(302)
-				case "cross origin":
-					w.Header().Set("Location", strings.Replace(target.URL, "http://", "http://username-secret:password-secret@", 1)+"/?token=destination-secret")
-					w.WriteHeader(302)
-				case "invalid location":
-					w.Header().Set("Location", "http://bad%zz/?token=destination-secret")
-					w.WriteHeader(302)
-				case "incomplete":
-					w.Header().Set("Content-Length", "100")
-					w.WriteHeader(200)
-					_, _ = io.WriteString(w, "short")
-				case "no retry":
-					connection, _, err := w.(http.Hijacker).Hijack()
-					if err != nil {
-						t.Error(err)
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		for _, mode := range []string{"redirect limit", "cross origin", "invalid location", "TLS", "connection", "incomplete", "no retry"} {
+			t.Run(method+"/"+mode, func(t *testing.T) {
+				var hits, next, targetHits atomic.Int32
+				target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { targetHits.Add(1); w.WriteHeader(200) }))
+				defer target.Close()
+				source := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/next" {
+						next.Add(1)
+						w.WriteHeader(200)
 						return
 					}
-					_ = connection.Close()
-				default:
-					w.WriteHeader(200)
+					hits.Add(1)
+					switch mode {
+					case "redirect limit":
+						n, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/"))
+						w.Header().Set("Location", fmt.Sprintf("/%d?token=query-secret", n+1))
+						w.WriteHeader(302)
+					case "cross origin":
+						w.Header().Set("Location", strings.Replace(target.URL, "http://", "http://username-secret:password-secret@", 1)+"/?token=destination-secret")
+						w.WriteHeader(302)
+					case "invalid location":
+						w.Header().Set("Location", "http://bad%zz/?token=destination-secret")
+						w.WriteHeader(302)
+					case "incomplete":
+						w.Header().Set("Content-Length", "100")
+						w.WriteHeader(200)
+						_, _ = io.WriteString(w, "short")
+					case "no retry":
+						connection, _, err := w.(http.Hijacker).Hijack()
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						_ = connection.Close()
+					default:
+						w.WriteHeader(200)
+					}
+				}))
+				source.Config.ErrorLog = log.New(io.Discard, "", 0)
+				if mode == "TLS" {
+					source.StartTLS()
+				} else {
+					source.Start()
 				}
+				defer source.Close()
+				address := source.URL + "/0?token=query-secret"
+				if mode == "connection" {
+					listener, err := net.Listen("tcp", "127.0.0.1:0")
+					if err != nil {
+						t.Fatal(err)
+					}
+					address = "http://" + listener.Addr().String() + "/visible-path?token=query-secret"
+					if err := listener.Close(); err != nil {
+						t.Fatal(err)
+					}
+				}
+				body := "\nAuthorization: auth-secret\n{\"password\":\"body-secret\"}"
+				if method == "GET" {
+					body = ""
+				}
+				code, out, stderr := run(t, "test", scenario(t, method+" "+address+body+"\nHTTP 200\nDELETE "+source.URL+"/next\nHTTP 200"))
+				if code != 2 || !strings.Contains(out, "erro de transporte") || !strings.Contains(out, "concluídas=0") || !strings.Contains(out, "não_iniciadas=1") || stderr == "" || next.Load() != 0 || targetHits.Load() != 0 {
+					t.Fatalf("code=%d,out=%q,err=%q,hits=%d,next=%d,target=%d", code, out, stderr, hits.Load(), next.Load(), targetHits.Load())
+				}
+				if mode == "redirect limit" && hits.Load() != 11 {
+					t.Fatalf("hits=%d,want 11", hits.Load())
+				}
+				if mode == "no retry" && hits.Load() != 1 {
+					t.Fatalf("retry: hits=%d", hits.Load())
+				}
+				assertNoSecrets(t, out+stderr)
+			})
+		}
+	}
+
+}
+func TestPublicTimeoutIncludesBody(t *testing.T) {
+	for _, method := range []string{"GET", "POST"} {
+		t.Run(method, func(t *testing.T) {
+			var next atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.Copy(io.Discard, r.Body)
+				if r.URL.Path == "/next" {
+					next.Add(1)
+					return
+				}
+				if r.URL.Path == "/start" {
+					w.Header().Set("Location", "/body")
+					w.WriteHeader(307)
+					return
+				}
+				w.WriteHeader(200)
+				w.(http.Flusher).Flush()
+				<-r.Context().Done()
 			}))
-			source.Config.ErrorLog = log.New(io.Discard, "", 0)
-			if mode == "TLS" {
-				source.StartTLS()
-			} else {
-				source.Start()
+			defer server.Close()
+			started := time.Now()
+			body := ""
+			if method == "POST" {
+				body = "\nAuthorization: auth-secret\n{\"password\":\"body-secret\"}"
 			}
-			defer source.Close()
-			address := source.URL + "/0?token=query-secret"
-			if mode == "connection" {
-				listener, err := net.Listen("tcp", "127.0.0.1:0")
-				if err != nil {
-					t.Fatal(err)
-				}
-				address = "http://" + listener.Addr().String() + "/visible-path?token=query-secret"
-				if err := listener.Close(); err != nil {
-					t.Fatal(err)
-				}
-			}
-			code, out, stderr := run(t, "test", scenario(t, "GET "+address+"\nHTTP 200\nGET "+source.URL+"/next\nHTTP 200"))
-			if code != 2 || !strings.Contains(out, "erro de transporte") || !strings.Contains(out, "concluídas=0") || !strings.Contains(out, "não_iniciadas=1") || stderr == "" || next.Load() != 0 || targetHits.Load() != 0 {
-				t.Fatalf("code=%d,out=%q,err=%q,hits=%d,next=%d,target=%d", code, out, stderr, hits.Load(), next.Load(), targetHits.Load())
-			}
-			if mode == "redirect limit" && hits.Load() != 11 {
-				t.Fatalf("hits=%d,want 11", hits.Load())
-			}
-			if mode == "no retry" && hits.Load() != 1 {
-				t.Fatalf("retry: hits=%d", hits.Load())
+			code, out, stderr := run(t, "test", scenario(t, method+" "+server.URL+"/start"+body+"\nHTTP 200\nDELETE "+server.URL+"/next"))
+			if code != 2 || !strings.Contains(stderr, "timeout") || !strings.Contains(out, "concluídas=0") || next.Load() != 0 || time.Since(started) < 10*time.Second {
+				t.Fatalf("code=%d,out=%q,err=%q,next=%d,elapsed=%s", code, out, stderr, next.Load(), time.Since(started))
 			}
 			assertNoSecrets(t, out+stderr)
 		})
 	}
 }
 
-func TestPublicTimeoutIncludesBody(t *testing.T) {
-	var next atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/next" {
-			next.Add(1)
-			return
-		}
-		if r.URL.Path == "/start" {
-			w.Header().Set("Location", "/body")
-			w.WriteHeader(302)
-			return
-		}
-		w.WriteHeader(200)
-		w.(http.Flusher).Flush()
-		<-r.Context().Done()
-	}))
-	defer server.Close()
-	started := time.Now()
-	code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/start\nHTTP 200\nGET "+server.URL+"/next"))
-	if code != 2 || !strings.Contains(stderr, "timeout") || !strings.Contains(out, "concluídas=0") || next.Load() != 0 || time.Since(started) < 10*time.Second {
-		t.Fatalf("code=%d,out=%q,err=%q,next=%d,elapsed=%s", code, out, stderr, next.Load(), time.Since(started))
-	}
-}
-
 func assertNoSecrets(t *testing.T, text string) {
 	t.Helper()
-	for _, secret := range []string{"username-secret", "password-secret", "query-secret", "value-secret", "hidden-name", "fragment-secret", "destination-secret", "bad%zz"} {
+	for _, secret := range []string{"username-secret", "password-secret", "query-secret", "value-secret", "hidden-name", "fragment-secret", "destination-secret", "bad%zz", "auth-secret", "proxy-secret", "cookie-secret", "set-cookie-secret", "body-secret"} {
 		if strings.Contains(text, secret) {
 			t.Errorf("leaked %q in %q", secret, text)
 		}

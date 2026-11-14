@@ -1,8 +1,10 @@
 {
-  "classification": "restriction: other methods",
+  "classification": "shared: bodyless POST",
   "httpgo": {
-    "exit": 2,
-    "paths": []
+    "exit": 0,
+    "paths": [
+      "/health"
+    ]
   },
   "hurl": {
     "exit": 0,

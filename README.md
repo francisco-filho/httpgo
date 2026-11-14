@@ -23,18 +23,28 @@ make serve
 Ele escuta somente em `http://127.0.0.1:8080` (também acessível via localhost),
 em primeiro plano. Ctrl+C encerra o servidor. A porta precisa estar livre.
 
-| GET | Status |
-|---|---|
-| `/health` | 200 |
-| `/inexistente` | 404 |
-| `/error` | 500 |
-| Outros caminhos | 404 |
+| Método | Caminho | Status |
+|---|---|---|
+| GET | `/health` | 200 |
+| GET | `/inexistente` | 404 |
+| GET | `/error` | 500 |
+| POST | `/products` | 201 |
+| GET / PUT / PATCH | `/products/1` | 200 |
+| DELETE | `/products/1` | 204 |
+| GET / POST / PUT / PATCH / DELETE | `/echo` | 200 |
+
+Os produtos são demonstrativos, **sem persistência**. `/echo` devolve os bytes do
+JSON e os headers de resposta `X-Dummy-Method` e `X-Dummy-Body-Bytes`, sem ecoar
+headers de autenticação/cookies. Use apenas dados fictícios.
 
 O cenário `scenario_get_status.hurl` executa `/health`, `/inexistente` e repete
 `/health`, validando três respostas em sequência. Também é possível executar:
 
 ```sh
 bin/httpgo test testdata/scenarios/scenario_unvalidated_status.hurl
+# POST de demonstração e sequência de métodos da US-02:
+bin/httpgo test testdata/scenarios/scenario_json_inline.hurl
+bin/httpgo test testdata/scenarios/scenario_dummy_methods.hurl
 ```
 
 Esse cenário recebe 500 e informa explicitamente que não validou status.
@@ -52,15 +62,36 @@ GET http://localhost:8080/inexistente
 HTTP 404
 ```
 
-O arquivo inteiro é validado antes da rede. GETs são sequenciais e a primeira
+Também são suportados `POST`, `PUT`, `PATCH` e `DELETE`, com headers e um valor
+JSON inline opcional (objeto, array ou escalar; inclusive multilinha). GET aceita
+headers, mas permanece sem body. Exemplo contra uma API local com `/products`:
+
+```hurl
+POST http://localhost:8080/products
+Content-Type: application/json
+{"name":"Pizza","price":4500}
+
+HTTP 201
+```
+
+Salve como `products.hurl` e execute `bin/httpgo test products.hurl`. O mesmo
+exemplo está em `testdata/scenarios/scenario_json_inline.hurl` e é exercitado
+pelo binário nos E2E. O dummy manual também implementa essa demonstração: basta
+iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e os bytes do valor
+JSON são preservados, sem serialização. Declare Content-Type quando necessário;
+não há inferência automática desse header.
+
+O arquivo inteiro é validado antes da rede. As requisições são sequenciais e a primeira
 falha interrompe a execução. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
 - `0`: sucesso; `1`: status divergente; `2`: demais erros.
-- Timeout total de 10 segundos por GET, incluindo redirects e leitura do body.
+- Timeout total de 10 segundos por requisição, incluindo redirects e leitura do body.
 - TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
-- Cada resultado é emitido em stdout assim que o GET termina, antes do próximo;
+- Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
   resumo ao final e diagnósticos em stderr. Sempre texto sem cores.
+- 301/302/303 convertem POST/PUT/PATCH/DELETE em GET sem body; 307/308 preservam ambos.
+- Valores de headers e bodies não são impressos, nem em erros de entrada.
 - Credenciais, query inteira e fragmento da URL não são exibidos.
   **Não coloque segredos no path: ele permanece visível.**
 
@@ -85,4 +116,6 @@ make portable
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
 **desenvolvimento**, não no binário entregue. O gate local com race já passou;
 o aceite nativo pendente em macOS/Windows está registrado em
-`docs/validation.md`. A história não está declarada concluída.
+`docs/validation.md`, que distingue a evidência local US-02 do histórico US-01.
+Cross-build não comprova execução nessas plataformas. A aprovação da história
+passa pelo gate de revisão; não há alegação de compatibilidade Hurl completa.
