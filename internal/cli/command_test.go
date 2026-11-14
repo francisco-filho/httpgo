@@ -136,7 +136,7 @@ func TestResultsAndSecretRedaction(t *testing.T) {
 }
 
 func TestInvalidInputNeverCallsExecutor(t *testing.T) {
-	for _, text := range []string{"", "# only comments", "GET http://example.test/first\nPOST http://example.test/second", "GET http://example.test/first\nGET http://url-user:url-password@bad%zz/?token=query-secret", "GET http://example.test/first\nHTTP 999", "GET http://example.test/first\nHTTP 200 # forbidden"} {
+	for _, text := range []string{"", "# only comments", "GET http://example.test/first\nHEAD http://example.test/second", "GET http://example.test/first\nGET http://url-user:url-password@bad%zz/?token=query-secret", "GET http://example.test/first\nHTTP 999", "GET http://example.test/first\nHTTP 200 # forbidden"} {
 		t.Run(text, func(t *testing.T) {
 			fake := &fakeExecutor{}
 			file := writeScenario(t, text)

@@ -144,7 +144,7 @@ func TestInputAndUsageNeverSend(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
 	defer server.Close()
-	for _, suffix := range []string{"POST " + server.URL, "GET http://username-secret:password-secret@bad%zz/?token=query-secret", "HTTP 999", "HTTP 200 # comment", "[Asserts]"} {
+	for _, suffix := range []string{"HEAD " + server.URL, "GET http://username-secret:password-secret@bad%zz/?token=query-secret", "HTTP 999", "HTTP 200 # comment", "[Asserts]"} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"\n"+suffix))
 		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("code=%d,out=%q,err=%q,hits=%d", code, out, stderr, hits.Load())

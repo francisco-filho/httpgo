@@ -32,7 +32,7 @@ func TestParseRejectsCompleteFile(t *testing.T) {
 	cases := []string{
 		"GET", "GET http://example.test # forbidden", "HTTP 200 # forbidden", "HTTP 099", "HTTP 600", "HTTP 20", "HTTP 0200", "HTTP +20", "HTTP abc", "HTTP 200\nHTTP 200",
 		"GET /relative", "GET ftp://example.test", "GET http://", "GET http://:80", "GET http://example.test:65536", "GET http://example.test:", "GET http://[broken]", "GET http://::1/", "GET http://user:password@broken%zz/?secret=value", "GET http://example.test/\x00",
-		"HTTP/1.1 200", "POST http://example.test", "[Asserts]", "[Captures]", "Authorization: password", "file,secret;", "{{variable}}", "GET http://example.test/{{variable}}", "??? password", "\xff", "\u00a0",
+		"HTTP/1.1 200", "HEAD http://example.test", "[Asserts]", "[Captures]", "Bad Header: password", "file,secret;", "{{variable}}", "GET http://example.test/{{variable}}", "??? password", "\xff", "\u00a0",
 	}
 	for _, suffix := range cases {
 		t.Run(suffix, func(t *testing.T) {
