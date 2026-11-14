@@ -1,0 +1,40 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "name=Pizza",
+    "n=4500",
+    "b=true",
+    "nil=null"
+  ],
+  "classification": "shared contextual JSON scalar interpolation for the observed CLI literals",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"name\":\"Pizza\",\"n\":4500,\"active\":true,\"nil\":null}",
+        "content_type": "application/json",
+        "probe": "4500-true-null"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"name\":\"Pizza\",\"n\":4500,\"active\":true,\"nil\":null}",
+        "content_type": "application/json",
+        "probe": "4500-true-null"
+      }
+    ]
+  }
+}

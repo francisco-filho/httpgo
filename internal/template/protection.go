@@ -32,6 +32,13 @@ func SecretVariants(source string) []string {
 		quoted := strconv.Quote(base)
 		variants = append(variants, base, string(encoded[1:len(encoded)-1]), quoted[1:len(quoted)-1], url.PathEscape(base), url.QueryEscape(base))
 	}
+	// Diagnostics quote filenames with %q. Protect that presentation of each
+	// known form too, including a filename already containing JSON escapes.
+	for _, variant := range append([]string(nil), variants...) {
+		quoted := strconv.Quote(variant)
+		encoded, _ := json.Marshal(variant)
+		variants = append(variants, quoted[1:len(quoted)-1], string(encoded[1:len(encoded)-1]))
+	}
 	return variants
 }
 

@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-03
+# Matriz de compatibilidade — US-01 a US-04
 
 ## Escopo da evidência
 
@@ -88,17 +88,45 @@ Todos os valores usados são fictícios ou não sigilosos, nunca credenciais rea
 | `variables_duplicate` | 2; sem envio | 0; /health, X-Probe=second | httpgo rejeita repetição; Hurl sobrescreve |
 | `variables_conflict` | 2; sem envio | 0; /health | httpgo rejeita escalar/descendente mesmo sem uso; Hurl aceita atribuições |
 | `variables_malformed_late` | 2; sem envio | 3; somente /health | nome com hífen é inválido estruturalmente aqui; Hurl o trata como referência ausente após primeiro envio |
-| `variables_body` | 2; sem envio | 0; POST /health | httpgo ainda rejeita template em JSON; Hurl interpola |
+| `variables_body` | **0; POST /health na US-04** | 0; POST /health | bytes idênticos; antiga restrição US-03 removida intencionalmente na issue #13 |
 | `variables_header_name` | 2; sem envio | 0; X-Probe=value | nomes de headers permanecem estáticos aqui; Hurl interpola |
+
+### Ampliação US-04 — JSON tipado (issue #13)
+
+**Mudança intencional de contrato:** `variables_body.json` passa de exit 2/zero
+envios para exit 0/POST com body `{"probe":"fictitious"}`. O arquivo `.hurl` não
+mudou. A antiga rejeição global de body no corpus de cenários foi limitada a chaves
+JSON; corpos e valores string agora são aceitos nos contextos previstos. Os demais
+34 pares anteriores permanecem com as mesmas observações. Seis pares novos
+ampliam a matriz para **41 pares**, com os mesmos argumentos fornecidos a ambos
+os executáveis; todos usam `Content-Type` explícito para isolar a tipagem.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/diferença observada |
+|---|---|---|---|
+| `typed_values` | 0; JSON com string, número, booleano e null | 0; mesmos bytes/header | interpolação contextual escalar compartilhada neste par; `X-Probe=4500-true-null` |
+| `typed_forced_string` | 0; `{"code":"001","text":"001"}` | 0; `{"code":001,"text":"001"}` | extensão CLI HTTPGo: string delimitada decodificada preserva tipo; Hurl enviou `001` sem aspas no valor completo, que não é JSON válido |
+| `typed_composite` | 0; objeto opaco com array e número de alta precisão | 3; zero envios | tipo composto na CLI é extensão própria; Hurl rejeita este valor de variável |
+| `typed_root` | 0; array raiz, depois GET /missing | 3; zero envios | HTTPGo preserva tipo e fronteira do placeholder raiz; CLI Hurl rejeita este composto |
+| `typed_text_rejected` | 2; zero envios | 0; `{"text":"[1,true]"}` | HTTPGo não converte array em texto implicitamente; CLI Hurl fornece texto neste caso |
+| `typed_key_rejected` | 2; zero envios | 0; `{"static":1}` | restrição HTTPGo: chaves permanecem estáticas |
+
+A tipagem de `--var` é **extensão HTTPGo**, não comportamento imputado à CLI Hurl.
+Os testes próprios também verificam escapes, Unicode, composição, não recursão,
+objetos opacos, conflitos, segredo após decodificação e JSON final antes do envio.
+Não se deduz suporte geral a templates de raiz/estruturas no Hurl a partir de uma
+falha da sua CLI em aceitar o valor; registra-se somente o comportamento observado.
 
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
-DNS e diagnósticos podem diferir. As demais garantias httpgo são verificadas nos
-testes próprios. Templates em body/nomes de headers, capturas, seções, bodies externos/binários/multipart,
-headers de enquadramento e demais construções fora de escopo continuam
-explicitamente não suportadas.
+DNS e diagnósticos podem diferir. Templates em chaves JSON/nomes de headers,
+capturas, seções, bodies externos/binários/multipart, headers de enquadramento e
+demais construções fora de escopo continuam explicitamente não suportadas.
 
 ## Extensões e restrições
+
+Interpretação tipada de literais JSON na CLI é uma extensão implementada na US-04,
+com mudança intencional do contrato textual temporário da US-03. Não há conversão
+implícita de objetos/arrays em texto nem navegação de propriedades.
 
 YAML hierárquico e interpolação em arquivos externos são extensões futuras do
 httpgo, **não capacidades do formato Hurl implementadas nesta história**.

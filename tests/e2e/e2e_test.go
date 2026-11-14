@@ -239,11 +239,11 @@ func TestTransportFailuresStopSequence(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				body := "\nAuthorization: auth-secret\n{\"password\":\"body-secret\"}"
+				body := "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 				if method == "GET" {
 					body = ""
 				}
-				code, out, stderr := run(t, "test", scenario(t, method+" {{target}}"+body+"\nHTTP 200\nDELETE {{base}}/next\nHTTP 200"), "--var", "target="+address, "--var", "base="+source.URL)
+				code, out, stderr := run(t, "test", scenario(t, method+" {{target}}"+body+"\nHTTP 200\nDELETE {{base}}/next\nHTTP 200"), "--var", "target="+address, "--var", "base="+source.URL, "--var", `password="body-secret"`, "--secret", "password")
 				if code != 2 || !strings.Contains(out, "erro de transporte") || !strings.Contains(out, "concluídas=0") || !strings.Contains(out, "não_iniciadas=1") || stderr == "" || next.Load() != 0 || targetHits.Load() != 0 {
 					t.Fatalf("code=%d,out=%q,err=%q,hits=%d,next=%d,target=%d", code, out, stderr, hits.Load(), next.Load(), targetHits.Load())
 				}
@@ -282,9 +282,9 @@ func TestPublicTimeoutIncludesBody(t *testing.T) {
 			started := time.Now()
 			body := ""
 			if method == "POST" {
-				body = "\nAuthorization: auth-secret\n{\"password\":\"body-secret\"}"
+				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 			}
-			code, out, stderr := run(t, "test", scenario(t, method+" {{base}}/start"+body+"\nHTTP 200\nDELETE {{base}}/next"), "--var", "base="+server.URL)
+			code, out, stderr := run(t, "test", scenario(t, method+" {{base}}/start"+body+"\nHTTP 200\nDELETE {{base}}/next"), "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
 			if code != 2 || !strings.Contains(stderr, "timeout") || !strings.Contains(out, "concluídas=0") || next.Load() != 0 || time.Since(started) < 10*time.Second {
 				t.Fatalf("code=%d,out=%q,err=%q,next=%d,elapsed=%s", code, out, stderr, next.Load(), time.Since(started))
 			}

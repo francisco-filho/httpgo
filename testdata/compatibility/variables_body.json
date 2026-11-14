@@ -3,10 +3,21 @@
     "base=http://example.invalid",
     "probe=fictitious"
   ],
-  "classification": "intentional restriction: no JSON interpolation in US-03",
+  "classification": "shared JSON string interpolation; intentional support expansion in US-04",
   "httpgo": {
-    "exit": 2,
-    "paths": null
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"probe\":\"fictitious\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
   },
   "hurl": {
     "exit": 0,

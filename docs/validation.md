@@ -1,4 +1,84 @@
-# Validação — US-01 a US-03
+# Validação — US-01 a US-04
+
+## US-04 — issue #13 / história 004
+
+Plano da issue #13 executado sem planner, somente backend. As quatro tasks foram
+registradas e autoaprovadas na fila 004 antes de implementar. Tasks 1–3 concluídas
+com commits `31b7b72`, `145ecbc` e `e3d474d`. A implementação e os testes locais da
+task 4 estão nesta alteração; **seu aceite está bloqueado pela evidência nativa
+macOS/Windows**, conforme o critério do plano. Não há frontend/estáticos, novas
+dependências, aumento de Go ou mudanças de CI/lint. SonarQube não foi executado.
+
+### Ambiente e evidência local executada
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, CGO/GCC para race, goimports e
+golangci-lint já disponíveis; Hurl 8.0.0/libcurl 8.18.0. Nenhuma ferramenta foi
+instalada. Os testes usam HTTP/TLS local em portas dinâmicas, não o dummy.
+
+- `go test ./internal/template`: literais e fallback textual, strings decodificadas,
+  vazio, `=`, números grandes/exponentes sem float64, objetos opacos, nomes exatos,
+  conflitos, representações escalares e rejeição de estruturas em texto.
+- `go test ./internal/parser ./internal/template`: plano de referências JSON,
+  valores completos/raiz, composição de strings, escapes/Unicode, não recursão,
+  estrutura completa validada antes da rede, chaves estáticas, posições LF/CRLF,
+  fronteiras e bytes estáticos (inclusive fechamentos adjacentes e `}}` em string).
+- `go test ./internal/runner ./internal/cli ./internal/transport`: fake sem rede,
+  contrato HTTP real, demonstração com tipos, clones/cenário imutável, apresentação
+  síncrona e resultados anteriores mantidos após falha. Variável ausente, tipo
+  incompatível e controles decodificados impedem o envio afetado/posteriores.
+  Renderer falso com JSON final inválido comprova a defesa pré-executor, com erro
+  seguro e posição no início do body, sem propagar payload. O renderer real insere
+  JSON válido por construção e ainda o valida antes de retornar.
+- Proteção antes/depois do contexto: valores fictícios brutos, decodificados,
+  escapes JSON/Go/URL conhecidos, componentes de estruturas, filename já escapado
+  seguido de quoting de diagnóstico, segredo vazio, ordem de flags e isolamento.
+  Sucesso, divergência, uso, estrutura, renderização, transporte e falha de escrita
+  não reproduzem payloads ou causas sensíveis.
+- `go test ./tests/e2e -count=1`: passou pelo binário real (build único).
+  Demonstração `scenario_products_typed.hurl`, tipos completos inclusive raiz,
+  precisão, escapes e Unicode, não recursão, ausência/conflitos/objetos opacos,
+  invalidez tardia com zero envios, interrupção preservando resumo e localização
+  original após expansão/escape, bytes estáticos LF/CRLF e saídas protegidas.
+- Regressões E2E com **body renderizado**: redirects 301/302/303/307/308 com método
+  e bytes verificados; falhas HTTP/TLS/origem/limite/conexão/body incompleto,
+  ausência de retry, timeout público real de 10 segundos incluindo redirect/body
+  e Ctrl+C real Linux. Pipe confirma resultado anterior visível enquanto POST
+  tipado seguinte está bloqueado. Testes de escrita com streams injetados mantêm
+  prioridade do código 2 e impedem o envio seguinte. Ajuda/versão/flags inválidas,
+  NO_COLOR, arquivo/pipe/PTY Linux continuam passando.
+- `make compatibility`: passou com **41 pares**, Hurl **8.0.0** obrigatório,
+  sem skip. `variables_body.json` muda intencionalmente de rejeição para sucesso;
+  seis pares `typed_*` distinguem semântica compartilhada de extensões CLI. As
+  observações geradas com `-update` foram lidas e revisadas antes da rodada sem
+  atualização. Os outros 34 pares antigos conservam suas observações.
+- `make fmt lint test`: passou; lint com **0 issues**, testes `-race -cover`.
+- `go vet ./...`, `go build ./...`, `make build` e `make portable`: passaram.
+  Builds emitiram aviso de cache de metadados do módulo em diretório somente
+  leitura, sem impedir compilação (exit 0). `make portable` comprova apenas build
+  CGO=0 linux/darwin/windows amd64, não execução nativa nas outras plataformas.
+- Fuzzing separado, 20 segundos e duas workers por alvo, repetido após os ajustes:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    passou; 18.927 execuções na última rodada.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`:
+    passou; 17.232 execuções na última rodada.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`:
+    passou; 463.924 execuções na última rodada; nenhum panic/JSON inválido aceito
+    ou mutação da origem encontrado.
+
+### Bloqueio de aceite / handoff final da 004
+
+Esta sessão não dispõe de runtime nativo macOS/Windows. A lacuna herdada das
+histórias anteriores não foi resolvida nem convertida em skip. Falta executar
+`go test ./tests/e2e -count=1` nativamente nessas plataformas e registrar a evidência
+aplicável de streams/códigos/contatos; os harnesses de sinal/PTY têm os limites
+históricos descritos abaixo. **Cross-build não substitui execução nativa.**
+
+A task `back:4` deve permanecer não concluída na fila até suprir a evidência
+exigida; o claim é liberado enquanto aguarda ambientes/resultados. Não enviar
+`done` final, não disparar review e não publicar comentário de implementação
+concluída na issue #13 antes de resolver o bloqueio. A implementação passa nos
+gates locais, mas a história não está declarada pronta. Commits da task 4 são
+consultáveis no histórico do repositório. Nenhum gate foi removido ou reduzido.
 
 ## US-03 — issue #11 / história 003
 

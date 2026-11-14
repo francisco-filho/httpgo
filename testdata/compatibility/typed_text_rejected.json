@@ -1,0 +1,26 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "value=[1,true]"
+  ],
+  "classification": "intentional HTTPGo restriction: no composite-to-text conversion",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"text\":\"[1,true]\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

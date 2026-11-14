@@ -1,0 +1,26 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "value={\"big\":9007199254740993123456789,\"a\":[null,true]}"
+  ],
+  "classification": "intentional HTTPGo extension: opaque composite CLI value preserves JSON type and precision",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"value\":{\"big\":9007199254740993123456789,\"a\":[null,true]}}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": null
+  }
+}

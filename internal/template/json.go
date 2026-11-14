@@ -98,9 +98,6 @@ func (s *jsonScanner) quoted(key bool) error {
 			}
 			continue
 		}
-		if bytes.HasPrefix(s.source[s.offset:], []byte("}}")) {
-			return jsonError(s.offset, "placeholder inválido: fechamento sem abertura")
-		}
 		s.offset++
 	}
 	return jsonError(start, "string JSON inválida ou não terminada")
@@ -124,6 +121,9 @@ func (s *jsonScanner) value(depth int) error {
 		}
 		for {
 			s.space()
+			if bytes.HasPrefix(s.source[s.offset:], []byte("{{")) {
+				return jsonError(s.offset, "variáveis em chave JSON não são suportadas")
+			}
 			if s.offset >= len(s.source) || s.source[s.offset] != '"' {
 				return jsonError(s.offset, "objeto JSON exige chave estática entre aspas")
 			}

@@ -32,6 +32,10 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 					w.WriteHeader(200)
 					return
 				}
+				body, err := io.ReadAll(r.Body)
+				if err != nil || r.Method != "POST" || string(body) != `{"typed":[true,null,9007199254740993123456789]}` {
+					t.Errorf("method=%s body=%s err=%v", r.Method, body, err)
+				}
 				close(secondStarted)
 				select {
 				case <-releaseSecond:
@@ -51,7 +55,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}))
 			defer server.Close()
 			address := strings.Replace(server.URL, "http://", "http://username-secret:password-secret@", 1)
-			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\nGET {{base}}/second\nHTTP 404")
+			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\nPOST {{base}}/second\n{\"typed\":{{payload}}}\nHTTP 404")
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			reader, writer, err := os.Pipe()
@@ -59,7 +63,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = reader.Close(); _ = writer.Close() }()
-			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "first="+address, "--var", "base="+server.URL)
+			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "first="+address, "--var", "base="+server.URL, "--var", "payload=[true,null,9007199254740993123456789]")
 			var stderr bytes.Buffer
 			command.Stdout, command.Stderr = writer, &stderr
 			if err := command.Start(); err != nil {
@@ -122,9 +126,9 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			if len(remaining) != 2 || !strings.Contains(remaining[0], "/second: "+tc.outcome) || !strings.HasPrefix(remaining[1], "resumo ") || !strings.Contains(remaining[1], tc.completed) {
 				t.Fatalf("remaining output = %q", remaining)
 			}
-			prefix := "GET "
+			prefix := "POST "
 			if tc.code != 0 {
-				prefix = fmt.Sprintf("%q:3:1: GET ", file)
+				prefix = fmt.Sprintf("%q:3:1: POST ", file)
 			}
 			if !strings.HasPrefix(remaining[0], prefix) {
 				t.Fatalf("second result = %q; want prefix %q", remaining[0], prefix)

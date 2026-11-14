@@ -33,12 +33,12 @@ func TestRealCtrlC(t *testing.T) {
 			defer server.Close()
 			body := ""
 			if method != "GET" {
-				body = "\nAuthorization: auth-secret\n{\"password\":\"body-secret\"}"
+				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 			}
 			file := scenario(t, method+" {{base}}/wait?token=query-secret"+body+"\nHTTP 200\nDELETE {{base}}/next")
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "base="+server.URL)
+			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
 			var out, stderr bytes.Buffer
 			command.Stdout, command.Stderr = &out, &stderr
 			if err := command.Start(); err != nil {

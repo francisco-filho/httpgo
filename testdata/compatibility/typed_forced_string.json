@@ -1,0 +1,37 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "code=\"001\""
+  ],
+  "classification": "intentional HTTPGo extension: CLI JSON strings are decoded",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"code\":\"001\",\"text\":\"001\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"code\":001,\"text\":\"001\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

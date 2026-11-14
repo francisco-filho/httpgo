@@ -78,7 +78,7 @@ Salve como `products.hurl` e execute `bin/httpgo test products.hurl`. O mesmo
 exemplo está em `testdata/scenarios/scenario_json_inline.hurl` e é exercitado
 pelo binário nos E2E. O dummy manual também implementa essa demonstração: basta
 iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e os bytes do valor
-JSON são preservados, sem serialização. Declare Content-Type quando necessário;
+JSON estático são preservados, sem serialização. Declare Content-Type quando necessário;
 não há inferência automática desse header.
 
 ## Parametrizar URL e headers (US-03 / issue #11)
@@ -102,13 +102,51 @@ O cenário também está em `testdata/scenarios/scenario_products_variables.hurl
 requer uma API com `GET /products` retornando 200 (o dummy manual não oferece esse
 GET). Os E2E demonstram dois destinos locais isolados sem editar o cenário.
 
-`--var nome=valor` é repetível e fornece **somente texto**, temporariamente:
-`42`, `true` e `null` não são convertidos em tipos JSON. O primeiro `=` separa
-nome/valor; vazio e sinais `=` adicionais são preservados. Nomes ASCII podem
-usar caminhos como `api.baseUrl`; duplicações e conflitos como `api`/`api.baseUrl`
-são erros, sem sobrescrita. URL e valores de headers aceitam `{{nome}}` e
-`{{ nome }}`, sem recursão. A URL final exige encoding explícito. Templates no
-body e em nomes de headers continuam rejeitados.
+`--var nome=valor` é repetível. **Mudança de contrato na US-04:** um literal JSON
+válido preserva seu tipo; o restante permanece texto, inclusive vazio. Strings JSON
+perdem as aspas delimitadoras e interpretam escapes. O primeiro `=` separa nome/valor;
+os seguintes são preservados. Nomes ASCII pontuados, como `api.baseUrl`, resolvem por
+nome exato. Duplicações e conflitos ancestral/descendente, como `api`/`api.baseUrl`,
+são erros independentemente do tipo, sem merge nem sobrescrita. Objetos são opacos:
+`--var 'product={"name":"Pizza"}'` **não** define `product.name`.
+URL e valores de headers aceitam `{{nome}}` e `{{ nome }}`, sem recursão. Nesses
+contextos só são aceitos escalares; arrays/objetos geram erro antes do envio.
+A URL final exige encoding explícito; nomes de headers permanecem estáticos.
+
+## Parametrizar JSON preservando tipos (US-04 / issue #13)
+
+Salve como `products.hurl`:
+
+```hurl
+POST {{api.baseUrl}}/products
+Content-Type: application/json
+{"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}},"code":{{product.code}}}
+
+HTTP 201
+```
+
+```sh
+bin/httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+  --var product.name=Pizza --var product.price=4500 \
+  --var product.active=true --var 'product.code="001"'
+```
+
+A API recebe `name` e `code` como strings, `price` como número e `active` como
+booleano. O cenário versionado é `testdata/scenarios/scenario_products_typed.hurl`;
+os E2E verificam os dados recebidos por HTTP local. O dummy pode ser usado
+manualmente, sem alterar seu código ou depender dele nos testes.
+
+Placeholder sem aspas em posição de valor JSON completo preserva qualquer tipo,
+inclusive `null`, array e objeto, também na raiz (`{{body}}`). Dentro de strings
+JSON, aceita apenas escalares e composição textual, com escape correto de aspas,
+barras invertidas e controles, preservando Unicode. Números conservam sua
+representação JSON sem arredondamento, inclusive dentro de estruturas. Conteúdo
+inserido semelhante a placeholder permanece literal. Chaves JSON são estáticas;
+arquivos externos, expressões e acesso a propriedades não são suportados.
+
+A interpretação tipada de `--var` é uma **extensão própria HTTPGo**, não promessa
+de equivalência com a CLI do Hurl. A sintaxe contextual compartilhada e as diferenças
+observadas contra Hurl 8.0.0 estão em [compatibilidade](docs/compatibility.md).
 
 **É proibido fornecer credenciais reais em argumentos, inclusive `--var`.** Use
 somente valores não sigilosos ou fictícios. `--secret nome` apenas marca proteção
@@ -134,7 +172,9 @@ com indicação explícita de **sem validação de status**.
   Valores marcados com `--secret` também são ocultos em paths e headers comuns,
   antes de escapes/normalização de URL. O restante do path permanece visível:
   não coloque segredos arbitrários nele. A CLI não detecta toda credencial ou
-  codificação desconhecida automaticamente.
+  codificação desconhecida automaticamente. A proteção cobre formas brutas,
+  decodificadas e escapes conhecidos (JSON, quoting de diagnóstico e URL), inclusive
+  em falhas anteriores à construção do contexto. Não há payload de diagnóstico.
 
 ## Documentação e desenvolvimento
 
@@ -157,6 +197,6 @@ make portable
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
 **desenvolvimento**, não no binário entregue. O gate local com race já passou;
 o aceite nativo pendente em macOS/Windows está registrado em
-`docs/validation.md`, que distingue a evidência local US-03 dos históricos US-01/US-02.
+`docs/validation.md`, que distingue a evidência local US-04 dos históricos anteriores.
 Cross-build não comprova execução nessas plataformas. A aprovação da história
 passa pelo gate de revisão; não há alegação de compatibilidade Hurl completa.

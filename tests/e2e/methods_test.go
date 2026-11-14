@@ -184,7 +184,7 @@ func TestRedirectBytesByBinary(t *testing.T) {
 				w.WriteHeader(201)
 			}))
 			defer server.Close()
-			code, out, stderr := run(t, "test", scenario(t, "POST {{base}}/start\nAuthorization: {{auth}}\n"+body+"\nHTTP 201"), "--var", "base="+server.URL, "--var", "auth=auth-secret", "--secret", "auth")
+			code, out, stderr := run(t, "test", scenario(t, "POST {{base}}/start\nAuthorization: {{auth}}\n{\n \"password\": {{password}}\n}\nHTTP 201"), "--var", "base="+server.URL, "--var", "auth=auth-secret", "--secret", "auth", "--var", `password="body-secret"`, "--secret", "password")
 			if code != 0 || stderr != "" || hits.Load() != 2 || !strings.Contains(out, "esperado 201, recebido 201") {
 				t.Fatalf("code=%d,out=%q,err=%q,hits=%d", code, out, stderr, hits.Load())
 			}

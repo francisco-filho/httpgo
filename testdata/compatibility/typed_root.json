@@ -1,0 +1,34 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "value=[null,{\"x\":42}]"
+  ],
+  "classification": "intentional HTTPGo extension: typed composite root; Hurl CLI rejects this variable value",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/missing"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "[null,{\"x\":42}]",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "uri": "/missing",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": null
+  }
+}

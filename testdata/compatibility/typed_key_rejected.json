@@ -1,0 +1,26 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "key=static"
+  ],
+  "classification": "intentional HTTPGo restriction: JSON property names remain static",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"static\":1}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

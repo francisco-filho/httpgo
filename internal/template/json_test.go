@@ -53,7 +53,7 @@ func TestJSONStringComposition(t *testing.T) {
 }
 
 func TestJSONPlanBoundariesAndStaticBytes(t *testing.T) {
-	for _, source := range []string{`{"a":{}}`, "{\r\n \"a\": [1,{}],\r\n \"instruction\": \"HTTP 200 GET #\"\r\n}", `"escaped\"\\"`, `null`, `42`, `[]`} {
+	for _, source := range []string{`{"a":{}}`, `{"literal":"}}"}`, "{\r\n \"a\": [1,{}],\r\n \"instruction\": \"HTTP 200 GET #\"\r\n}", `"escaped\"\\"`, `null`, `42`, `[]`} {
 		c, _ := New(nil, nil)
 		plan, err := ParseJSON([]byte(source + "\r\nHTTP 201\r\nGET http://example.test"))
 		if err != nil || plan.End != len(source) || len(plan.References) != 0 {
@@ -71,7 +71,7 @@ func TestJSONPlanBoundariesAndStaticBytes(t *testing.T) {
 }
 
 func TestJSONErrorsSafeAndLocated(t *testing.T) {
-	for _, source := range []string{`{"{{x}}":1}`, `{ {{x}}:1}`, `{"x":{{bad-name}}}`, `{"x":{{x}`, `{"x":{{x}} "y":1}`, `{"x":}`, `[{{x}},]`, `"bad\q{{x}}"`, `"{{x}}`, `"xx}}"`, `{{}}`, `{"a":"\uZZZZ"}`, "\"\xff\""} {
+	for _, source := range []string{`{"{{x}}":1}`, `{ {{x}}:1}`, `{"x":{{bad-name}}}`, `{"x":{{x}`, `{"x":{{x}} "y":1}`, `{"x":}`, `[{{x}},]`, `"bad\q{{x}}"`, `"{{x}}`, `{{}}`, `{"a":"\uZZZZ"}`, "\"\xff\""} {
 		plan, err := ParseJSON([]byte(source))
 		if err == nil || len(plan.References) != 0 || strings.Contains(err.Error(), "bad-name") {
 			t.Fatalf("accepted/unsafe %q: %+v %v", source, plan, err)

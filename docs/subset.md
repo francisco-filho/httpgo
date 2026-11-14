@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-03 (issues #4, #6 e #11)
+# Subconjunto suportado — US-01 a US-04 (issues #4, #6, #11 e #13)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -49,7 +49,9 @@ calcula o tamanho do body. Não há autenticação ou cookie jar implícito.
 objeto, array, string, número, booleano ou `null`, inclusive multilinha. `GET`
 permanece sem body. O valor começa no primeiro caractere JSON e termina no último.
 Espaços/linhas separadores externos não são enviados; todos os bytes internos,
-inclusive indentação, escapes e LF/CRLF, são preservados, sem nova serialização.
+inclusive indentação, escapes e LF/CRLF, são preservados, sem nova serialização
+em bodies estáticos. Bodies com templates substituem apenas os intervalos dos
+placeholders, respeitando os contextos descritos abaixo.
 Na última linha do valor só pode haver whitespace após ele. A expectativa e a
 próxima request-line devem começar em outra linha. Texto dentro de strings JSON
 (como `HTTP 200`, `GET`, `#` e `[Asserts]`) não é delimitador externo.
@@ -71,31 +73,38 @@ rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
 
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
 sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
-templates no body e em nomes de headers, `[Captures]`, `[Asserts]` e demais
+templates em chaves JSON e nomes de headers, `[Captures]`, `[Asserts]` e demais
 seções, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
 não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
 
-## Variáveis textuais e templates — US-03
+## Variáveis tipadas e templates — US-03/US-04
 
 `--var nome=valor` e `--secret nome` são repetíveis (também aceitam
 `--var=nome=valor` e `--secret=nome`). Flags podem vir antes/depois do único
 arquivo, após `test`. Cada execução cria contexto novo, sem estado compartilhado.
 O primeiro `=` de uma atribuição separa nome e valor; os demais pertencem ao
-valor. Texto vazio é definido e difere de ausência. Valores são **somente texto**:
-números, booleanos, `null`, aspas e conteúdo parecido com JSON não são convertidos.
-Essa limitação temporária não anuncia a interpolação JSON da US-04.
+valor. Texto vazio é definido e difere de ausência. **Mudança intencional de contrato
+na US-04:** literal JSON válido preserva seu tipo; valor não JSON permanece texto.
+Strings JSON perdem somente as aspas delimitadoras e interpretam escapes; por
+exemplo `--var 'code="001"'` força string. `001` sem aspas também é texto (não é
+número JSON válido). Números mantêm representação numérica JSON sem passar por
+float64, inclusive dentro de arrays/objetos. A tipagem CLI é extensão HTTPGo.
 
 Cada segmento do nome corresponde a `[A-Za-z_][A-Za-z0-9_]*`; pontos separam
 segmentos hierárquicos (`api.baseUrl`). Segmento vazio, nome inválido, atribuição
-sem `=`, repetição (mesmo valor idêntico) ou conflito escalar/descendente em qualquer
-ordem impede todos os envios. Nunca há sobrescrita silenciosa.
+sem `=`, repetição (mesmo valor idêntico) ou conflito ancestral/descendente em qualquer
+ordem e tipo impede todos os envios. Nunca há merge ou sobrescrita silenciosa.
+Objetos são indivisíveis: `--var 'product={"name":"Pizza"}'` define apenas `product`,
+não `product.name`. Nomes pontuados funcionam quando declarados explicitamente.
 
 URL e **valores** de headers aceitam `{{nome}}` e `{{ nome }}`, com espaços/tabs
 internos opcionais e múltiplas referências combinadas com texto. O conteúdo
 inserido não é interpretado novamente como template. Nomes de headers são
-estáticos; body inline permanece sem interpolação, inclusive em strings JSON.
+estáticos. URL e headers aceitam apenas escalares: strings usam seu conteúdo,
+números sua representação JSON, booleanos `true`/`false` e null o texto `null`.
+Arrays/objetos nesses contextos geram erro, nunca conversão implícita.
 
 ```hurl
 GET {{ api.baseUrl }}/products/{{id}}
@@ -115,7 +124,8 @@ na separação método/URL e dentro de placeholders; comentários inline continu
 inválidos. URLs e headers estáticos mantêm as validações anteriores. Os templates
 originais são conservados e resolvidos imediatamente antes da requisição.
 
-Variável ausente, URL final inválida ou header final inválido gera **erro de
+Variável ausente, tipo incompatível, JSON final inválido, URL final inválida ou
+header final inválido gera **erro de
 renderização**, código 2, preserva resultados anteriores e impede a requisição
 afetada e as seguintes. A entrada afetada é apresentada sem status e com URL
 não renderizada; não é chamada de erro de transporte nem contada como iniciada.
@@ -138,6 +148,42 @@ valores não sigilosos/fictícios são adequados aqui. A fonte segura pelo ambie
 do processo chega na US-13; não há entrada de segredos por stdin, configuração
 YAML ou capturas nesta entrega. Proteção de streams não protege histórico do shell,
 listagem de processos, arquivos em disco nem segredos arbitrários não marcados.
+
+### JSON contextual — US-04
+
+```hurl
+POST {{api.baseUrl}}/products
+Content-Type: application/json
+{"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}},"code":{{product.code}}}
+HTTP 201
+```
+
+```sh
+httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+  --var product.name=Pizza --var product.price=4500 \
+  --var product.active=true --var 'product.code="001"'
+```
+
+- Sem aspas, placeholder deve ocupar **um valor completo**, inclusive raiz.
+  Insere string, número, booleano, null, array ou objeto com seu tipo, sem converter
+  estruturas em strings. Ex.: `{"value":{{x}}}`, `[{{x}}]` ou `{{x}}` na raiz.
+- Dentro de string JSON, placeholders podem compor texto e aceitam só escalares
+  segundo as representações de URL/headers. O conteúdo é escapado uma vez, com
+  aspas, barras invertidas, controles e Unicode corretos. Escapes estáticos
+  existentes no template conservam sua função.
+- Valores inseridos nunca são reinterpretados como template, mesmo em estruturas.
+  `null` completo é null JSON; `"{{x}}"` com x=null é string `"null"`; x vazio
+  completo é string vazia, não ausência. Não há navegação de propriedades,
+  expressões/funções ou interpolação de nomes de propriedades.
+- Chaves são estáticas, com ou sem aspas ao redor do placeholder. Template
+  malformado ou estrutura JSON inválida em qualquer entrada rejeita **todo** o
+  arquivo antes da rede. Fechamentos adjacentes (`{"a":{}}`) não são placeholders.
+- JSON final é validado novamente antes do executor. Falha impede a requisição
+  afetada/posteriores e mantém resultados prévios e código 2. Diagnósticos mapeiam
+  offsets para o template original, inclusive multiline/LF/CRLF, nunca posições
+  deslocadas pelo escape do valor. Nenhum payload completo é reproduzido.
+- Sem placeholders, bytes e validação permanecem os da US-02. A expectativa e a
+  entrada seguinte começam em nova linha, inclusive depois de placeholder raiz.
 
 ## Execução HTTP
 
@@ -263,7 +309,12 @@ de normalizações/escapes de URL, inclusive no path. Valores operacionais segue
 intactos para o executor; a representação protegida é separada. Essa proteção
 vale também em sucesso, divergência, erros de uso/parsing/renderização/transporte
 e falhas de escrita. Declarações são consolidadas independentemente da ordem das
-flags. Headers/bodies permanecem ausentes das saídas.
+flags. Formas brutas, strings JSON decodificadas e variantes conhecidas de escape
+JSON/Go/URL são protegidas também antes da construção do contexto. Constituintes
+de objetos/arrays secretos são protegidos sem disponibilizá-los como variáveis.
+Valores vazios não provocam substituição global. Headers/bodies permanecem ausentes
+das saídas; não é gerado body de diagnóstico. Codificações arbitrárias desconhecidas
+não têm garantia de detecção.
 
 **O restante do path permanece visível: não coloque segredos arbitrários nele.** Não é possível
 detectar qualquer segredo arbitrário embutido no path/hostname/nome de arquivo,
@@ -282,10 +333,13 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 - Redirects são automáticos mas limitados à mesma origem; o diferencial usa
   `--location --max-redirs 10 --max-time 10 --retry 0` no Hurl para aproximar as
   políticas compartilhadas. Essa aproximação não torna os motores equivalentes.
-- Variáveis iniciais são textuais, sem recursão; nomes hierárquicos pontuados são
-  aceitos aqui, mas o exemplo `api.baseUrl` falhou na resolução do Hurl 8.0.0.
-  Duplicações e conflitos são erros no httpgo; Hurl permite sobrescrita no corpus.
-  Hurl aceita templates em JSON e nomes de headers; esta entrega não.
+- Variáveis CLI tipadas são extensão HTTPGo, sem recursão. Não presuma as mesmas
+  regras na CLI Hurl: o corpus diferencia strings explicitamente delimitadas,
+  estruturas e conversão textual. Interpolação escalar contextual em JSON possui
+  pares compartilhados observados, sem anunciar equivalência geral.
+- Nomes pontuados são aceitos aqui, mas `api.baseUrl` falhou no Hurl 8.0.0.
+  Duplicações/conflitos são erros aqui; Hurl permite sobrescrita no corpus.
+  Hurl aceita templates em nomes de headers/chaves JSON; esta entrega não.
 - Configuração YAML hierárquica e interpolação externa, quando implementadas,
   serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
 
