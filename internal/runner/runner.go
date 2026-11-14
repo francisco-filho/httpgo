@@ -8,7 +8,12 @@ import (
 	"capimgrosso.com/httpgo/internal/parser"
 )
 
-type Request struct{ URL string }
+type Request struct {
+	Method  string
+	URL     string
+	Headers []parser.Header
+	Body    []byte
+}
 type Response struct{ Status int }
 
 // HTTPExecutor returns a response only after consuming and closing its body.
@@ -64,7 +69,7 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 		}
 		result.Summary.Started++
 		result.Summary.NotStarted--
-		response, err := r.executor.Execute(ctx, Request{URL: entry.URL})
+		response, err := r.executor.Execute(ctx, Request{Method: entry.Method, URL: entry.URL, Headers: entry.Headers, Body: entry.Body})
 		current := EntryResult{Entry: entry, Status: response.Status}
 		if err != nil {
 			current.Outcome, current.Status = Failed, 0

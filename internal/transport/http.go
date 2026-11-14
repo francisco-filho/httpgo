@@ -2,6 +2,7 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -68,10 +69,21 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 	}
 	current.Scheme = strings.ToLower(current.Scheme)
 	origin := current
+	method, body := request.Method, request.Body
+	if method == "" {
+		method = http.MethodGet
+	}
 	for hops := 0; ; hops++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, current.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, method, current.String(), bytes.NewReader(body))
 		if err != nil {
 			return runner.Response{}, classify(ctx, Network, err)
+		}
+		for _, header := range request.Headers {
+			if strings.EqualFold(header.Name, "Host") {
+				req.Host = header.Value
+			} else {
+				req.Header.Add(header.Name, header.Value)
+			}
 		}
 		response, err := e.transport.RoundTrip(req)
 		if err != nil {
@@ -98,6 +110,11 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		next.Scheme = strings.ToLower(next.Scheme)
 		if hops >= 10 || !sameOrigin(origin, next) {
 			return runner.Response{}, &Error{Kind: Redirect}
+		}
+		if response.StatusCode == 301 || response.StatusCode == 302 || response.StatusCode == 303 {
+			if method != http.MethodGet && method != http.MethodHead {
+				method, body = http.MethodGet, nil
+			}
 		}
 		current = next
 	}
