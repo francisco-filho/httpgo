@@ -1,0 +1,37 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "path=a%2Fb"
+  ],
+  "classification": "shared: explicitly encoded path is not encoded twice",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/a/b"
+    ],
+    "requests": [
+      {
+        "uri": "/a%2Fb?q=a/b",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/a/b"
+    ],
+    "requests": [
+      {
+        "uri": "/a%2Fb?q=a/b",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

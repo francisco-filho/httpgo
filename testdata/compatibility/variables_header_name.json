@@ -1,0 +1,26 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "name=Probe"
+  ],
+  "classification": "intentional restriction: header names must remain static",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "value"
+      }
+    ]
+  }
+}

@@ -51,7 +51,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}))
 			defer server.Close()
 			address := strings.Replace(server.URL, "http://", "http://username-secret:password-secret@", 1)
-			file := scenario(t, "GET "+address+"/first?token=query-secret#fragment-secret\nHTTP 200\nGET "+server.URL+"/second\nHTTP 404")
+			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\nGET {{base}}/second\nHTTP 404")
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			reader, writer, err := os.Pipe()
@@ -59,7 +59,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = reader.Close(); _ = writer.Close() }()
-			command := exec.CommandContext(ctx, binary(t), "test", file)
+			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "first="+address, "--var", "base="+server.URL)
 			var stderr bytes.Buffer
 			command.Stdout, command.Stderr = writer, &stderr
 			if err := command.Start(); err != nil {

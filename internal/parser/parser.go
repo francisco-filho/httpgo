@@ -12,6 +12,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"capimgrosso.com/httpgo/internal/template"
 )
 
 type Position struct {
@@ -30,6 +32,8 @@ type Entry struct {
 	Position         Position
 	ExpectedStatus   *int
 	ExpectedPosition Position
+	URLPosition      Position
+	HeaderPositions  []Position
 }
 
 type Scenario struct {
@@ -87,18 +91,33 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		}
 		switch fields[0] {
 		case "GET", "POST", "PUT", "PATCH", "DELETE":
-			if len(fields) != 2 {
+			token := strings.TrimLeft(text[len(fields[0]):], " \t")
+			urlPos := pos
+			urlPos.Column += len(text) - len(token)
+			refs, err := template.Parse(token)
+			if err != nil {
+				pos = templatePosition(urlPos, err)
+				return fail("sintaxe inválida", err.Error())
+			}
+			// Only placeholder interiors can contain whitespace in the request URL.
+			masked, last := "", 0
+			for _, ref := range refs {
+				masked += token[last:ref.Start] + "x"
+				last = ref.End
+			}
+			masked += token[last:]
+			if token == "" || strings.ContainsFunc(masked, unicode.IsSpace) {
 				return fail("sintaxe inválida", "método exige somente uma URL absoluta HTTP/HTTPS; comentários apenas em linha própria")
 			}
-			if hasTemplate(fields[1]) {
-				return fail("construção não suportada", "variáveis")
+			if len(refs) == 0 {
+				u, err := parseURL(token)
+				if err != nil {
+					pos = urlPos
+					return fail("sintaxe inválida", "URL absoluta HTTP/HTTPS inválida")
+				}
+				token = u.String()
 			}
-			u, err := parseURL(fields[1])
-			if err != nil {
-				pos.Column += strings.Index(text, fields[1])
-				return fail("sintaxe inválida", "URL absoluta HTTP/HTTPS inválida")
-			}
-			scenario.Entries = append(scenario.Entries, Entry{Method: fields[0], URL: u.String(), Position: pos})
+			scenario.Entries = append(scenario.Entries, Entry{Method: fields[0], URL: token, Position: pos, URLPosition: urlPos})
 		case "HTTP":
 			if len(fields) != 2 {
 				return fail("sintaxe inválida", "HTTP exige somente um status de três dígitos")
@@ -136,6 +155,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 					return fail("sintaxe inválida", "body JSON deve usar UTF-8 válido")
 				}
 				if bytes.Contains(body, []byte("{{")) {
+					pos = position(file, data, start)
 					return fail("construção não suportada", "variáveis no body")
 				}
 				// Only whitespace may follow a value on its last line. Never absorb
@@ -159,17 +179,25 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 					return fail("sintaxe inválida", "header fora da requisição ou após body")
 				}
 				name, value, _ := strings.Cut(text, ":")
+				if hasTemplate(name) {
+					return fail("construção não suportada", "variáveis no nome de header")
+				}
 				if !validHeaderName(name) || !validHeaderValue(value) {
 					return fail("sintaxe inválida", "nome ou valor de header inválido")
 				}
-				if hasTemplate(value) {
-					return fail("construção não suportada", "variáveis no header")
+				valuePos := pos
+				valuePos.Column += len(name) + 1 + len(value) - len(strings.TrimLeft(value, " \t"))
+				value = strings.Trim(value, " \t")
+				refs, err := template.Parse(value)
+				if err != nil {
+					pos = templatePosition(valuePos, err)
+					return fail("sintaxe inválida", err.Error())
 				}
+				entry.HeaderPositions = append(entry.HeaderPositions, valuePos)
 				switch strings.ToLower(name) {
 				case "host":
 					host := strings.Trim(value, " \t")
-					u, err := parseURL("http://" + host)
-					if err != nil || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(host, " \t/?#") {
+					if len(refs) == 0 && ValidateHeader(name, host) != nil {
 						return fail("sintaxe inválida", "valor de Host inválido")
 					}
 					for _, header := range entry.Headers {
@@ -204,6 +232,13 @@ func position(file string, data []byte, offset int) Position {
 	}
 	prefix := data[:offset]
 	return Position{file, bytes.Count(prefix, []byte{'\n'}) + 1, offset - bytes.LastIndexByte(prefix, '\n')}
+}
+
+func templatePosition(pos Position, err error) Position {
+	if located, ok := err.(*template.Error); ok {
+		pos.Column += located.Offset
+	}
+	return pos
 }
 
 func hasTemplate(s string) bool { return strings.Contains(s, "{{") || strings.Contains(s, "}}") }
@@ -251,6 +286,59 @@ func unsupported(token string) string {
 			return ""
 		}
 	}
+}
+
+// ValidateURL validates a rendered URL without normalizing or encoding its bytes.
+func ValidateURL(raw string) error {
+	for _, c := range []byte(raw) {
+		if c <= 32 || c >= 127 || strings.ContainsRune("\"<>\\^`{|}", rune(c)) {
+			return fmt.Errorf("URL absoluta HTTP/HTTPS inválida; forneça o encoding necessário")
+		}
+	}
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '%' {
+			continue
+		}
+		if i+2 >= len(raw) || !isHex(raw[i+1]) || !isHex(raw[i+2]) {
+			return fmt.Errorf("encoding de URL inválido")
+		}
+		i += 2
+	}
+	u, err := parseURL(raw)
+	if err != nil {
+		return fmt.Errorf("URL absoluta HTTP/HTTPS inválida")
+	}
+	// Compare the actual request target with the supplied bytes, not URL.String:
+	// the latter may legitimately canonicalize percent-encoded userinfo.
+	authority := raw[strings.Index(raw, "://")+3:]
+	target := ""
+	if start := strings.IndexAny(authority, "/?#"); start >= 0 {
+		target = authority[start:]
+	}
+	target, _, _ = strings.Cut(target, "#")
+	if target == "" || target[0] == '?' {
+		target = "/" + target
+	}
+	if u.RequestURI() != target {
+		return fmt.Errorf("URL exige encoding explícito")
+	}
+	return nil
+}
+
+func isHex(c byte) bool { return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' }
+
+// ValidateHeader applies the same value and Host rules to static and final values.
+func ValidateHeader(name, value string) error {
+	if !validHeaderName(name) || !validHeaderValue(value) || !utf8.ValidString(value) {
+		return fmt.Errorf("nome ou valor de header inválido")
+	}
+	if strings.EqualFold(name, "Host") {
+		u, err := parseURL("http://" + value)
+		if err != nil || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(value, " \t/?#") {
+			return fmt.Errorf("valor de Host inválido")
+		}
+	}
+	return nil
 }
 
 func parseURL(token string) (*url.URL, error) {

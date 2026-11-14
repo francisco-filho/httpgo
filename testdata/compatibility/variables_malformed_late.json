@@ -1,0 +1,25 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "intentional restriction: invalid placeholder name prevents all httpgo sends; Hurl resolves it as a missing variable after first send",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

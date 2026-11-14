@@ -1,0 +1,36 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "shared: missing variable interrupts before dependent send; own exit codes",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

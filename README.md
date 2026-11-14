@@ -81,8 +81,46 @@ iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e o
 JSON são preservados, sem serialização. Declare Content-Type quando necessário;
 não há inferência automática desse header.
 
-O arquivo inteiro é validado antes da rede. As requisições são sequenciais e a primeira
-falha interrompe a execução. Sem `HTTP`, qualquer status recebido é aceito,
+## Parametrizar URL e headers (US-03 / issue #11)
+
+Salve o exemplo abaixo como `products.hurl`:
+
+```hurl
+GET {{api.baseUrl}}/products
+Authorization: Bearer {{token}}
+
+HTTP 200
+```
+
+```sh
+bin/httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+  --var token=valor-ficticio --secret token
+# Troque somente api.baseUrl para executar o mesmo arquivo em outro destino.
+```
+
+O cenário também está em `testdata/scenarios/scenario_products_variables.hurl`;
+requer uma API com `GET /products` retornando 200 (o dummy manual não oferece esse
+GET). Os E2E demonstram dois destinos locais isolados sem editar o cenário.
+
+`--var nome=valor` é repetível e fornece **somente texto**, temporariamente:
+`42`, `true` e `null` não são convertidos em tipos JSON. O primeiro `=` separa
+nome/valor; vazio e sinais `=` adicionais são preservados. Nomes ASCII podem
+usar caminhos como `api.baseUrl`; duplicações e conflitos como `api`/`api.baseUrl`
+são erros, sem sobrescrita. URL e valores de headers aceitam `{{nome}}` e
+`{{ nome }}`, sem recursão. A URL final exige encoding explícito. Templates no
+body e em nomes de headers continuam rejeitados.
+
+**É proibido fornecer credenciais reais em argumentos, inclusive `--var`.** Use
+somente valores não sigilosos ou fictícios. `--secret nome` apenas marca proteção
+nas saídas; não fornece valor nem protege histórico de shell/listagem de processos.
+Marcar um nome ainda ausente é permitido, mas não resolve sua referência. A fonte
+segura pelo ambiente do processo chega na US-13; stdin e capturas não estão
+implementados nesta entrega.
+
+A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
+valores finais inválidos falham imediatamente antes da requisição dependente,
+sem contá-la como iniciada e sem enviar as seguintes. As requisições são
+sequenciais e a primeira falha interrompe a execução. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
 - `0`: sucesso; `1`: status divergente; `2`: demais erros.
@@ -93,7 +131,10 @@ com indicação explícita de **sem validação de status**.
 - 301/302/303 convertem POST/PUT/PATCH/DELETE em GET sem body; 307/308 preservam ambos.
 - Valores de headers e bodies não são impressos, nem em erros de entrada.
 - Credenciais, query inteira e fragmento da URL não são exibidos.
-  **Não coloque segredos no path: ele permanece visível.**
+  Valores marcados com `--secret` também são ocultos em paths e headers comuns,
+  antes de escapes/normalização de URL. O restante do path permanece visível:
+  não coloque segredos arbitrários nele. A CLI não detecta toda credencial ou
+  codificação desconhecida automaticamente.
 
 ## Documentação e desenvolvimento
 
@@ -116,6 +157,6 @@ make portable
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
 **desenvolvimento**, não no binário entregue. O gate local com race já passou;
 o aceite nativo pendente em macOS/Windows está registrado em
-`docs/validation.md`, que distingue a evidência local US-02 do histórico US-01.
+`docs/validation.md`, que distingue a evidência local US-03 dos históricos US-01/US-02.
 Cross-build não comprova execução nessas plataformas. A aprovação da história
 passa pelo gate de revisão; não há alegação de compatibilidade Hurl completa.

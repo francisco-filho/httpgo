@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 e US-02
+# Matriz de compatibilidade — US-01 a US-03
 
 ## Escopo da evidência
 
@@ -18,7 +18,12 @@ go test -tags compatibility ./tests/e2e -run '^TestCompatibility$' -count=1 -arg
 Ausência de Hurl ou versão diferente de 8.0.0 causa **falha**, não skip. O alvo
 não baixa ou instala Hurl automaticamente. O teste substitui a origem absoluta
 `http://example.invalid` por um httptest.Server local em cópia temporária. Isso
-é adaptação do harness, **não suporte a variáveis/interpolação no httpgo**.
+é adaptação do harness para os pares estáticos US-01/US-02. Os pares US-03 usam
+placeholders no cenário original e o campo `variables` no JSON de referência:
+o harness fornece os mesmos valores via `--var` ao httpgo e `--variable` ao Hurl.
+Somente a origem do valor da variável é adaptada ao servidor local; o cenário
+parametrizado não é editado. Os novos pares incluem `uri` (RequestURI recebido)
+para provar que encoding explícito não foi duplicado.
 
 Os comandos Hurl usam `--no-color --no-output --location --max-redirs 10
 --max-time 10 --retry 0 --no-cookie-store --no-proxy '*'`. Não se compara texto
@@ -65,10 +70,31 @@ na demonstração. A matriz não generaliza a política de redirects para todos 
 métodos do Hurl: o diferencial fixa POST; os testes próprios httpgo também cobrem
 PUT/PATCH/DELETE conforme a semântica definida na US-02.
 
+### Ampliação US-03 — contrato de variáveis sinalizado (issue #11)
+
+Dez novos pares `variables_*.hurl/.json` ampliam o contrato para **35 pares**.
+Nenhuma observação antiga US-01/US-02 foi alterada. A aceitação de templates em
+URL/valores de headers é uma ampliação intencional; o corpus de cenários renomeia
+as antigas rejeições globais para positivos, mantendo negativos de body/nomes.
+Todos os valores usados são fictícios ou não sigilosos, nunca credenciais reais.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/diferença |
+|---|---|---|---|
+| `variables_text` | 0; /health | 0; /health | texto vazio, `=`, números/booleanos textuais, composição e header não recursivo idênticos |
+| `variables_encoding` | 0; URI `/a%2Fb?q=a/b` | 0; mesma URI | encoding fornecido não é duplicado; separadores reservados preservados |
+| `variables_missing` | 2; somente /health | 3; somente /health | falta variável antes do segundo envio; códigos próprios |
+| `variables_url_space` | 2; sem envio | 3; sem envio | ambos rejeitam espaço em URL renderizada, sem encoding automático |
+| `variables_hierarchical` | 0; /health | 3; sem envio | `api.baseUrl` funciona aqui; Hurl não resolve esse nome pontuado no exemplo |
+| `variables_duplicate` | 2; sem envio | 0; /health, X-Probe=second | httpgo rejeita repetição; Hurl sobrescreve |
+| `variables_conflict` | 2; sem envio | 0; /health | httpgo rejeita escalar/descendente mesmo sem uso; Hurl aceita atribuições |
+| `variables_malformed_late` | 2; sem envio | 3; somente /health | nome com hífen é inválido estruturalmente aqui; Hurl o trata como referência ausente após primeiro envio |
+| `variables_body` | 2; sem envio | 0; POST /health | httpgo ainda rejeita template em JSON; Hurl interpola |
+| `variables_header_name` | 2; sem envio | 0; X-Probe=value | nomes de headers permanecem estáticos aqui; Hurl interpola |
+
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. As demais garantias httpgo são verificadas nos
-testes próprios. Variáveis, capturas, seções, bodies externos/binários/multipart,
+testes próprios. Templates em body/nomes de headers, capturas, seções, bodies externos/binários/multipart,
 headers de enquadramento e demais construções fora de escopo continuam
 explicitamente não suportadas.
 
@@ -76,7 +102,7 @@ explicitamente não suportadas.
 
 YAML hierárquico e interpolação em arquivos externos são extensões futuras do
 httpgo, **não capacidades do formato Hurl implementadas nesta história**.
-Não há configuração YAML ou interpolação nesta entrega. A gramática menor,
+Não há configuração YAML ou interpolação **externa** nesta entrega. A gramática menor,
 saída/exit codes próprios e restrição de redirects estão detalhados em `subset.md`.
 
 ## Ambiente usado

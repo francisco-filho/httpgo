@@ -1,0 +1,25 @@
+{
+  "variables": [
+    "api.baseUrl=http://example.invalid"
+  ],
+  "classification": "httpgo hierarchical names; observed Hurl naming restriction",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": null
+  }
+}

@@ -26,6 +26,7 @@ const hurlVersion = "8.0.0"
 var updateCompatibility = flag.Bool("update", false, "update compatibility observations; review contract changes")
 
 type wireRequest struct {
+	URI         string `json:"uri,omitempty"`
 	Method      string `json:"method"`
 	Body        string `json:"body"`
 	ContentType string `json:"content_type"`
@@ -39,6 +40,7 @@ type observation struct {
 }
 
 type comparison struct {
+	Variables      []string    `json:"variables,omitempty"`
 	Classification string      `json:"classification"`
 	HTTPGo         observation `json:"httpgo"`
 	Hurl           observation `json:"hurl"`
@@ -87,7 +89,11 @@ func TestCompatibility(t *testing.T) {
 				}
 				mu.Lock()
 				paths = append(paths, r.URL.Path)
-				requests = append(requests, wireRequest{r.Method, string(body), r.Header.Get("Content-Type"), r.Header.Get("X-Probe")})
+				request := wireRequest{Method: r.Method, Body: string(body), ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe")}
+				if expected.Variables != nil {
+					request.URI = r.RequestURI
+				}
+				requests = append(requests, request)
 				mu.Unlock()
 				switch r.URL.Path {
 				case "/redirect301", "/redirect302", "/redirect303", "/redirect307", "/redirect308":
@@ -116,7 +122,14 @@ func TestCompatibility(t *testing.T) {
 			}))
 			defer server.Close()
 			generated := scenario(t, strings.ReplaceAll(string(input), "http://example.invalid", server.URL))
-			code, out, stderr := run(t, "test", generated)
+			httpgoArgs := []string{"test", generated}
+			var variableArgs []string
+			for _, variable := range expected.Variables {
+				assignment := strings.ReplaceAll(variable, "http://example.invalid", server.URL)
+				httpgoArgs = append(httpgoArgs, "--var", assignment)
+				variableArgs = append(variableArgs, "--variable", assignment)
+			}
+			code, out, stderr := run(t, httpgoArgs...)
 			mu.Lock()
 			httpgoPaths := slices.Clone(paths)
 			httpgoRequests := slices.Clone(requests)
@@ -124,7 +137,10 @@ func TestCompatibility(t *testing.T) {
 			mu.Unlock()
 			hurlContext, hurlCancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer hurlCancel()
-			command := exec.CommandContext(hurlContext, "hurl", "--no-color", "--no-output", "--location", "--max-redirs", "10", "--max-time", "10", "--retry", "0", "--no-cookie-store", "--no-proxy", "*", generated)
+			hurlArgs := []string{"--no-color", "--no-output", "--location", "--max-redirs", "10", "--max-time", "10", "--retry", "0", "--no-cookie-store", "--no-proxy", "*"}
+			hurlArgs = append(hurlArgs, variableArgs...)
+			hurlArgs = append(hurlArgs, generated)
+			command := exec.CommandContext(hurlContext, "hurl", hurlArgs...)
 			hurlOutput, hurlErr := command.CombinedOutput()
 			hurlCode := 0
 			if hurlContext.Err() != nil {
@@ -148,7 +164,7 @@ func TestCompatibility(t *testing.T) {
 			if expected.Hurl.Requests == nil {
 				hurlRequests = nil
 			}
-			got := comparison{Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
+			got := comparison{Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {

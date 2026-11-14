@@ -1,0 +1,41 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "empty=",
+    "eq=a=b=c",
+    "num=42",
+    "bool=true",
+    "raw={{literal}}"
+  ],
+  "classification": "shared: textual values, empty, equals, composition and non-recursive header",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "a=b=c-42-true-{{literal}}"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "a=b=c-42-true-{{literal}}"
+      }
+    ]
+  }
+}
