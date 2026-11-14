@@ -3,6 +3,9 @@ package runner
 
 import (
 	"context"
+	"fmt"
+
+	"capimgrosso.com/httpgo/internal/template"
 
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/parser"
@@ -24,16 +27,18 @@ type HTTPExecutor interface {
 type Outcome string
 
 const (
-	Unvalidated Outcome = "sem validação de status"
-	Passed      Outcome = "status validado"
-	Mismatch    Outcome = "status divergente"
-	Failed      Outcome = "erro de transporte"
+	Unvalidated  Outcome = "sem validação de status"
+	Passed       Outcome = "status validado"
+	Mismatch     Outcome = "status divergente"
+	Failed       Outcome = "erro de transporte"
+	RenderFailed Outcome = "erro de renderização"
 )
 
 type EntryResult struct {
-	Entry   parser.Entry
-	Outcome Outcome
-	Status  int
+	Entry      parser.Entry
+	Outcome    Outcome
+	Status     int
+	DisplayURL string
 }
 
 type Summary struct {
@@ -49,15 +54,37 @@ type Result struct {
 	Diverged      bool
 }
 
+// Renderer is the textual rendering contract consumed before each request.
+type Renderer interface {
+	Render(string) (template.Text, error)
+}
+
+type RenderError struct {
+	Position parser.Position
+	Detail   string
+	cause    error
+}
+
+func (e *RenderError) Error() string { return fmt.Sprintf("erro de renderização: %s", e.Detail) }
+func (e *RenderError) Unwrap() error { return e.cause }
+
 type Runner struct {
 	executor HTTPExecutor
 	report   func(EntryResult) error
+	renderer Renderer
 }
 
 // New accepts an optional synchronous reporter, called before the next entry.
 // A reporting error stops execution; nil collects results without reporting.
 func New(executor HTTPExecutor, report func(EntryResult) error) *Runner {
-	return &Runner{executor: executor, report: report}
+	return NewWithRenderer(executor, nil, report)
+}
+
+func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(EntryResult) error) *Runner {
+	if renderer == nil {
+		renderer, _ = template.New(nil, nil)
+	}
+	return &Runner{executor: executor, renderer: renderer, report: report}
 }
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
@@ -67,10 +94,22 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 			result.Err, result.ErrorPosition = err, entry.Position
 			return result
 		}
+		request, display, renderErr := r.render(entry)
+		if renderErr != nil {
+			result.Err, result.ErrorPosition = renderErr, renderErr.Position
+			current := EntryResult{Entry: entry, Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
+			result.Entries = append(result.Entries, current)
+			if r.report != nil {
+				if err := r.report(current); err != nil {
+					result.ReportErr = err
+				}
+			}
+			return result
+		}
 		result.Summary.Started++
 		result.Summary.NotStarted--
-		response, err := r.executor.Execute(ctx, Request{Method: entry.Method, URL: entry.URL, Headers: entry.Headers, Body: entry.Body})
-		current := EntryResult{Entry: entry, Status: response.Status}
+		response, err := r.executor.Execute(ctx, request)
+		current := EntryResult{Entry: entry, Status: response.Status, DisplayURL: display}
 		if err != nil {
 			current.Outcome, current.Status = Failed, 0
 			result.Err, result.ErrorPosition = err, entry.Position

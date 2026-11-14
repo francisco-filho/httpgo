@@ -197,8 +197,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				switch strings.ToLower(name) {
 				case "host":
 					host := strings.Trim(value, " \t")
-					u, err := parseURL("http://" + host)
-					if len(refs) == 0 && (err != nil || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(host, " \t/?#")) {
+					if len(refs) == 0 && ValidateHeader(name, host) != nil {
 						return fail("sintaxe inválida", "valor de Host inválido")
 					}
 					for _, header := range entry.Headers {
@@ -287,6 +286,33 @@ func unsupported(token string) string {
 			return ""
 		}
 	}
+}
+
+// ValidateURL validates a rendered URL without normalizing or encoding its bytes.
+func ValidateURL(raw string) error {
+	for _, c := range []byte(raw) {
+		if c <= 32 || c >= 127 || strings.ContainsRune("\"<>\\^`{|}", rune(c)) {
+			return fmt.Errorf("URL absoluta HTTP/HTTPS inválida; forneça o encoding necessário")
+		}
+	}
+	if _, err := parseURL(raw); err != nil {
+		return fmt.Errorf("URL absoluta HTTP/HTTPS inválida")
+	}
+	return nil
+}
+
+// ValidateHeader applies the same value and Host rules to static and final values.
+func ValidateHeader(name, value string) error {
+	if !validHeaderName(name) || !validHeaderValue(value) || !utf8.ValidString(value) {
+		return fmt.Errorf("nome ou valor de header inválido")
+	}
+	if strings.EqualFold(name, "Host") {
+		u, err := parseURL("http://" + value)
+		if err != nil || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(value, " \t/?#") {
+			return fmt.Errorf("valor de Host inválido")
+		}
+	}
+	return nil
 }
 
 func parseURL(token string) (*url.URL, error) {
