@@ -3,11 +3,12 @@
   "variables": [
     "base=http://example.invalid"
   ],
-  "classification": "restrição HTTPGo: somente captura string, sem conversão implícita de número",
+  "classification": "ampliação US-06: número capturado representado como texto em header nas duas ferramentas",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/capture"
+      "/capture",
+      "/health"
     ],
     "requests": [
       {
@@ -16,6 +17,13 @@
         "body": "",
         "content_type": "",
         "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "123"
       }
     ]
   },

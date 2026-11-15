@@ -241,7 +241,7 @@ Duplicação e ancestral/descendente são erros, sem merge nem sobrescrita.
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
-Capturas string da resposta para entradas seguintes (URL, headers e JSON inline):
+Capturas tipadas da resposta para entradas seguintes (URL, headers e JSON inline):
   POST {{base_url}}/auth/login
   {"username":"{{username}}","password":"{{password}}"}
   HTTP 200
@@ -252,8 +252,26 @@ Capturas string da resposta para entradas seguintes (URL, headers e JSON inline)
   HTTP 200
   httpgo test products.hurl --var base_url=http://localhost:8080 --var username=demo --var password=senha-ficticia --secret password --secret accessToken
 JSONPath limitado: raiz $, propriedades por ponto e índices não negativos,
-como $.product.id e $.items[0]. Somente strings, inclusive vazia; sem conversão.
-JSON inválido, caminho ausente, null ou outro tipo geram erro de captura.
+como $.product.id e $.items[0]. Aceita string, número, booleano, null, array ou objeto,
+inclusive raiz e vazios. Números mantêm precisão, também nas estruturas.
+  POST {{base_url}}/products
+  Content-Type: application/json
+  {"name":"Pizza"}
+  HTTP 201
+  [Captures]
+  productId: jsonpath "$.id"
+  GET {{base_url}}/products/{{productId}}
+  HTTP 200
+  POST {{base_url}}/echo
+  Content-Type: application/json
+  {"productId":{{productId}}}
+  HTTP 200
+  httpgo test products.hurl --var base_url=http://localhost:8080
+Um id recebido como 9007199254740993 chega exato ao path e como número no JSON.
+Strings como "null" ou "{{literal}}" permanecem strings, sem reinterpretação.
+Array/objeto exige valor JSON completo: URL, header ou string JSON gera erro antes do envio.
+JSON inválido, campo ausente ou índice fora do array geram erro de captura;
+null é valor existente e válido. Objetos não criam variáveis para suas propriedades.
 Status divergente impede capturas e próximos envios. Capturas não sobrescrevem
 variáveis iniciais nem capturas anteriores; cada execução começa sem capturas.
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.

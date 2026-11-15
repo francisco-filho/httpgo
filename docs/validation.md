@@ -1,4 +1,83 @@
-# Validação — US-01 a US-05
+# Validação — US-01 a US-06
+
+## US-06 — issue #16 / história 006
+
+Plano executado diretamente da issue #16, sem planner, somente backend. Três
+tasks registradas e autoaprovadas na fila 006 antes da implementação. Tasks 1 e 2
+concluídas com commits `3afeb3b` e `fe893b6`; implementação e validação da task 3
+registradas nesta alteração. Sem frontend/estáticos, novas dependências, mudança
+de toolchain, CI ou lint. SonarQube não foi executado (exclusivo do QA).
+
+### Política atual de portabilidade
+
+Conforme o plano v4, seção 7, referenciado na issue #16, **Linux é o gate obrigatório
+por história**. `make portable` e testes nativos macOS/Windows são opcionais nesta
+história e ficam para a validação final de portabilidade/release. Não foram
+executados nesta US-06 e sua ausência **não bloqueia** tasks, review ou conclusão.
+Nenhuma execução nessas plataformas é declarada. Os registros US-01–US-05 abaixo
+são históricos: suas afirmações de bloqueio nativo não definem o gate atual e
+não devem ser interpretadas como instruções para impedir o handoff da US-06.
+Build cruzado, quando executado, não é evidência de runtime.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64; Go `go1.26.10-X:nodwarf5`, CGO/compilador C para race, goimports,
+golangci-lint e Hurl 8.0.0/libcurl 8.18.0 já disponíveis. Nenhuma instalação.
+Servidores HTTP/TLS locais com portas dinâmicas, sem depender de dummy/8080.
+
+- `go test ./internal/query ./internal/template`: todos os tipos na raiz,
+  propriedades/índices, presença de null/vazios versus ausência; números grandes,
+  decimais e expoentes, inclusive aninhados, sem float64. Publicação atômica,
+  cópia do payload JSON, erro seguro sem fallback textual, strings semelhantes
+  a JSON/placeholders, objetos opacos, conflitos exatos/hierárquicos e proteção
+  de constituintes mesmo quando o lote falha. Sessão e contexto inicial isolados.
+- `go test ./internal/runner ./internal/cli ./internal/parser ./internal/transport`:
+  demonstração autenticada com ID `9007199254740993` exato no path e JSON numérico;
+  callback síncrono, contagens, cenário não mutado e novo Run sem capturas.
+  Contextos textuais escalares, estruturas rejeitadas antes do envio com posição
+  original LF/CRLF; arquivo inválido/não suportado rejeitado antes da rede.
+  JSON inválido/adicional, ausência e percurso incompatível, status divergente
+  antes da captura, 4xx esperado e ausência de expectativa. Saídas protegidas em
+  sucesso, divergência, captura/conflito, renderização, transporte, erro de escrita
+  e short write; escrita prevalece também sobre divergência. HTTP/TLS real retém
+  só resposta final; body tipado completo seguido de falha de leitura/fechamento,
+  cancelamento/timeout ou resposta incompleta não publica nem libera novo envio.
+- `go test ./tests/e2e -count=1`: passou pelo binário real com build único e
+  CommandContext. Cenários `scenario_capture_products.hurl` e
+  `scenario_capture_auth_products.hurl` comprovam os três status da demonstração
+  e o login adicional, token efetivamente recebido, precisão e isolamento entre
+  processos. Todos os tipos, vazios, números aninhados e strings literais são
+  selecionados na raiz/propriedades/índices, verificando bytes sem float64.
+  Escalares em URI/header/string JSON e encoding explícito são observados pela
+  API. Array/objeto em URL/header/string JSON retorna 2 com localização LF/CRLF,
+  uma resposta concluída e zero envios dependentes/posteriores. Segredos escalares
+  e compostos, constituintes e escapes conhecidos permanecem ocultos nos streams
+  e filenames, inclusive após outra declaração do mesmo lote falhar; dados
+  enviados continuam intactos. Redirects 301/302/303/307/308 usam apenas token,
+  número e array da resposta final, com método/body verificados. Regressões de
+  ajuda/versão, flags, pipe/arquivo/PTY Linux, NO_COLOR, timeout público de 10s,
+  cancelamento real, rede e apresentação incremental passaram.
+- `make compatibility`: passou, **58 pares**, Hurl **8.0.0** obrigatório, sem skip.
+  Oito pares `captures_typed_*` novos; `captures_non_string.json` muda
+  intencionalmente de rejeição para sucesso com header `123`. Os outros **49 pares
+  anteriores não mudaram**. Observações atualizadas apenas nos pares autorizados
+  com `-update`, lidas/revisadas e reexecutadas sem atualização. URI/header/body
+  comprovam ID `9007199254740993`, booleano e null compartilhados nesses pares;
+  estruturas completas passam aqui e terminam com 3 no Hurl. Diferenças e limites
+  documentados em `compatibility.md`, sem presumir equivalência geral de tipos.
+- `make fmt lint test`: passou, **0 issues** no lint e `go test ./... -race -cover`.
+  Também executado antes de concluir cada uma das tasks 1 e 2.
+- `go vet ./...`, `go build ./...` e `make build`: passaram.
+- Fuzzing separado, 20 segundos e duas workers por alvo, com seeds ampliados:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    passou; 13.541 execuções.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`:
+    passou; 30.376 execuções, incluindo capturas string e JSON tipado válido.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`:
+    passou; 693.829 execuções. Nenhum caso de falha encontrado.
+
+A evidência local não é aprovação de review: o handoff final da fila 006 solicita
+a revisão da história; o veredito cabe ao code-reviewer.
 
 ## US-05 — issue #14 / história 005
 

@@ -1,0 +1,45 @@
+{
+  "response_json": "{\"flag\":false,\"nothing\":null,\"empty\":\"\",\"items\":[],\"object\":{}}",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "HTTPGo preserva boolean/null/vazios em JSON e texto escalar; Hurl termina com exit 3 após /capture neste par",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/false/null"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/false/null",
+        "method": "POST",
+        "body": "{\"flag\":false,\"nothing\":null,\"empty\":\"\",\"items\":[],\"object\":{},\"text\":\"false-null\"}",
+        "content_type": "application/json",
+        "probe": "false-null"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

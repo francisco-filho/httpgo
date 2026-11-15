@@ -1,0 +1,53 @@
+{
+  "response_json": "true",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "compartilhado neste par: booleano raiz true preservado em JSON e texto em URI/header/string, exit 0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/true"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/true",
+        "method": "POST",
+        "body": "{\"value\":true,\"text\":\"pretrue\"}",
+        "content_type": "application/json",
+        "probe": "pretrue"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/true"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/true",
+        "method": "POST",
+        "body": "{\"value\":true,\"text\":\"pretrue\"}",
+        "content_type": "application/json",
+        "probe": "pretrue"
+      }
+    ]
+  }
+}

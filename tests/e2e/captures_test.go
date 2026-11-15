@@ -96,6 +96,7 @@ func TestCaptureResponseFailuresByBinary(t *testing.T) {
 		detail                        string
 	}{
 		{"invalid", "response-body-secret", "$", "HTTP 200\n", 200, 2, "JSON válido"},
+		{"additional values", `null true`, "$", "HTTP 200\n", 200, 2, "JSON válido"},
 		{"missing", `{}`, "$.missing", "HTTP 200\n", 200, 2, "não encontrou"},
 		{"index", `[]`, "$[0]", "HTTP 200\n", 200, 2, "não encontrou"},
 		{"null traversal", `null`, "$.child", "HTTP 200\n", 200, 2, "não encontrou"},

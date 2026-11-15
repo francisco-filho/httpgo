@@ -1,0 +1,53 @@
+{
+  "response_json": "null",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "compartilhado neste par: null raiz preservado em JSON e texto em URI/header/string, exit 0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/null"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/null",
+        "method": "POST",
+        "body": "{\"value\":null,\"text\":\"prenull\"}",
+        "content_type": "application/json",
+        "probe": "prenull"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/null"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/null",
+        "method": "POST",
+        "body": "{\"value\":null,\"text\":\"prenull\"}",
+        "content_type": "application/json",
+        "probe": "prenull"
+      }
+    ]
+  }
+}
