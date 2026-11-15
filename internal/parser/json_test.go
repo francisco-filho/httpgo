@@ -60,6 +60,16 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 
 func FuzzParse(f *testing.F) {
 	for _, seed := range []string{
+		"GET http://example.test\nHTTP *",
+		"GET http://example.test\r\nHTTP *\r\n[Asserts]\r\nheader \"X\" == \"{{literal}}\"\r\nheader \"X\" contains \"\"\r\nheader \"X\" exists",
+		"GET http://example.test\nHTTP 200\n[Captures]\ntoken: jsonpath \"$\"\n[Asserts]\nheader \"Set-Cookie\" == \"private\"\nGET http://example.test/next",
+		"GET http://example.test\nHTTP 200\n[Asserts]\nheader \"X\" exists\n[Captures]\ntoken: jsonpath \"$\"",
+		"GET http://example.test\nHTTP *\n[Asserts]\nheader \"X\" matches \"x\"",
+		"GET http://example.test\n[Asserts]",
+	} {
+		f.Add(seed)
+	}
+	for _, seed := range []string{
 		"POST http://example.test/products\n{\"name\":\"Pizza\"}\nHTTP 201\n[Captures]\nid: jsonpath \"$.id\"\nGET http://example.test/products/{{id}}\nHTTP 200\nPOST http://example.test/echo\n{\"id\":{{id}}}",
 		"GET http://example.test/capture\r\nHTTP 200\r\n[Captures]\r\nvalue: jsonpath \"$[0].items\"\r\nPOST http://example.test/echo\r\n{{value}}\r\nHTTP 200",
 		"GET http://example.test/capture\nHTTP 200\n[Captures]\nobject: jsonpath \"$\"\nname: jsonpath \"$.name\"\nPOST http://example.test/echo\n{\"object\":{{object}},\"name\":{{name}}}",
