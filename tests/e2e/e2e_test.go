@@ -280,11 +280,12 @@ func TestPublicTimeoutIncludesBody(t *testing.T) {
 			}))
 			defer server.Close()
 			started := time.Now()
-			body := ""
+			body, captures := "", "\n[Captures]\ntoken: jsonpath \"$\""
 			if method == "POST" {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
+				captures = ""
 			}
-			code, out, stderr := run(t, "test", scenario(t, method+" {{base}}/start"+body+"\nHTTP 200\nDELETE {{base}}/next"), "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
+			code, out, stderr := run(t, "test", scenario(t, method+" {{base}}/start"+body+"\nHTTP 200"+captures+"\nDELETE {{base}}/next"), "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
 			if code != 2 || !strings.Contains(stderr, "timeout") || !strings.Contains(out, "concluídas=0") || next.Load() != 0 || time.Since(started) < 10*time.Second {
 				t.Fatalf("code=%d,out=%q,err=%q,next=%d,elapsed=%s", code, out, stderr, next.Load(), time.Since(started))
 			}

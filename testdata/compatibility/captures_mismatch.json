@@ -1,0 +1,36 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "status divergente com captura e resposta não JSON: precedência e interrupção observadas",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/unavailable"
+    ],
+    "requests": [
+      {
+        "uri": "/unavailable",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/unavailable"
+    ],
+    "requests": [
+      {
+        "uri": "/unavailable",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

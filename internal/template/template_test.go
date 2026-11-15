@@ -64,6 +64,13 @@ func FuzzRender(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		s := c.NewSession()
+		if err := s.Publish([]Capture{{"captured", value}}); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.Render("{{captured}}"); err != nil || got.Value != value {
+			t.Fatal("capture was reinterpreted")
+		}
 		_, err = c.Render(source)
 		if err != nil && strings.Contains(err.Error(), "notRecursive") {
 			t.Fatal("unsafe error")

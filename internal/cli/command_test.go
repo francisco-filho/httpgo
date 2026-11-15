@@ -28,7 +28,7 @@ func (f *fakeExecutor) Execute(_ context.Context, req runner.Request) (runner.Re
 	return runner.Response{Status: f.statuses[len(f.calls)-1]}, nil
 }
 
-func execute(t *testing.T, ctx context.Context, fake *fakeExecutor, args ...string) (int, string, string) {
+func execute(t *testing.T, ctx context.Context, fake runner.HTTPExecutor, args ...string) (int, string, string) {
 	t.Helper()
 	var out, err bytes.Buffer
 	command := NewRootCommand(fake, BuildInfo{"1.0-test", "abc123", "2026-11-14"})

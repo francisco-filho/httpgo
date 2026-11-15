@@ -1,0 +1,41 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "JSONPath wildcard fora do subconjunto HTTPGo: rejeição integral antes da rede",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/auth/login",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

@@ -11,12 +11,16 @@ import (
 )
 
 type Request struct {
-	Method  string
-	URL     string
-	Headers []parser.Header
-	Body    []byte
+	Method     string
+	URL        string
+	Headers    []parser.Header
+	Body       []byte
+	RetainBody bool
 }
-type Response struct{ Status int }
+type Response struct {
+	Status int
+	Body   []byte
+}
 
 // HTTPExecutor returns a response only after consuming and closing its body.
 type HTTPExecutor interface {
@@ -26,11 +30,12 @@ type HTTPExecutor interface {
 type Outcome string
 
 const (
-	Unvalidated  Outcome = "sem validação de status"
-	Passed       Outcome = "status validado"
-	Mismatch     Outcome = "status divergente"
-	Failed       Outcome = "erro de transporte"
-	RenderFailed Outcome = "erro de renderização"
+	Unvalidated   Outcome = "sem validação de status"
+	Passed        Outcome = "status validado"
+	Mismatch      Outcome = "status divergente"
+	Failed        Outcome = "erro de transporte"
+	RenderFailed  Outcome = "erro de renderização"
+	CaptureFailed Outcome = "erro de captura"
 )
 
 type EntryResult struct {
@@ -53,10 +58,9 @@ type Result struct {
 	Diverged      bool
 }
 
-// Renderer resolves textual and JSON contexts before each request.
+// Renderer creates an isolated session for each Run.
 type Renderer interface {
-	Render(string) (template.Text, error)
-	RenderJSON([]byte) ([]byte, error)
+	NewSession() template.Session
 }
 
 type RenderError struct {
@@ -89,12 +93,13 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
+	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
 		if err := ctx.Err(); err != nil {
 			result.Err, result.ErrorPosition = err, entry.Position
 			return result
 		}
-		request, display, renderErr := r.render(entry)
+		request, display, renderErr := render(session, entry)
 		if renderErr != nil {
 			result.Err, result.ErrorPosition = renderErr, renderErr.Position
 			current := EntryResult{Entry: entry, Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
@@ -126,6 +131,13 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 				result.Diverged = true
 			}
 		}
+		if err == nil && !result.Diverged && len(entry.Captures) > 0 {
+			if captureErr := captureResponse(session, entry.Captures, response.Body); captureErr != nil {
+				current.Outcome = CaptureFailed
+				result.Err, result.ErrorPosition = captureErr, captureErr.Position
+			}
+		}
+		current.DisplayURL = session.Sanitize(current.DisplayURL)
 		result.Entries = append(result.Entries, current)
 		if r.report != nil {
 			if err := r.report(current); err != nil {

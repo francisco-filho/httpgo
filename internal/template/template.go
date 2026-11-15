@@ -95,8 +95,10 @@ func parseVariable(source string) variable {
 }
 
 type Context struct {
-	values  map[string]variable
-	secrets map[string]bool
+	values    map[string]variable
+	captures  map[string]variable
+	secrets   map[string]bool
+	protected []string
 }
 
 func New(assignments, secrets []string) (*Context, error) {
@@ -116,11 +118,8 @@ func New(assignments, secrets []string) (*Context, error) {
 			return nil, fmt.Errorf("nome inválido em --var")
 		}
 		for existing := range c.values {
-			if name == existing {
-				return nil, fmt.Errorf("variável repetida em --var")
-			}
-			if strings.HasPrefix(name, existing+".") || strings.HasPrefix(existing, name+".") {
-				return nil, fmt.Errorf("conflito entre variável ancestral e descendente")
+			if NamesConflict(name, existing) {
+				return nil, fmt.Errorf("variável repetida ou conflito entre variável ancestral e descendente")
 			}
 		}
 		c.values[name] = parseVariable(value)
@@ -136,7 +135,7 @@ func (c *Context) Render(source string) (Text, error) {
 	var value, display strings.Builder
 	last := 0
 	for _, ref := range refs {
-		text, ok := c.values[ref.Name]
+		text, ok := c.lookup(ref.Name)
 		if !ok {
 			return Text{}, &Error{ref.Start, "variável ausente; forneça seu valor com --var"}
 		}
@@ -166,5 +165,6 @@ func (c *Context) Sanitize(text string) string {
 			values = append(values, SecretVariants(value.original)...)
 		}
 	}
+	values = append(values, c.protected...)
 	return Protector(values)(text)
 }

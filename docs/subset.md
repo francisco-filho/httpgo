@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-04 (issues #4, #6, #11 e #13)
+# Subconjunto suportado — US-01 a US-05 (issues #4, #6, #11, #13 e #14)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -73,8 +73,8 @@ rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
 
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
 sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
-templates em chaves JSON e nomes de headers, `[Captures]`, `[Asserts]` e demais
-seções, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
+templates em chaves JSON e nomes de headers, `[Asserts]` e seções além de
+`[Captures]`, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
 não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
@@ -138,15 +138,16 @@ não podem conter CR/LF ou controles indevidos; `Host` mantém suas restrições
 Os bytes do JSON estático não são alterados pela renderização de URL/headers.
 
 `--secret nome` marca proteção sem fornecer valor. A declaração pode preceder ou
-seguir a atribuição e pode marcar um nome ainda ausente para futuras capturas
-(**não implementadas**); usar esse nome ainda ausente continua falhando. Um valor
+seguir a atribuição e pode marcar um nome ainda ausente, inclusive uma captura
+futura; usar esse nome antes de estar disponível continua falhando. Um valor
 vazio explicitamente fornecido existe e sua proteção não substitui texto vazio
 globalmente. Valores derivados conservam proteção, inclusive path e header comum.
 
 **Credenciais reais em argumentos são proibidas, inclusive em `--var`.** Apenas
 valores não sigilosos/fictícios são adequados aqui. A fonte segura pelo ambiente
 do processo chega na US-13; não há entrada de segredos por stdin, configuração
-YAML ou capturas nesta entrega. Proteção de streams não protege histórico do shell,
+YAML nesta entrega. Capturas string de respostas não são uma nova fonte de
+credenciais iniciais. Proteção de streams não protege histórico do shell,
 listagem de processos, arquivos em disco nem segredos arbitrários não marcados.
 
 ### JSON contextual — US-04
@@ -185,6 +186,66 @@ httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
 - Sem placeholders, bytes e validação permanecem os da US-02. A expectativa e a
   entrada seguinte começam em nova linha, inclusive depois de placeholder raiz.
 
+## Capturas string — US-05
+
+```hurl
+POST {{base_url}}/auth/login
+Content-Type: application/json
+{"username":"{{username}}","password":"{{password}}"}
+HTTP 200
+[Captures]
+auth.token: jsonpath "$.accessToken"
+
+GET {{base_url}}/products
+Authorization: Bearer {{auth.token}}
+HTTP 200
+```
+
+`[Captures]` associa declarações à resposta anterior, após a expectativa quando
+presente; também pode existir sem `HTTP`. A seção não pode ser órfã, duplicada
+na entrada ou vazia. Cada declaração tem a forma `nome: jsonpath "consulta"`.
+Comentários em linha própria e LF/CRLF mantêm a associação. A próxima request-line
+encerra a seção. Outras queries, filtros e seções não são aceitos nem ignorados.
+Nomes seguem a mesma regra ASCII pontuada das variáveis.
+
+O subconjunto de JSONPath aceita `$`, propriedades por ponto e índices decimais
+não negativos, combináveis: `$.accessToken`, `$.product.id`, `$.items[0].token` e
+`$[0]`. Propriedades simples usam letras ASCII, dígitos e `_`; nomes com outros
+caracteres exigiriam uma sintaxe ainda não suportada. Não há wildcard, filtros,
+descida recursiva, slices, união, propriedades entre colchetes ou índices negativos.
+Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
+**todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
+
+A resposta final deve conter exatamente um valor JSON válido e a seleção deve
+produzir string, inclusive vazia. Campo ausente/índice fora do array difere de
+null, mas ambos falham; números, booleanos, arrays e objetos também são erros de
+captura, sem conversão para texto. A string decodificada conserva seu tipo em JSON
+completo: `"123"`/`"null"` recebidos não viram número/null. Conteúdo semelhante a
+placeholder não é reinterpretado. Escapes contextuais e validações finais de
+URL/header/JSON são os mesmos das variáveis iniciais.
+
+Após consumir e fechar a resposta, o status esperado é validado **antes** de
+avaliar capturas. Divergência retorna 1 mesmo se a resposta não for JSON; nenhuma
+captura é publicada e não há próxima requisição. 4xx/5xx esperado corretamente
+permite capturar; sem expectativa, não se presume validação de status.
+
+Capturas têm escopo separado das variáveis iniciais e uma sessão nova por execução.
+Não há sobrescrita: duplicações e conflitos ancestral/descendente com qualquer
+valor inicial, captura anterior ou outra declaração da resposta falham,
+independentemente do tipo inicial. O lote só fica disponível se todas as consultas,
+tipos e nomes passarem. Colisão, consulta/tipo inválido ou uso antecipado/ausente
+retorna 2 e interrompe as entradas seguintes. Resultados anteriores são preservados.
+Falha de captura mantém a resposta em `concluídas` e o status aprovado em
+`validadas` (ou `sem_validação` sem expectativa), sem classificá-la como transporte.
+
+`--secret nome` pode marcar a captura antes de ela existir, sem fornecer valor.
+Uma string secreta descoberta é protegida antes de apresentar o resultado,
+inclusive se outra declaração da resposta falhar. A proteção dinâmica é local à
+execução, combina-se com a proteção inicial e cobre variantes JSON/Go/URL
+conhecidas e nomes de arquivo em diagnósticos. Vazio não causa substituição global.
+Bodies e valores selecionados nunca entram no relatório/diagnóstico. Nada permite
+identificar universalmente segredos ainda desconhecidos ou recodificações arbitrárias.
+
 ## Execução HTTP
 
 - Cada requisição é iniciada em ordem. Não há paralelismo ou retry, inclusive retry
@@ -203,12 +264,15 @@ httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
   porta efetiva numérica (80 para HTTP e 443 para HTTPS, quando omitida).
   Não se usa DNS para equiparar hosts: localhost não equivale a 127.0.0.1.
   Mudar scheme/host/porta é erro de transporte, sem contato ao destino proibido.
-- Bodies são consumidos em streaming e fechados antes de avaliar o status final.
+- Bodies intermediários e respostas sem capturas são consumidos em streaming,
+  sem retenção. Somente o body final de entrada com capturas é lido em memória,
+  sob o mesmo prazo, e fechado antes de avaliar o status final. Os bytes são
+  usados na captura e não ficam acumulados nos resultados.
   Resposta incompleta, erro de leitura/fechamento ou timeout no body não aprova
   a expectativa só porque os headers já chegaram. Não há body em relatório.
 - Sem expectativa, inclusive 4xx/5xx é sucesso **sem validação de status**.
   Com expectativa, a comparação é de igualdade com o status final recebido.
-- Divergência, falha de renderização/transporte ou cancelamento interrompe as próximas entradas.
+- Divergência, falha de captura/renderização/transporte ou cancelamento interrompe as próximas entradas.
   Ctrl+C cancela a requisição em andamento. Evidência de sinal real: Linux;
   macOS/Windows ainda não têm aceite nativo (ver `validation.md`).
 - Não há cookie jar, proxy configurável, configuração YAML ou leitura automática
@@ -234,8 +298,9 @@ classificação: `status validado`, `sem validação de status`, `status diverge
 ou `erro de transporte`; uma entrada que falha antes do envio recebe
 `erro de renderização`. Em sucesso, inclusive sem expectativa, a linha começa
 diretamente com o método, sem prefixo de arquivo/linha/coluna. Apenas divergências
-e erros de transporte/renderização incluem esse prefixo. Divergências mostram esperado e
-recebido. Falha de transporte não inventa status.
+e erros de transporte/renderização/captura incluem esse prefixo. Divergências mostram esperado e
+recebido. Falha de transporte não inventa status. `erro de captura` mostra o status
+real concluído e se ele foi validado; o diagnóstico em stderr localiza a declaração/consulta.
 
 ```text
 GET http://localhost:8080/health: status validado (esperado 200, recebido 200)
@@ -254,7 +319,7 @@ adicionais para apresentar os resultados. Os códigos de saída são preservados
 A apresentação incremental não reimprime resultados no final.
 
 O resumo é escrito uma única vez ao final da execução, inclusive quando uma
-requisição interrompe a sequência por divergência, renderização, transporte ou cancelamento.
+requisição interrompe a sequência por divergência, captura, renderização, transporte ou cancelamento.
 O resumo em stdout informa:
 
 - `total`: entradas validadas pelo parser;
@@ -272,7 +337,7 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 |---|---|
 | 0 | todas as entradas concluídas sem divergência; inclui sem expectativa |
 | 1 | primeira divergência de status |
-| 2 | uso, arquivo, parsing, renderização, transporte, TLS, timeout, cancelamento ou escrita |
+| 2 | uso, arquivo, parsing, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
 em sucesso. Falha na escrita de um resultado interrompe o arquivo antes da requisição
@@ -340,6 +405,11 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 - Nomes pontuados são aceitos aqui, mas `api.baseUrl` falhou no Hurl 8.0.0.
   Duplicações/conflitos são erros aqui; Hurl permite sobrescrita no corpus.
   Hurl aceita templates em nomes de headers/chaves JSON; esta entrega não.
+- Capturas aqui são somente strings, sem sobrescrita. Hurl 8.0.0 aceita outros
+  tipos e sobrescreve variáveis no corpus. Nomes pontuados não resolvem nele;
+  seção sem expectativa é rejeitada. Em valor JSON completo Hurl pode reinterpretar
+  o texto capturado (`"null"` vira null); aqui permanece string. Veja os pares
+  `captures_*`, que verificam inclusive Authorization recebido pela API.
 - Configuração YAML hierárquica e interpolação externa, quando implementadas,
   serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
 

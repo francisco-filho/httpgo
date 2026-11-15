@@ -41,7 +41,7 @@ func TestSequence(t *testing.T) {
 					t.Fatalf("next request started before reporting the previous result: calls=%v reports=%v", calls, reports)
 				}
 				calls = append(calls, req.URL)
-				return Response{tc.statuses[len(calls)-1]}, tc.err
+				return Response{Status: tc.statuses[len(calls)-1]}, tc.err
 			})
 			got := New(executor, func(entry EntryResult) error {
 				reports = append(reports, entry)

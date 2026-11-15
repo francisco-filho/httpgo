@@ -89,7 +89,14 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		if err != nil {
 			return runner.Response{}, classify(ctx, Network, err)
 		}
-		_, readErr := io.Copy(io.Discard, response.Body)
+		final := !isRedirect(response.StatusCode) || response.Header.Get("Location") == ""
+		var retained []byte
+		var readErr error
+		if final && request.RetainBody {
+			retained, readErr = io.ReadAll(response.Body)
+		} else {
+			_, readErr = io.Copy(io.Discard, response.Body)
+		}
 		closeErr := response.Body.Close()
 		if readErr != nil {
 			return runner.Response{}, classify(ctx, Body, readErr)
@@ -100,8 +107,8 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		if ctx.Err() != nil {
 			return runner.Response{}, classify(ctx, Network, ctx.Err())
 		}
-		if !isRedirect(response.StatusCode) || response.Header.Get("Location") == "" {
-			return runner.Response{Status: response.StatusCode}, nil
+		if final {
+			return runner.Response{Status: response.StatusCode, Body: retained}, nil
 		}
 		next, err := response.Location()
 		if err != nil {

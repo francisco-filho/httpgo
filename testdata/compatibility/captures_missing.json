@@ -1,0 +1,36 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "caminho ausente: interrupção após resposta de login; códigos próprios",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/auth/login"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/auth/login"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

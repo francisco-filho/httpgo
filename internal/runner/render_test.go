@@ -46,7 +46,7 @@ func TestRenderSequenceStopsBeforeSend(t *testing.T) {
 				t.Fatal(err)
 			}
 			calls, reports := 0, 0
-			got := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) { calls++; return Response{200}, nil }), renderer, func(EntryResult) error { reports++; return nil }).Run(context.Background(), scenario)
+			got := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) { calls++; return Response{Status: 200}, nil }), renderer, func(EntryResult) error { reports++; return nil }).Run(context.Background(), scenario)
 			var located *RenderError
 			if !errors.As(got.Err, &located) || located.Position.Line != tc.line || calls != 1 || reports != 2 || got.Summary != (Summary{3, 1, 1, 1, 0, 2}) || len(got.Entries) != 2 || got.Entries[1].Outcome != RenderFailed {
 				t.Fatalf("result=%+v, calls=%d reports=%d", got, calls, reports)
@@ -80,7 +80,7 @@ func TestRenderPreservesScenarioAndText(t *testing.T) {
 		}
 		req.Headers[0].Value = "mutated"
 		req.Body[0] = 'X'
-		return Response{201}, nil
+		return Response{Status: 201}, nil
 	})
 	got := NewWithRenderer(executor, renderer, nil).Run(context.Background(), scenario)
 	if got.Err != nil || calls != 1 || strings.Contains(got.Entries[0].DisplayURL, "a%2Fb") || !reflect.DeepEqual(before, scenario) {

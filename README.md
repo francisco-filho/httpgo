@@ -152,13 +152,63 @@ observadas contra Hurl 8.0.0 estão em [compatibilidade](docs/compatibility.md).
 somente valores não sigilosos ou fictícios. `--secret nome` apenas marca proteção
 nas saídas; não fornece valor nem protege histórico de shell/listagem de processos.
 Marcar um nome ainda ausente é permitido, mas não resolve sua referência. A fonte
-segura pelo ambiente do processo chega na US-13; stdin e capturas não estão
-implementados nesta entrega.
+segura para credenciais iniciais pelo ambiente do processo chega na US-13;
+stdin não está implementado. Capturas string de respostas estão disponíveis na US-05.
+
+## Autenticar e reutilizar token (US-05 / issue #14)
+
+Salve como `products.hurl` (também em
+`testdata/scenarios/scenario_auth_capture.hurl`):
+
+```hurl
+POST {{base_url}}/auth/login
+Content-Type: application/json
+{"username":"{{username}}","password":"{{password}}"}
+
+HTTP 200
+[Captures]
+accessToken: jsonpath "$.accessToken"
+
+GET {{base_url}}/products
+Authorization: Bearer {{accessToken}}
+HTTP 200
+```
+
+```sh
+bin/httpgo test products.hurl --var base_url=http://localhost:8080 \
+  --var username=demo --var password=senha-ficticia \
+  --secret password --secret accessToken
+```
+
+Requer API que devolva `{"accessToken":"token-ficticio"}` no login e aceite esse
+Bearer em `/products`; o dummy manual não implementa autenticação. Os E2E usam
+servidor HTTP isolado e verificam o token efetivamente recebido. Todas as
+credenciais do exemplo são **fictícias**; credenciais reais em argumentos continuam
+proibidas.
+
+`[Captures]` associa-se à resposta anterior, depois de `HTTP` quando declarado.
+JSONPath aceita somente raiz `$`, propriedades por ponto (`$.product.id`) e
+índices de array não negativos (`$.items[0]`). O resultado deve ser string,
+inclusive vazia. JSON inválido, caminho ausente, null ou outro tipo é erro de
+captura (código 2); não há conversão implícita. Consultas não suportadas em qualquer
+entrada impedem todos os envios.
+
+Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
+quando esperado, para URLs, valores de headers e JSON inline seguintes. Strings
+como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
+Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
+variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada execução
+começa sem capturas, e continua aceitando exatamente um arquivo. `--secret` pode
+marcar uma captura futura sem criá-la; valores descobertos ficam ocultos nos
+streams e diagnósticos, inclusive variantes de escape conhecidas. Não há garantia
+de reconhecer segredos arbitrários antes de descobri-los ou codificações desconhecidas.
 
 A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
 valores finais inválidos falham imediatamente antes da requisição dependente,
 sem contá-la como iniciada e sem enviar as seguintes. As requisições são
-sequenciais e a primeira falha interrompe a execução. Sem `HTTP`, qualquer status recebido é aceito,
+sequenciais e a primeira falha de status, captura, renderização ou transporte
+interrompe a execução. Uma falha de captura preserva a resposta concluída e o
+status aprovado nas contagens, mas impede o próximo envio. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
 - `0`: sucesso; `1`: status divergente; `2`: demais erros.
@@ -197,6 +247,6 @@ make portable
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
 **desenvolvimento**, não no binário entregue. O gate local com race já passou;
 o aceite nativo pendente em macOS/Windows está registrado em
-`docs/validation.md`, que distingue a evidência local US-04 dos históricos anteriores.
+`docs/validation.md`, que distingue a evidência local US-05 dos históricos anteriores.
 Cross-build não comprova execução nessas plataformas. A aprovação da história
 passa pelo gate de revisão; não há alegação de compatibilidade Hurl completa.
