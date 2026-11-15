@@ -91,6 +91,9 @@ func FuzzRenderJSON(f *testing.F) {
 	for _, seed := range []string{`{{x}}`, `{"a":{{x}}}`, `"prefix{{x}}"`, `{"a":{}}`, `{"a":"\\{{x}}"}`, `{"{{x}}":1}`, "[\r\n{{x}}\r\n]", `"bad\{{x}}"`} {
 		f.Add(seed, `"\"\\\n雪{{literal}}"`)
 	}
+	for _, value := range []string{`null`, `true`, `9007199254740993`, `1.2300e+99`, `[]`, `{"n":[9007199254740993,"{{literal}}"]}`} {
+		f.Add(`{"value":{{x}}}`, value)
+	}
 	f.Fuzz(func(t *testing.T, source, value string) {
 		c, err := New([]string{"x=" + value}, []string{"x"})
 		if err != nil {
@@ -98,13 +101,22 @@ func FuzzRenderJSON(f *testing.F) {
 		}
 		s := c.NewSession()
 		captureValue := strings.ToValidUTF8(value, "\ufffd")
-		if err := s.Publish([]Capture{{"captured", captureValue}}); err != nil {
+		if err := s.Publish([]Capture{{"captured", captureString(captureValue)}}); err != nil {
 			t.Fatal(err)
 		}
 		captured, err := s.RenderJSON([]byte(`{{captured}}`))
 		var decoded string
 		if err != nil || json.Unmarshal(captured, &decoded) != nil || decoded != captureValue {
 			t.Fatal("captured string changed type or content")
+		}
+		if json.Valid([]byte(value)) {
+			if err := s.Publish([]Capture{{"typed", json.RawMessage(value)}}); err != nil {
+				t.Fatal(err)
+			}
+			got, err := s.RenderJSON([]byte(`{{typed}}`))
+			if err != nil || !json.Valid(got) {
+				t.Fatal("invalid typed capture", err)
+			}
 		}
 		original := []byte(source)
 		saved := bytes.Clone(original)

@@ -11,7 +11,7 @@ func TestCaptureStringsAndIsolation(t *testing.T) {
 	initial, _ := New([]string{"base=initial"}, []string{"auth.token"})
 	for _, value := range []string{"123", "null", "true", "", `{"a":1}`, `{{missing}}`, "quotes\"\\\n雪"} {
 		s := initial.NewSession()
-		if err := s.Publish([]Capture{{"auth.token", value}}); err != nil {
+		if err := s.Publish([]Capture{{"auth.token", captureString(value)}}); err != nil {
 			t.Fatal(err)
 		}
 		text, err := s.Render("{{auth.token}}")
@@ -37,12 +37,12 @@ func TestCapturePublicationAtomicConflicts(t *testing.T) {
 		for _, names := range [][]string{{"base"}, {"base.child"}, {"auth"}, {"auth.token.child"}, {"new", "new"}, {"new", "new.child"}, {"new.child", "new"}} {
 			initial, _ := New([]string{"base=" + initialValue}, nil)
 			s := initial.NewSession()
-			if err := s.Publish([]Capture{{"auth.token", "original"}}); err != nil {
+			if err := s.Publish([]Capture{{"auth.token", captureString("original")}}); err != nil {
 				t.Fatal(err)
 			}
-			batch := []Capture{{"good", "unpublished"}}
+			batch := []Capture{{"good", captureString("unpublished")}}
 			for _, name := range names {
-				batch = append(batch, Capture{name, "replacement"})
+				batch = append(batch, Capture{name, captureString("replacement")})
 			}
 			var conflict *ConflictError
 			if err := s.Publish(batch); !errors.As(err, &conflict) {
@@ -58,7 +58,7 @@ func TestCapturePublicationAtomicConflicts(t *testing.T) {
 	}
 	c, _ := New(nil, []string{"token"})
 	s := c.NewSession()
-	s.ProtectCapture("token", "discovered")
+	s.ProtectCapture("token", captureString("discovered"))
 	if strings.Contains(s.Sanitize("discovered"), "discovered") {
 		t.Fatal("unpublished secret exposed")
 	}

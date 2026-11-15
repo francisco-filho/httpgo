@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -29,8 +30,12 @@ func captureResponse(session template.Session, declarations []parser.Capture, bo
 		if !ok {
 			return &CaptureError{Position: declaration.QueryPosition, Detail: "consulta exige resultado string"}
 		}
-		session.ProtectCapture(declaration.Name, text)
-		batch = append(batch, template.Capture{Name: declaration.Name, Value: text})
+		raw, err := json.Marshal(text)
+		if err != nil {
+			return &CaptureError{Position: declaration.QueryPosition, Detail: "não foi possível serializar valor da captura"}
+		}
+		session.ProtectCapture(declaration.Name, raw)
+		batch = append(batch, template.Capture{Name: declaration.Name, Value: raw})
 	}
 	if err := session.Publish(batch); err != nil {
 		pos := declarations[0].Position

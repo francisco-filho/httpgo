@@ -1,6 +1,7 @@
 package template
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -65,11 +66,22 @@ func FuzzRender(f *testing.F) {
 			t.Fatal(err)
 		}
 		s := c.NewSession()
-		if err := s.Publish([]Capture{{"captured", value}}); err != nil {
+		if err := s.Publish([]Capture{{"captured", captureString(value)}}); err != nil {
 			t.Fatal(err)
 		}
-		if got, err := s.Render("{{captured}}"); err != nil || got.Value != value {
+		var normalized string
+		_ = json.Unmarshal(captureString(value), &normalized)
+		if got, err := s.Render("{{captured}}"); err != nil || got.Value != normalized {
 			t.Fatal("capture was reinterpreted")
+		}
+		if json.Valid([]byte(value)) {
+			if err := s.Publish([]Capture{{"typed", json.RawMessage(value)}}); err != nil {
+				t.Fatal(err)
+			}
+			got, err := s.RenderJSON([]byte(`{{typed}}`))
+			if err != nil || !json.Valid(got) {
+				t.Fatal("invalid typed capture", err)
+			}
 		}
 		_, err = c.Render(source)
 		if err != nil && strings.Contains(err.Error(), "notRecursive") {
