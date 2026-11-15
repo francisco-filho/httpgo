@@ -1,6 +1,6 @@
 {
   "response_json":"{\"value\":\"ok\"}",
-  "classification":"intentional restriction: JSON assertions unsupported here; Hurl supports this query",
-  "httpgo":{"exit":2,"paths":null},
+  "classification":"contract expansion US-08: JSON string equality now shared in this pair",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
   "hurl":{"exit":0,"paths":["/capture","/health"]}
 }

@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"price\":4500}",
+  "classification":"incompatible traversal is evaluation error here, not absence",
+  "httpgo":{"exit":2,"paths":["/capture"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}

@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"a\":[],\"o\":{}}",
+  "classification":"empty arrays and objects supported here; Hurl rejects expected composite literals",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
+  "hurl":{"exit":2,"paths":null}
+}

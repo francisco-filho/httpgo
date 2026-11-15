@@ -1,0 +1,6 @@
+{
+  "response_json":"[1,2]",
+  "classification":"array order matters here; Hurl rejects the expected array literal",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":2,"paths":null}
+}

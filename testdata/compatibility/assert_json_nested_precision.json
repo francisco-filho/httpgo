@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"items\":[9007199254740993]}",
+  "classification":"nested exact number mismatch here; Hurl rejects expected object literal",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":2,"paths":null}
+}

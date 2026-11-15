@@ -1,0 +1,6 @@
+{
+  "response_json":"null",
+  "classification":"shared requirement of HTTP declaration for assertions; rejection before any send",
+  "httpgo":{"exit":2,"paths":null},
+  "hurl":{"exit":2,"paths":null}
+}

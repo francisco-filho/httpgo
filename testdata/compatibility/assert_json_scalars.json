@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"name\":\"Pizza\",\"price\":4500,\"active\":true,\"empty\":\"\",\"off\":false,\"nil\":null}",
+  "classification":"shared scalar equality and present null in this pair",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
+  "hurl":{"exit":0,"paths":["/capture","/health"]}
+}

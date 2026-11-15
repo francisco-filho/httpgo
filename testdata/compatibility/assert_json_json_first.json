@@ -1,0 +1,7 @@
+{
+  "response_json":"invalid JSON",
+  "response_headers":[{"name":"X-Test","value":"different"}],
+  "classification":"JSON first determines evaluation error before header mismatch here",
+  "httpgo":{"exit":2,"paths":["/capture"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}

@@ -1,0 +1,6 @@
+{
+  "response_json":"{}",
+  "classification":"missing property differs from present null here",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}

@@ -12,6 +12,23 @@ import (
 	"capimgrosso.com/httpgo/internal/runner"
 )
 
+func TestJSONAssertionHelp(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
+		code, out, stderr := execute(t, context.Background(), &fakeExecutor{}, args...)
+		if code != 0 || stderr != "" {
+			t.Fatalf("code=%d err=%s", code, stderr)
+		}
+		for _, want := range []string{`jsonpath "$.name" == "Pizza"`, `jsonpath "$.price" == 4500`, `jsonpath "$.active" == true`, "precisão exata", "sem float64", "ordem escrita", "erro de avaliação JSON (2)", "Captura secreta pendente", "sem avaliar/publicar", "Sem count, exists JSON", "não marcados"} {
+			if !strings.Contains(out, want) {
+				t.Fatalf("help lacks %q", want)
+			}
+		}
+		if strings.Contains(out, "assertions JSON ou outros operadores") {
+			t.Fatal("stale unsupported JSON help")
+		}
+	}
+}
+
 func TestJSONAssertionCLI(t *testing.T) {
 	for index, tc := range []struct {
 		query, expected, body, diagnostic string

@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"price\":\"4500\"}",
+  "classification":"shared type mismatch and interruption; different exit codes",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}
