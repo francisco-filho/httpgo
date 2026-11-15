@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-10 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24 e #25)
+# Subconjunto suportado e extensões — US-01 a US-11 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25 e #27)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -95,7 +95,7 @@ não criam campos multilinha. Todos os campos são validados antes de abrir o ar
 
 307/308 rebobinam a mesma fonte e reutilizam boundary; 301/302/303 convertem em GET
 sem body nem Content-Type multipart. Mantêm-se limite de dez redirects de mesma
-origem, TLS verificado, prazo único de dez segundos e nenhum retry. Resposta 413
+origem, TLS verificado, prazo único configurável (default de dez segundos) e nenhum retry. Resposta 413
 completa é avaliada normalmente, inclusive antecipada; erro de conexão sem resposta
 completa é transporte (2). Leituras HTTP terminam antes de rebobinar/fechar a fonte;
 falhas de leitura/fechamento não viram sucesso. I/O local bloqueado pelo SO continua
@@ -212,8 +212,8 @@ Sem flag, o contrato bytes da seção anterior permanece integralmente inalterad
 Reutiliza as regras do JSON contextual inline: nomes pontuados explícitos, tipos
 preservados em valores completos (inclusive raiz), escalares escapados em strings,
 arrays/objetos não convertidos em texto e nenhuma reinterpretação do conteúdo
-inserido. Chaves e caminhos não interpolam; sem novas expressões, YAML ou fontes
-de variáveis/segredos. Variáveis iniciais e capturas anteriores usam a mesma sessão.
+inserido. Chaves e caminhos não interpolam; sem novas expressões.
+Variáveis iniciais (CLI/YAML) e capturas anteriores usam a mesma sessão.
 JSON estático válido conserva todos os bytes, inclusive whitespace externo LF/CRLF.
 
 O parser valida o `.hurl` inteiro antes da rede **sem abrir payloads**. Ler,
@@ -236,6 +236,101 @@ protegidos em sucesso/falha, sem descobrir segredos arbitrários do arquivo.
 Permanecem os limites de memória, acesso local sem sandbox, contexto e I/O bloqueado
 já descritos; nenhuma nova goroutine/retry/limite de tamanho é introduzida.
 
+## Extensão HTTPGo: configuração YAML — US-11 (issue #27)
+
+`httpgo test products.hurl --config projeto.yaml` seleciona somente o arquivo
+indicado, inclusive fora do cwd. A flag aceita `--config=projeto.yaml`, antes ou
+depois do cenário após `test`; vazia, sem argumento ou repetida é uso inválido.
+Sem a flag, carrega somente `.httpgo.yaml` do **diretório corrente**, sem buscar
+ancestrais. Ausência do arquivo opcional equivale a defaults; inexistência
+explícita ou erro de abertura/leitura/fechamento é configuração inválida (2).
+Arquivo vazio ou com somente espaços/comentários equivale a configuração ausente.
+
+```yaml
+version: 1
+defaults:
+  timeout: 2.5
+variables:
+  api:
+    baseUrl: http://localhost:8080
+  product:
+    price: 4500
+secrets: [auth.token, password]
+```
+
+```hurl
+POST {{api.baseUrl}}/products
+Content-Type: application/json
+{"price": {{product.price}}}
+HTTP 201
+```
+
+Execute `httpgo test products.hurl`, ou use os exemplos separados em
+`testdata/config/project.yaml` e `testdata/scenarios/scenario_config_products.hurl`
+com `--config testdata/config/project.yaml`. Para trocar somente o destino,
+acrescente `--var api.baseUrl=http://localhost:9090` (valor não sigiloso).
+
+### Schema e conversão
+
+- No máximo **1 MiB (1.048.576 bytes)**, verificado durante a leitura, inclusive
+  para espaços/comentários. Arquivo exatamente no limite é permitido.
+- Um documento YAML apenas, raiz mapa, `version: 1` obrigatória (inteiro).
+  Opcionais: `defaults` (mapa com somente `timeout`), `variables` (mapa) e
+  `secrets` (lista de nomes válidos). Campos desconhecidos, chaves repetidas e
+  estruturas/tipos incompatíveis são erro, nunca ignorados.
+- Âncoras, aliases e tags explícitas são proibidos em qualquer profundidade,
+  inclusive tags padrão como `!!str`. Não há expansão ou resolução externa.
+- Mapas em `variables` viram caminhos hierárquicos exatos conforme nomes ASCII
+  das variáveis. `api: {baseUrl: ...}` define `api.baseUrl`, **não** `api`.
+  Chaves pontuadas também são aceitas, mas caminhos repetidos/sobrepostos e
+  conflitos valor/descendente são rejeitados, em qualquer ordem.
+- Valores: strings, números finitos, booleanos, null ou arrays JSON-compatíveis.
+  Mapas **dentro de arrays** são objetos de conteúdo com chaves string, nunca
+  caminhos; duplicações e tipos incompatíveis também são rejeitados ali.
+  Datas/timestamps não são valores JSON: use aspas para torná-los strings.
+  Strings numéricas entre aspas mantêm tipo string. Números usam a representação
+  original/canônica sem passar seus valores por float64; precisão inteira,
+  decimal e aninhada não é arredondada. `.inf`/`.nan` são rejeitados.
+- Qualquer referência `${NOME}` em valor é rejeitada explicitamente **antes de
+  overrides**, inclusive aninhada e com variável de processo definida.
+  Nada é resolvido nem enviado como credencial literal. Não há `HTTPGO_*`,
+  ambientes nomeados, stdin ou hooks nesta história.
+
+### Composição, prazo e proteção
+
+Precedência efetivamente implementada: **defaults internos < YAML base < CLI**.
+A fonte CLI é validada separadamente: repetir `--var` para o mesmo nome continua
+erro. Entre fontes, CLI substitui o mesmo caminho ou acrescenta outro, sem perder
+irmãos. Escalares, listas e null substituem integralmente, sem combinar listas.
+Objetos CLI permanecem valores opacos, sem propriedades acessíveis; não podem
+substituir um mapa hierárquico deixando descendentes conflitantes.
+
+`defaults.timeout` é **número de segundos entre 0.001 e 86400**, inclusive,
+representável exatamente em milissegundos inteiros. Não admite texto com unidade,
+string numérica, não finitos ou arredondamento. Omissão conserva dez segundos.
+O prazo é por requisição lógica, incluindo conexão, TLS, redirects e consumo/
+fechamento da resposta, sem tetos internos de dez segundos. Cada nova requisição
+recebe orçamento próprio; contexto cancelado ou prazo menor do chamador prevalece.
+Não há retry, interrupção prometida de I/O local bloqueado ou mutação do executor.
+
+`secrets` acumula com `--secret`, sem exigir variável existente. Pode proteger
+captura futura; usar valor ainda ausente continua falhando. Override nunca remove
+proteção. Valores conhecidos da base e substitutos CLI, inclusive variantes e
+constituintes JSON, são protegidos desde a inicialização dos writers/contexto;
+a sessão mantém a proteção dinâmica das capturas/derivados e callbacks.
+Credenciais reais em flags seguem proibidas. YAML não protege o conteúdo em disco:
+use permissões `0600`; não há descoberta universal de segredos arbitrários.
+
+Carga/validação precedem parsing do cenário e qualquer HTTP. Erro retorna **2**,
+sem aplicação parcial, com arquivo/linha/coluna quando identificáveis (fallback
+1:1), mensagens controladas, sem ecoar nomes arbitrários, trechos ou erros brutos
+YAML/I/O. Contexto é checado antes/depois da carga e antes do envio. Origem exibida
+passa por quoting e proteção; o caminho selecionado não redefine `OriginDir` do
+cenário. Contexto, marcas e prazo são locais à invocação, sem vazamento na próxima.
+
+Esta configuração é **extensão HTTPGo**, não parte do formato Hurl. Os testes YAML
+são separados do corpus diferencial Hurl; nenhuma flag própria é passada ao Hurl.
+
 ## Variáveis tipadas e templates — US-03/US-04
 
 `--var nome=valor` e `--secret nome` são repetíveis (também aceitam
@@ -252,7 +347,8 @@ float64, inclusive dentro de arrays/objetos. A tipagem CLI é extensão HTTPGo.
 Cada segmento do nome corresponde a `[A-Za-z_][A-Za-z0-9_]*`; pontos separam
 segmentos hierárquicos (`api.baseUrl`). Segmento vazio, nome inválido, atribuição
 sem `=`, repetição (mesmo valor idêntico) ou conflito ancestral/descendente em qualquer
-ordem e tipo impede todos os envios. Nunca há merge ou sobrescrita silenciosa.
+ordem e tipo impede todos os envios. Duplicações são erros na mesma fonte;
+CLI pode sobrescrever explicitamente o mesmo nome YAML, conforme a US-11.
 Objetos são indivisíveis: `--var 'product={"name":"Pizza"}'` define apenas `product`,
 não `product.name`. Nomes pontuados funcionam quando declarados explicitamente.
 
@@ -302,8 +398,8 @@ globalmente. Valores derivados conservam proteção, inclusive path e header com
 
 **Credenciais reais em argumentos são proibidas, inclusive em `--var`.** Apenas
 valores não sigilosos/fictícios são adequados aqui. A fonte segura pelo ambiente
-do processo chega na US-13; não há entrada de segredos por stdin, configuração
-YAML nesta entrega. Capturas de respostas não são uma nova fonte de
+do processo chega na US-13; não há entrada de segredos por stdin.
+Configuração YAML é a extensão US-11 descrita acima. Capturas de respostas não são uma nova fonte de
 credenciais iniciais. Proteção de streams não protege histórico do shell,
 listagem de processos, arquivos em disco nem segredos arbitrários não marcados.
 
@@ -572,8 +668,9 @@ compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 - Cada requisição é iniciada em ordem. Não há paralelismo ou retry, inclusive retry
   implícito do transporte. HTTP/1.1 sem conexão persistente evita o replay de
   requisições em conexão reutilizada. HTTP/2 não é habilitado nesta história.
-- Timeout total **fixo de 10 segundos** por requisição, contado uma vez e compartilhado
-  por conexão/TLS, redirects e consumo de todos os bodies. Não há flag de ajuste.
+- Timeout total **configurável em YAML, default de 10 segundos** por requisição,
+  contado uma vez e compartilhado por conexão/TLS, redirects e consumo de todos
+  os bodies. Ajuste por `defaults.timeout`, não por uma flag de timeout.
 - TLS é verificado; não há opção para ignorar certificados.
 - Redirects 301/302/303/307/308 com Location são seguidos até **10 saltos**.
   O 11º salto é bloqueado antes de enviar ao próximo destino. Resposta sem
@@ -599,13 +696,12 @@ compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 - Divergência, falha de captura/renderização/transporte ou cancelamento interrompe as próximas entradas.
   Ctrl+C cancela a requisição em andamento. Evidência de sinal real: Linux;
   macOS/Windows ainda não têm aceite nativo (ver `validation.md`).
-- Não há cookie jar, proxy configurável, configuração YAML ou leitura automática
-  de HTTPGO_*. O transporte não lê HTTP_PROXY/HTTPS_PROXY nesta história.
+- Não há cookie jar, proxy configurável ou leitura automática de HTTPGO_*. O transporte não lê HTTP_PROXY/HTTPS_PROXY nesta história.
 
 ## CLI e saída
 
 ```text
-httpgo test <arquivo> [--render-files] [--var nome=valor] [--secret nome]
+httpgo test <arquivo> [--config arquivo] [--render-files] [--var nome=valor] [--secret nome]
 httpgo --help
 httpgo test --help
 httpgo --version
@@ -664,7 +760,7 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 |---|---|
 | 0 | todas as entradas concluídas sem divergência; inclui sem expectativa |
 | 1 | primeira divergência de status ou assertion de header/JSON |
-| 2 | uso, arquivo, parsing, avaliação JSON, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
+| 2 | uso, configuração, arquivo, parsing, avaliação JSON, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
 em sucesso. Falha na escrita de um resultado interrompe o arquivo antes da requisição
@@ -753,6 +849,7 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
   ausência de propriedade/índice retorna 1 aqui contra 4. Veja `assert_json_*`.
 - `--render-files` é uma **extensão HTTPGo** implementada na US-10, não parte do
   Hurl. Seus testes ficam separados do corpus diferencial em modo bytes, que não
-  recebe essa flag. Configuração YAML hierárquica permanece futura e fora do suporte.
+  recebe essa flag. Configuração YAML hierárquica é a extensão US-11, também
+  separada do diferencial e sem promessa de equivalência com configuração Hurl.
 
 Veja a matriz e evidências limitadas ao corpus em `compatibility.md`.

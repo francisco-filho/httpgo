@@ -52,8 +52,8 @@ func NewNetHTTPExecutor() *NetHTTPExecutor {
 	return &NetHTTPExecutor{
 		timeout: requestTimeout,
 		transport: &http.Transport{
-			DialContext:         (&net.Dialer{Timeout: requestTimeout}).DialContext,
-			TLSHandshakeTimeout: requestTimeout,
+			// The per-request context owns the deadline, including dial and TLS.
+			DialContext: (&net.Dialer{}).DialContext,
 			// Go retries idempotent requests on reused connections. Never reuse
 			// connections, and disable HTTP/2 (which has its own replay paths).
 			DisableKeepAlives: true,
@@ -64,7 +64,11 @@ func NewNetHTTPExecutor() *NetHTTPExecutor {
 }
 
 func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request) (runner.Response, error) {
-	ctx, cancel := context.WithTimeout(parent, e.timeout)
+	timeout := request.Timeout
+	if timeout == 0 {
+		timeout = e.timeout
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	current, err := url.Parse(request.URL)
 	if err != nil {

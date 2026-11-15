@@ -11,6 +11,7 @@ import (
 type arguments struct {
 	renderFiles        bool
 	file               string
+	config             string
 	variables, secrets []string
 }
 
@@ -26,7 +27,7 @@ func parseArguments(args []string) (arguments, error) {
 				invalid = true
 			}
 			result.renderFiles = true
-		case "--var", "--secret":
+		case "--config", "--var", "--secret":
 			if !inline {
 				if i+1 == len(args) {
 					invalid = true
@@ -35,9 +36,15 @@ func parseArguments(args []string) (arguments, error) {
 				i++
 				value = args[i]
 			}
-			if name == "--var" {
+			switch name {
+			case "--config":
+				if value == "" || result.config != "" {
+					invalid = true
+				}
+				result.config = value
+			case "--var":
 				result.variables = append(result.variables, value)
-			} else {
+			case "--secret":
 				result.secrets = append(result.secrets, value)
 			}
 		default:

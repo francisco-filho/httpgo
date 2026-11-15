@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-10 e US-20
+# Arquitetura implementada — US-01 a US-11 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -10,6 +10,7 @@ copiar, adaptar ou traduzir código-fonte Hurl.
 ```text
 cmd/httpgo/main.go
   → internal/cli/command.go + arguments.go (flags/contexto novo e proteção)
+    → internal/config/config.go + value.go + compose.go (YAML seguro e composição)
     → internal/parser/parser.go + capture.go + assertion.go + multipart.go (arquivo inteiro)
       → internal/query/jsonpath.go (validar consultas antes da rede)
     → internal/runner/runner.go + render.go (somente cenário validado)
@@ -33,13 +34,15 @@ cmd/httpgo/main.go
 
 O diagrama é fluxo de execução; `runner` **não importa** o adapter HTTP.
 Não há framework de CLI, pacote genérico de tipos, domínio rico ou novos pacotes
-reservados para capacidades futuras. Toda a implementação usa biblioteca padrão;
-`go.mod` preserva módulo `capimgrosso.com/httpgo` e Go `1.26.10`.
+reservados para capacidades futuras. A US-11 acrescenta somente `internal/config`
+e a dependência YAML mantida `go.yaml.in/yaml/v3` **v3.0.6**, isolada nesse pacote.
+O restante usa biblioteca padrão; `go.mod` preserva módulo
+`capimgrosso.com/httpgo` e Go `1.26.10`.
 
 | Pacote/tipos | Responsabilidade |
 |---|---|
 | `parser.Position`, `Header`, `Assertion`, `HeaderAssertion`, `JSONAssertion`, `Capture`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, body, capturas e posições de declaração/consulta; estados de requisição, expectativa e capturas; validação completa sem cenário parcial |
-| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`), Multipart (`*MultipartBody`) e RetainBody; Response retorna Status, Headers (`[]query.HeaderValue`, ocorrências ordenadas) e Body final retido somente quando solicitado |
+| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`), Multipart (`*MultipartBody`), RetainBody e Timeout (`time.Duration`); Response retorna Status, Headers (`[]query.HeaderValue`, ocorrências ordenadas) e Body final retido somente quando solicitado |
 | `runner.Runner`, `EntryResult`, `Outcome`, `Summary`, `Result` | Ordem, contexto antes de cada chamada, comparação delegada e interrupção; resultado estruturado e notificação síncrona por entrada, sem escrever em streams nem chamar os.Exit |
 | `template.Context`, `Text`, `Reference`, `Error` | Contexto tipado isolado, nomes exatos/conflitos, offsets, substituição não recursiva e proveniência; não importa parser/runner/CLI/transporte |
 | `template.JSONPlan`, `JSONReference` | Reconhecimento de strings/escapes/valores e chaves estáticas, referências com intervalos originais, limite exato do body; compartilhado por parser e renderer |
@@ -58,6 +61,53 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 `runner.Request/Response`, implementando o contrato consumer-owned sem camada
 adicional nem ciclo. Testes de integração podem montar `runner.New` com o adapter.
 Somente o código de produção em `transport` importa `net/http`.
+
+## Configuração do projeto — US-11
+
+`config.Load(context.Context, path)` seleciona o explícito ou somente
+`.httpgo.yaml` do cwd. `config.Settings` guarda `Variables map[string]json.RawMessage`,
+`Secrets []string` e `Timeout time.Duration`. `load` recebe uma função privada de
+abertura para testes de falhas, sem filesystem público ou estado global.
+Lê com `io.LimitReader(MaxBytes+1)`, fecha inclusive em falha e descarta conteúdo
+parcial; `Error` conserva causas I/O para `errors.Is/As` e só apresenta texto
+controlado, origem com quoting e posição (1:1 quando indisponível).
+Ausência opcional/vazio mantém defaults, falhas explícitas não têm fallback.
+
+O decoder YAML produz **nós**, nunca unmarshal irrestrito em objetos. Antes de
+converter, valida árvore completa, chaves únicas/string, aliases/âncoras/tags,
+referências de processo e documento único. O schema aceita somente version 1,
+defaults.timeout, variables e secrets. Mensagens brutas da biblioteca, trechos,
+valores e nomes arbitrários não são expostos. `flatten` converte mapas variables
+em caminhos usando `template.ValidName/NamesConflict`; arrays são valores JSON
+completos, incluindo objetos internos. Conversão numérica trabalha na grafia,
+sem float64, inclusive plain numbers que o resolver YAML classificaria como string
+por exceder faixa de máquina. Strings entre aspas mantêm seu tipo.
+`timeoutValue` calcula milissegundos exatos por dígitos/expoente decimal sem
+expandir potências arbitrárias, verifica faixa 1..86400000 e só então cria Duration.
+
+`Settings.Compose` valida CLI separadamente com `template.New`, aplica overrides
+por nome exato e valida conflitos finais com o mesmo renderer. Não cria uma nova
+linguagem de template, navegação de objetos ou merge de listas. Marcações são a
+união YAML/CLI; `Settings.Protection` protege variantes dos valores conhecidos
+da base e de todos os substitutos, inclusive em erros anteriores à sessão.
+A CLI conecta essa proteção aos writers **antes** de reportar erros de argumentos,
+contexto, composição ou cenário. `template.Context.NewSession` copia as proteções
+iniciais e conserva o mecanismo dinâmico já existente para capturas/derivados.
+Nada vaza para o comando/executor ou execução seguinte; capturas não sobrescrevem
+valores iniciais. `Scenario.OriginDir` continua sendo o diretório do `.hurl`.
+
+`runner.Options.Timeout` é metadado por execução, copiado para `Request.Timeout`
+antes de Execute. Zero preserva o default existente de dez segundos. CLI fornece
+o timeout efetivo e o usa no diagnóstico. O adapter escolhe o limite da request,
+cria um contexto filho único antes do loop e mantém esse orçamento para conexão,
+TLS, redirects e consumo/fechamento. Dial/TLS não possuem mais teto fixo de dez
+segundos; o contexto menor/cancelamento do chamador prevalece. O executor não é
+mutado. Não há goroutines novas nem promessa de interromper I/O local bloqueado.
+
+Configuração inválida termina com 2 antes de parsing/HTTP. Não há ambientes,
+`HTTPGO_*`, referências ao ambiente do processo, stdin ou hooks; `${NOME}` é
+rejeitado mesmo quando o nome teria override. YAML é extensão HTTPGo, com testes
+próprios separados do diferencial Hurl e no máximo 1 MiB lido.
 
 ## Arquivos externos — US-09
 
@@ -173,7 +223,7 @@ da fonte é preservada; encerramento normal de envio após resposta completa, co
 307/308 rebobinam somente depois desse encerramento e reutilizam o boundary;
 301/302/303 descartam formulário/Content-Type e seguem como GET sem body. O loop
 existente conserva dez redirects de mesma origem, TLS verificado e o mesmo contexto
-de dez segundos para todos os hops e consumo da resposta. Cancelamento encerra a
+com timeout efetivo para todos os hops e consumo da resposta. Cancelamento encerra a
 atividade de rede; I/O local bloqueado pelo SO tem a limitação já documentada na
 US-09. Bodies JSON inline e externos completos continuam em `[]byte` como antes.
 
@@ -391,7 +441,7 @@ precedência e restrições frente ao Hurl 8.0.0; total 100. Veja `compatibility
 
 ## Rede e recursos
 
-`Execute` cria um único contexto filho com timeout de 10 segundos e chama
+`Execute` cria um único contexto filho com timeout efetivo (default de 10 segundos) e chama
 `http.Transport.RoundTrip` diretamente. O loop de redirects é explícito, para
 consumir e fechar também respostas intermediárias, verificar limite/origem antes
 do próximo envio e manter o mesmo deadline. O teste observa os deadlines nas
@@ -450,7 +500,7 @@ geram código 2.
 - `internal/assertion` / `internal/runner`: table-driven; fake HTTP sem rede,
   ausência de chamadas posteriores, resumo e contexto propagado.
 - `internal/transport`: httptest HTTP/TLS, contadores de acesso e conexões,
-  redirects, prazo menor **somente em testes internos**, body incompleto e cancelamento.
+  redirects, prazos configurados menores/maiores que dez segundos, body incompleto e cancelamento.
 - `internal/cli`: root command com streams/args injetados; sem executar binário;
   quarenta entradas verificam resultado visível antes do próximo GET e falhas de
   escrita comprovam interrupção imediata e prioridade do exit code 2.

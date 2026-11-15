@@ -1,4 +1,89 @@
-# Validação — US-01 a US-10 e US-20
+# Validação — US-01 a US-11 e US-20
+
+## US-11 — issue #27 / história 011
+
+Plano da issue #27 executado diretamente, sem planner, somente backend. Quatro
+Tasks registradas e autoaprovadas na fila 011, implementadas sequencialmente.
+Tasks 1–3: `37dfbb3` (carga YAML segura/CLI), `5d928fc` (composição/proteção) e
+`e930687` (timeout por requisição). Task 4 nesta alteração: coexistência, precisão
+além da faixa de máquina, exemplos, ajuda e documentação/evidências integradas.
+Nenhuma alteração em frontend/estáticos, toolchain, CI, regras de lint ou budgets.
+SonarQube não foi executado; é responsabilidade exclusiva do QA. Estes resultados
+locais não substituem o gate de revisão da história.
+
+### Ambiente, dependência e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, goimports, golangci-lint e Hurl **8.0.0**.
+A biblioteca YAML prevista pelo plano foi fixada em `go.yaml.in/yaml/v3 v3.0.6`,
+release de 2026-10-13 do repositório mantido pela organização YAML
+(`https://github.com/yaml/go-yaml`, metadados consultados com `go list -m -json`).
+Uso isolado em `internal/config`; `go mod tidy` executado e go.mod/go.sum revisados.
+Cache padrão de módulos/sumdb somente leitura: usados `GOPATH=/tmp/httpgo-011-go`
+e `GOMODCACHE=/tmp/httpgo-011-modcache`, sem mudar a versão do Go. A ferramenta
+`govulncheck v1.9.0`, ausente inicialmente, foi instalada **com autorização do
+usuário**, somente em `/tmp/httpgo-011-tools`, sem dependência do projeto.
+`govulncheck ./...` concluiu: **No vulnerabilities found.**
+
+HTTP/TLS local em portas dinâmicas, build único do binário E2E, CommandContext,
+diretórios temporários e cwd alterado somente no filho. Sem dummy, porta fixa,
+sleeps ou dependências de runtime. O teste público de prazo maior espera timer
+de 10,1 segundos sob limite de 15 segundos; o teste público anterior de timeout
+default de dez segundos permanece inalterado. Testes nativos/cross-builds
+macOS/Windows não realizados: opcionais nesta história conforme plano v4, seção 7.
+
+- Task 1: `go test ./internal/config ./internal/cli` e
+  `go test ./tests/e2e -run '^TestConfig' -count=1` passaram.
+- Task 2: `go test ./internal/config ./internal/template ./internal/cli ./internal/runner`
+  passou; seeds pertinentes do JSON renderer ampliados.
+- Task 3: `go test ./internal/config ./internal/runner ./internal/transport ./internal/cli`
+  e `go test ./tests/e2e -run '^TestConfig' -count=1` passaram.
+- `make fmt lint test` passou antes de concluir cada task e na validação integrada:
+  lint **0 issues**, `go test ./... -race -cover` sem falhas. Cobertura final:
+  config **95,0%**, CLI **94,9%**, runner **93,0%**, template **95,7%**, transporte
+  **90,4%**. Também passaram explicitamente `go vet ./...`, `go build ./...`,
+  `go test ./internal/cli ./tests/e2e` e `make e2e`.
+  `gofmt -l` dos Go alterados/novos e `git diff --check` sem pendências.
+- `make compatibility` passou com Hurl **8.0.0**, sem skip: **116 pares**,
+  `testdata/compatibility/` inalterado, sem regenerar observações ou fornecer
+  `--config`/`--render-files` ao Hurl. O aviso local de versão da libcurl não
+  impediu a identificação da versão nem o diferencial.
+- Fuzzing executado separadamente, sem falhas:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    **23.760** execuções, passou.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`:
+    **20.760** execuções, passou.
+
+### Rastreabilidade dos cenários da issue #27
+
+| Cenários | Evidência automatizada |
+|---|---|
+| GO-119 | `TestConfigDiscoveryAndSelection`, `TestConfigTypedRequest`, `TestConfigDocumentedFixturesAndOverrides` — URL/body tipados efetivamente recebidos |
+| GO-120 | `TestConfigDiscoveryAndSelection`, `TestConfigDocumentedFixturesAndOverrides` — explícito fora do cwd prevalece sobre padrão inválido, inexistente sem fallback |
+| GO-121 | `TestTypedHierarchy`, `TestConfigHierarchyNotAnObject`, `TestPlainNumbersBeyondMachineRangeKeepType`, `TestConfigExternalOriginAndMixedModes` — hierarquia, strings numéricas, precisão aninhada, números grandes/pequenos sem float64 |
+| GO-122 | `TestComposeExactOverrides`, `TestConfigDocumentedFixturesAndOverrides` — irmãos preservados, listas/null substituídos, objetos opacos, conflitos e duplicação CLI rejeitados |
+| GO-123 | `TestConfiguredTimeoutOwnsWholeOperation`, `TestTimeoutMetadataIsolationAndCaller`, `TestConfigPublicFractionalTimeout` — orçamento único em redirects/body, interrupção e isolamento |
+| GO-124 | `TestOptionalEmptyAndLimit`, `TestConfigEmptyAbsentAndNoAncestor` — ausência/vazio/comentários/defaults e nenhuma busca em ancestral |
+| GO-125 | `TestRejectedDocuments`, `TestConfigInvalidBeforeHTTP`, `TestConfigInvalidDocumentsNeverSend` — rejeições localizadas, código 2, zero envios |
+| GO-126 | `TestTimeoutExactMilliseconds`, `TestConfigTimeoutMetadataAndDiagnostic`, `TestConfigInvalidDocumentsNeverSend` — tipo/faixa/precisão sem coerção ou arredondamento |
+| GO-127 | `TestProtectionUnionBeforeAndAfterCompose`, `TestConfigProtectionReachesCallback`, `TestConfigSecretProtectionByBinary`, `TestConfigExternalOriginAndMixedModes` — proteção base/CLI/derivados em callbacks e streams de sucesso/erro |
+| GO-128 | `TestConfigProtectionCapturesAndIsolation`, `TestConfigMissingAndInitialCaptureConflict`, `TestConfigExternalOriginAndMixedModes` — marca sem valor, ausência falha, captura futura protegida e colisão com inicial não sobrescreve |
+| GO-129 | `TestRejectedDocuments`, `TestConfigDocumentedFixturesAndOverrides` — `${NOME}` rejeitado inclusive com variável de processo definida e override CLI |
+| GO-130 | `TestRejectedDocuments`, `TestConfigDocumentedFixturesAndOverrides` — âncora/alias/tag explícita, inclusive aninhada, sem expansão ou mensagem bruta |
+| GO-131 | `TestOptionalEmptyAndLimit`, `TestConfigInvalidDocumentsNeverSend` — exatamente 1 MiB aceito, byte adicional rejeitado, também só comentários, leitura limitada sem Stat |
+| GO-132 | `TestTimeoutExactMilliseconds`, `TestConfigTimeoutMetadataAndDiagnostic` — extremos 1 ms/24 h, omissão de timeout mantém dez segundos |
+| GO-133 | `TestResourceFailures` — funções privadas de abertura, falhas de leitura/fechamento, causas preservadas e nenhum dado parcial aplicado |
+| GO-134 | `TestConfigProtectionBeforeSession`, `TestConfigInvalidBeforeHTTP` — erros de CLI/contexto/cenário e nomes de arquivo protegidos antes da sessão; YAML nunca ecoado |
+| GO-135 | `TestConfigProtectionCapturesAndIsolation`, `TestConfigCommandIsolationAcrossSettings`, `TestTimeoutMetadataIsolationAndCaller`, `TestTimeoutOptionIsPerRunMetadata` — mesmo comando/executor com configurações diferentes e depois defaults, sem vazamento |
+| GO-136 | `TestResourceFailures`, `TestTimeoutMetadataIsolationAndCaller`, `TestConfigRealCancellation` — cancelamento antes da carga/envio, prazo menor do caller e Ctrl+C real durante body sob timeout YAML, sem próxima entrada |
+| GO-137 | `TestConfigPublicTimeoutAboveTenSeconds`, `TestTimeoutMetadataIsolationAndCaller`, `TestConfigTimeoutMetadataAndDiagnostic` — processo real conclui após dez segundos, limites internos removidos, diagnóstico efetivo |
+| GO-138 | `TestConfigHelpDocumentsOnlyImplementedSources` e regressões `TestHelpAndBuildMetadata`, `TestPlainOutputOnRealTTY` — ajuda, flags, versão, streams e TTY Linux |
+| GO-139 | `TestConfigExternalOriginAndMixedModes` — captura → inline → JSON externo opt-in → multipart, configuração/cwd externos sem mudar origem dos payloads, bytes multipart intactos |
+| GO-140 | `TestConfigWriterFailureKeepsPriorityAndProtection`, `TestConfigProcessOutputFailure` — erros/short writes em unitários e falha real `/dev/full` Linux em stdout/stderr; código 2, sem próxima entrada ou exposição |
+
+Exemplos e negativos YAML ficam em `testdata/config/`, separados do corpus Hurl.
+Ajuda, README, subset, arquitetura e matriz refletem somente o suporte real;
+ambientes, HTTPGO_*, referências de processo, stdin e hooks continuam indisponíveis.
+Não há alegação de compatibilidade Hurl geral ou validação nativa fora de Linux.
 
 ## US-10 — issue #25 / história 010
 

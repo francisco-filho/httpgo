@@ -165,7 +165,7 @@ func TestAlreadyCanceled(t *testing.T) {
 	cancel()
 	fake := &fakeExecutor{}
 	code, out, err := execute(t, ctx, fake, "test", writeScenario(t, "GET http://example.test/health"))
-	if code != 2 || len(fake.calls) != 0 || !strings.Contains(err, "cancelada") || !strings.Contains(out, "iniciadas=0") {
+	if code != 2 || len(fake.calls) != 0 || !strings.Contains(err, "cancelada") || out != "" {
 		t.Fatalf("code=%d,out=%q,err=%q", code, out, err)
 	}
 }
