@@ -36,6 +36,14 @@ func jsonValue(file string, node *yaml.Node) (any, error) {
 	case yaml.ScalarNode:
 		switch node.Tag {
 		case "!!str":
+			// The YAML resolver uses machine floats to infer tags and can label
+			// large/very small plain numbers as strings. Resolve their spelling
+			// exactly; quoted numeric strings must remain strings.
+			if node.Style == 0 {
+				if number, err := numberValue(node); err == nil {
+					return json.Number(number), nil
+				}
+			}
 			return node.Value, nil
 		case "!!null":
 			return nil, nil
@@ -57,19 +65,27 @@ func jsonValue(file string, node *yaml.Node) (any, error) {
 
 // Convert spelling, never magnitude through float64. JSON exponents stay compact.
 func numberValue(node *yaml.Node) (string, error) {
-	if node.Kind != yaml.ScalarNode || (node.Tag != "!!int" && node.Tag != "!!float") {
+	if node.Kind != yaml.ScalarNode || (node.Tag != "!!int" && node.Tag != "!!float" && (node.Tag != "!!str" || node.Style != 0)) {
 		return "", fmt.Errorf("tipo numérico inválido")
 	}
+	if node.Value == "" || !strings.ContainsRune("+-0123456789.", rune(node.Value[0])) {
+		return "", fmt.Errorf("número inválido")
+	}
 	source := strings.ReplaceAll(node.Value, "_", "")
-	if node.Tag == "!!int" {
-		value, ok := new(big.Int).SetString(source, 0)
-		if !ok {
-			return "", fmt.Errorf("inteiro inválido")
-		}
+	if source == "" || !strings.ContainsRune("+-0123456789.", rune(source[0])) {
+		return "", fmt.Errorf("número inválido")
+	}
+	if value, ok := new(big.Int).SetString(source, 0); ok {
 		return value.String(), nil
+	}
+	if node.Tag == "!!int" {
+		return "", fmt.Errorf("inteiro inválido")
 	}
 	source = strings.TrimPrefix(source, "+")
 	mantissa, exponent, hasExponent := strings.Cut(strings.ToLower(source), "e")
+	if !strings.ContainsAny(mantissa, "0123456789") {
+		return "", fmt.Errorf("número inválido")
+	}
 	sign := ""
 	if strings.HasPrefix(mantissa, "-") {
 		sign = "-"

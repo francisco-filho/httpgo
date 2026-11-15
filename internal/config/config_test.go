@@ -56,6 +56,7 @@ secrets: [future.token]
 func TestRejectedDocuments(t *testing.T) {
 	cases := []struct{ name, source, detail string }{
 		{"malformed", "version: [", "YAML inválido"},
+		{"invalid comment encoding", "#\xff", "YAML inválido"},
 		{"missing version", "variables: {}", "version: 1"},
 		{"version", "version: 2", "version"},
 		{"version string", "version: '1'", "version"},
@@ -75,6 +76,7 @@ func TestRejectedDocuments(t *testing.T) {
 		{"infinite", "version: 1\nvariables: {a: .inf}", "finito"},
 		{"nan", "version: 1\nvariables: {a: .nan}", "finito"},
 		{"key number", "version: 1\nvariables: {a: [{1: x}]}", "chave"},
+		{"key huge number", "version: 1\nvariables: {a: [{1e400: x}]}", "chave"},
 		{"secret type", "version: 1\nsecrets: x", "lista"},
 		{"secret name", "version: 1\nsecrets: [bad-name]", "nome"},
 		{"defaults type", "version: 1\ndefaults: null", "defaults"},

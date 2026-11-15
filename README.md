@@ -81,6 +81,79 @@ iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e o
 JSON estático são preservados, sem serialização. Declare Content-Type quando necessário;
 não há inferência automática desse header.
 
+## Reutilizar configuração do projeto — extensão HTTPGo (US-11 / issue #27)
+
+No diretório corrente, salve `.httpgo.yaml`:
+
+```yaml
+version: 1
+defaults:
+  timeout: 2.5
+variables:
+  api:
+    baseUrl: http://localhost:8080
+  product:
+    price: 4500
+secrets: [auth.token, password]
+```
+
+Em `products.hurl`:
+
+```hurl
+POST {{api.baseUrl}}/products
+Content-Type: application/json
+{"price": {{product.price}}}
+HTTP 201
+```
+
+```sh
+bin/httpgo test products.hurl
+# Somente o arquivo indicado, com override não sigiloso do destino:
+bin/httpgo test products.hurl --config environments/local.yaml \
+  --var api.baseUrl=http://localhost:9090
+# Exemplo versionado, também utilizável com o dummy manual:
+bin/httpgo test testdata/scenarios/scenario_config_products.hurl \
+  --config testdata/config/project.yaml
+```
+
+A API recebe `price` numérico e o prazo total por requisição é 2,5 segundos.
+Sem flag, descobre **somente** `.httpgo.yaml` do cwd, nunca dos ancestrais.
+Ausência do opcional ou arquivo vazio/só comentários mantém defaults internos;
+arquivo explícito inexistente ou selecionado ilegível é erro **2**, sem HTTP.
+O diretório da configuração não muda a origem de payloads: continuam relativos
+à localização do `.hurl`.
+
+Precedência: **defaults internos < YAML base < CLI**. Mapas de `variables`
+definem caminhos exatos, como `api.baseUrl`, não um objeto interpolável `api`.
+Strings (inclusive `"001"`), números exatos, booleanos, null e arrays JSON-compatíveis
+preservam tipos; objetos dentro de arrays são conteúdo, não novos caminhos.
+`--var` substitui o mesmo nome ou acrescenta outro, preservando irmãos. Listas,
+null e escalares substituem integralmente; objetos CLI continuam opacos.
+Duplicações na mesma fonte e conflitos ancestral/descendente continuam inválidos.
+
+`defaults.timeout` aceita **número de segundos entre 0.001 e 86400**, inclusive,
+com precisão de milissegundos inteiros; não aceita `2s` nem arredonda. Omitido,
+vale **10 segundos**. Um orçamento cobre conexão/TLS, redirects e consumo da
+resposta, respeitando cancelamento/prazo menor do chamador; cada requisição nova
+recebe um novo orçamento. Não interrompe I/O local bloqueado pelo SO.
+
+Limite YAML: **1 MiB (1.048.576 bytes)**, um documento, raiz mapa, `version: 1`
+obrigatória; opcionais somente `defaults.timeout`, `variables` e `secrets`.
+Rejeita campos/chaves/tipos/nomes inválidos, duplicações, âncoras, aliases e tags
+explícitas, inclusive aninhados. Referências `${NOME}` ainda são rejeitadas,
+mesmo com override CLI: não são resolvidas nem enviadas literalmente.
+Erros controlados incluem arquivo/posição quando identificáveis, sem trecho bruto.
+
+`secrets` une marcações com `--secret`; overrides não removem proteção. Pode
+marcar capturas futuras sem criar valores. Valores conhecidos base/substitutos,
+capturados e derivados permanecem protegidos em stdout/stderr/diagnósticos,
+inclusive antes da sessão. Não há detecção universal de segredos arbitrários.
+**Credenciais reais em flags continuam proibidas**: a proteção não cobre histórico
+ou listagem de processos. YAML em disco não é um cofre; proteja arquivos com
+permissões `0600`. Ambientes nomeados, `HTTPGO_*`, referências ao ambiente do
+processo, stdin e hooks continuam fora do suporte. YAML é **extensão HTTPGo**,
+não parte do formato Hurl. Contrato completo: [subconjunto](docs/subset.md).
+
 ## Payload de arquivo externo (US-09 / issue #22)
 
 ```hurl
@@ -107,7 +180,7 @@ vazio, não JSON, binário e `{{placeholder}}` literal, definido ou não. Conten
 não é inferido. O arquivo é lido integralmente e fechado somente na vez da
 requisição, antes do envio. Falha de abertura/leitura/fechamento retorna 2 com
 posição da referência e causa segura; aquela requisição e as seguintes não são
-enviadas. As anteriores permanecem executadas, sem rollback. O prazo de 10s é do
+enviadas. As anteriores permanecem executadas, sem rollback. O prazo configurado (default de 10s) é do
 transporte e não promete interromper leitura local bloqueada pelo sistema.
 Não há limite de tamanho: a memória acompanha o arquivo corrente.
 Não se imprimem conteúdo nem caminho operacional nos diagnósticos. A proteção
@@ -201,7 +274,7 @@ header ou declarar `Content-Type: multipart/form-data` sem boundary manual;
 outro tipo ou qualquer boundary manual é erro. Parâmetros compatíveis, como
 `charset=utf-8`, são preservados. Arquivo é enviado incrementalmente, sem buffer
 proporcional ao seu tamanho. O descritor fica aberto durante o executor e fecha
-antes de assertions/capturas/resultados, também em falha. Há prazo único de 10s
+antes de assertions/capturas/resultados, também em falha. Há prazo único configurável (default de 10s)
 por requisição/redirects/resposta e cancelamento; I/O local bloqueado pelo SO
 continua não sendo interrompível por essa garantia.
 
@@ -245,7 +318,8 @@ válido preserva seu tipo; o restante permanece texto, inclusive vazio. Strings 
 perdem as aspas delimitadoras e interpretam escapes. O primeiro `=` separa nome/valor;
 os seguintes são preservados. Nomes ASCII pontuados, como `api.baseUrl`, resolvem por
 nome exato. Duplicações e conflitos ancestral/descendente, como `api`/`api.baseUrl`,
-são erros independentemente do tipo, sem merge nem sobrescrita. Objetos são opacos:
+são erros independentemente do tipo. Duplicações são rejeitadas na mesma fonte;
+entre YAML e CLI, somente o mesmo nome admite override explícito. Objetos são opacos:
 `--var 'product={"name":"Pizza"}'` **não** define `product.name`.
 URL e valores de headers aceitam `{{nome}}` e `{{ nome }}`, sem recursão. Nesses
 contextos só são aceitos escalares; arrays/objetos geram erro antes do envio.
@@ -401,7 +475,8 @@ com indicação explícita de **sem validação de status**.
 
 - `0`: sucesso; `1`: status ou assertion de header/JSON divergente; `2`: demais erros,
   inclusive avaliação de JSON inválido ou percurso incompatível.
-- Timeout total de 10 segundos por requisição, incluindo redirects e leitura do body.
+- Timeout total configurável em YAML, default de 10 segundos por requisição,
+  incluindo redirects e leitura do body.
 - TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
 - Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
   resumo ao final e diagnósticos em stderr. Sempre texto sem cores.

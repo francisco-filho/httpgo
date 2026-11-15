@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -8,6 +9,49 @@ import (
 
 	"capimgrosso.com/httpgo/internal/runner"
 )
+
+func TestConfigCommandIsolationAcrossSettings(t *testing.T) {
+	var out, stderr bytes.Buffer
+	want := time.Duration(0)
+	calls := 0
+	command := NewRootCommand(executorFunc(func(_ context.Context, r runner.Request) (runner.Response, error) {
+		calls++
+		if r.Timeout != want || r.URL != "http://example.test/fake-visible-token" {
+			t.Fatalf("request=%+v want timeout=%s", r, want)
+		}
+		return runner.Response{Status: 200}, nil
+	}), BuildInfo{})
+	command.SetOut(&out)
+	command.SetErr(&stderr)
+	file := writeScenario(t, "GET http://example.test/{{token}}\nHTTP 200")
+	for index, source := range []string{
+		"version: 1\ndefaults: {timeout: 0.001}\nvariables: {token: fake-visible-token}\nsecrets: [token]",
+		"version: 1\ndefaults: {timeout: 2.5}\nvariables: {token: fake-visible-token}",
+		"",
+	} {
+		out.Reset()
+		stderr.Reset()
+		args := []string{"test", file}
+		want = 10 * time.Second
+		if index < 2 {
+			args = append(args, "--config", writeConfig(t, source))
+			want = time.Millisecond
+			if index == 1 {
+				want = 2500 * time.Millisecond
+			}
+		} else {
+			args = append(args, "--var", "token=fake-visible-token")
+		}
+		command.SetArgs(args)
+		code := command.ExecuteContext(context.Background())
+		if code != 0 || stderr.Len() != 0 || strings.Contains(out.String(), "fake-visible-token") != (index > 0) {
+			t.Fatalf("index=%d code=%d out=%q err=%q", index, code, out.String(), stderr.String())
+		}
+	}
+	if calls != 3 {
+		t.Fatal(calls)
+	}
+}
 
 func TestConfigTimeoutMetadataAndDiagnostic(t *testing.T) {
 	for _, tc := range []struct {

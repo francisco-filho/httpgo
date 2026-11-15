@@ -1,4 +1,25 @@
-# Matriz de compatibilidade — US-01 a US-10 e US-20
+# Matriz de compatibilidade — US-01 a US-11 e US-20
+
+## Extensão US-11 — configuração YAML (issue #27)
+
+`--config` e descoberta de `.httpgo.yaml` são **extensões HTTPGo**, não sintaxe
+Hurl nem promessa de equivalência com arquivos de configuração Hurl. Não mudam
+as construções `.hurl` compartilhadas. O corpus YAML está separado em
+`testdata/config/`; o exemplo `.hurl` está em
+`testdata/scenarios/scenario_config_products.hurl`.
+
+Testes `TestConfig*` unitários, HTTP/TLS e de binário comprovam carga segura,
+composição/tipos, precedência, prazo e proteção inicial/dinâmica. Configuração
+fora do cwd não altera origem dos payloads e arquivos multipart permanecem
+literais. Timeout de produção agora pode ser diferente dos dez segundos padrão;
+o diferencial continua usando os defaults anteriores em ambas as ferramentas.
+
+Os **116 pares existentes** de `testdata/compatibility/` permanecem inalterados.
+Não se fornece `--config`/`--render-files` ao Hurl e não se regeneram observações
+para forçar equivalência. Ambientes, referências de processo, stdin e sandbox
+continuam fora do suporte. YAML inválido, recursos YAML proibidos e `${NOME}`
+são rejeições explícitas antes de qualquer HTTP, verificadas nos testes próprios.
+
 
 ## Extensão US-10 — JSON externo opt-in (issue #25)
 
@@ -14,7 +35,8 @@ validação tardia, origem original segura, modos mistos e políticas HTTP. Não
 passa `--render-files` ao Hurl nem se alteram observações para forçar equivalência.
 Os **116 pares existentes** continuam exercitando o modo bytes e o subconjunto
 anterior, sem mudanças em `testdata/compatibility/`. A nova capacidade não implica
-renderização externa equivalente pelo Hurl; YAML e sandbox continuam fora do suporte.
+renderização externa equivalente pelo Hurl. YAML tem agora o contrato US-11
+separado acima; sandbox continua fora do suporte.
 
 ## Ampliação US-20 — multipart (issue #24)
 
@@ -367,8 +389,9 @@ com mudança intencional do contrato textual temporário da US-03. Não há conv
 implícita de objetos/arrays em texto nem navegação de propriedades.
 
 Interpolação JSON em arquivos externos com `--render-files` é extensão HTTPGo
-implementada na US-10, **não parte do subconjunto Hurl**. YAML hierárquico permanece
-uma extensão futura, não implementada. A gramática menor, saída/exit codes próprios
+implementada na US-10, **não parte do subconjunto Hurl**. YAML hierárquico é a
+extensão US-11, implementada/testada separadamente conforme a seção inicial.
+A gramática menor, saída/exit codes próprios
 e restrição de redirects estão detalhados em `subset.md`.
 
 ## Ambiente usado

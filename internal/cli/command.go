@@ -276,7 +276,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
-  httpgo test <arquivo> [--render-files] [--var nome=valor] [--secret nome]
+  httpgo test <arquivo> [--config arquivo] [--render-files] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -355,7 +355,8 @@ status é aceito e informado como sem validação. HTTP * aceita qualquer status
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
 e conta em sem_validação, não em validadas. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
-Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
+Timeout total: default de 10 segundos por requisição, configurável em YAML.
+Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
 Códigos: 0 sucesso, 1 status ou assertion de header/JSON divergente,
 2 entrada/arquivo externo/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
@@ -429,7 +430,8 @@ inclusive vazio. Sinais = após o primeiro são preservados. Para forçar string
   {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}},"code":{{product.code}}}
   HTTP 201
 Nomes ASCII pontuados são exatos: objetos são opacos, sem acesso a propriedades.
-Duplicação e ancestral/descendente são erros, sem merge nem sobrescrita.
+Duplicação na mesma fonte e ancestral/descendente são erros.
+CLI substitui o mesmo nome YAML, preservando irmãos; objetos CLI continuam opacos.
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
@@ -469,7 +471,37 @@ variáveis iniciais nem capturas anteriores; cada execução começa sem captura
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas
 valores não sigilosos ou fictícios. A proteção não cobre histórico/processos.
-Ambiente do processo e stdin indisponíveis. Templates externos exigem --render-files.
+Configuração do projeto — extensão HTTPGo (US-11):
+  httpgo test products.hurl --config testdata/config/project.yaml
+  httpgo test products.hurl --config testdata/config/project.yaml --var api.baseUrl=http://localhost:9090
+Sem --config: somente .httpgo.yaml do diretório corrente, sem buscar ancestrais.
+--config seleciona somente o arquivo indicado; inexistente/ilegível é erro.
+Ausência do opcional e arquivo vazio/só comentários conservam os defaults internos.
+Exemplo de .httpgo.yaml (YAML, não sintaxe Hurl):
+  version: 1
+  defaults:
+    timeout: 2.5
+  variables:
+    api:
+      baseUrl: http://localhost:8080
+    product:
+      price: 4500
+  secrets: [auth.token, password]
+Precedência: defaults internos < YAML base < CLI; --var substitui por nome exato.
+Mapas variables definem caminhos, não objetos interpoláveis. Tipos: string,
+número finito exato, booleano, null e arrays JSON-compatíveis; mapas dentro de
+arrays são conteúdo. Strings numéricas entre aspas conservam o tipo string.
+Timeout: número de segundos entre 0.001 e 86400, precisão de milissegundos inteiros,
+sem texto com unidade ou arredondamento. Um orçamento cobre conexão/TLS,
+redirects e consumo da resposta; cada nova requisição recebe seu próprio limite.
+YAML: máximo 1 MiB, documento único, raiz mapa, version: 1 obrigatória.
+Rejeita campos desconhecidos, chaves/caminhos repetidos, conflitos, âncoras,
+aliases, tags explícitas e referências ${NOME}, sem mostrar entrada bruta.
+secrets acumula marcações com --secret, inclusive para capturas futuras e overrides.
+Payloads permanecem relativos ao .hurl, nunca à configuração.
+Erro de configuração: código 2, antes de qualquer HTTP.
+Sem ambientes nomeados, HTTPGO_*, referências ao ambiente do processo ou stdin.
+Templates externos exigem --render-files.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.
 `

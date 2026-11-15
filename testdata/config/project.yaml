@@ -1,0 +1,10 @@
+# Extensão HTTPGo — dados locais não sigilosos.
+version: 1
+defaults:
+  timeout: 2.5
+variables:
+  api:
+    baseUrl: http://localhost:8080
+  product:
+    price: 4500
+secrets: [auth.token, password]

@@ -10,8 +10,10 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 
@@ -67,6 +69,9 @@ func load(ctx context.Context, path string, open func(string) (io.ReadCloser, er
 	input, err := open(path)
 	if err != nil {
 		if optional && errors.Is(err, os.ErrNotExist) {
+			if err := ctx.Err(); err != nil {
+				return empty, failure(path, nil, "carga cancelada", err)
+			}
 			return empty, nil
 		}
 		return empty, failure(path, nil, "não foi possível abrir o arquivo; verifique caminho e permissões", err)
@@ -83,6 +88,9 @@ func load(ctx context.Context, path string, open func(string) (io.ReadCloser, er
 	if err != nil {
 		return empty, err
 	}
+	if err := ctx.Err(); err != nil {
+		return empty, failure(path, nil, "carga cancelada", err)
+	}
 	return settings, nil
 }
 
@@ -96,7 +104,7 @@ func decode(file string, data []byte) (Settings, error) {
 			break
 		}
 	}
-	if empty {
+	if empty && utf8.Valid(data) {
 		return result, nil
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
@@ -105,7 +113,16 @@ func decode(file string, data []byte) (Settings, error) {
 		if errors.Is(err, io.EOF) {
 			return result, nil
 		}
-		return result, failure(file, nil, "YAML inválido", nil)
+		// The decoder offers no structured syntax position. Extract only its
+		// numeric line prefix, never propagate its source-bearing message.
+		var position *yaml.Node
+		if rest, ok := strings.CutPrefix(err.Error(), "yaml: line "); ok {
+			lineText, _, _ := strings.Cut(rest, ":")
+			if line, parseErr := strconv.Atoi(lineText); parseErr == nil && line > 0 {
+				position = &yaml.Node{Line: line, Column: 1}
+			}
+		}
+		return result, failure(file, position, "YAML inválido", nil)
 	}
 	var extra yaml.Node
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
@@ -181,6 +198,11 @@ func validateTree(file string, node *yaml.Node) error {
 			key := node.Content[i]
 			if key.Kind != yaml.ScalarNode || key.Tag != "!!str" {
 				return failure(file, key, "chave deve ser string", nil)
+			}
+			if key.Style == 0 {
+				if _, err := numberValue(key); err == nil {
+					return failure(file, key, "chave deve ser string", nil)
+				}
 			}
 			if seen[key.Value] {
 				return failure(file, key, "chave repetida", nil)
