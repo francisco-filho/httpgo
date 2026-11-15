@@ -24,8 +24,8 @@ func TestCaptureDiagnosticsAndCodes(t *testing.T) {
 		{"login", `{"token":"token-ficticio"}`, "", 200, 0, 2, "", "validadas=2"},
 		{"invalid", `secret-body`, "", 200, 2, 1, "resposta não contém JSON válido", "concluídas=1 validadas=1"},
 		{"missing", `{}`, "", 200, 2, 1, "consulta não encontrou valor", "concluídas=1 validadas=1"},
-		{"null", `{"token":null}`, "", 200, 2, 1, "exige resultado string", "concluídas=1 validadas=1"},
-		{"number", `{"token":123}`, "", 200, 2, 1, "exige resultado string", "concluídas=1 validadas=1"},
+		{"null", `{"token":null}`, "", 200, 0, 2, "", "validadas=2"},
+		{"number", `{"token":9007199254740993}`, "", 200, 0, 2, "", "validadas=2"},
 		{"mismatch wins", `not JSON`, "", 503, 1, 1, "status divergente", "concluídas=1 validadas=0"},
 		{"absent later", `{"token":"token-ficticio"}`, "GET http://example.test/{{absent}}", 200, 2, 2, "erro de renderização", "concluídas=2 validadas=2"},
 	} {
@@ -34,8 +34,17 @@ func TestCaptureDiagnosticsAndCodes(t *testing.T) {
 			calls := 0
 			fake := executorFunc(func(_ context.Context, req runner.Request) (runner.Response, error) {
 				calls++
-				if calls == 2 && req.Headers[0].Value != "Bearer token-ficticio" {
-					t.Fatalf("%+v", req)
+				if calls == 2 {
+					want := "Bearer token-ficticio"
+					if tc.name == "null" {
+						want = "Bearer null"
+					}
+					if tc.name == "number" {
+						want = "Bearer 9007199254740993"
+					}
+					if req.Headers[0].Value != want {
+						t.Fatalf("%+v", req)
+					}
 				}
 				return runner.Response{Status: tc.status, Body: []byte(tc.body)}, nil
 			})
