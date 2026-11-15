@@ -36,7 +36,7 @@ func TestRealCtrlC(t *testing.T) {
 				<-r.Context().Done()
 			}))
 			defer server.Close()
-			body, captures := "", "\n[Captures]\ntoken: jsonpath \"$\""
+			body, captures := "", "\njsonpath \"$.token\" == \"ready\""
 			if method != "GET" {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 				captures = ""
