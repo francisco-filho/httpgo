@@ -1,0 +1,54 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "compartilhado: login e capturas string em URL, header e JSON; autorização recebida pela API",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/auth/login",
+      "/protected/token-ficticio"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "POST",
+        "body": "{\"username\":\"demo\",\"password\":\"senha-ficticia\"}",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "uri": "/protected/token-ficticio",
+        "method": "POST",
+        "body": "{\"full\":\"token-ficticio\",\"text\":\"pre-token-ficticio\"}",
+        "content_type": "application/json",
+        "probe": "array-token|",
+        "authorization": "Bearer token-ficticio"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/auth/login",
+      "/protected/token-ficticio"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "POST",
+        "body": "{\"username\":\"demo\",\"password\":\"senha-ficticia\"}",
+        "content_type": "application/json",
+        "probe": ""
+      },
+      {
+        "uri": "/protected/token-ficticio",
+        "method": "POST",
+        "body": "{\"full\":\"token-ficticio\",\"text\":\"pre-token-ficticio\"}",
+        "content_type": "application/json",
+        "probe": "array-token|",
+        "authorization": "Bearer token-ficticio"
+      }
+    ]
+  }
+}

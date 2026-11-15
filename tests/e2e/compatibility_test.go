@@ -26,11 +26,12 @@ const hurlVersion = "8.0.0"
 var updateCompatibility = flag.Bool("update", false, "update compatibility observations; review contract changes")
 
 type wireRequest struct {
-	URI         string `json:"uri,omitempty"`
-	Method      string `json:"method"`
-	Body        string `json:"body"`
-	ContentType string `json:"content_type"`
-	Probe       string `json:"probe"`
+	URI           string `json:"uri,omitempty"`
+	Method        string `json:"method"`
+	Body          string `json:"body"`
+	ContentType   string `json:"content_type"`
+	Probe         string `json:"probe"`
+	Authorization string `json:"authorization,omitempty"`
 }
 
 type observation struct {
@@ -40,6 +41,7 @@ type observation struct {
 }
 
 type comparison struct {
+	ResponseJSON   string      `json:"response_json,omitempty"`
 	Variables      []string    `json:"variables,omitempty"`
 	Classification string      `json:"classification"`
 	HTTPGo         observation `json:"httpgo"`
@@ -89,13 +91,19 @@ func TestCompatibility(t *testing.T) {
 				}
 				mu.Lock()
 				paths = append(paths, r.URL.Path)
-				request := wireRequest{Method: r.Method, Body: string(body), ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe")}
+				request := wireRequest{Method: r.Method, Body: string(body), ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization")}
 				if expected.Variables != nil {
 					request.URI = r.RequestURI
 				}
 				requests = append(requests, request)
 				mu.Unlock()
 				switch r.URL.Path {
+				case "/capture":
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = io.WriteString(w, expected.ResponseJSON)
+				case "/auth/login":
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = io.WriteString(w, `{"accessToken":"token-ficticio","items":["","array-token"]}`)
 				case "/redirect301", "/redirect302", "/redirect303", "/redirect307", "/redirect308":
 					status, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/redirect"))
 					w.Header().Set("Location", "/health")
@@ -164,7 +172,7 @@ func TestCompatibility(t *testing.T) {
 			if expected.Hurl.Requests == nil {
 				hurlRequests = nil
 			}
-			got := comparison{Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
+			got := comparison{ResponseJSON: expected.ResponseJSON, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {

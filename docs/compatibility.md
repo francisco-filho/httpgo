@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-04
+# Matriz de compatibilidade — US-01 a US-05
 
 ## Escopo da evidência
 
@@ -119,8 +119,40 @@ falha da sua CLI em aceitar o valor; registra-se somente o comportamento observa
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. Templates em chaves JSON/nomes de headers,
-capturas, seções, bodies externos/binários/multipart, headers de enquadramento e
+seções além de `[Captures]`, bodies externos/binários/multipart, headers de enquadramento e
 demais construções fora de escopo continuam explicitamente não suportadas.
+
+## Ampliação US-05 — capturas string (issue #14)
+
+Nove pares `captures_*` ampliam o contrato para **50 pares**. Os **41 pares
+anteriores não mudaram**. No corpus de cenários, a antiga rejeição global
+`unsupported_section_captures.hurl` virou `invalid_capture_empty.hurl`: a seção
+agora é suportada, mas vazia continua inválida. Negativos específicos mantêm
+wildcard, filtro, descida recursiva, índice negativo e outras queries rejeitados
+antes da rede. Esta ampliação intencional deve ser sinalizada na revisão/PR.
+
+O harness retorna JSON fictício em `/auth/login`; `response_json` parametriza a
+resposta de `/capture` por par. Além dos campos anteriores, `authorization` registra
+o token **efetivamente recebido** pela API quando presente. Não são segredos reais;
+a saída protegida da ferramenta é verificada pelos E2E próprios, não por este
+registro de tráfego fictício.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/diferença observada |
+|---|---|---|---|
+| `captures_login` | 0; login e POST protegido | 0; mesmos requests | token no path/Authorization/strings JSON; arrays e string vazia; X-Probe `array-token\|` |
+| `captures_literal` | 0; body `{"value":"null","text":"null"}` | 0; body `{"value":null,"text":"null"}` | string capturada na raiz conserva tipo aqui; Hurl reinterpreta no valor completo |
+| `captures_root` | 0; seleção `$[0].token` sem expectativa | 2; zero envios | HTTPGo permite seção sem `HTTP`; Hurl exige resposta esperada para a seção |
+| `captures_dotted` | 0; token recebido em X-Probe | 3; somente login | nome pontuado resolve exatamente aqui; Hurl não resolve o exemplo |
+| `captures_collision` | 2; somente login | 0; login e /health com token novo | HTTPGo não sobrescreve variável inicial; Hurl sobrescreve |
+| `captures_missing` | 2; somente login | 3; somente login | caminho ausente interrompe; códigos próprios |
+| `captures_non_string` | 2; somente /capture | 0; /capture e /health, X-Probe `123` | restrição HTTPGo: capturas somente string, sem coerção numérica |
+| `captures_unsupported` | 2; zero envios | 0; /health, login e /health | wildcard reconhecido e não suportado impede todo envio HTTPGo |
+| `captures_mismatch` | 1; somente /unavailable | 4; mesmo path | status divergente prevalece sobre captura de body não JSON |
+
+Os testes próprios httpgo cobrem também strings semelhantes a placeholders,
+controles/Unicode/escapes, URL/headers inválidos após captura, múltiplas capturas,
+conflitos hierárquicos e de lote, isolamento de execução e proteção dinâmica.
+Não se deduz compatibilidade geral de JSONPath/capturas a partir desses pares.
 
 ## Extensões e restrições
 

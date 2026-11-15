@@ -30,10 +30,11 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/first" {
 					w.WriteHeader(200)
+					_, _ = io.WriteString(w, `{"token":"stream-token-ficticio"}`)
 					return
 				}
 				body, err := io.ReadAll(r.Body)
-				if err != nil || r.Method != "POST" || string(body) != `{"typed":[true,null,9007199254740993123456789]}` {
+				if err != nil || r.Method != "POST" || string(body) != `{"typed":[true,null,9007199254740993123456789]}` || r.Header.Get("Authorization") != "Bearer stream-token-ficticio" {
 					t.Errorf("method=%s body=%s err=%v", r.Method, body, err)
 				}
 				close(secondStarted)
@@ -55,7 +56,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}))
 			defer server.Close()
 			address := strings.Replace(server.URL, "http://", "http://username-secret:password-secret@", 1)
-			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\nPOST {{base}}/second\n{\"typed\":{{payload}}}\nHTTP 404")
+			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/second\nAuthorization: Bearer {{token}}\n{\"typed\":{{payload}}}\nHTTP 404")
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			reader, writer, err := os.Pipe()
@@ -63,7 +64,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = reader.Close(); _ = writer.Close() }()
-			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "first="+address, "--var", "base="+server.URL, "--var", "payload=[true,null,9007199254740993123456789]")
+			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "first="+address, "--var", "base="+server.URL, "--var", "payload=[true,null,9007199254740993123456789]", "--secret", "token")
 			var stderr bytes.Buffer
 			command.Stdout, command.Stderr = writer, &stderr
 			if err := command.Start(); err != nil {
@@ -128,7 +129,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}
 			prefix := "POST "
 			if tc.code != 0 {
-				prefix = fmt.Sprintf("%q:3:1: POST ", file)
+				prefix = fmt.Sprintf("%q:5:1: POST ", file)
 			}
 			if !strings.HasPrefix(remaining[0], prefix) {
 				t.Fatalf("second result = %q; want prefix %q", remaining[0], prefix)
@@ -137,6 +138,9 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 				t.Fatalf("stderr = %q", stderr.String())
 			}
 			assertNoSecrets(t, first+strings.Join(remaining, "\n")+stderr.String())
+			if strings.Contains(first+strings.Join(remaining, "\n")+stderr.String(), "stream-token-ficticio") {
+				t.Fatal("capture leaked")
+			}
 		})
 	}
 }

@@ -1,4 +1,97 @@
-# Validação — US-01 a US-04
+# Validação — US-01 a US-05
+
+## US-05 — issue #14 / história 005
+
+Plano executado diretamente da issue #14, sem planner, somente backend. Tasks
+registradas e autoaprovadas na fila 005 antes da implementação. Tasks 1–3
+concluídas com commits `15961e8`, `58de83b` e `9f82684`. A implementação e a
+validação **local** da task 4 estão nesta alteração. Seu aceite continua
+**bloqueado pela execução nativa macOS/Windows** exigida no plano. Nenhuma
+alteração de frontend/estáticos, dependências, versão de Go, CI ou lint.
+SonarQube não foi executado (exclusivo do QA).
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, CGO/compilador C para race,
+goimports/golangci-lint e Hurl 8.0.0/libcurl 8.18.0 já disponíveis. Nenhuma
+ferramenta foi instalada. Os servidores dos testes são HTTP/TLS locais, em
+portas dinâmicas; não há dependência do dummy nem de serviço externo.
+
+- `go test ./internal/parser ./internal/query`: associação e posições de
+  declarações/consultas, LF/CRLF, limites com JSON/strings e próximas entradas,
+  rejeição integral de seção órfã/vazia/duplicada, nomes e queries inválidos ou
+  não suportados. Seleção de raiz, propriedades/índices combinados, vazio,
+  ausência versus null, tipos preservados com `UseNumber` e erros sem resposta.
+- `go test ./internal/template ./internal/runner ./internal/transport`: sessão
+  nova por Run, strings sem reinterpretar literais CLI/placeholders, nomes exatos,
+  publicação atômica e colisões hierárquicas em qualquer tipo inicial; fakes HTTP
+  sem rede no runner, contagens e callback síncrono. HTTP local comprova login,
+  Authorization e somente bytes finais de redirects retidos. Sem captura não há
+  retenção. Leitura incompleta, cancelamento/timeout durante leitura e falha de
+  fechamento não publicam capturas nem liberam próximos envios. Falhas de leitura
+  e fechamento também são injetadas por RoundTripper de teste com body observável.
+- `go test ./internal/cli ./internal/template ./internal/runner`: códigos 0/1/2,
+  captura localizada separada de transporte/renderização, status divergente
+  prevalece sobre JSON inválido, 4xx esperado e ausência de expectativa. Proteção
+  inicial/dinâmica, segredo descoberto antes de falha em outra declaração,
+  variantes brutas/JSON/Go/URL conhecidas, filename escapado, strings semelhantes
+  a JSON, vazio, isolamento do comando e ausência de corpos/causas brutas.
+  Writers com erro/short write impedem próximo envio; escrita prevalece sobre
+  divergência. Contagens mantêm resposta concluída e status aprovado na falha
+  de captura, sem inventar transporte ou reimprimir resultados.
+- `go test ./tests/e2e -count=1`: passou com binário real compilado uma vez.
+  Demonstração `scenario_auth_capture.hurl` verifica credenciais fictícias e
+  Bearer efetivamente recebido; segundo processo/arquivo não encontra a captura.
+  POST/PUT/PATCH/DELETE com strings completas/compostas, arrays/caminhos aninhados,
+  nomes pontuados, strings vazias, controles/Unicode, escapes e texto semelhante
+  a placeholder. Casos negativos verificam stdout/stderr, exit code e contatos:
+  tipo/JSON/caminho, status, colisões iniciais/de lote/anteriores, uso antecipado,
+  URL/header final inválido e construção tardia inválida/não suportada com zero
+  envios. Proteção de senha/token também em nomes de arquivo e falhas.
+- Regressões E2E de rede com capturas: redirects 301/302/303/307/308 retêm somente
+  JSON final; origem bloqueada, TLS inválido, body incompleto e conexão encerrada
+  não liberam próxima entrada nem retry. GET com captura comprova timeout público
+  de **10 segundos** incluindo redirect e leitura; POST tipado sem captura conserva
+  o teste anterior. Ctrl+C real Linux interrompe GET durante leitura de body com
+  captura; métodos restantes conservam cancelamento sem captura. Pipe de stdout
+  comprova resultado do login visível enquanto POST autenticado seguinte está
+  bloqueado, em sucesso, divergência e body incompleto. Ajuda/versão, flags
+  inválidas, NO_COLOR, arquivo/pipe/PTY Linux continuam passando.
+- `make compatibility`: passou com **50 pares**, Hurl **8.0.0** obrigatório e sem
+  skip. Nove pares novos `captures_*` foram atualizados com `-update`, lidos e
+  revisados, e novamente executados sem atualização. Confirmam token recebido
+  pela API e diferenças de nomes pontuados, sobrescrita, captura não string,
+  ausência de expectativa e string `"null"` em valor JSON completo. Os **41 pares
+  antigos não mudaram**; o harness acrescenta somente campos opcionais de resposta
+  JSON/Authorization. A troca do negativo genérico de Captures por seção vazia e
+  negativos específicos é uma ampliação intencional documentada do subconjunto.
+- `make fmt lint test`: passou; lint com **0 issues**, `go test ./... -race -cover`.
+  O aviso inicial de lint no novo teste foi corrigido antes da rodada aprovada.
+- `go vet ./...`, `go build ./...`, `make build` e `make portable`: passaram.
+  Portable comprova somente build CGO=0 linux/darwin/windows amd64, não runtime.
+- Fuzzing separado, 20 segundos e duas workers por alvo:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    passou; 700.202 execuções, seeds ampliados para seções/consultas/fronteiras.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`:
+    passou; 41.010 execuções, também verificando strings provenientes de captura.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`:
+    passou; 430.095 execuções, preservando tipo/conteúdo da captura, JSON válido e
+    origem sem mutação. Nenhum panic ou caso de falha foi encontrado.
+
+### Bloqueio de aceite / handoff final da 005
+
+Não há ambiente nativo macOS/Windows nesta sessão. Falta executar
+`go test ./tests/e2e -count=1` nativamente em cada plataforma e registrar os
+resultados aplicáveis de streams/códigos/contatos. Permanecem os limites históricos:
+harness de sinal real com tags linux/darwin, executado apenas em Linux, e PTY
+Linux-only; não há evidência de console/sinal/TTY nativos nas outras plataformas.
+**Cross-build e testes de contexto não substituem essa evidência.**
+
+A task `back:4` não deve receber `done`; seu claim deve ser liberado enquanto
+aguarda ambientes/resultados. Não houve handoff final, disparo de review nem
+comentário de implementação concluída na issue #14. A implementação passa nos
+gates locais, mas a história não está declarada pronta. Nenhum gate foi removido,
+reduzido ou transformado em skip. As tasks 1–3 permanecem concluídas.
 
 ## US-04 — issue #13 / história 004
 

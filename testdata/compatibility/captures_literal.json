@@ -1,0 +1,53 @@
+{
+  "response_json": "\"null\"",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "captura raiz string: HTTPGo preserva tipo em valor JSON completo; Hurl reinterpreta null nesse contexto",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"value\":\"null\",\"text\":\"null\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"value\":null,\"text\":\"null\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

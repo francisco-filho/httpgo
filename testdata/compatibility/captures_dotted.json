@@ -1,0 +1,44 @@
+{
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "nomes pontuados de captura: resolução exata HTTPGo versus gramática Hurl observada",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/auth/login",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "token-ficticio"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/auth/login"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

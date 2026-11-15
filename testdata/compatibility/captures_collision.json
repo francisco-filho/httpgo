@@ -1,0 +1,45 @@
+{
+  "variables": [
+    "base=http://example.invalid",
+    "token=initial"
+  ],
+  "classification": "colisão: HTTPGo não sobrescreve variável inicial; comportamento Hurl observado",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/auth/login"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/auth/login",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/auth/login",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "token-ficticio"
+      }
+    ]
+  }
+}

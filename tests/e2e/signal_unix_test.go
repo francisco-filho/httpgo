@@ -21,21 +21,26 @@ func TestRealCtrlC(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			started := make(chan struct{})
 			var next atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.Copy(io.Discard, r.Body)
 				if r.URL.Path == "/next" {
 					next.Add(1)
 					return
 				}
+				if method == "GET" {
+					_, _ = io.WriteString(w, `{"token":"`)
+					w.(http.Flusher).Flush()
+				}
 				close(started)
 				<-r.Context().Done()
 			}))
 			defer server.Close()
-			body := ""
+			body, captures := "", "\n[Captures]\ntoken: jsonpath \"$\""
 			if method != "GET" {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
+				captures = ""
 			}
-			file := scenario(t, method+" {{base}}/wait?token=query-secret"+body+"\nHTTP 200\nDELETE {{base}}/next")
+			file := scenario(t, method+" {{base}}/wait?token=query-secret"+body+"\nHTTP 200"+captures+"\nDELETE {{base}}/next")
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
