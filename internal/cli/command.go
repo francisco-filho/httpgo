@@ -283,7 +283,22 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
   HTTP 201
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
-Headers e um valor JSON inline são opcionais; JSON estático preserva seus bytes.
+Headers e um body são opcionais: JSON inline ou file,<caminho>; (exclusivos).
+JSON inline estático preserva seus bytes. Arquivo externo preserva todos os bytes,
+inclusive vazio, binário e {{placeholder}} literal, sem validar JSON nem renderizar.
+Exemplo: salve tests/products.hurl e execute httpgo test tests/products.hurl
+  POST http://localhost:8080/products
+  Content-Type: application/json
+  file,../payloads/product.json;
+  HTTP 201
+Caminho literal entre file, e ; final, incluindo espaços, sem aspas/escapes especiais
+nem interpolação. Vírgula/ponto e vírgula no nome não são aceitos.
+Relativos partem do diretório do .hurl, não do diretório corrente; absolutos aceitos.
+Sem sandbox: .. e absolutos podem ler fora do projeto, com permissões do usuário.
+Leitura completa e fechamento só na vez da entrada, antes do envio; falha localizada
+retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeitas.
+Content-Type não é inferido. Sem --render-files, renderização externa ou multipart.
+O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
 status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
@@ -292,7 +307,7 @@ Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo 
 Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
 Códigos: 0 sucesso, 1 status ou assertion de header/JSON divergente,
-2 entrada/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
+2 entrada/arquivo externo/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Bodies e coleções de headers não são impressos, nem em erros de entrada.

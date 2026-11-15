@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-08 (issues #4, #6, #11, #13, #14, #16, #18 e #20)
+# Subconjunto suportado — US-01 a US-09 (issues #4, #6, #11, #13, #14, #16, #18, #20 e #22)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -47,7 +47,8 @@ definindo o host HTTP sem alterar a URL operacional nem a política de origem. H
 `Transfer-Encoding` e `Trailer` são explicitamente não suportados: o transporte
 calcula o tamanho do body. Não há autenticação ou cookie jar implícito.
 
-`POST`, `PUT`, `PATCH` e `DELETE` aceitam **nenhum body ou um único valor JSON**:
+`POST`, `PUT`, `PATCH` e `DELETE` aceitam **nenhum body, um único valor JSON ou
+uma referência externa** (abaixo). Para JSON inline:
 objeto, array, string, número, booleano ou `null`, inclusive multilinha. `GET`
 permanece sem body. O valor começa no primeiro caractere JSON e termina no último.
 Espaços/linhas separadores externos não são enviados; todos os bytes internos,
@@ -102,7 +103,14 @@ HTTP 201
 O arquivo é lido somente na vez da requisição e enviado integralmente, sem
 validar JSON, renderizar placeholders ou normalizar bytes (inclusive vazio e
 binário). Não se infere Content-Type. Falha de leitura interrompe antes do envio
-com código 2; requisições anteriores não são desfeitas. Renderização externa,
+com código 2; requisições anteriores não são desfeitas. Inexistente, diretório e
+acesso negado têm causas controladas distintas; nenhuma causa bruta, conteúdo ou
+caminho operacional é impresso. Erros de leitura/fechamento descartam bytes parciais.
+A referência é identificada pelo arquivo/linha/coluna do cenário. A proteção não
+inspeciona conteúdo para descobrir segredos arbitrários. O arquivo corrente é
+carregado integralmente em memória, sem limite de tamanho. Contexto é checado
+antes/depois da leitura; o timeout do transporte não interrompe um I/O local
+bloqueado no sistema operacional. Renderização externa,
 `--render-files` e multipart permanecem fora de escopo.
 **Mudança de contrato:** a referência externa, antes rejeitada, passa a ser aceita.
 

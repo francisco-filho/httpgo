@@ -1,0 +1,13 @@
+{
+  "classification": "shared: empty external file sends empty body",
+  "httpgo": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{ "method": "POST", "body": "", "content_type": "", "probe": "" }]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{ "method": "POST", "body": "", "content_type": "", "probe": "" }]
+  }
+}

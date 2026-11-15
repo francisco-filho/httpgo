@@ -135,6 +135,11 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 			}
 			return result
 		}
+		for _, header := range request.Headers {
+			if sensitiveHeader(header.Name) {
+				session.ProtectValue(header.Value)
+			}
+		}
 		if entry.ExternalBody != nil {
 			path := entry.ExternalBody.Path
 			if !filepath.IsAbs(path) {
@@ -164,11 +169,6 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 		}
 		result.Summary.Started++
 		result.Summary.NotStarted--
-		for _, header := range request.Headers {
-			if sensitiveHeader(header.Name) {
-				session.ProtectValue(header.Value)
-			}
-		}
 		response, err := r.executor.Execute(ctx, request)
 		for _, header := range response.Headers {
 			if sensitiveHeader(header.Name) {

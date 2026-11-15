@@ -13,6 +13,49 @@ import (
 	"testing"
 )
 
+func TestExternalDemoAndHelpByBinary(t *testing.T) {
+	input, err := os.ReadFile("../../testdata/scenarios/scenario_external_body.hurl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile("../../testdata/payloads/product.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil || !bytes.Equal(body, payload) || r.URL.Path != "/products" || r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("body=%q err=%v request=%v", body, err, r)
+		}
+		hits.Add(1)
+		w.WriteHeader(201)
+	}))
+	defer server.Close()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "tests"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "payloads"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "payloads", "product.json"), payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "tests", "products.hurl")
+	if err := os.WriteFile(file, []byte(strings.ReplaceAll(string(input), "http://localhost:8080", server.URL)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, stderr := run(t, "test", file)
+	if code != 0 || stderr != "" || hits.Load() != 1 || !strings.Contains(out, "validadas=1") {
+		t.Fatalf("code=%d hits=%d out=%q err=%q", code, hits.Load(), out, stderr)
+	}
+	code, out, stderr = run(t, "test", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(out, "file,../payloads/product.json;") || !strings.Contains(out, "Sem sandbox") {
+		t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
+	}
+}
+
 func TestExternalBodiesByBinary(t *testing.T) {
 	for i, body := range [][]byte{nil, []byte(" \ttext\r\n\n"), {0, 255, 254, 1}, []byte(`{"x":"{{missing}}"}`)} {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {

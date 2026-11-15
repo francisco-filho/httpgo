@@ -81,6 +81,44 @@ iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e o
 JSON estático são preservados, sem serialização. Declare Content-Type quando necessário;
 não há inferência automática desse header.
 
+## Payload de arquivo externo (US-09 / issue #22)
+
+```hurl
+POST http://localhost:8080/products
+Content-Type: application/json
+file,../payloads/product.json;
+HTTP 201
+```
+
+Salve em `tests/products.hurl`, crie `payloads/product.json` e execute
+`bin/httpgo test tests/products.hurl`. Exemplo pronto contra o dummy:
+`bin/httpgo test testdata/scenarios/scenario_external_body.hurl`.
+
+`file,<caminho>;` substitui o body inline inteiro, não pode ser combinado com
+outro body e não é aceito em GET. O caminho é literal, incluindo espaços entre
+`file,` e o `;` final; não há sintaxe especial de aspas/escapes nem interpolação.
+Nomes com vírgula/ponto e vírgula ficam fora deste recorte. Caminhos relativos
+partem do diretório do `.hurl`, independentemente do diretório corrente;
+absolutos são aceitos. **Sem sandbox:** `..` e caminhos absolutos podem alcançar
+arquivos fora da raiz do projeto, com as permissões do usuário da CLI.
+
+Todos os bytes são enviados sem normalização, validação JSON ou renderização:
+vazio, não JSON, binário e `{{placeholder}}` literal, definido ou não. Content-Type
+não é inferido. O arquivo é lido integralmente e fechado somente na vez da
+requisição, antes do envio. Falha de abertura/leitura/fechamento retorna 2 com
+posição da referência e causa segura; aquela requisição e as seguintes não são
+enviadas. As anteriores permanecem executadas, sem rollback. O prazo de 10s é do
+transporte e não promete interromper leitura local bloqueada pelo sistema.
+Não há limite de tamanho: a memória acompanha o arquivo corrente.
+Não se imprimem conteúdo nem caminho operacional nos diagnósticos. A proteção
+não descobre segredos arbitrários no payload; use somente cenários confiáveis.
+
+**Mudança de contrato:** a antiga rejeição global de `file,...;` foi removida;
+negativos específicos mantêm as restrições. Multipart e `--render-files` continuam
+não suportados. Renderização externa futura será extensão explícita HTTPGo,
+não uma capacidade anunciada nesta entrega. Veja [subconjunto](docs/subset.md)
+e [evidência diferencial](docs/compatibility.md).
+
 ## Parametrizar URL e headers (US-03 / issue #11)
 
 Salve o exemplo abaixo como `products.hurl`:
@@ -142,7 +180,7 @@ JSON, aceita apenas escalares e composição textual, com escape correto de aspa
 barras invertidas e controles, preservando Unicode. Números conservam sua
 representação JSON sem arredondamento, inclusive dentro de estruturas. Conteúdo
 inserido semelhante a placeholder permanece literal. Chaves JSON são estáticas;
-arquivos externos, expressões e acesso a propriedades não são suportados.
+renderização de arquivos externos, expressões e acesso a propriedades não são suportados.
 
 A interpretação tipada de `--var` é uma **extensão própria HTTPGo**, não promessa
 de equivalência com a CLI do Hurl. A sintaxe contextual compartilhada e as diferenças

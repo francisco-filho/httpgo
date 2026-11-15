@@ -1,4 +1,84 @@
-# Validação — US-01 a US-08
+# Validação — US-01 a US-09
+
+## US-09 — issue #22 / história 009
+
+Plano da issue #22 executado diretamente, sem planner, somente backend. Quatro
+tasks registradas e autoaprovadas na fila 009. Tasks 1–3 nos commits `cafa469`,
+`9d60765` e `19baacf`; contrato, ajuda, corpus e validação integrada da task 4
+nesta alteração. Nenhum frontend/estático, dependência, Go, CI ou gate alterado.
+SonarQube não foi executado (responsabilidade exclusiva QA).
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go conforme `go.mod` (`1.26.10`), goimports, golangci-lint e Hurl
+8.0.0 já disponíveis, sem instalação. Processo com UID 1000 (não privilegiado):
+E2E de acesso negado usa arquivo com modo 0000 e comprova o diagnóstico e ausência
+de contato, não apenas a aplicação de chmod. HTTP local em portas dinâmicas,
+sem depender de dummy/8080. macOS/Windows nativos e cross-builds são opcionais
+pelo plano v4, seção 7; não executados nem anunciados.
+
+- Task 1: `go test ./internal/parser ./internal/runner ./internal/cli
+  ./internal/transport` e `go test ./tests/e2e -count=1` passaram. Bytes exatos
+  (whitespace, LF/CRLF, não JSON, UTF-8 inválido/binário, zero bytes), nomes com
+  espaços/placeholders e caminho absoluto. Malformados/duplicados/misturados e
+  headers após body rejeitam todo o cenário; GET sem body preservado.
+- Task 2: `go test ./internal/runner ./internal/cli` e
+  `go test ./tests/e2e -count=1` passaram. Primeira requisição concluída, falha na
+  segunda e terceira não enviada; contagens baseadas no executor. Inexistente,
+  diretório, acesso negado real e falhas determinísticas de leitura/fechamento.
+  Bytes parciais descartados e causas inspecionáveis via errors.Is/As, sem texto
+  bruto. Callback/resultado sem referência operacional/body/headers, escrita
+  prevalecendo com código 2, credenciais fictícias ausentes dos streams.
+- Task 3: `go test ./internal/runner ./internal/transport ./internal/cli` e
+  `make e2e` passaram. Diretório do processo filho distinto sem chdir global,
+  referências relativas com `..` fora do projeto e absolutas. Fluxo misto
+  inline estático → externo → inline com template, códigos 0/1/2, interrupção.
+  Redirects 301/302/303 convertem em GET vazio; 307/308 preservam método/bytes.
+  Descritor real fechado antes do executor e após leitura com erro. Resposta
+  consumida/fechada em sucesso e falha; cancelamento antes/durante leitura não
+  inicia executor e cancelamento no transporte não envia próxima entrada.
+  Ctrl+C real agora inclui body externo, com saída 2 e sem envio posterior.
+- Task 4: `go test ./internal/cli ./internal/parser ./tests/e2e` passou. Exemplo
+  versionado executado pelo binário com payload adjacente, ajuda de root/test,
+  negativos no corpus, proteção de headers sensíveis renderizados antes de
+  eventual falha local (inclusive quando o mesmo valor ocorre na URL exibível).
+- Fuzz: `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s
+  -parallel=2` passou: 57.194 execuções, seeds ampliados com referências externas,
+  CRLF, caminhos com espaços/placeholders/colon, delimitadores e duplicados;
+  nenhuma falha encontrada.
+- `make compatibility` passou com Hurl **8.0.0** obrigatório, sem skip: **106
+  pares**, seis novos `external_*`; as **100 observações anteriores não mudam**.
+  Cada ferramenta recebe sua própria árvore temporária de cenário/payloads,
+  sem substituir referências por absolutos. Bytes/contatos/códigos são medidos.
+  Espaço literal no nome é aceito aqui e rejeitado neste par pelo Hurl; falhas
+  de arquivo retornam 2 aqui e 3 no Hurl observado. JSONs novos escritos/revisados
+  explicitamente, sem atualização automática indiscriminada. O binário Hurl
+  imprime aviso de metadados de versão da libcurl no ambiente; a identificação
+  8.0.0 e todos os pares passaram. Não se anuncia equivalência geral.
+- `make fmt lint test` passou antes de concluir cada task e na validação integrada,
+  lint **0 issues**, `go test ./... -race -cover`. `go vet ./...` e
+  `go build ./...` executados explicitamente. `make build` e `make e2e` passaram.
+  `gofmt -l` dos Go alterados e `git diff --check` sem pendências; exemplos,
+  links locais, classificações e aviso de ausência de sandbox revisados.
+
+### Rastreabilidade dos cenários da issue
+
+| Cenários | Evidência automatizada |
+|---|---|
+| GO-01–02 | `TestExternalBytes`, `TestExternalBodiesByBinary`: whitespace, LF/CRLF, binário/não JSON, vazio |
+| GO-03–04 | `TestFileBodyLiteral`, `TestExternalBytes`, `TestExternalOriginAcrossProcessDirectories`: origem, absolutos, `..`, nomes literais |
+| GO-05 | `TestExternalBodiesByBinary`: mesmo placeholder externo com variável ausente/definida, bytes idênticos |
+| GO-06 | `TestInvalidFileBodyRejectsWholeScenario`, `TestMalformedExternalPreventsAllNetwork`, corpus negativo integral |
+| GO-07–08 | `TestFileFailuresPreservePreviousResults`, `TestPayloadReadFailureClosesAndDiscardsPartialBytes`, `TestFileDiagnostics`, `TestExternalReadFailureByBinary` |
+| GO-09 | `TestExternalBytes`, `TestFileFailureProtectsRenderedSensitiveHeadersBeforeReporting`, `TestFileDiagnostics`, `TestExternalMixedSequenceByBinary` |
+| GO-10 | `TestExternalMixedSequenceByBinary` e regressões inline existentes: códigos 0/1/2 e ausência de próximo envio |
+| GO-11 | `TestExternalRedirectsByBinary`: cinco status e bytes efetivamente recebidos |
+| GO-12 | `TestExternalDescriptorClosedBeforeExecutorOrFailure`, `TestPayloadCloseFailureAndCanceledRead`, `TestExternalResponseConsumedAndClosed` |
+| GO-13 | `TestExternalCancellationNeverStartsPrematurely`, `TestRealCtrlC/external`, `TestExternalMixedSequenceByBinary/incomplete` |
+| GO-14 | `TestCompatibility`, seis pares `external_*`, Hurl 8.0.0 sem skip; diferenças em `compatibility.md` |
+
+Evidência local não substitui o review. Renderização de arquivos externos,
+`--render-files`, multipart e sandbox permanecem fora do suporte anunciado.
 
 ## US-08 — issue #20 / história 008
 

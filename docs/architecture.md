@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-08
+# Arquitetura implementada — US-01 a US-09
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07) e #20 (US-08),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08) e #22 (US-09),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -15,6 +15,7 @@ cmd/httpgo/main.go
     → internal/runner/runner.go + render.go (somente cenário validado)
       → internal/template/template.go + json.go (valores tipados, texto/JSON contextual)
       → parser.ValidateURL/ValidateHeader e validação JSON final
+      → internal/runner/file.go (leitura literal local só para body externo)
       → internal/transport/http.go (via HTTPExecutor)
       → internal/assertion/status.go (somente expectativa numérica)
       → internal/runner/assertions.go (headers/JSON na ordem escrita, antes de capturas)
@@ -55,6 +56,42 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 adicional nem ciclo. Testes de integração podem montar `runner.New` com o adapter.
 Somente o código de produção em `transport` importa `net/http`.
 
+## Arquivos externos — US-09
+
+`parser.FileBody` conserva `Path` literal e `Position`, ligado por
+`Entry.ExternalBody` não nulo (inclusive para arquivo vazio). `Entry.Body` não
+nulo continua representando JSON inline; ambos nulos significam ausência de
+body. O parser reconhece `file,` antes de headers e da rejeição genérica, inclusive
+caminhos com `:`. Valida estrutura inteira/exclusividade/GET, sem I/O do payload.
+
+`cli.Command` calcula a origem absoluta antes de abrir o `.hurl`, associa
+`Scenario.OriginDir` e preserva `Scenario.File` nos diagnósticos. Na entrada
+corrente, runner renderiza URL/headers e resolve o arquivo com `filepath.IsAbs`
+e `filepath.Join`. `readPayload` abre, verifica diretório, lê integralmente e
+fecha antes do executor, inclusive em leitura parcial/falha. `readAndClosePayload`
+compõe erros com `errors.Join`; `FileError.Unwrap` conserva as causas para
+`errors.Is/As`, mas seu texto expõe somente categorias controladas. `Runner.readFile`
+é um ponto privado de substituição por instância para testes determinísticos;
+não há interface pública de filesystem nem dependência nova.
+
+O conteúdo externo não passa por `BodyPlan`, `Session.RenderJSON` ou validação
+JSON: é entregue como `Request.Body []byte`. Transport não conhece caminhos e
+continua responsável somente por HTTP/redirects/consumo/fechamento de resposta.
+Template não conhece arquivos. Não há sandbox, tamanho máximo ou inferência de
+Content-Type; memória adicional acompanha o payload corrente, sem retenção nos
+resultados. A leitura usa permissões locais e pode alcançar fora do projeto.
+
+Contexto é verificado antes/depois da leitura e antes do executor, sem goroutines.
+Uma leitura local bloqueada pelo SO não é interrompida pelo timeout de transporte.
+Erro local gera `FileFailed`, `Result.Err *FileError` e posição da referência;
+callback síncrono recebe metadados seguros, e `safeEntry` remove `ExternalBody`,
+body e headers. Não há bytes carregados nem caminho operacional no resultado.
+A falha pré-envio não aumenta Started/Completed e preserva resultados anteriores.
+Headers sensíveis já renderizados entram na proteção antes da leitura, inclusive
+para sanitizar DisplayURL e writers se o arquivo falhar antes do transporte.
+CLI reconhece FileError sem classificar como transporte/renderização nem imprimir
+erro bruto/linha do cenário. ReportErr ainda prevalece com código 2.
+
 ## Apresentação incremental
 
 A CLI monta `runner.NewWithRenderer(executor, sessionRenderer, c.renderEntry)`.
@@ -76,7 +113,7 @@ Se o callback falhar, `Result.ReportErr` preserva a causa e o runner não inicia
 envio seguinte. A CLI diagnostica a falha de escrita em stderr com texto controlado,
 retorna 2 (também se houve divergência) e não tenta escrever o resumo no stdout
 que falhou. `Result.Err` carrega transporte/cancelamento, `*runner.RenderError`
-ou `*runner.CaptureError`/`*runner.JSONError`;
+ou `*runner.CaptureError`/`*runner.JSONError`/`*runner.FileError`;
 a CLI distingue a categoria com `errors.As`, sem ecoar causas brutas.
 
 ## Validação em duas etapas e segredos
@@ -110,7 +147,7 @@ rejeita estruturas em contexto textual. `parser.ValidateURL`/`ValidateHeader`
 reutilizam as restrições, inclusive Host; URL não ganha percent-encoding implícito.
 `Session.RenderJSON` reutiliza o reconhecimento contextual: valores completos
 recebem JSON tipado; conteúdo de strings usa representação escalar e escape JSON.
-O body final é validado com `encoding/json` antes de `Execute`, também na borda
+O body inline final é validado com `encoding/json` antes de `Execute`, também na borda
 do runner para verificar o contrato do renderer. Offsets de erros mapeiam para
 linha/coluna originais, inclusive CRLF, sem usar o comprimento renderizado.
 O cenário não é mutado: requisição recebe clones de headers/body e somente o

@@ -83,6 +83,28 @@ func TestFileFailureReportErrorTakesPriority(t *testing.T) {
 	}
 }
 
+func TestFileFailureProtectsRenderedSensitiveHeadersBeforeReporting(t *testing.T) {
+	scenario, err := parser.Parse("safe.hurl", strings.NewReader("POST http://example.test/{{credential}}\nAuthorization: {{credential}}\nfile,private;"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer, err := template.New([]string{"credential=fictitious-sensitive-value"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) { t.Fatal("unexpected send"); return Response{}, nil }), renderer, func(entry EntryResult) error {
+		if strings.Contains(fmt.Sprintf("%+v", entry), "fictitious-sensitive-value") {
+			t.Fatalf("unsafe callback=%+v", entry)
+		}
+		return nil
+	})
+	r.readFile = func(context.Context, string) ([]byte, error) { return nil, fs.ErrNotExist }
+	result := r.Run(context.Background(), scenario)
+	if result.Err == nil || strings.Contains(result.Entries[0].DisplayURL, "fictitious-sensitive-value") {
+		t.Fatalf("result=%+v", result)
+	}
+}
+
 func TestExternalBytes(t *testing.T) {
 	for _, body := range [][]byte{nil, []byte(" \ttext\r\n\n"), {0, 255, 254, 1}, []byte(`{"x":"{{missing}}"}`)} {
 		for _, absolute := range []bool{false, true} {
@@ -111,7 +133,12 @@ func TestExternalBytes(t *testing.T) {
 					t.Fatalf("request=%+v want body=%q", req, body)
 				}
 				return Response{Status: 201}, nil
-			}), renderer, nil).Run(context.Background(), scenario)
+			}), renderer, func(entry EntryResult) error {
+				if entry.Entry.ExternalBody != nil || entry.Entry.Body != nil || entry.Entry.Headers != nil || len(entry.Entry.BodyPlan.References) != 0 {
+					t.Fatalf("operational metadata retained in callback: %+v", entry)
+				}
+				return nil
+			}).Run(context.Background(), scenario)
 			if calls != 1 || got.Err != nil || got.Diverged {
 				t.Fatalf("calls=%d got=%+v", calls, got)
 			}

@@ -19,6 +19,24 @@ func (e *fileExecutor) Execute(context.Context, runner.Request) (runner.Response
 	return runner.Response{Status: 200}, nil
 }
 
+func TestExternalFileHelp(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
+		cmd := NewRootCommand(&fileExecutor{}, BuildInfo{})
+		var out, stderr bytes.Buffer
+		cmd.SetArgs(args)
+		cmd.SetOut(&out)
+		cmd.SetErr(&stderr)
+		if code := cmd.ExecuteContext(context.Background()); code != 0 || stderr.Len() != 0 {
+			t.Fatalf("code=%d err=%q", code, stderr.String())
+		}
+		for _, text := range []string{"file,<caminho>;", "file,../payloads/product.json;", "diretório do .hurl", "Sem sandbox", "sem aspas/escapes especiais", "Sem --render-files", "binário", "falha localizada"} {
+			if !strings.Contains(out.String(), text) {
+				t.Fatalf("help missing %q", text)
+			}
+		}
+	}
+}
+
 func TestFileDiagnostics(t *testing.T) {
 	for _, directory := range []bool{false, true} {
 		t.Run(fmt.Sprint(directory), func(t *testing.T) {
@@ -32,14 +50,14 @@ func TestFileDiagnostics(t *testing.T) {
 				want = "diretório"
 			}
 			file := filepath.Join(dir, "source.hurl")
-			input := "GET http://example.test/first\nHTTP 200\nPOST http://example.test/second\nAuthorization: credential-secret\nfile,credential-secret;\nGET http://example.test/last"
+			input := "GET http://example.test/first\nHTTP 200\nPOST http://example.test/{{credential}}\nAuthorization: {{credential}}\nfile,credential-secret;\nGET http://example.test/last"
 			if err := os.WriteFile(file, []byte(input), 0600); err != nil {
 				t.Fatal(err)
 			}
 			executor := &fileExecutor{}
 			cmd := NewRootCommand(executor, BuildInfo{})
 			var out, stderr bytes.Buffer
-			cmd.SetArgs([]string{"test", file})
+			cmd.SetArgs([]string{"test", file, "--var", "credential=credential-secret"})
 			cmd.SetOut(&out)
 			cmd.SetErr(&stderr)
 			code := cmd.ExecuteContext(context.Background())
