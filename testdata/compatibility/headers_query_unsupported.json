@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"value\":\"ok\"}",
+  "classification":"intentional restriction: JSON assertions unsupported here; Hurl supports this query",
+  "httpgo":{"exit":2,"paths":null},
+  "hurl":{"exit":0,"paths":["/capture","/health"]}
+}

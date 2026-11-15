@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Test","value":"value"}],
+  "classification":"intentional restriction: != unsupported here; Hurl supports it",
+  "httpgo":{"exit":2,"paths":null},
+  "hurl":{"exit":0,"paths":["/health","/missing"]}
+}

@@ -1,4 +1,66 @@
-# Validação — US-01 a US-06
+# Validação — US-01 a US-07
+
+## US-07 — issue #18 / história 007
+
+Plano executado diretamente da issue #18, sem planner, somente backend. Quatro
+tasks registradas e autoaprovadas na fila 007 antes da implementação. Tasks 1–3
+concluídas nos commits `e5ed98c`, `87026b9` e `1e18abf`; a implementação e evidência
+local da task 4 estão nesta alteração. Nenhum frontend/estático, dependência,
+toolchain, CI ou lint alterado. SonarQube não foi executado (exclusivo do QA).
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64; Go `go1.26.10-X:nodwarf5`, CGO/compilador C para race, goimports,
+golangci-lint e Hurl 8.0.0/libcurl 8.18.0 já disponíveis; nenhuma instalação.
+Servidores HTTP/TLS locais em portas dinâmicas, sem dummy ou serviço em 8080.
+Linux é o gate obrigatório do plano v4, seção 7. Cross-builds e runtime nativo
+macOS/Windows são opcionais nesta história, não foram executados nem anunciados.
+
+- Task 1: `go test ./internal/parser ./internal/runner ./internal/cli` e
+  `go test ./tests/e2e -count=1` passaram. `HTTP *` em qualquer entrada aceita
+  200/404/503, sem status fictício ou comparação numérica contada. Ausência de
+  resposta permanece erro de transporte; expectativa ausente/numérica preservadas.
+- Task 2: `go test ./internal/parser ./internal/query ./internal/assertion
+  ./internal/runner ./internal/transport ./internal/cli` passou. Três operadores,
+  caixa de nome/valor, primeira ocorrência, vírgulas, ausência/vazio/substring
+  vazia, esperado literal com variável definida/ausente, seções e posições LF/CRLF.
+  Fakes verificam status → headers → capturas, ausência de publicação/envio após
+  falha, callback síncrono e resultados sem coleção bruta de headers/body.
+  Valores sensíveis literais e recebidos ficam ocultos antes do callback; headers
+  comuns também usam segredos conhecidos. Escrita/short write prevalece com 2.
+- Task 3: `go test ./internal/transport` e `go test ./tests/e2e -count=1` passaram.
+  Binário real, compilado uma vez: demonstração, cada operador satisfeito/falho,
+  ausência/vazio/repetição/vírgula, códigos/streams e interrupção preservando
+  resultados prévios. Capturas tipadas com `HTTP *` em 200/404/503; status ou
+  header divergente prevalece sobre body inválido. Erro tardio impede todos os
+  envios. Saídas não expõem esperado/recebido sensíveis. Só headers finais de
+  redirect satisfazem assertions. Body incompleto e leitura/fechamento com erro
+  não aprovam headers nem liberam próxima requisição; sem capturas, não há
+  retenção. Timeout público de 10s e Ctrl+C real Linux exercitam headers corretos
+  antes de leitura/cancelamento. Pipe comprova resultado com assertion/captura
+  visível antes de terminar o próximo envio, sem sleeps.
+- `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=10s` passou:
+  257.262 execuções, seeds ampliados para curinga/assertions/transições e negativos;
+  nenhuma falha encontrada.
+- `make fmt lint test` passou antes de cada task concluída e na validação final:
+  **0 issues** no lint, `go test ./... -race -cover`. `go vet ./...` executado
+  explicitamente em cada entrega de código. `go build ./...` e `make build`
+  também passaram na validação integrada. `gofmt -l` e `git diff --check` sem
+  pendências; links Markdown locais e JSONs/classificações dos pares conferidos.
+- `make compatibility` passou com Hurl **8.0.0** obrigatório, sem skip, **79 pares**.
+  **21 pares novos** `headers_*`; os **58 anteriores não mudaram**. Nenhuma
+  atualização automática indiscriminada: observações novas escritas e revisadas
+  individualmente. A primeira execução identificou que Hurl retorna lista para
+  repetidos, não a primeira string; isso foi classificado, sem mudar a regra
+  HTTPGo. Também observados esperado interpolado no Hurl (inclusive erro de
+  variável ausente com exit 4) e captura antes de assertion (exit 3 contra 1).
+  As classificações foram corrigidas conforme evidência e a matriz foi
+  reexecutada sem `-update`. `docs/compatibility.md` distingue equivalência
+  compartilhada, restrições e divergências deliberadas; não presume mensagens
+  ou motores iguais. Ajuda da CLI e demonstrações têm testes próprios.
+
+A evidência local não é aprovação de review. O handoff final solicita revisão
+pelo code-reviewer; nenhuma alegação de compatibilidade Hurl completa.
 
 ## US-06 — issue #16 / história 006
 

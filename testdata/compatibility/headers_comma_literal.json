@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Test","value":"first,second"}],
+  "classification":"shared: single comma-containing value stays one string for equality and substring",
+  "httpgo":{"exit":0,"paths":["/health","/missing"]},
+  "hurl":{"exit":0,"paths":["/health","/missing"]}
+}

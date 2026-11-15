@@ -1,0 +1,7 @@
+{
+  "response_json":"invalid JSON",
+  "response_headers":[{"name":"X-Test","value":"different"}],
+  "classification":"intentional precedence: httpgo evaluates header assertions before captures; Hurl capture failure takes priority",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":3,"paths":["/capture"]}
+}

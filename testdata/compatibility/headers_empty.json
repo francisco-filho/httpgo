@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Empty","value":""},{"name":"X-Value","value":"nonempty"}],
+  "classification":"shared: present empty differs from missing; empty substring matches all present values",
+  "httpgo":{"exit":0,"paths":["/health","/missing"]},
+  "hurl":{"exit":0,"paths":["/health","/missing"]}
+}

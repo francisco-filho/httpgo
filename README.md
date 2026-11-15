@@ -195,7 +195,8 @@ JSON inválido, caminho ausente ou índice fora do array é erro de captura (có
 Consultas não suportadas em qualquer entrada impedem todos os envios.
 
 Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
-quando esperado, para URLs, valores de headers e JSON inline seguintes. Strings
+quando esperado, e as assertions de headers declaradas, para URLs, valores de
+headers e JSON inline seguintes. Strings
 como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
 Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
 variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada execução
@@ -254,18 +255,19 @@ conhecidos sem mudar os dados enviados nem criar variáveis para as propriedades
 A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
 valores finais inválidos falham imediatamente antes da requisição dependente,
 sem contá-la como iniciada e sem enviar as seguintes. As requisições são
-sequenciais e a primeira falha de status, captura, renderização ou transporte
+sequenciais e a primeira falha de status, header, captura, renderização ou transporte
 interrompe a execução. Uma falha de captura preserva a resposta concluída e o
 status aprovado nas contagens, mas impede o próximo envio. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
-- `0`: sucesso; `1`: status divergente; `2`: demais erros.
+- `0`: sucesso; `1`: status ou assertion de header divergente; `2`: demais erros.
 - Timeout total de 10 segundos por requisição, incluindo redirects e leitura do body.
 - TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
 - Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
   resumo ao final e diagnósticos em stderr. Sempre texto sem cores.
 - 301/302/303 convertem POST/PUT/PATCH/DELETE em GET sem body; 307/308 preservam ambos.
-- Valores de headers e bodies não são impressos, nem em erros de entrada.
+- Bodies e coleções de headers não são impressos. Apenas valores comuns sanitizados
+  podem aparecer no diagnóstico de assertion; valores sensíveis nunca são expostos.
 - Credenciais, query inteira e fragmento da URL não são exibidos.
   Valores marcados com `--secret` também são ocultos em paths e headers comuns,
   antes de escapes/normalização de URL. O restante do path permanece visível:
@@ -273,6 +275,51 @@ com indicação explícita de **sem validação de status**.
   codificação desconhecida automaticamente. A proteção cobre formas brutas,
   decodificadas e escapes conhecidos (JSON, quoting de diagnóstico e URL), inclusive
   em falhas anteriores à construção do contexto. Não há payload de diagnóstico.
+
+## Validar headers da resposta (US-07 / issue #18)
+
+Salve como `health.hurl` e execute `bin/httpgo test health.hurl` contra uma API
+que devolva `Content-Type: application/json; charset=utf-8` e `X-Request-Id: req-123`:
+
+```hurl
+GET http://localhost:8080/health
+HTTP 200
+[Asserts]
+header "Content-Type" contains "application/json"
+header "X-Request-Id" exists
+header "X-Request-Id" == "req-123"
+```
+
+O cenário também está em `testdata/scenarios/scenario_assert_headers.hurl` e é
+verificado por HTTP real nos E2E. O dummy manual não promete esses headers.
+Esta é uma **ampliação intencional**: `[Asserts]`, antes rejeitada globalmente,
+agora aceita somente essas três formas, com strings literais entre aspas duplas.
+Nomes são case-insensitive; igualdade e substring distinguem caixa dos valores.
+`{{nome}}` no esperado permanece literal, sem interpolação. Regex, assertions
+JSON, filtros, captura de headers e outros operadores continuam não suportados.
+
+Só a primeira ocorrência de cada header participa da comparação, sem concatenar
+ou separar vírgulas. Ausência faz todos os operadores falharem; presente vazio
+satisfaz `exists` e `== ""`. `contains ""` passa em qualquer valor presente.
+
+`[Asserts]` exige declaração `HTTP` na entrada. `HTTP *` é aceito com ou sem
+assertions/capturas e permite qualquer status, inclusive 404/503. Sua linha mostra
+`status aceito por HTTP *`; o resumo conta em `sem_validação`, não em `validadas`.
+Isso dispensa **só a comparação numérica**, não headers nem capturas declarados.
+
+Após consumo/fechamento da resposta final, a ordem é status numérico → headers →
+capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
+localiza a assertion e esperado/recebido (ausência difere de `""`), não publica
+capturas nem envia a próxima requisição. Erro estrutural tardio retorna 2 sem
+qualquer envio. Escrita, consumo incompleto, timeout e cancelamento continuam 2.
+Valores sensíveis de Authorization/Proxy-Authorization/Cookie/Set-Cookie são
+ocultos nos dois lados, inclusive esperados literais; headers comuns usam a
+proteção de segredos conhecidos. Nenhum body ou coleção de headers é exibido.
+
+Equivalência com Hurl 8.0.0 é limitada aos pares observados: **repetidos são listas
+no Hurl**, que também interpola esperados e avalia capturas antes das assertions.
+Essas divergências são deliberadas, preservando as regras da história; veja
+[matriz de compatibilidade](docs/compatibility.md).
 
 ## Documentação e desenvolvimento
 
@@ -295,7 +342,7 @@ make portable
 
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
 **desenvolvimento**, não no binário entregue. O gate local com race já passou;
-a evidência Linux da US-06 está registrada em `docs/validation.md`, separada dos
+a evidência Linux por história está registrada em `docs/validation.md`, separada dos
 históricos anteriores. Conforme o plano v4, seção 7, cross-build e testes nativos
 macOS/Windows são opcionais nesta história e ficam para a validação final de
 portabilidade/release, sem bloquear a entrega. Não foi executado runtime nessas

@@ -1,0 +1,6 @@
+{
+  "response_headers": [{"name":"Content-Type","value":"application/json; charset=utf-8"},{"name":"X-Request-Id","value":"req-123"}],
+  "classification":"shared: three literal header operators and case-insensitive names",
+  "httpgo":{"exit":0,"paths":["/health","/missing"]},
+  "hurl":{"exit":0,"paths":["/health","/missing"]}
+}

@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-06
+# Matriz de compatibilidade — US-01 a US-07
 
 ## Escopo da evidência
 
@@ -119,7 +119,7 @@ falha da sua CLI em aceitar o valor; registra-se somente o comportamento observa
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. Templates em chaves JSON/nomes de headers,
-seções além de `[Captures]`, bodies externos/binários/multipart, headers de enquadramento e
+seções além de `[Captures]` e `[Asserts]`, bodies externos/binários/multipart, headers de enquadramento e
 demais construções fora de escopo continuam explicitamente não suportadas.
 
 ## Ampliação US-05 — capturas string (issue #14)
@@ -182,6 +182,48 @@ O teste diferencial não avalia proteção de credenciais: usa só valores fict�
 E2E próprios cobrem capturas secretas escalares/compostas, constituintes, escapes
 conhecidos, falhas posteriores e ausência de mutação dos dados enviados.
 
+## Ampliação US-07 — assertions de headers e HTTP * (issue #18)
+
+**Ampliação intencional do contrato antes rejeitado:** `[Asserts]` agora aceita
+`header` com `==`, `contains` e `exists`; `HTTP *` aceita qualquer status recebido.
+A rejeição global `unsupported_section_asserts.hurl` virou
+`invalid_asserts_without_http.hurl`, acompanhada de negativos específicos de query,
+operador, filtro e sintaxe. Isso deve ser sinalizado na revisão/PR.
+
+**21 pares novos**, total **79**. Os **58 pares anteriores permanecem inalterados**.
+O harness ganhou `response_headers`: lista ordenada de nome/valor fictícios,
+permitindo ocorrências repetidas e valores vazios, sem perder dados por mapa.
+`net/http` canonicaliza os nomes ao escrever; a ordem das ocorrências é preservada.
+Caixas diferentes no wire são exercitadas adicionalmente no transporte próprio.
+As observações novas foram escritas/revisadas individualmente e confirmadas com
+`make compatibility`, sem atualização automática dos pares antigos.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/diferença observada |
+|---|---|---|---|
+| `headers_operators` | 0; /health → /missing | 0; mesmos paths | três operadores e consulta de nomes sem distinção de caixa compartilhados, com uma ocorrência |
+| `headers_equal_mismatch`, `headers_contains_mismatch` | 1; somente /health | 4; somente /health | valores case-sensitive, igualdade/substring literal e interrupção compartilhados; códigos próprios |
+| `headers_exists_missing` | 1; somente /health | 4; somente /health | ausência falha em exists mesmo com `HTTP *` |
+| `headers_empty` | 0; /health → /missing | 0; mesmos paths | vazio existe e é igual a `""`; substring vazia passa em valores presentes vazios/não vazios |
+| `headers_missing_empty`, `headers_missing_contains_empty` | 1; somente /health | 4; somente /health | ausência difere de vazio e não contém substring vazia |
+| `headers_repeated_first` | 0; /health → /missing | 4; somente /health | **divergência deliberada**: primeira ocorrência aqui; Hurl retorna lista e falha em igualdade com string e substring escalar |
+| `headers_repeated_second` | 1; somente /health | 4; somente /health | ambos falham, mas **não comprova equivalência**: primeiro valor aqui, lista no Hurl |
+| `headers_repeated_exists` | 0; /health → /missing | 0; mesmos paths | presença de header repetido, inclusive com primeiro valor vazio |
+| `headers_comma_literal` | 0; /health → /missing | 0; mesmos paths | uma ocorrência com vírgula permanece string única na igualdade e substring |
+| `headers_comma` | 1; somente /health | 4; somente /health | uma ocorrência não é dividida por vírgula para igualdade |
+| `headers_wildcard`, `headers_wildcard_alone` | 0; /health → /missing → /unavailable | 0; mesmos paths | `HTTP *` aceita 200/404/503, com e sem assertions; resumo próprio não conta comparação numérica |
+| `headers_without_http`, `headers_invalid_late` | 2; zero envios | 2; zero envios | exigência de HTTP para `[Asserts]` e sintaxe inválida tardia rejeitam arquivo integral |
+| `headers_query_unsupported` | 2; zero envios | 0; /capture → /health | restrição explícita: assertions JSON fora do subconjunto |
+| `headers_operator_unsupported` | 2; zero envios | 0; /health → /missing | restrição explícita: `!=` fora do subconjunto |
+| `headers_literal_missing`, `headers_literal_defined` | 0; /health → /missing | 4; somente /health | esperado `{{name}}` permanece literal aqui; Hurl tenta resolver variável (ausente: Undefined variable; definida: divergência) |
+| `headers_capture_precedence` | 1; somente /capture | 3; somente /capture | **divergência deliberada**: headers falham antes de examinar JSON/capturas aqui; Hurl falha primeiro na captura |
+
+Não se anuncia compatibilidade de comparação escalar com headers repetidos nem
+interpolação de esperado. A regra da história de primeira ocorrência e precedência
+não foi alterada para forçar equivalência. Segurança de diagnósticos, prioridade de
+escrita, ausência de retenção do body sem capturas, redirects finais, timeout e
+cancelamento são verificados nos testes próprios; o diferencial não exige mensagens
+iguais nem generaliza equivalência entre net/http e libcurl.
+
 ## Extensões e restrições
 
 Interpretação tipada de literais JSON na CLI é uma extensão implementada na US-04,
@@ -198,7 +240,7 @@ saída/exit codes próprios e restrição de redirects estão detalhados em `sub
 A execução local usou Hurl 8.0.0 com libcurl 8.18.0. O binário da sandbox emite um
 aviso de versionamento de libcurl em stderr ao iniciar; o harness não o confunde
 com falha de HTTP ou altera os resultados para escondê-lo. A matriz acima passou
-contra esse binário. Evidência Linux da US-06 em `validation.md`. Conforme o
+contra esse binário. Evidências Linux por história em `validation.md`. Conforme o
 plano v4, seção 7, builds cruzados e runtime macOS/Windows ficam opcionais nesta
 história, para validação final de portabilidade/release; não bloqueiam seu gate.
 Nenhuma execução nativa nessas plataformas foi declarada.

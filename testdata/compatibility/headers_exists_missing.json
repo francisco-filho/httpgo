@@ -1,0 +1,5 @@
+{
+  "classification":"shared: exists fails for missing header with wildcard status; exit codes differ",
+  "httpgo":{"exit":1,"paths":["/health"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}

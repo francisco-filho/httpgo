@@ -1,0 +1,5 @@
+{
+  "classification":"shared: missing header is not equal to empty string; exit codes differ",
+  "httpgo":{"exit":1,"paths":["/health"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}
