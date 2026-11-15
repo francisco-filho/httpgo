@@ -55,6 +55,32 @@ integral. O runner abre a fonte na vez da entrada e a fecha antes do resultado.
 O transporte gera boundary e Content-Type coerentes; um header explícito deve
 ser `multipart/form-data`, sem parâmetros. Caminhos seguem as regras de arquivo
 externo abaixo. Conteúdo e descrição operacional não entram nos resultados.
+Somente valores textuais interpolam, sem recursão ou interpretação JSON;
+arrays/objetos não são convertidos em texto e valores derivados de segredos
+continuam protegidos. Nomes, MIME e caminho são estáticos. Controles em nomes,
+filename e MIME são rejeitados antes da rede. MIME explícito prevalece; sem ele,
+a extensão (sem distinção de caixa) usa a tabela determinística abaixo, sem
+consultar o sistema nem examinar os bytes:
+
+| Extensão | MIME |
+|---|---|
+| `.pdf` | `application/pdf` |
+| `.json` | `application/json` |
+| `.xml` | `application/xml` |
+| `.txt` | `text/plain` |
+| `.csv` | `text/csv` |
+| `.html`, `.htm` | `text/html` |
+| `.png` | `image/png` |
+| `.jpg`, `.jpeg` | `image/jpeg` |
+| `.gif` | `image/gif` |
+| `.webp` | `image/webp` |
+| `.zip` | `application/zip` |
+| demais ou sem extensão | `application/octet-stream` |
+
+Estrutura/metadados estáticos inválidos impedem todos os envios. Variável
+ausente, tipo textual inválido, Content-Type dependente de variável proibido ou
+falha de arquivo impedem somente a entrada afetada e as seguintes (código 2),
+sem contar envio inexistente nem desfazer resultados anteriores.
 
 ### Headers e JSON inline
 

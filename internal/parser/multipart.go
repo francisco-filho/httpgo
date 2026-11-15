@@ -3,8 +3,10 @@ package parser
 import (
 	"fmt"
 	"mime"
+	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"capimgrosso.com/httpgo/internal/template"
 )
@@ -38,16 +40,19 @@ func parseMultipartPart(text string, pos Position) (MultipartPart, error) {
 	part := MultipartPart{Name: name, Value: value, Position: pos, ValuePosition: valuePos}
 	if strings.HasPrefix(value, "file,") {
 		path, media, found := strings.Cut(value[5:], ";")
-		if !found || path == "" || strings.ContainsAny(path, ",;") || strings.Contains(media, ";") {
+		if !found || path == "" || strings.ContainsAny(path, ",;") {
 			return fail("referência multipart file exige caminho literal e terminador ; seguido de MIME opcional")
+		}
+		if !utf8.ValidString(filepath.Base(path)) || strings.ContainsFunc(filepath.Base(path), unicode.IsControl) {
+			return fail("filename de multipart inválido")
 		}
 		part.File = &FileBody{Path: path, Position: valuePos}
 		part.Value = ""
 		part.MIME = strings.TrimSpace(media)
 		if part.MIME != "" {
-			kind, params, err := mime.ParseMediaType(part.MIME)
-			if err != nil || len(params) != 0 || !strings.Contains(kind, "/") || hasTemplate(part.MIME) || strings.ContainsFunc(part.MIME, unicode.IsControl) {
-				return fail("MIME de multipart inválido; use tipo/subtipo sem parâmetros")
+			kind, _, err := mime.ParseMediaType(part.MIME)
+			if err != nil || !strings.Contains(kind, "/") || hasTemplate(part.MIME) || strings.ContainsFunc(part.MIME, unicode.IsControl) {
+				return fail("MIME de multipart inválido; use tipo/subtipo")
 			}
 		}
 	} else if _, err := template.Parse(value); err != nil {

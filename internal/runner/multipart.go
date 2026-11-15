@@ -47,7 +47,7 @@ func (r *Runner) prepareMultipart(ctx context.Context, session template.Session,
 				return nil, &RenderError{Position: reference.Position, Detail: "filename de multipart inválido"}
 			}
 			if part.MIME == "" {
-				part.MIME = "application/octet-stream"
+				part.MIME = multipartMIME(part.Filename)
 			}
 		} else {
 			text, err := session.Render(declaration.Value)
@@ -55,6 +55,9 @@ func (r *Runner) prepareMultipart(ctx context.Context, session template.Session,
 				return nil, renderFailure(declaration.ValuePosition, declaration.Value, err)
 			}
 			part.Value = text.Value
+			if text.Value != text.Display {
+				session.ProtectValue(text.Value)
+			}
 		}
 		body.Parts = append(body.Parts, part)
 	}
