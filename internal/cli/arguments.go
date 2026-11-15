@@ -79,6 +79,31 @@ func argumentProtection(args []string) func(string) string {
 	return template.Protector(values)
 }
 
+// executionProtection is local to ExecuteContext. The runner still owns session
+// creation; its factory publishes only the sanitizer to the output boundary.
+type executionProtection struct {
+	initial func(string) string
+	session template.Session
+}
+
+func (p *executionProtection) sanitize(text string) string {
+	if p.session != nil {
+		text = p.session.Sanitize(text)
+	}
+	return p.initial(text)
+}
+
+type sessionRenderer struct {
+	context    *template.Context
+	protection *executionProtection
+}
+
+func (r sessionRenderer) NewSession() template.Session {
+	session := r.context.NewSession()
+	r.protection.session = session
+	return session
+}
+
 type protectedWriter struct {
 	writer  io.Writer
 	protect func(string) string

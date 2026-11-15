@@ -19,11 +19,12 @@ import (
 type BuildInfo struct{ Version, Commit, Date string }
 
 type Command struct {
-	executor runner.HTTPExecutor
-	build    BuildInfo
-	args     []string
-	in       io.Reader
-	out, err io.Writer
+	executor   runner.HTTPExecutor
+	build      BuildInfo
+	args       []string
+	in         io.Reader
+	out, err   io.Writer
+	protection *executionProtection
 }
 
 func NewRootCommand(executor runner.HTTPExecutor, build BuildInfo) *Command {
@@ -37,9 +38,9 @@ func (c *Command) SetErr(err io.Writer)  { c.err = err }
 
 func (c *Command) ExecuteContext(ctx context.Context) int {
 	local := *c
-	protect := argumentProtection(c.args)
-	local.out = protectedWriter{c.out, protect}
-	local.err = protectedWriter{c.err, protect}
+	local.protection = &executionProtection{initial: argumentProtection(c.args)}
+	local.out = protectedWriter{c.out, local.protection.sanitize}
+	local.err = protectedWriter{c.err, local.protection.sanitize}
 	return local.executeContext(ctx)
 }
 
@@ -76,7 +77,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if closeErr != nil {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
-	result := runner.NewWithRenderer(c.executor, renderer, c.renderEntry).Run(ctx, scenario)
+	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).Run(ctx, scenario)
 	return c.renderSummary(scenario, result)
 }
 
@@ -92,7 +93,11 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	case runner.Unvalidated:
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
 	case runner.CaptureFailed:
-		line += fmt.Sprintf(" (recebido %d)", entry.Status)
+		if entry.Entry.ExpectedStatus != nil {
+			line += fmt.Sprintf(" (status validado: esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
+		} else {
+			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
+		}
 	case runner.Failed, runner.RenderFailed:
 		// Headers alone are not a completed response: never invent a status.
 	default:
@@ -213,7 +218,7 @@ status é aceito e informado como sem validação. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
 Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
-Códigos: 0 sucesso, 1 status divergente, 2 entrada/renderização/transporte/cancelamento/saída.
+Códigos: 0 sucesso, 1 status divergente, 2 entrada/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Valores de headers e bodies não são impressos, nem em erros de entrada.
@@ -236,10 +241,25 @@ Duplicação e ancestral/descendente são erros, sem merge nem sobrescrita.
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
---secret nome: protege uma variável, sem fornecer valor; pode ainda estar ausente.
+Capturas string da resposta para entradas seguintes (URL, headers e JSON inline):
+  POST {{base_url}}/auth/login
+  {"username":"{{username}}","password":"{{password}}"}
+  HTTP 200
+  [Captures]
+  accessToken: jsonpath "$.accessToken"
+  GET {{base_url}}/products
+  Authorization: Bearer {{accessToken}}
+  HTTP 200
+  httpgo test products.hurl --var base_url=http://localhost:8080 --var username=demo --var password=senha-ficticia --secret password --secret accessToken
+JSONPath limitado: raiz $, propriedades por ponto e índices não negativos,
+como $.product.id e $.items[0]. Somente strings, inclusive vazia; sem conversão.
+JSON inválido, caminho ausente, null ou outro tipo geram erro de captura.
+Status divergente impede capturas e próximos envios. Capturas não sobrescrevem
+variáveis iniciais nem capturas anteriores; cada execução começa sem capturas.
+--secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas
 valores não sigilosos ou fictícios. A proteção não cobre histórico/processos.
-Ambiente do processo, stdin, capturas e templates de arquivos externos indisponíveis.
+Ambiente do processo, stdin e templates de arquivos externos indisponíveis.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.
 `
