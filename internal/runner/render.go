@@ -27,13 +27,23 @@ func renderFailure(pos parser.Position, source string, err error) *RenderError {
 	return &RenderError{Position: pos, Detail: detail, cause: err}
 }
 
-func renderExternal(session template.Session, source []byte, pos parser.Position) ([]byte, *RenderError) {
+func renderExternal(session template.Session, source []byte, reference parser.FileBody) ([]byte, *RenderError) {
+	// Positions always index the original payload, never the rendered bytes or
+	// the resolved operational path. Unknown offsets fall back to its start.
+	pos := parser.Position{File: session.Sanitize(reference.Path), Line: 1, Column: 1}
 	body, err := session.RenderJSON(source)
+	var failure *RenderError
 	if err != nil {
-		return nil, renderFailure(pos, string(source), err)
+		failure = renderFailure(pos, string(source), err)
+	} else if !json.Valid(body) {
+		failure = &RenderError{Position: pos, Detail: "body JSON renderizado inválido"}
 	}
-	if !json.Valid(body) {
-		return nil, &RenderError{Position: pos, Detail: "body JSON renderizado inválido"}
+	if failure != nil {
+		ref := reference.Position
+		ref.File = session.Sanitize(ref.File)
+		failure.Reference = &ref
+		failure.Detail = session.Sanitize(failure.Detail)
+		return nil, failure
 	}
 	return body, nil
 }

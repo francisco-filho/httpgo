@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +9,27 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
+
+func TestExternalRenderedFailuresByBinary(t *testing.T) {
+	for _, body := range []string{"", " \t", "not JSON", "\"\xff\"", "{} []", `{"x":"{{missing}}"}`, `{"x":{{unfinished}`, `{"x":"{{value}}"}`, `{"{{value}}":1}`} {
+		t.Run(fmt.Sprintf("%q", body), func(t *testing.T) {
+			var hits atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
+			defer server.Close()
+			file := scenario(t, "GET "+server.URL+"/first\nHTTP 200\nPOST "+server.URL+"/second\nfile,payload.json;\nGET "+server.URL+"/last")
+			if err := os.WriteFile(filepath.Join(filepath.Dir(file), "payload.json"), []byte(body), 0600); err != nil {
+				t.Fatal(err)
+			}
+			code, out, stderr := run(t, "test", file, "--render-files", "--var", "value=[1,2]")
+			if code != 2 || hits.Load() != 1 || !strings.Contains(stderr, `"payload.json":`) || !strings.Contains(stderr, "erro de renderização") || !strings.Contains(stderr, fmt.Sprintf("referência %q:4:1", file)) || !strings.Contains(out, "iniciadas=1 concluídas=1 validadas=1 sem_validação=0 não_iniciadas=2") {
+				t.Fatalf("code=%d hits=%d out=%q err=%q", code, hits.Load(), out, stderr)
+			}
+		})
+	}
+}
 
 func TestExternalRenderedDemoByBinary(t *testing.T) {
 	source := `{"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}`
