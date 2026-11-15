@@ -14,6 +14,15 @@ import (
 )
 
 func TestConfigProcessOutputFailure(t *testing.T) {
+	testConfiguredProcessOutput(t, false)
+}
+
+func TestEnvironmentProcessOutputFailure(t *testing.T) {
+	testConfiguredProcessOutput(t, true)
+}
+
+func testConfiguredProcessOutput(t *testing.T, environment bool) {
+	t.Helper()
 	for _, stream := range []string{"stdout", "stderr"} {
 		t.Run(stream, func(t *testing.T) {
 			var hits atomic.Int32
@@ -36,7 +45,12 @@ func TestConfigProcessOutputFailure(t *testing.T) {
 			defer func() { _ = full.Close() }()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, binary(t), "test", file)
+			args := []string{"test", file}
+			if environment {
+				environmentFile(t, dir, "local", "variables: {token: fake-output-token}\nsecrets: []")
+				args = append(args, "--env", "local")
+			}
+			command := exec.CommandContext(ctx, binary(t), args...)
 			command.Dir = dir
 			var out, stderr bytes.Buffer
 			command.Stdout = &out

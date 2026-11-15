@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"capimgrosso.com/httpgo/internal/config"
 	"capimgrosso.com/httpgo/internal/template"
 )
 
@@ -12,12 +13,15 @@ type arguments struct {
 	renderFiles        bool
 	file               string
 	config             string
+	environment        string
 	variables, secrets []string
 }
 
 func parseArguments(args []string) (arguments, error) {
 	var result arguments
 	invalid := len(args) == 0 || args[0] != "test"
+	environmentSeen := false
+	environmentIssue := ""
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
 		name, value, inline := strings.Cut(arg, "=")
@@ -27,10 +31,13 @@ func parseArguments(args []string) (arguments, error) {
 				invalid = true
 			}
 			result.renderFiles = true
-		case "--config", "--var", "--secret":
+		case "--config", "--env", "--var", "--secret":
 			if !inline {
 				if i+1 == len(args) {
 					invalid = true
+					if name == "--env" {
+						environmentIssue = "--env exige um nome de ambiente"
+					}
 					continue
 				}
 				i++
@@ -42,6 +49,14 @@ func parseArguments(args []string) (arguments, error) {
 					invalid = true
 				}
 				result.config = value
+			case "--env":
+				if environmentSeen {
+					environmentIssue = "--env pode ser informado somente uma vez, mesmo com nome igual"
+				} else if !config.ValidEnvironmentName(value) {
+					environmentIssue = "nome de ambiente inválido em --env; use nome não vazio com letras ASCII, números, _ ou -"
+				}
+				environmentSeen = true
+				result.environment = value
 			case "--var":
 				result.variables = append(result.variables, value)
 			case "--secret":
@@ -54,6 +69,9 @@ func parseArguments(args []string) (arguments, error) {
 				result.file = arg
 			}
 		}
+	}
+	if environmentIssue != "" {
+		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
 	}
 	if invalid || result.file == "" {
 		return result, fmt.Errorf("uso inválido ou flag não suportada; use httpgo test <arquivo> ou httpgo --help")

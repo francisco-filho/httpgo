@@ -1,0 +1,2 @@
+variables:
+  token: ${HTTPGO_TEST_TOKEN}

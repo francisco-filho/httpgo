@@ -55,7 +55,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.writeText(help())
 	}
 	args, argumentErr := parseArguments(c.args)
-	settings, loadErr := config.Load(ctx, args.config)
+	settings, loadErr := config.LoadEnvironment(ctx, args.config, args.environment)
 	initial := c.protection.initial
 	configured := settings.Protection(args.variables, args.secrets)
 	c.protection.initial = func(text string) string { return initial(configured(text)) }
@@ -276,7 +276,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
-  httpgo test <arquivo> [--config arquivo] [--render-files] [--var nome=valor] [--secret nome]
+  httpgo test <arquivo> [--config arquivo] [--env nome] [--render-files] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -487,7 +487,8 @@ Exemplo de .httpgo.yaml (YAML, não sintaxe Hurl):
     product:
       price: 4500
   secrets: [auth.token, password]
-Precedência: defaults internos < YAML base < CLI; --var substitui por nome exato.
+Precedência: defaults internos < YAML base < ambiente selecionado < CLI.
+--var substitui por nome exato, preservando folhas irmãs.
 Mapas variables definem caminhos, não objetos interpoláveis. Tipos: string,
 número finito exato, booleano, null e arrays JSON-compatíveis; mapas dentro de
 arrays são conteúdo. Strings numéricas entre aspas conservam o tipo string.
@@ -497,10 +498,26 @@ redirects e consumo da resposta; cada nova requisição recebe seu próprio limi
 YAML: máximo 1 MiB, documento único, raiz mapa, version: 1 obrigatória.
 Rejeita campos desconhecidos, chaves/caminhos repetidos, conflitos, âncoras,
 aliases, tags explícitas e referências ${NOME}, sem mostrar entrada bruta.
-secrets acumula marcações com --secret, inclusive para capturas futuras e overrides.
+secrets acumula marcações da base, ambiente e --secret, inclusive para capturas
+futuras e overrides; lista vazia nunca remove proteção de valores anteriores.
 Payloads permanecem relativos ao .hurl, nunca à configuração.
 Erro de configuração: código 2, antes de qualquer HTTP.
-Sem ambientes nomeados, HTTPGO_*, referências ao ambiente do processo ou stdin.
+Ambientes nomeados — extensão HTTPGo (US-12):
+  httpgo test tests/products.hurl --env local
+  httpgo test tests/products.hurl --config projeto/base.yaml --env staging
+--env <nome> (ou --env=nome): seleção única; repetir, mesmo nome, é erro 2.
+Nome não vazio: somente letras ASCII, números, _ e -; sem pontos ou separadores.
+Carrega somente environments/<nome>.yaml, relativo ao diretório da base selecionada,
+inclusive vazia. Sem base, usa o diretório corrente, nunca cenário ou ancestrais.
+Sem --env, não abre ambiente algum. Arquivo solicitado ausente/ilegível é erro 2,
+antes de qualquer HTTP e sem fallback. Versão 1 opcional no ambiente; mesmos campos,
+tipos, timeout, limite de 1 MiB e proteções YAML da base. Vazio/comentários não alteram nada.
+Mapas combinam profundamente por caminho; escalares, listas e null substituem folhas,
+sem concatenar listas ou remover null. Trocar mapa de caminhos por valor ou vice-versa
+é erro, inclusive com mapa vazio. Cada fonte é validada antes de aplicar overrides.
+Contexto, timeout e capturas são novos por execução; payloads seguem relativos ao .hurl.
+Ambiente nomeado NÃO é ambiente do processo: ${NOME} continua rejeitado,
+mesmo substituído por CLI. Sem HTTPGO_*, referências de processo ou stdin.
 Templates externos exigem --render-files.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.

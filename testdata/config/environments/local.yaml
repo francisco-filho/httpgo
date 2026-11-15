@@ -1,0 +1,7 @@
+# HTTPGo extension: paths are merged with the selected base.
+variables:
+  api:
+    baseUrl: http://localhost:8080
+  product:
+    name: Pizza
+    price: 4500

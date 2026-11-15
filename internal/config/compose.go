@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"capimgrosso.com/httpgo/internal/template"
@@ -18,6 +20,9 @@ func (s Settings) Compose(assignments, secrets []string) (*template.Context, err
 	}
 	for _, assignment := range assignments {
 		name, value, _ := strings.Cut(assignment, "=")
+		if s.cliPathConflict(name) {
+			return nil, fmt.Errorf("configuração: conflito entre mapa de caminhos e valor CLI")
+		}
 		values[name] = value
 	}
 	effective := make([]string, 0, len(values))
@@ -53,9 +58,15 @@ func (s Settings) protectedValues(assignments, secrets []string) []string {
 		marked[name] = true
 	}
 	var values []string
-	for name, value := range s.Variables {
-		if marked[name] {
-			values = append(values, string(value))
+	sources := s.sources
+	if len(sources) == 0 {
+		sources = []map[string]json.RawMessage{s.Variables}
+	}
+	for _, source := range sources {
+		for name, value := range source {
+			if marked[name] {
+				values = append(values, string(value))
+			}
 		}
 	}
 	for _, assignment := range assignments {

@@ -1,4 +1,21 @@
-# Matriz de compatibilidade — US-01 a US-11 e US-20
+# Matriz de compatibilidade — US-01 a US-12 e US-20
+
+## Extensão US-12 — ambientes nomeados (issue #29)
+
+`--env <nome>` seleciona somente `environments/<nome>.yaml` relativo à base
+selecionada, mesmo vazia (sem base, cwd). É **extensão HTTPGo**, não sintaxe
+Hurl nem equivalência com ambientes da outra ferramenta. Versão 1 opcional no
+ambiente; validação YAML reutilizada da US-11. Precedência base < ambiente < CLI,
+merge tipado por caminho e união das marcas de segredos. `${NOME}`, `HTTPGO_*`,
+stdin e composição de vários ambientes continuam fora do suporte.
+
+Os testes `TestEnvironment*` exercitam seleção, fontes inválidas, tipos, prazo,
+segurança, isolamento e modos inline/externo/multipart pelo binário real. Exemplos
+positivos/negativos YAML ficam em `testdata/config/environments/`, separados do
+corpus Hurl. O `.hurl` demonstrativo é `scenario_environment_products.hurl`.
+Sem alteração de construções compartilhadas: **116 pares existentes inalterados**,
+sem regenerar observações nem fornecer `--env`, `--config` ou `--render-files` ao
+Hurl 8.0.0. O diferencial continua verificando somente o subconjunto anterior.
 
 ## Extensão US-11 — configuração YAML (issue #27)
 
@@ -16,8 +33,8 @@ o diferencial continua usando os defaults anteriores em ambas as ferramentas.
 
 Os **116 pares existentes** de `testdata/compatibility/` permanecem inalterados.
 Não se fornece `--config`/`--render-files` ao Hurl e não se regeneram observações
-para forçar equivalência. Ambientes, referências de processo, stdin e sandbox
-continuam fora do suporte. YAML inválido, recursos YAML proibidos e `${NOME}`
+para forçar equivalência. Referências de processo, stdin e sandbox continuam
+fora do suporte; ambientes nomeados têm o contrato US-12 separado acima. YAML inválido, recursos YAML proibidos e `${NOME}`
 são rejeições explícitas antes de qualquer HTTP, verificadas nos testes próprios.
 
 
