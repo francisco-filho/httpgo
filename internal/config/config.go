@@ -31,6 +31,8 @@ type Settings struct {
 	Secrets    []string
 	Timeout    time.Duration
 	timeoutSet bool
+	paths      map[string]variablePath
+	sources    []map[string]json.RawMessage
 }
 
 // Error preserves an I/O cause but displays only controlled diagnostics.
@@ -73,14 +75,7 @@ func loadEnvironment(ctx context.Context, path, name string, open func(string) (
 	if err != nil {
 		return base, err
 	}
-	for key, value := range environment.Variables {
-		base.Variables[key] = value
-	}
-	base.Secrets = append(base.Secrets, environment.Secrets...)
-	if environment.timeoutSet {
-		base.Timeout = environment.Timeout
-	}
-	return base, nil
+	return mergeEnvironment(base, environment)
 }
 
 // ValidEnvironmentName excludes paths, whitespace and non-ASCII characters.
@@ -150,7 +145,7 @@ func decode(file string, data []byte) (Settings, error) {
 }
 
 func decodeDocument(file string, data []byte, environment bool) (Settings, error) {
-	result := Settings{Variables: make(map[string]json.RawMessage), Timeout: DefaultTimeout}
+	result := Settings{Variables: make(map[string]json.RawMessage), Timeout: DefaultTimeout, paths: make(map[string]variablePath)}
 	empty := true
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.Trim(line, " \t\r")
@@ -206,7 +201,7 @@ func decodeDocument(file string, data []byte, environment bool) (Settings, error
 			if value.Kind != yaml.MappingNode {
 				return result, failure(file, value, "variables deve ser um mapa", nil)
 			}
-			if err := flatten(file, value, "", result.Variables); err != nil {
+			if err := flatten(file, value, "", result.Variables, result.paths); err != nil {
 				return result, err
 			}
 		case "secrets":
@@ -277,7 +272,7 @@ func validateTree(file string, node *yaml.Node) error {
 	return nil
 }
 
-func flatten(file string, node *yaml.Node, prefix string, values map[string]json.RawMessage) error {
+func flatten(file string, node *yaml.Node, prefix string, values map[string]json.RawMessage, paths map[string]variablePath) error {
 	for i := 0; i < len(node.Content); i += 2 {
 		key, value := node.Content[i], node.Content[i+1]
 		name := key.Value
@@ -287,8 +282,11 @@ func flatten(file string, node *yaml.Node, prefix string, values map[string]json
 		if !template.ValidName(name) {
 			return failure(file, key, "nome de variável inválido", nil)
 		}
+		if err := declarePath(file, key, name, value.Kind == yaml.MappingNode, paths); err != nil {
+			return err
+		}
 		if value.Kind == yaml.MappingNode {
-			if err := flatten(file, value, name, values); err != nil {
+			if err := flatten(file, value, name, values, paths); err != nil {
 				return err
 			}
 			continue
