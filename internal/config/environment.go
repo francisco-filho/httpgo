@@ -39,6 +39,20 @@ func mergeEnvironment(base, environment Settings) (Settings, error) {
 	// A later mark also protects old values overridden in another source.
 	base.Secrets = append(append([]string(nil), base.Secrets...), environment.Secrets...)
 	base.sources = []map[string]json.RawMessage{base.Variables, environment.Variables}
+	// Keep effective references available for protection even if a structural
+	// conflict prevents publishing the merged values. Discarded references must
+	// not trigger lookups, including on this early diagnostic path.
+	references := make(map[string]processReference, len(base.references)+len(environment.references))
+	for name, reference := range base.references {
+		references[name] = reference
+	}
+	for name := range environment.Variables {
+		delete(references, name)
+	}
+	for name, reference := range environment.references {
+		references[name] = reference
+	}
+	base.references = references
 	for name, path := range environment.paths {
 		if previous, ok := base.paths[name]; ok && previous.mapping != path.mapping {
 			return base, failure(path.file, path.node, "conflito entre mapa de caminhos e valor de variável", nil)
@@ -58,17 +72,7 @@ func mergeEnvironment(base, environment Settings) (Settings, error) {
 	for name, path := range environment.paths {
 		paths[name] = path
 	}
-	references := make(map[string]processReference, len(base.references)+len(environment.references))
-	for name, reference := range base.references {
-		references[name] = reference
-	}
-	for name := range environment.Variables {
-		delete(references, name)
-	}
-	for name, reference := range environment.references {
-		references[name] = reference
-	}
-	base.Variables, base.paths, base.references = values, paths, references
+	base.Variables, base.paths = values, paths
 	if environment.timeoutSet {
 		base.Timeout = environment.Timeout
 	}
