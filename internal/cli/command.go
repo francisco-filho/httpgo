@@ -283,7 +283,7 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
   HTTP 201
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
-Headers e um body são opcionais: JSON inline ou file,<caminho>; (exclusivos).
+Headers e um body são opcionais: JSON inline, file,<caminho>; ou multipart (exclusivos).
 JSON inline estático preserva seus bytes. Arquivo externo preserva todos os bytes,
 inclusive vazio, binário e {{placeholder}} literal, sem validar JSON nem renderizar.
 Exemplo: salve tests/products.hurl e execute httpgo test tests/products.hurl
@@ -297,8 +297,34 @@ Relativos partem do diretório do .hurl, não do diretório corrente; absolutos 
 Sem sandbox: .. e absolutos podem ler fora do projeto, com permissões do usuário.
 Leitura completa e fechamento só na vez da entrada, antes do envio; falha localizada
 retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeitas.
-Content-Type não é inferido. Sem --render-files, renderização externa ou multipart.
+No body externo completo, Content-Type não é inferido. Sem --render-files ou renderização externa.
 O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
+
+Upload multipart: salve tests/documents.hurl, crie fixtures/document.pdf e execute
+  httpgo test tests/documents.hurl --var base_url=http://localhost:8080 --var category=reports --var token=ficticio --secret token
+  POST {{base_url}}/documents
+  Authorization: Bearer {{token}}
+  [MultipartFormData]
+  description: Documento de teste
+  category: {{category}}
+  document: file,../fixtures/document.pdf; application/pdf
+  HTTP 201
+[MultipartFormData]: POST, PUT ou PATCH, exatamente um arquivo e zero ou mais textos.
+Nomes estáticos únicos; não combina com JSON ou outro body. Só valores textuais
+interpolam, sem converter arrays/objetos ou interpretar JSON; segredos protegidos.
+Arquivo literal nunca é renderizado; caminhos seguem as regras acima, sem sandbox.
+Filename é somente basename, preservando espaços/Unicode. MIME explícito prevalece;
+sem MIME: tabela determinística por extensão (docs/subset.md), fallback application/octet-stream.
+Boundary e Content-Type são automáticos; header opcional multipart/form-data sem boundary manual.
+Boundary manual, tipo incompatível, metadados com controles e estrutura inválida: erro 2.
+Estrutura inválida impede todos os envios; falha de variável/arquivo na entrada
+impede a afetada e as seguintes, sem desfazer anteriores nem contar envio inexistente.
+Upload incremental, sem buffer integral nem goroutine produtora; fonte fechada antes
+do resultado, inclusive em falha/cancelamento. Não imprime arquivo ou campos brutos.
+413 esperado passa; divergência de status retorna 1. Sem múltiplos arquivos,
+campos repetidos, filename customizado, headers de parte ou multipart aninhado.
+Diferenças Hurl 8.0.0 (caminhos/filename/restrições): docs/compatibility.md.
+
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
 status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *

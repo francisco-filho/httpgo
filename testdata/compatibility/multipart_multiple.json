@@ -1,0 +1,35 @@
+{
+  "classification": "restrição HTTPGo: exatamente um arquivo; Hurl aceita múltiplos",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "a",
+            "filename": "payloads/raw.txt",
+            "mime": "text/plain",
+            "data": "IHJhdyBieXRlcyAKe3twbGFjZWhvbGRlcn19Cg=="
+          },
+          {
+            "name": "b",
+            "filename": "payloads/empty.txt",
+            "mime": "text/plain",
+            "data": ""
+          }
+        ],
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  }
+}

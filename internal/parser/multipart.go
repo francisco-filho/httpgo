@@ -61,11 +61,12 @@ func parseMultipartPart(text string, pos Position) (MultipartPart, error) {
 	return part, nil
 }
 
-// ValidateMultipartContentType refuses all manual parameters, including boundary.
+// ValidateMultipartContentType refuses incompatible types and any manual boundary.
 func ValidateMultipartContentType(value string) error {
 	kind, params, err := mime.ParseMediaType(value)
-	if err != nil || kind != "multipart/form-data" || len(params) != 0 {
-		return fmt.Errorf("Content-Type de multipart deve ser multipart/form-data sem boundary ou parâmetros")
+	_, manualBoundary := params["boundary"]
+	if err != nil || kind != "multipart/form-data" || manualBoundary {
+		return fmt.Errorf("Content-Type de multipart deve ser multipart/form-data sem boundary manual")
 	}
 	return nil
 }

@@ -59,6 +59,15 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, form := range []string{
+		"description: {{category}}\ndocument: file,../payloads/olá mundo.pdf; application/pdf",
+		"document: file,{{literal}}.bin;",
+		"document: file,empty;\nafter: {\"x\":true}",
+		"a: text", "a: file,a;\na: text", "a: file,a;\nb: file,b;",
+		"{{dynamic}}: file,a;", "a: file,a; application/pdf\rInjected: bad",
+	} {
+		f.Add("POST http://example.test\n[MultipartFormData]\n" + form + "\nHTTP 201")
+	}
 	for _, reference := range []string{"../payloads/a b.bin;", "{{missing}};", `C:\payloads\a.bin;`, ";", "a,b;", "a;b;", "unterminated", "a;\n{}", "a;\nX-Late: v"} {
 		f.Add("POST http://example.test\r\n  file," + reference + "\r\nHTTP 201")
 	}

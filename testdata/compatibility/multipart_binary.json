@@ -1,0 +1,47 @@
+{
+  "classification": "multipart binário e placeholders preservados; filename Hurl inclui payloads/, HTTPGo só basename",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "document",
+            "filename": "multipart.bin",
+            "mime": "application/octet-stream",
+            "data": "AAF7e21pc3Npbmd9fQ0K"
+          }
+        ],
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "document",
+            "filename": "payloads/multipart.bin",
+            "mime": "application/octet-stream",
+            "data": "AAF7e21pc3Npbmd9fQ0K"
+          }
+        ],
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  }
+}

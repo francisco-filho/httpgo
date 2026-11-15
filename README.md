@@ -114,10 +114,66 @@ Não se imprimem conteúdo nem caminho operacional nos diagnósticos. A proteç�
 não descobre segredos arbitrários no payload; use somente cenários confiáveis.
 
 **Mudança de contrato:** a antiga rejeição global de `file,...;` foi removida;
-negativos específicos mantêm as restrições. Multipart e `--render-files` continuam
-não suportados. Renderização externa futura será extensão explícita HTTPGo,
+negativos específicos mantêm as restrições. `--render-files` continua
+não suportado. Renderização externa futura será extensão explícita HTTPGo,
 não uma capacidade anunciada nesta entrega. Veja [subconjunto](docs/subset.md)
 e [evidência diferencial](docs/compatibility.md).
+
+## Upload multipart (US-20 / issue #24)
+
+```hurl
+POST {{base_url}}/documents
+Authorization: Bearer {{token}}
+[MultipartFormData]
+description: Documento de teste
+category: {{category}}
+document: file,../fixtures/document.pdf; application/pdf
+HTTP 201
+```
+
+Salve em `tests/documents.hurl`, crie `fixtures/document.pdf` e execute contra
+uma API que aceite o formulário e responda 201:
+
+```sh
+bin/httpgo test tests/documents.hurl --var base_url=http://localhost:8080 \
+  --var category=reports --var token=ficticio --secret token
+```
+
+O token acima é **fictício**; credenciais reais nunca devem vir em argumentos.
+Exemplo versionado: `testdata/scenarios/scenario_multipart.hurl`, com payload
+adjacente em `testdata/payloads/`. Não requer frontend nem o dummy manual.
+
+POST/PUT/PATCH aceitam exatamente **um arquivo e zero ou mais campos textuais**.
+Nomes são estáticos/únicos; outro body na mesma requisição é erro. Só valores
+textuais interpolam, sem conversão de arrays/objetos nem interpretação JSON.
+Bytes do arquivo nunca são renderizados, inclusive placeholders indefinidos.
+Caminho literal segue a US-09: relativo ao `.hurl` ou absoluto, sem sandbox.
+Filename contém só o basename, preservando espaços/Unicode, sem caminho local.
+MIME explícito prevalece; se omitido, usa tabela determinística por extensão
+([contrato completo](docs/subset.md)), com fallback `application/octet-stream`.
+
+Boundary e Content-Type são gerados automaticamente. O cenário pode omitir o
+header ou declarar `Content-Type: multipart/form-data` sem boundary manual;
+outro tipo ou qualquer boundary manual é erro. Parâmetros compatíveis, como
+`charset=utf-8`, são preservados. Arquivo é enviado incrementalmente, sem buffer
+proporcional ao seu tamanho. O descritor fica aberto durante o executor e fecha
+antes de assertions/capturas/resultados, também em falha. Há prazo único de 10s
+por requisição/redirects/resposta e cancelamento; I/O local bloqueado pelo SO
+continua não sendo interrompível por essa garantia.
+
+Estrutura/metadados estáticos inválidos impedem **todo** envio do arquivo.
+Variável ausente, texto composto inválido, Content-Type renderizado proibido ou
+falha local retornam 2 antes da entrada afetada, preservando anteriores.
+413 declarado/recebido passa (0); status divergente interrompe com 1. Conteúdo e
+campos brutos não são impressos; segredos conhecidos e derivados são sanitizados,
+mas não se descobrem segredos arbitrários dentro do arquivo.
+
+**Mudança de contrato:** `[MultipartFormData]` deixa de ser globalmente rejeitado;
+negativos específicos preservam GET/DELETE sem multipart, exclusividade e limites.
+Sem múltiplos arquivos, repetição de campos, filename customizado, headers por
+parte, partes JSON tipadas, multipart aninhado ou `--render-files`.
+O [diferencial Hurl 8.0.0](docs/compatibility.md) registra diferenças reais de
+gramática, filename e restrições; não há promessa de compatibilidade completa.
 
 ## Parametrizar URL e headers (US-03 / issue #11)
 

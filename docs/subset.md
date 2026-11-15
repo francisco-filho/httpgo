@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-09 (issues #4, #6, #11, #13, #14, #16, #18, #20 e #22)
+# Subconjunto suportado — US-01 a US-09 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22 e #24)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -53,7 +53,8 @@ O arquivo mantém seus bytes (inclusive vazio, binário e placeholders literais)
 usa somente o basename como filename e é enviado incrementalmente, sem buffer
 integral. O runner abre a fonte na vez da entrada e a fecha antes do resultado.
 O transporte gera boundary e Content-Type coerentes; um header explícito deve
-ser `multipart/form-data`, sem parâmetros. Caminhos seguem as regras de arquivo
+ser `multipart/form-data`, sem boundary manual. Outros parâmetros válidos, como
+`charset=utf-8`, são preservados ao completar o header. Caminhos seguem as regras de arquivo
 externo abaixo. Conteúdo e descrição operacional não entram nos resultados.
 Somente valores textuais interpolam, sem recursão ou interpretação JSON;
 arrays/objetos não são convertidos em texto e valores derivados de segredos
@@ -82,6 +83,28 @@ ausente, tipo textual inválido, Content-Type dependente de variável proibido o
 falha de arquivo impedem somente a entrada afetada e as seguintes (código 2),
 sem contar envio inexistente nem desfazer resultados anteriores.
 
+Não há filename customizado, headers arbitrários por parte, múltiplos arquivos,
+campos repetidos, partes JSON tipadas, multipart aninhado, renderização do arquivo,
+retomada ou progresso. MIME é literal válido `tipo/subtipo` (parâmetros MIME
+válidos são preservados), nunca template. `document` não é palavra reservada.
+Nomes de campos aceitam texto estático sem controles ou espaços externos.
+Valores textuais preservam os espaços após remover a indentação inicial após `:`;
+espaços finais permanecem. Linhas vazias e comentários próprios separam instruções,
+não criam campos multilinha. Todos os campos são validados antes de abrir o arquivo.
+
+307/308 rebobinam a mesma fonte e reutilizam boundary; 301/302/303 convertem em GET
+sem body nem Content-Type multipart. Mantêm-se limite de dez redirects de mesma
+origem, TLS verificado, prazo único de dez segundos e nenhum retry. Resposta 413
+completa é avaliada normalmente, inclusive antecipada; erro de conexão sem resposta
+completa é transporte (2). Leituras HTTP terminam antes de rebobinar/fechar a fonte;
+falhas de leitura/fechamento não viram sucesso. I/O local bloqueado pelo SO continua
+sujeito à limitação descrita na US-09.
+
+**Mudança de contrato:** `[MultipartFormData]` antes rejeitado agora é suportado
+neste recorte. O antigo negativo global virou `unsupported_multipart_get.hurl`;
+negativos específicos cobrem limites. Dez pares diferenciais e diferenças Hurl
+8.0.0 (incluindo filename e nomes com espaços) estão em `compatibility.md`.
+
 ### Headers e JSON inline
 
 Depois da request-line, podem ser declarados headers `Nome: valor`, antes do
@@ -95,7 +118,8 @@ definindo o host HTTP sem alterar a URL operacional nem a política de origem. H
 calcula o tamanho do body. Não há autenticação ou cookie jar implícito.
 
 `POST`, `PUT`, `PATCH` e `DELETE` aceitam **nenhum body, um único valor JSON ou
-uma referência externa** (abaixo). Para JSON inline:
+uma referência externa** (abaixo). POST/PUT/PATCH também aceitam o multipart
+exclusivo descrito acima; DELETE não aceita multipart. Para JSON inline:
 objeto, array, string, número, booleano ou `null`, inclusive multilinha. `GET`
 permanece sem body. O valor começa no primeiro caractere JSON e termina no último.
 Espaços/linhas separadores externos não são enviados; todos os bytes internos,
@@ -123,8 +147,8 @@ rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
 
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
 sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
-templates em chaves JSON e nomes de headers, seções além de `[Captures]` e
-`[Asserts]`, multipart/form-urlencoded, bodies binários/string multilinha
+templates em chaves JSON e nomes de headers, seções além de `[Captures]`,
+`[Asserts]` e `[MultipartFormData]`, form-urlencoded e multipart avançado, bodies binários/string multilinha
 não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
@@ -157,8 +181,9 @@ A referência é identificada pelo arquivo/linha/coluna do cenário. A proteçã
 inspeciona conteúdo para descobrir segredos arbitrários. O arquivo corrente é
 carregado integralmente em memória, sem limite de tamanho. Contexto é checado
 antes/depois da leitura; o timeout do transporte não interrompe um I/O local
-bloqueado no sistema operacional. Renderização externa,
-`--render-files` e multipart permanecem fora de escopo.
+bloqueado no sistema operacional. Renderização externa e
+`--render-files` permanecem fora de escopo. Multipart usa a variante incremental
+separada descrita acima; não converte o body externo completo em streaming.
 **Mudança de contrato:** a referência externa, antes rejeitada, passa a ser aceita.
 
 ## Variáveis tipadas e templates — US-03/US-04

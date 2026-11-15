@@ -1,0 +1,68 @@
+{
+  "variables": [
+    "category=reports"
+  ],
+  "classification": "multipart POST: campos, MIME e bytes compartilhados; filename Hurl inclui payloads/, HTTPGo só basename",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "description",
+            "data": "RG9jdW1lbnRvIGRlIHRlc3Rl"
+          },
+          {
+            "name": "category",
+            "data": "cmVwb3J0cw=="
+          },
+          {
+            "name": "document",
+            "filename": "raw.txt",
+            "mime": "text/plain",
+            "data": "IHJhdyBieXRlcyAKe3twbGFjZWhvbGRlcn19Cg=="
+          }
+        ],
+        "uri": "/documents",
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "description",
+            "data": "RG9jdW1lbnRvIGRlIHRlc3Rl"
+          },
+          {
+            "name": "category",
+            "data": "cmVwb3J0cw=="
+          },
+          {
+            "name": "document",
+            "filename": "payloads/raw.txt",
+            "mime": "text/plain",
+            "data": "IHJhdyBieXRlcyAKe3twbGFjZWhvbGRlcn19Cg=="
+          }
+        ],
+        "uri": "/documents",
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  }
+}

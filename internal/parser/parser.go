@@ -130,6 +130,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			multipartActive = false
 		}
 		if multipartActive {
+			if strings.HasPrefix(text, "file,") || isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
+				return fail("sintaxe inválida", "multipart não pode coexistir com outro body")
+			}
 			part, err := parseMultipartPart(text, pos)
 			if err != nil {
 				return Scenario{}, err

@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-09
+# Arquitetura implementada — US-01 a US-09 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08) e #22 (US-09),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09) e #24 (US-20),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -10,13 +10,15 @@ copiar, adaptar ou traduzir código-fonte Hurl.
 ```text
 cmd/httpgo/main.go
   → internal/cli/command.go + arguments.go (flags/contexto novo e proteção)
-    → internal/parser/parser.go + capture.go + assertion.go (arquivo inteiro)
+    → internal/parser/parser.go + capture.go + assertion.go + multipart.go (arquivo inteiro)
       → internal/query/jsonpath.go (validar consultas antes da rede)
     → internal/runner/runner.go + render.go (somente cenário validado)
       → internal/template/template.go + json.go (valores tipados, texto/JSON contextual)
       → parser.ValidateURL/ValidateHeader e validação JSON final
-      → internal/runner/file.go (leitura literal local só para body externo)
-      → internal/transport/http.go (via HTTPExecutor)
+      → internal/runner/file.go (leitura integral literal para body externo)
+      → internal/runner/multipart.go + multipart_mime.go (fonte aberta e textos preparados)
+      → internal/transport/http.go + multipart.go (via HTTPExecutor)
+      → fechamento da fonte multipart antes da avaliação/apresentação
       → internal/assertion/status.go (somente expectativa numérica)
       → internal/runner/assertions.go (headers/JSON na ordem escrita, antes de capturas)
         → internal/query/header.go + internal/assertion/header.go
@@ -36,7 +38,7 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 | Pacote/tipos | Responsabilidade |
 |---|---|
 | `parser.Position`, `Header`, `Assertion`, `HeaderAssertion`, `JSONAssertion`, `Capture`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, body, capturas e posições de declaração/consulta; estados de requisição, expectativa e capturas; validação completa sem cenário parcial |
-| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`) e RetainBody; Response retorna Status, Headers (`[]query.HeaderValue`, ocorrências ordenadas) e Body final retido somente quando solicitado |
+| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`), Multipart (`*MultipartBody`) e RetainBody; Response retorna Status, Headers (`[]query.HeaderValue`, ocorrências ordenadas) e Body final retido somente quando solicitado |
 | `runner.Runner`, `EntryResult`, `Outcome`, `Summary`, `Result` | Ordem, contexto antes de cada chamada, comparação delegada e interrupção; resultado estruturado e notificação síncrona por entrada, sem escrever em streams nem chamar os.Exit |
 | `template.Context`, `Text`, `Reference`, `Error` | Contexto tipado isolado, nomes exatos/conflitos, offsets, substituição não recursiva e proveniência; não importa parser/runner/CLI/transporte |
 | `template.JSONPlan`, `JSONReference` | Reconhecimento de strings/escapes/valores e chaves estáticas, referências com intervalos originais, limite exato do body; compartilhado por parser e renderer |
@@ -60,8 +62,8 @@ Somente o código de produção em `transport` importa `net/http`.
 
 `parser.FileBody` conserva `Path` literal e `Position`, ligado por
 `Entry.ExternalBody` não nulo (inclusive para arquivo vazio). `Entry.Body` não
-nulo continua representando JSON inline; ambos nulos significam ausência de
-body. O parser reconhece `file,` antes de headers e da rejeição genérica, inclusive
+nulo continua representando JSON inline; ambos nulos **e Entry.Multipart nulo**
+significam ausência de body. O parser reconhece `file,` antes de headers e da rejeição genérica, inclusive
 caminhos com `:`. Valida estrutura inteira/exclusividade/GET, sem I/O do payload.
 
 `cli.Command` calcula a origem absoluta antes de abrir o `.hurl`, associa
@@ -91,6 +93,50 @@ Headers sensíveis já renderizados entram na proteção antes da leitura, inclu
 para sanitizar DisplayURL e writers se o arquivo falhar antes do transporte.
 CLI reconhece FileError sem classificar como transporte/renderização nem imprimir
 erro bruto/linha do cenário. ReportErr ainda prevalece com código 2.
+
+## Multipart incremental — US-20
+
+`parser.MultipartForm` conserva `Position` e `Parts []MultipartPart` em ordem.
+Cada parte tem nome, texto ou `File *FileBody`, MIME e posições de nome/valor.
+`Entry.Multipart` distingue formulário de ausência de body, inclusive vazio do
+arquivo. Parser reconhece a seção antes das rejeições genéricas e separa campos
+de headers/JSON/capturas/assertions. Sem abrir arquivos, valida métodos, exclusividade,
+nomes únicos, exatamente um arquivo, templates textuais e metadados estáticos.
+Content-Type estático proibido rejeita todo o cenário; dinâmico espera a entrada.
+
+`Runner.prepareMultipart` renderiza todos os textos via `Session.Render` e registra
+proteção dos derivados antes de callback/diagnóstico. Arrays/objetos não viram
+texto. Valida Content-Type final e basename e usa `multipartMIME` determinístico
+(sem base MIME do SO ou sniffing); abre e verifica a fonte com origem da US-09.
+`Runner.openUpload` é um ponto **privado por instância** para testes de I/O;
+a interface privada `uploadFile` usa `io.ReadSeekCloser` e `Stat`, sem filesystem
+público nem novo pacote. `runner.MultipartBody` contém partes operacionais,
+`Source io.ReadSeeker` e tamanho; não contém caminhos e nunca entra em resultado.
+
+Runner é dono do descritor. Mantém-no aberto durante `HTTPExecutor.Execute`, fecha
+antes de status/assertions/capturas/callback e antes da próxima entrada, inclusive
+em erro. Falha pré-envio não conta `Started`; falha de fechamento não confirma
+`Completed` e preserva `FileError` localizado e causa via `errors.Is/As`. Falha de
+writer ainda prevalece com 2. `safeEntry` remove **todo** `Entry.Multipart` além
+dos bodies/headers anteriores. Não são retidos textos, arquivo ou metadados locais.
+
+Transporte gera um boundary por requisição lógica, preserva os outros parâmetros
+válidos de Content-Type (proibindo qualquer boundary manual) e compõe framing com
+`mime/multipart.Writer` e `io.MultiReader`, mantendo em memória campos/metadados e
+framing, não o arquivo. `uploadReader` serializa Read/Close e sinaliza fechamento:
+o adapter aguarda o leitor HTTP terminar antes de retornar ou rebobinar, pois
+`RoundTrip` pode retornar antes do fechamento assíncrono do request body. Não há
+goroutine produtora, filas, concorrência entre entradas ou retry. Transporte é
+dono desses leitores, mas não fecha nem abre o descritor local. Falha de leitura
+da fonte é preservada; encerramento normal de envio após resposta completa, como
+413 antecipado, não vira erro artificial de upload.
+
+307/308 rebobinam somente depois desse encerramento e reutilizam o boundary;
+301/302/303 descartam formulário/Content-Type e seguem como GET sem body. O loop
+existente conserva dez redirects de mesma origem, TLS verificado e o mesmo contexto
+de dez segundos para todos os hops e consumo da resposta. Cancelamento encerra a
+atividade de rede; I/O local bloqueado pelo SO tem a limitação já documentada na
+US-09. Bodies JSON inline e externos completos continuam em `[]byte` como antes.
 
 ## Apresentação incremental
 

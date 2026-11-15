@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/textproto"
 	"strings"
@@ -49,6 +50,26 @@ func (r *uploadReader) finished() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.readErr
+}
+
+// Preserve compatible declared parameters; boundary is always transport-owned.
+func multipartContentType(request runner.Request, boundary string) (string, error) {
+	params := make(map[string]string)
+	for _, header := range request.Headers {
+		if !strings.EqualFold(header.Name, "Content-Type") {
+			continue
+		}
+		kind, declared, err := mime.ParseMediaType(header.Value)
+		if err != nil {
+			return "", fmt.Errorf("Content-Type multipart inválido: %w", err)
+		}
+		if _, manual := declared["boundary"]; manual || kind != "multipart/form-data" {
+			return "", fmt.Errorf("Content-Type multipart incompatível ou com boundary manual")
+		}
+		params = declared
+	}
+	params["boundary"] = boundary
+	return mime.FormatMediaType("multipart/form-data", params), nil
 }
 
 func multipartReader(body *runner.MultipartBody, boundary string) (*uploadReader, int64, error) {

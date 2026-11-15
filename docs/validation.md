@@ -1,4 +1,94 @@
-# Validação — US-01 a US-09
+# Validação — US-01 a US-09 e US-20
+
+## US-20 — issue #24 / história 020
+
+Plano da issue #24 executado diretamente, sem planner, somente backend. Quatro
+tasks registradas e autoaprovadas na fila 020 antes da implementação. Tasks 1–3
+nos commits `21370fe`, `726729d` e `dc8f93f`; documentação, ajuda, corpus e
+validação integrada da task 4 nesta alteração. Sem frontend/estáticos, dependências,
+toolchain, CI ou gates alterados. SonarQube não executado: responsabilidade QA.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `1.26.10`, goimports, golangci-lint e Hurl **8.0.0** já disponíveis.
+UID 1000: o teste de acesso negado usa processo sem privilégios, arquivo 0000,
+código 2, diagnóstico e ausência de contato; fakes cobrem falhas determinísticas.
+Servidores HTTP/TLS locais em portas dinâmicas, sem dummy/8080. Cross-builds e
+execução nativa macOS/Windows não realizados: opcionais pelo plano v4, seção 7.
+
+- Task 1: `go test ./internal/parser ./internal/runner ./internal/transport` e
+  `go test ./tests/e2e -count=1` passaram. POST/PUT/PATCH, zero campos, arquivos
+  vazios/binários/placeholders, basename com espaço/Unicode e MIME explícito.
+  Preparação não lê a fonte; teste isolado de **64 MiB** usa fonte virtual,
+  receptor `io.CopyBuffer` sem acumulação e orçamento de alocação adicional
+  inferior a 16 MiB. Sem limite de memória global alterado, sem buffer do arquivo.
+- Task 2: `go test ./internal/parser ./internal/template ./internal/runner
+  ./internal/cli` e `go test ./tests/e2e -count=1` passaram. Processos filhos
+  com cwd distintos comprovam relativo/absoluto e `..` fora do projeto; caminho
+  com placeholder é literal. Textos escalares, vazios e composição não recursiva,
+  MIME explícito/inferido/fallback, controles/duplicações/bodies misturados,
+  Content-Type estático/dinâmico e falhas de arquivo/variável/arrays/objetos.
+  Falhas pré-envio preservam contagens anteriores e não expõem textos, arquivo
+  ou segredo fictício; respostas de eco/assertions/callbacks continuam sanitizados.
+- Task 3: `go test ./internal/runner ./internal/transport ./internal/cli -race`
+  e `make e2e` passaram. 307/308 repetem bytes e boundary, com fonte rebobinada
+  somente após fechamento do leitor HTTP; detector de leitura/seek concorrente.
+  301/302/303 seguem como GET sem body/Content-Type multipart. Dez redirects,
+  origem, TLS verificado, deadline único em todos os hops, sem retry. 413 completo
+  antecipado passa; status divergente, leitura/fechamento/seek, conexão encerrada,
+  timeout e cancelamento retornam suas categorias e impedem próximo envio.
+  Testes verificam fechamento antes do callback/avaliação e depois de falhas;
+  Ctrl+C real durante upload usa arquivo esparso de 128 MiB e retorna 2.
+  Fluxo inline → multipart → externo → inline tipado mantém assertions/capturas;
+  falha de writer conserva prioridade de código 2 e não retém descritores.
+- Task 4: `go test ./internal/cli ./tests/e2e` passou. Ajuda root/test e exemplo
+  `scenario_multipart.hurl` são executados pelo binário com payload adjacente.
+  A revisão integrada acrescentou regressão de JSON não vazio após multipart:
+  não pode ser confundido com campo textual nem produzir envio parcial. Também
+  comprovou que Content-Type multipart preserva parâmetros compatíveis como
+  charset, recusando qualquer boundary manual, conforme RN-05.
+- `make compatibility` passou sem skip com Hurl **8.0.0**: **116 pares**, dez novos
+  `multipart_*`, **106 anteriores inalterados**. Observações semânticas registram
+  ordem, campos, filename bruto, MIME, bytes em base64 e contatos/códigos por
+  ferramenta, não framing/boundary aleatório. Novos JSONs foram gerados apenas
+  com o filtro `^TestCompatibility/multipart_` e revisados; a suíte completa foi
+  executada sem `-update`. Diferenças de filename, espaço no caminho, repetição,
+  múltiplos arquivos e boundary manual estão em `compatibility.md`. Hurl emite
+  aviso local de versão de libcurl, sem impedir identificação 8.0.0 ou testes.
+- Fuzz separado com seeds ampliados:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  passou (última execução: **82.350** entradas), e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  passou (**29.671** entradas). Nenhum crash encontrado.
+- `make fmt lint test` passou antes de concluir cada task de implementação e na
+  validação integrada: lint **0 issues**, testes `-race -cover`. Também passaram
+  explicitamente `go vet ./...`, `go build ./...`, `make build` e `make e2e`.
+  Builds retornaram sucesso com aviso não fatal de escrita no cache de módulos
+  somente leitura do ambiente. `gofmt -l` dos Go alterados e `git diff --check`
+  sem pendências. Sem instalação de ferramentas nem flexibilização de gates.
+
+### Rastreabilidade dos cenários da issue
+
+| Cenários | Evidência automatizada |
+|---|---|
+| GO-01 | `TestMultipartModel`, `TestMultipartWire`, `TestMultipartByBinary`, `TestMultipartDocumentedScenario` |
+| GO-02 | `TestMultipartWire`, `TestMultipartByBinary`, `TestMultipartPreparationIsIncrementalAndOwned` |
+| GO-03 | `TestMultipartOriginAndMIMEByProcess` (relativo/absoluto/fora da raiz/cwd filho) |
+| GO-04 | `TestMultipartTextAndMIME`, `TestMultipartOriginAndMIMEByProcess`, pares de MIME diferencial |
+| GO-05 | `TestMultipartTextAndMIME` (escalar/vazio/não recursivo/texto semelhante a JSON) |
+| GO-06 | `TestMultipartRejectsStructure`, `TestMultipartInvalidInputsByBinary`, corpus negativo |
+| GO-07–08 | `TestMultipartMetadataAndContentType`, `TestMultipartPreparationFailuresPreserveCounts`, corpus negativo |
+| GO-09 | `TestMultipartPreparationFailuresPreserveCounts`, `TestMultipartProtectionAndPreparationByBinary` |
+| GO-10 | `TestMultipartEarlyResponseAndReadFailure`, `TestMultipartStatusAndDisconnectByBinary` |
+| GO-11 | `TestMultipartResourceFailurePaths`, `TestMultipartNetworkPoliciesAndDeadline`, `TestMultipartEarlyResponseAndReadFailure`, `TestMultipartTimeoutByBinary`, `TestRealCtrlC/multipart` |
+| GO-12 | `TestMultipartLargeUploadMemory`, `TestMultipartPreparationIsIncrementalAndOwned` |
+| GO-13 | `TestMultipartRedirects`, `TestMultipartNetworkPoliciesAndDeadline` |
+| GO-14 | `TestMultipartCLISafeDiagnostics`, `TestMultipartProtectionAndPreparationByBinary`, callbacks dos testes runner |
+| GO-15 | `TestMultipartMixedBodiesAndCaptures`, `TestMultipartMixedProcess`, `TestMultipartResourceFailurePaths/report` |
+| GO-16 | `TestCompatibility`, dez pares multipart com Hurl 8.0.0, diferenças explícitas em `compatibility.md` |
+
+Evidência local não substitui review. Multipart avançado, renderização externa,
+`--render-files`, sandbox e detecção arbitrária de segredos não são anunciados.
 
 ## US-09 — issue #22 / história 009
 
@@ -77,8 +167,9 @@ pelo plano v4, seção 7; não executados nem anunciados.
 | GO-13 | `TestExternalCancellationNeverStartsPrematurely`, `TestRealCtrlC/external`, `TestExternalMixedSequenceByBinary/incomplete` |
 | GO-14 | `TestCompatibility`, seis pares `external_*`, Hurl 8.0.0 sem skip; diferenças em `compatibility.md` |
 
-Evidência local não substitui o review. Renderização de arquivos externos,
-`--render-files`, multipart e sandbox permanecem fora do suporte anunciado.
+Registro histórico da US-09: renderização de arquivos externos, `--render-files`,
+multipart e sandbox estavam fora do suporte daquela entrega. Multipart foi
+ampliado na US-20 acima; evidência local não substitui review.
 
 ## US-08 — issue #20 / história 008
 

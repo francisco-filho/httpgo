@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,13 +27,23 @@ const hurlVersion = "8.0.0"
 
 var updateCompatibility = flag.Bool("update", false, "update compatibility observations; review contract changes")
 
+// Multipart observations compare parts, never random boundary or raw framing.
+type wirePart struct {
+	Name     string `json:"name"`
+	Filename string `json:"filename,omitempty"`
+	MIME     string `json:"mime,omitempty"`
+	Data     []byte `json:"data"`
+}
+
 type wireRequest struct {
-	URI           string `json:"uri,omitempty"`
-	Method        string `json:"method"`
-	Body          string `json:"body"`
-	ContentType   string `json:"content_type"`
-	Probe         string `json:"probe"`
-	Authorization string `json:"authorization,omitempty"`
+	Multipart            []wirePart `json:"multipart,omitempty"`
+	MultipartHeaderIssue string     `json:"multipart_header_issue,omitempty"`
+	URI                  string     `json:"uri,omitempty"`
+	Method               string     `json:"method"`
+	Body                 string     `json:"body"`
+	ContentType          string     `json:"content_type"`
+	Probe                string     `json:"probe"`
+	Authorization        string     `json:"authorization,omitempty"`
 }
 
 type observation struct {
@@ -106,13 +118,54 @@ func TestCompatibility(t *testing.T) {
 			var paths []string
 			var requests []wireRequest
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Error(err)
+				request := wireRequest{Method: r.Method, ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization")}
+				_, params, mediaErr := mime.ParseMediaType(request.ContentType)
+				baseType, _, _ := strings.Cut(request.ContentType, ";")
+				if strings.EqualFold(strings.TrimSpace(baseType), "multipart/form-data") {
+					if mediaErr != nil {
+						request.MultipartHeaderIssue = "parâmetros Content-Type inválidos ou repetidos"
+						// Observe generated framing even when libcurl added a second
+						// boundary. Never golden a random raw multipart request body.
+						for _, parameter := range strings.Split(request.ContentType, ";")[1:] {
+							_, candidate, err := mime.ParseMediaType("multipart/form-data;" + parameter)
+							if err == nil && candidate["boundary"] != "" {
+								params = candidate
+							}
+						}
+					}
+					reader := multipart.NewReader(r.Body, params["boundary"])
+					request.ContentType = "multipart/form-data"
+					for {
+						part, err := reader.NextPart()
+						if err == io.EOF {
+							break
+						}
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						data, err := io.ReadAll(part)
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						_, disposition, err := mime.ParseMediaType(part.Header.Get("Content-Disposition"))
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						request.Multipart = append(request.Multipart, wirePart{Name: part.FormName(), Filename: disposition["filename"], MIME: part.Header.Get("Content-Type"), Data: data})
+					}
+				} else {
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					request.Body = string(body)
 				}
 				mu.Lock()
 				paths = append(paths, r.URL.Path)
-				request := wireRequest{Method: r.Method, Body: string(body), ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization")}
 				if expected.Variables != nil {
 					request.URI = r.RequestURI
 				}

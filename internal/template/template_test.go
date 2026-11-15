@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{"", "{{missing}}", "雪\r\ntext", "application/pdf", "multipart/form-data; boundary=manual", "[]", "{}"} {
+		f.Add("description-prefix-{{x}}-suffix", value)
+	}
 	for _, seed := range []string{"{{ x }}", "{{x}}{{x}}", "{{", "}}", "{{invalid-name}}", "plain"} {
 		f.Add(seed, "{{notRecursive}}")
 	}

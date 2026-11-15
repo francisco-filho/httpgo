@@ -1,4 +1,45 @@
-# Matriz de compatibilidade — US-01 a US-09
+# Matriz de compatibilidade — US-01 a US-09 e US-20
+
+## Ampliação US-20 — multipart (issue #24)
+
+**Mudança intencional de contrato:** `[MultipartFormData]` deixa de ser globalmente
+rejeitado. O negativo antigo foi renomeado para `unsupported_multipart_get.hurl`;
+GET/DELETE, duplicações e formulários fora do recorte continuam rejeitados.
+São **116 pares**, dez novos `multipart_*`; as **106 observações anteriores
+não mudaram**. Nenhum código-fonte Hurl foi usado.
+
+O harness registra partes **em ordem**, nome, filename bruto de Content-Disposition
+(sem normalizá-lo com `Part.FileName`), MIME e bytes (`data` em base64 no JSON,
+inclusive binário/vazio). Não compara framing bruto nem boundary aleatório.
+Content-Type válido é normalizado a `multipart/form-data` após usar o boundary
+real para ler as partes. Header com boundary duplicado é marcado como inválido;
+nesse caso o framing do último boundary gerado é observado separadamente, sem
+anunciar que o header inválido seria utilizável por qualquer servidor.
+
+| Par | HTTPGo | Hurl 8.0.0 | Evidência / diferença em Linux |
+|---|---|---|---|
+| `multipart_post` | 0; POST /documents | 0; mesmo contato | campos estáticos/interpolados, MIME e bytes compartilhados |
+| `multipart_put` | 0; PUT /documents | 0; mesmo contato | arquivo sem textos, Content-Type declarado sem boundary |
+| `multipart_patch` | 0; PATCH /documents | 0; mesmo contato | texto antes/depois do arquivo; ordem preservada |
+| `multipart_empty` | 0; POST /documents | 0; mesmo contato | zero bytes e inferência `.txt` → `text/plain` em ambos |
+| `multipart_binary` | 0; POST /documents | 0; mesmo contato | NUL/controle, CRLF e placeholder indefinido intactos; octet-stream |
+| `multipart_unknown` | 0; POST /documents | 0; mesmo contato | extensão desconhecida usa `application/octet-stream` |
+| `multipart_spaces` | 0; POST /documents | 2; zero contatos | caminho literal com espaço/Unicode aceito aqui, rejeitado pela gramática Hurl deste par |
+| `multipart_duplicate` | 2; zero contatos | 0; POST /documents | HTTPGo não aceita nomes repetidos |
+| `multipart_multiple` | 2; zero contatos | 0; POST /documents | HTTPGo exige exatamente um arquivo |
+| `multipart_boundary` | 2; zero contatos | 0; POST /documents | Hurl/libcurl envia dois parâmetros boundary, um manual e um gerado; HTTPGo proíbe manual |
+
+**Filename difere intencionalmente:** nos pares aceitos por ambos, Hurl envia
+`payloads/raw.txt`, `payloads/empty.txt` etc. como filename bruto; HTTPGo envia só
+`raw.txt`, `empty.txt` etc., sem caminho local, conforme RN-04. Não se usa a
+normalização de basename do receptor para esconder essa diferença. Os testes
+próprios comprovam espaços/Unicode e referências absolutas/fora da raiz, sem
+prometer igualdade de gramática Hurl. Inferência em outras extensões segue a tabela
+HTTPGo documentada em `subset.md`, não se deduz igualdade de bancos MIME do SO.
+
+Continuam fora do recorte: multipart avançado, campos repetidos, arquivo renderizado,
+filename customizado, headers de parte, sandbox e `--render-files`. Renderização
+externa futura permanece extensão HTTPGo, não uma capacidade desta entrega.
 
 ## Ampliação US-09 — payload externo literal (issue #22)
 
@@ -26,7 +67,8 @@ do projeto, nomes com espaços/placeholders e diretórios correntes distintos.
 Acesso negado real é verificado pelo E2E Linux sob usuário sem privilégios;
 o diferencial acima observa inexistente/diretório, não anuncia equivalência de
 mensagem de permissão. Não há sandbox automática, renderização externa,
-`--render-files`, multipart ou inferência de MIME nesta história. Interpolação
+`--render-files`, multipart ou inferência de MIME **na entrega US-09** (multipart
+agora tem o contrato separado acima). Interpolação
 externa futura é extensão HTTPGo, não capacidade atual.
 
 ## Escopo da evidência
@@ -148,7 +190,8 @@ falha da sua CLI em aceitar o valor; registra-se somente o comportamento observa
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. Templates em chaves JSON/nomes de headers,
-seções além de `[Captures]` e `[Asserts]`, renderização externa, bodies inline binários/multipart, headers de enquadramento e
+seções além de `[Captures]`, `[Asserts]` e `[MultipartFormData]`, renderização externa,
+bodies inline binários e multipart avançado, headers de enquadramento e
 demais construções fora de escopo continuam explicitamente não suportadas.
 
 ## Ampliação US-05 — capturas string (issue #14)

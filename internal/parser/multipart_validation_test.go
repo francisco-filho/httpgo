@@ -14,6 +14,7 @@ func TestMultipartMetadataAndContentType(t *testing.T) {
 		{"omitted", "", "file: file,a.pdf;", true},
 		{"explicit", "Content-Type: multipart/form-data\n", "file: file,a.pdf; application/pdf", true},
 		{"variable", "Content-Type: {{kind}}\n", "file: file,a.pdf;", true},
+		{"compatible-parameter", "Content-Type: multipart/form-data; charset=utf-8\n", "file: file,a.pdf;", true},
 		{"type", "Content-Type: application/json\n", "file: file,a.pdf;", false},
 		{"boundary", "Content-Type: multipart/form-data; boundary=\"\"\n", "file: file,a.pdf;", false},
 		{"duplicate", "Content-Type: multipart/form-data\ncontent-type: multipart/form-data\n", "file: file,a.pdf;", false},

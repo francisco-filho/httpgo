@@ -74,9 +74,13 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 	origin := current
 	method, body := request.Method, request.Body
 	form := request.Multipart
-	boundary := ""
+	boundary, contentType := "", ""
 	if form != nil {
 		boundary = multipart.NewWriter(io.Discard).Boundary()
+		contentType, err = multipartContentType(request, boundary)
+		if err != nil {
+			return runner.Response{}, classify(ctx, Network, err)
+		}
 	}
 	if method == "" {
 		method = http.MethodGet
@@ -111,7 +115,7 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		}
 		if upload != nil {
 			req.ContentLength = length
-			req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+			req.Header.Set("Content-Type", contentType)
 		}
 		response, err := e.transport.RoundTrip(req)
 		if err != nil {

@@ -74,7 +74,7 @@ func TestMultipartInvalidInputsByBinary(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
 	defer server.Close()
 	for _, body := range []string{
-		"[MultipartFormData]\na: text", "[MultipartFormData]\na: file,a;\nb: file,b;", "[MultipartFormData]\na: file,a;\na: text", "{}\n[MultipartFormData]\na: file,a;", "[MultipartFormData]\n{{name}}: file,a;", "Content-Type: application/json\n[MultipartFormData]\na: file,a;", "Content-Type: multipart/form-data; boundary=x\n[MultipartFormData]\na: file,a;", "[MultipartFormData]\na: file,a; invalid-mime",
+		"[MultipartFormData]\na: text", "[MultipartFormData]\na: file,a;\nb: file,b;", "[MultipartFormData]\na: file,a;\na: text", "{}\n[MultipartFormData]\na: file,a;", "[MultipartFormData]\na: file,a;\n{\"other\":true}", "[MultipartFormData]\n{{name}}: file,a;", "Content-Type: application/json\n[MultipartFormData]\na: file,a;", "Content-Type: multipart/form-data; boundary=x\n[MultipartFormData]\na: file,a;", "[MultipartFormData]\na: file,a; invalid-mime",
 	} {
 		file := scenario(t, "GET "+server.URL+"/first\nPOST "+server.URL+"\n"+body)
 		code, out, stderr := run(t, "test", file)

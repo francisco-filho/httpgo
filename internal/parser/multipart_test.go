@@ -22,7 +22,7 @@ func TestMultipartModel(t *testing.T) {
 
 func TestMultipartRejectsStructure(t *testing.T) {
 	for _, body := range []string{
-		"[MultipartFormData]\na: text", "[MultipartFormData]\na: file,a;\nb: file,b;", "[MultipartFormData]\na: file,a;\na: text", "{}\n[MultipartFormData]\na: file,a;", "file,a;\n[MultipartFormData]\na: file,a;", "[MultipartFormData]\na: file,a;\n{}", "[MultipartFormData]\na: file,a;\n[MultipartFormData]", "HTTP 200\n[MultipartFormData]\na: file,a;",
+		"[MultipartFormData]\na: text", "[MultipartFormData]\na: file,a;\nb: file,b;", "[MultipartFormData]\na: file,a;\na: text", "{}\n[MultipartFormData]\na: file,a;", "file,a;\n[MultipartFormData]\na: file,a;", "[MultipartFormData]\na: file,a;\n{}", "[MultipartFormData]\na: file,a;\n{\"other\":true}", "[MultipartFormData]\na: file,a;\n[1,2]", "[MultipartFormData]\na: file,a;\nfile,other;", "[MultipartFormData]\na: file,a;\n[MultipartFormData]", "HTTP 200\n[MultipartFormData]\na: file,a;",
 	} {
 		t.Run(body, func(t *testing.T) {
 			scenario, err := Parse("bad.hurl", strings.NewReader("GET http://localhost/first\nPOST http://localhost/upload\n"+body))
