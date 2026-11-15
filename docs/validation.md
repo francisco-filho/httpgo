@@ -1,4 +1,76 @@
-# Validação — US-01 a US-11 e US-20
+# Validação — US-01 a US-12 e US-20
+
+## US-12 — issue #29 / história 012
+
+Plano da issue #29 executado diretamente, sem planner, somente backend. Três
+Tasks registradas, autoaprovadas e executadas na ordem da fila 012. Task 1:
+`b488c82` (seleção/carga pela CLI); Task 2: `8a14253` (composição tipada,
+proteção e isolamento); Task 3 nesta alteração (integração, ajuda, exemplos e
+validação). Nenhum frontend/estático, dependência, toolchain, CI, regra de lint
+ou budget alterado. SonarQube não executado (exclusivo do QA). Evidências locais
+não substituem o gate automático de revisão da história.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, goimports, golangci-lint e Hurl **8.0.0**
+já disponíveis. O cache padrão de módulos é somente leitura e a primeira tentativa
+de testes/lint falhou ao buscar YAML v3.0.6. Reexecução bem-sucedida com
+`GOMODCACHE=/tmp/httpgo-012-gomod`, sem mudar go.mod/go.sum ou instalar ferramentas.
+Servidores `httptest` em portas dinâmicas, build único do binário E2E,
+`exec.CommandContext`, cwd somente no processo filho, canais/contextos e timers,
+sem sleeps ou dummy. macOS/Windows não executados: opcionais pelo plano v4,
+seção 7; nenhuma alegação de validação nessas plataformas.
+
+- Task 1: `go test ./internal/config ./internal/cli` e
+  `go test ./tests/e2e -run '^TestEnvironment' -count=1` passaram.
+- Task 2: `go test ./internal/config ./internal/template ./internal/cli ./internal/runner`
+  e `go test ./internal/transport` passaram.
+- `make fmt lint test`, `go vet ./...` e `make build` passaram antes de concluir
+  cada task. Validação integrada: `go test ./internal/cli ./tests/e2e`,
+  `make fmt lint test`, `go vet ./...`, `go build ./...`, `make build` e
+  `make e2e` passaram; lint **0 issues**, testes **-race -cover** sem falhas.
+  Cobertura: config **94,8%**, CLI **95,2%**, runner **93,0%**, template **95,7%**,
+  transporte **90,4%**. `gofmt -l` dos Go alterados e `git diff --check` limpos.
+- `make compatibility` passou com Hurl **8.0.0**, sem skip: **116 pares** existentes,
+  sem alterações em `testdata/compatibility/`, regeneração de observações ou flags
+  próprias fornecidas ao Hurl. Aviso local de versão da libcurl não impediu o gate.
+- Fuzzing sem falhas:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    **40.244** execuções.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`:
+    **103.301** execuções.
+
+### Rastreabilidade dos cenários da issue #29
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-141 | `TestEnvironmentDemonstration`, `TestEnvironmentDocumentedFixtures` — binário real, dois servidores, Pizza/4500 e Suco/1200, active herdado, status 201 |
+| GO-142 | `TestEnvironmentTypedComposition`, `TestEnvironmentBodiesAndCaptures`, `TestEnvironmentDocumentedFixtures` — CLI prevalece, irmãos/tipos/precisão e objetos opacos |
+| GO-143 | `TestEnvironmentTypedComposition` — escalares, listas e null substituem integralmente folhas, string numérica mantém tipo |
+| GO-144 | `TestEnvironmentStructuralConflicts`, `TestEnvironmentConflictsCannotBeHiddenByCLI`, `TestEnvironmentInvalidDocumentsNeverSend` — conflitos em fontes/merge, mapas vazios e duplicação CLI não escondidos por override, zero envios |
+| GO-145 | `TestEnvironmentSelection`, `TestEnvironmentInvalidBeforeHTTP`, `TestEnvironmentInvalidDocumentsNeverSend` — nomes ASCII permitidos, inválidos/traversal, vazio, falta de argumento e repetição idêntica/diferente |
+| GO-146 | `TestEnvironmentRoots`, `TestEnvironmentSelection`, `TestEnvironmentEmptyLimitAndNoAncestor` — base externa inclusive vazia fixa raiz, sem base usa cwd, não cenário/ancestral |
+| GO-147 | `TestEnvironmentInvalidBeforeHTTP`, `TestEnvironmentInvalidDocumentsNeverSend` — arquivos inválidos não selecionados não interferem |
+| GO-148 | `TestEnvironmentDocuments`, `TestEnvironmentInvalidDocumentsNeverSend`, `TestEnvironmentDemonstration` — versão opcional/1, rejeições YAML/schema/nomes/tipos/recursos antes da rede |
+| GO-149 | `TestEnvironmentInvalidBeforeHTTP`, `TestEnvironmentInvalidDocumentsNeverSend`, `TestEnvironmentDocumentedFixtures` — referência rejeitada com processo definido e override CLI |
+| GO-150 | `TestEnvironmentProtectionAllSources`, `TestEnvironmentTimeoutsAndEmptyOverrides`, `TestEnvironmentSecretAssertions`, `TestEnvironmentReuseAndCaptureIsolation` — união de marcas, valores anteriores/substitutos/variantes, lista vazia, captura futura e marca sem valor |
+| GO-151 | `TestEnvironmentReadFailuresAndLimit`, `TestEnvironmentRoots`, `TestEnvironmentInvalidDocumentsNeverSend` — inexistente/ilegível, causa segura e nenhum fallback/envio |
+| GO-152 | `TestEnvironmentDocuments`, `TestEnvironmentTimeoutsAndEmptyOverrides`, `TestEnvironmentEmptyLimitAndNoAncestor` — vazio/whitespace/comentários conserva base/CLI/defaults |
+| GO-153 | `TestEnvironmentReadFailuresAndLimit`, `TestEnvironmentEmptyLimitAndNoAncestor`, `TestEnvironmentInvalidDocumentsNeverSend` — 1 MiB aceito, byte extra rejeitado durante leitura, inclusive só comentários |
+| GO-154 | `TestEnvironmentTimeoutsAndEmptyOverrides`, `TestEnvironmentTimeoutMetadata`, `TestEnvironmentPublicTimeout` — herança/extremos/precisão/faixa, orçamento em redirects/consumo e próxima entrada impedida; regressões US-11 de prazo maior que dez segundos mantidas |
+| GO-155 | `TestEnvironmentReadFailuresAndLimit`, regressões `TestResourceFailures` e cancelamento do runner — funções privadas de I/O, leitura/fechamento com falha, contexto, descritor fechado e nenhum conteúdo parcial aplicado |
+| GO-156 | `TestEnvironmentProtectionBeforeSession`, `TestEnvironmentProtectionAllSources`, `TestEnvironmentInvalidDocumentsNeverSend` — erro de composição/CLI/cenário com marca só no ambiente protege valores conhecidos antes da sessão; YAML sem conteúdo bruto |
+| GO-157 | `TestEnvironmentReuseAndCaptureIsolation` — mesmo comando/executor com local/staging/local/sem seleção, timeout e marcas isolados, captura indisponível na próxima invocação |
+| GO-158 | `TestEnvironmentBodiesAndCaptures` — captura → inline → JSON externo opt-in → multipart, base/cwd externos, payloads relativos ao cenário e bytes multipart literais |
+| GO-159 | `TestEnvironmentWriterFailureKeepsPriorityAndProtection`, `TestEnvironmentProcessOutputFailure` — erro/short write e /dev/full real Linux em stdout/stderr, prioridade 2 após divergência, sem próxima entrada, resumo reimpresso ou exposição |
+| GO-160 | `TestEnvironmentHelp`, `TestEnvironmentDocumentedFixtures`, regressões `TestHelpAndBuildMetadata` e `TestPlainOutputOnRealTTY` — extensão, seleção única, raiz, precedência, limites e distinção do ambiente do processo, flags/versão/streams/TTY |
+
+Exemplos YAML de ambientes positivos/negativos em `testdata/config/environments/`,
+base em `testdata/config/environment_base.yaml` e cenário em
+`testdata/scenarios/scenario_environment_products.hurl`. São separados do corpus
+Hurl. README, subset, arquitetura, ajuda e matriz refletem o suporte implementado:
+sem fontes do processo, stdin, composição de vários ambientes ou mudança de
+resolução de payloads.
 
 ## US-11 — issue #27 / história 011
 

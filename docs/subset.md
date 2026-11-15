@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-11 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25 e #27)
+# Subconjunto suportado e extensões — US-01 a US-12 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27 e #29)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -294,11 +294,11 @@ acrescente `--var api.baseUrl=http://localhost:9090` (valor não sigiloso).
 - Qualquer referência `${NOME}` em valor é rejeitada explicitamente **antes de
   overrides**, inclusive aninhada e com variável de processo definida.
   Nada é resolvido nem enviado como credencial literal. Não há `HTTPGO_*`,
-  ambientes nomeados, stdin ou hooks nesta história.
+  referências de processo, stdin ou hooks. Ambientes nomeados: seção US-12 abaixo.
 
 ### Composição, prazo e proteção
 
-Precedência efetivamente implementada: **defaults internos < YAML base < CLI**.
+Precedência efetivamente implementada: **defaults internos < YAML base < ambiente selecionado < CLI**.
 A fonte CLI é validada separadamente: repetir `--var` para o mesmo nome continua
 erro. Entre fontes, CLI substitui o mesmo caminho ou acrescenta outro, sem perder
 irmãos. Escalares, listas e null substituem integralmente, sem combinar listas.
@@ -315,7 +315,8 @@ Não há retry, interrupção prometida de I/O local bloqueado ou mutação do e
 
 `secrets` acumula com `--secret`, sem exigir variável existente. Pode proteger
 captura futura; usar valor ainda ausente continua falhando. Override nunca remove
-proteção. Valores conhecidos da base e substitutos CLI, inclusive variantes e
+proteção, inclusive com lista posterior vazia. Valores conhecidos da base,
+ambiente e substitutos CLI (mesmo os sobrescritos), inclusive variantes e
 constituintes JSON, são protegidos desde a inicialização dos writers/contexto;
 a sessão mantém a proteção dinâmica das capturas/derivados e callbacks.
 Credenciais reais em flags seguem proibidas. YAML não protege o conteúdo em disco:
@@ -330,6 +331,52 @@ cenário. Contexto, marcas e prazo são locais à invocação, sem vazamento na 
 
 Esta configuração é **extensão HTTPGo**, não parte do formato Hurl. Os testes YAML
 são separados do corpus diferencial Hurl; nenhuma flag própria é passada ao Hurl.
+
+## Extensão HTTPGo: ambientes nomeados — US-12 (issue #29)
+
+```sh
+httpgo test tests/products.hurl --env local
+httpgo test tests/products.hurl --config projeto/base.yaml --env=staging
+```
+
+`--env` seleciona no máximo um ambiente por invocação, antes/depois do cenário
+após `test`. Repetição, mesmo com nome idêntico, nome vazio ou argumento ausente
+é erro 2. Nomes aceitam somente `[A-Za-z0-9_-]+`; pontos, espaços, Unicode e
+separadores de caminho não são aceitos. O nome é validado antes de compor o caminho.
+Sem seleção, nenhum arquivo de ambiente é aberto.
+
+O único caminho é `environments/<nome>.yaml`, relativo ao diretório da configuração
+base selecionada (explícita ou descoberta), inclusive se vazia. Sem configuração
+base, parte do diretório corrente. Não busca ancestrais, arquivos alternativos ou
+ambientes relativos ao cenário. Ausente/ilegível, falha de leitura/fechamento ou
+cancelamento é erro antes de qualquer HTTP, sem fallback ou configuração parcial.
+Não altera cwd, `Scenario.OriginDir` ou resolução dos payloads.
+
+Ambiente usa o schema e proteções da base, exceto `version: 1` que é **opcional**.
+Somente `defaults.timeout`, `variables` e `secrets`; arquivo vazio/whitespace/só
+comentários não acrescenta overrides. Limite de **1 MiB por arquivo**, documento
+único, chaves únicas, mesmos tipos/nomes e timeout exato entre 1 ms e 24 horas.
+Versão diferente, campo desconhecido, recursos YAML proibidos e `${NOME}` são
+rejeitados com arquivo/posição e mensagem segura antes de qualquer envio. A
+referência é rejeitada mesmo se substituída pela CLI ou definida no processo.
+
+Base → ambiente → CLI preserva folhas irmãs, strings numéricas e precisão dos
+números. Mapas são caminhos e combinam profundamente; escalares, listas e `null`
+substituem a folha inteira, sem concatenar listas ou tratar `null` como ausência.
+Um mapa, inclusive vazio, não pode virar valor, nem um valor virar mapa com
+descendentes. Cada fonte é validada antes do merge: override não esconde erro.
+Objetos CLI continuam opacos e duplicação de `--var` continua erro.
+`secrets` é união das três fontes, mesmo com lista vazia posterior; conserva
+proteção dos valores anteriores/substitutos, variantes, capturas e derivados,
+inclusive em erros antes da sessão. Marcação isolada não cria valor. Cada
+invocação tem configuração/contexto/capturas novos, sem estado compartilhado.
+
+Exemplo completo e demonstração Pizza/Suco: `README.md`,
+`testdata/config/environment_base.yaml`, `testdata/config/environments/{local,staging}.yaml`
+e `testdata/scenarios/scenario_environment_products.hurl`.
+Sem múltiplos ambientes, seleção automática, referências de processo (US-13),
+stdin ou mudanças nos caminhos de payloads. Não é uma capacidade Hurl; testes
+separados do corpus diferencial, sem fornecer `--env` à outra ferramenta.
 
 ## Variáveis tipadas e templates — US-03/US-04
 

@@ -123,7 +123,7 @@ arquivo explícito inexistente ou selecionado ilegível é erro **2**, sem HTTP.
 O diretório da configuração não muda a origem de payloads: continuam relativos
 à localização do `.hurl`.
 
-Precedência: **defaults internos < YAML base < CLI**. Mapas de `variables`
+Precedência: **defaults internos < YAML base < ambiente selecionado < CLI**. Mapas de `variables`
 definem caminhos exatos, como `api.baseUrl`, não um objeto interpolável `api`.
 Strings (inclusive `"001"`), números exatos, booleanos, null e arrays JSON-compatíveis
 preservam tipos; objetos dentro de arrays são conteúdo, não novos caminhos.
@@ -150,9 +150,78 @@ capturados e derivados permanecem protegidos em stdout/stderr/diagnósticos,
 inclusive antes da sessão. Não há detecção universal de segredos arbitrários.
 **Credenciais reais em flags continuam proibidas**: a proteção não cobre histórico
 ou listagem de processos. YAML em disco não é um cofre; proteja arquivos com
-permissões `0600`. Ambientes nomeados, `HTTPGO_*`, referências ao ambiente do
-processo, stdin e hooks continuam fora do suporte. YAML é **extensão HTTPGo**,
+permissões `0600`. `HTTPGO_*`, referências ao ambiente do processo, stdin e hooks
+continuam fora do suporte. YAML é **extensão HTTPGo**,
 não parte do formato Hurl. Contrato completo: [subconjunto](docs/subset.md).
+
+## Selecionar ambientes — extensão HTTPGo (US-12 / issue #29)
+
+Na base `.httpgo.yaml`:
+
+```yaml
+version: 1
+variables:
+  product:
+    active: true
+```
+
+Em `environments/local.yaml`:
+
+```yaml
+variables:
+  api:
+    baseUrl: http://localhost:8080
+  product:
+    name: Pizza
+    price: 4500
+```
+
+Crie `environments/staging.yaml` com os mesmos caminhos, mudando destino para
+`http://localhost:9090`, nome para `Suco` e preço para `1200`. Em `tests/products.hurl`:
+
+```hurl
+POST {{api.baseUrl}}/products
+Content-Type: application/json
+{"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}
+HTTP 201
+```
+
+```sh
+bin/httpgo test tests/products.hurl --env local
+bin/httpgo test tests/products.hurl --env staging
+# Exemplos versionados (local também funciona contra o dummy manual):
+bin/httpgo test testdata/scenarios/scenario_environment_products.hurl \
+  --config testdata/config/environment_base.yaml --env local
+```
+
+Sem editar cenário/payload, cada servidor recebe seus dados, com preço numérico
+e `active` booleano herdado; status 201 retorna **0**. `--var product.price=99`
+prevalece sobre o ambiente sem apagar irmãos. Listas e `null` substituem folhas
+inteiras, nunca concatenam ou removem valores; mapas combinam profundamente por
+caminho. Trocar mapa de caminhos por valor ou vice-versa é erro, mesmo mapa vazio.
+Objetos CLI continuam opacos; conflitos em qualquer fonte não podem ser escondidos
+por overrides posteriores.
+
+`--env <nome>`/`--env=nome` seleciona **um único** ambiente. Repetir a opção, mesmo
+com nome igual, é erro. Nome não vazio aceita somente letras ASCII, números, `_`
+e `-`, sem ponto, espaço, separador ou traversal. Carrega **somente**
+`environments/<nome>.yaml`, relativo ao diretório da base selecionada por
+`--config`/descoberta, **mesmo vazia**. Sem base, usa cwd, nunca o diretório do
+cenário ou ancestrais. Não muda a origem dos payloads. Sem `--env`, nenhum ambiente
+é aberto. Arquivo solicitado ausente/ilegível é erro **2**, sem fallback nem HTTP.
+
+O documento de ambiente admite `defaults`, `variables` e `secrets`, com
+`version: 1` **opcional**. Vazio/só comentários não altera a base ou CLI. Valem os
+mesmos tipos, limite de 1 MiB por arquivo, precisão/faixa de timeout e proteções
+YAML da base. Cada fonte é validada antes da combinação. Marcações de segredos
+acumulam base + ambiente + CLI: listas vazias e substituições não desprotegem
+valores conhecidos anteriores, novos valores ou capturas futuras. Contexto,
+marcas, timeout e capturas não vazam entre execuções.
+
+**Ambiente nomeado não é ambiente do processo.** `${NOME}` continua rejeitado,
+mesmo com variável do processo definida ou override CLI. Sem composição de vários
+ambientes, seleção automática, fontes `HTTPGO_*` ou stdin. Configuração hierárquica
+e seleção nomeada são extensões HTTPGo, não sintaxe Hurl.
 
 ## Payload de arquivo externo (US-09 / issue #22)
 

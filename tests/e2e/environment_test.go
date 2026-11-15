@@ -53,6 +53,39 @@ func TestEnvironmentDemonstration(t *testing.T) {
 	}
 }
 
+func TestEnvironmentDocumentedFixtures(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		data, err := io.ReadAll(r.Body)
+		if err != nil || (string(data) != "{\"name\":\"Pizza\",\"price\":4500,\"active\":true}" && string(data) != "{\"name\":\"Suco\",\"price\":1200,\"active\":true}") {
+			t.Errorf("body=%q err=%v", data, err)
+		}
+		w.WriteHeader(201)
+	}))
+	defer server.Close()
+	root, err := filepath.Abs(filepath.Join("..", "..", "testdata"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Join(root, "config", "environment_base.yaml")
+	file := filepath.Join(root, "scenarios", "scenario_environment_products.hurl")
+	t.Setenv("HTTPGO_TEST_TOKEN", "fake-process-value")
+	for _, name := range []string{"local", "staging", "unsupported_process", "invalid_structure"} {
+		code, out, stderr := runConfig(t, t.TempDir(), "test", file, "--config", base, "--env", name, "--var", "api.baseUrl="+server.URL, "--var", "token=fake-override")
+		if name == "local" || name == "staging" {
+			if code != 0 || stderr != "" {
+				t.Fatalf("env=%s code=%d out=%q err=%q", name, code, out, stderr)
+			}
+		} else if code != 2 || out != "" || stderr == "" {
+			t.Fatalf("env=%s code=%d out=%q err=%q", name, code, out, stderr)
+		}
+	}
+	if hits.Load() != 2 {
+		t.Fatal(hits.Load())
+	}
+}
+
 func TestEnvironmentRoots(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
