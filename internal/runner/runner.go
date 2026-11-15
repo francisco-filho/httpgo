@@ -78,12 +78,20 @@ type Renderer interface {
 }
 
 type RenderError struct {
-	Position parser.Position
-	Detail   string
-	cause    error
+	Position  parser.Position
+	Reference *parser.Position // Scenario reference for an external payload, when present.
+	Detail    string
+	cause     error
 }
 
-func (e *RenderError) Error() string { return fmt.Sprintf("erro de renderização: %s", e.Detail) }
+func (e *RenderError) Error() string {
+	diagnostic := fmt.Sprintf("erro de renderização: %s", e.Detail)
+	if e.Reference != nil {
+		pos := e.Reference
+		diagnostic += fmt.Sprintf(" (referência %q:%d:%d)", pos.File, pos.Line, pos.Column)
+	}
+	return diagnostic
+}
 func (e *RenderError) Unwrap() error { return e.cause }
 
 type Runner struct {
@@ -107,7 +115,16 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload}
 }
 
+// Options applies to one execution only. The zero value preserves external bytes.
+type Options struct {
+	RenderFiles bool
+}
+
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
+	return r.RunWithOptions(ctx, scenario, Options{})
+}
+
+func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, options Options) Result {
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
 	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
@@ -164,6 +181,24 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 					result.ReportErr = r.report(current)
 				}
 				return result
+			}
+			if options.RenderFiles {
+				var failure *RenderError
+				body, failure = renderExternal(session, body, *entry.ExternalBody)
+				if err := ctx.Err(); err != nil {
+					result.Err, result.ErrorPosition = err, entry.ExternalBody.Position
+					return result
+				}
+				if failure != nil {
+					result.Err, result.ErrorPosition = failure, failure.Position
+					current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
+					current.Entry.Position = failure.Position
+					result.Entries = append(result.Entries, current)
+					if r.report != nil {
+						result.ReportErr = r.report(current)
+					}
+					return result
+				}
 			}
 			request.Body = body
 		}

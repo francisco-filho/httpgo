@@ -83,7 +83,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
 	scenario.OriginDir = filepath.Dir(absolute)
-	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).Run(ctx, scenario)
+	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).RunWithOptions(ctx, scenario, runner.Options{RenderFiles: args.renderFiles})
 	return c.renderSummary(scenario, result)
 }
 
@@ -263,7 +263,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
-  httpgo test <arquivo> [--var nome=valor] [--secret nome]
+  httpgo test <arquivo> [--render-files] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -284,8 +284,9 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
 Headers e um body são opcionais: JSON inline, file,<caminho>; ou multipart (exclusivos).
-JSON inline estático preserva seus bytes. Arquivo externo preserva todos os bytes,
-inclusive vazio, binário e {{placeholder}} literal, sem validar JSON nem renderizar.
+JSON inline estático preserva seus bytes. Sem --render-files, arquivo externo
+preserva todos os bytes, inclusive vazio, binário e {{placeholder}} literal,
+sem validar JSON nem renderizar.
 Exemplo: salve tests/products.hurl e execute httpgo test tests/products.hurl
   POST http://localhost:8080/products
   Content-Type: application/json
@@ -297,7 +298,18 @@ Relativos partem do diretório do .hurl, não do diretório corrente; absolutos 
 Sem sandbox: .. e absolutos podem ler fora do projeto, com permissões do usuário.
 Leitura completa e fechamento só na vez da entrada, antes do envio; falha localizada
 retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeitas.
-No body externo completo, Content-Type não é inferido. Sem --render-files ou renderização externa.
+No body externo completo, Content-Type não é inferido. Sem --render-files, bytes literais.
+--render-files: extensão HTTPGo; trata bodies externos completos como templates JSON,
+com as mesmas variáveis/tipos do JSON inline. Não renderiza arquivos multipart.
+Independe de extensão/Content-Type; JSON estático preserva inclusive whitespace externo.
+No payload: {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}
+Exemplo: httpgo test tests/products.hurl --render-files --var product.name=Pizza --var product.price=45 --var product.active=true
+Flag sem valor, antes/depois do arquivo após test, somente na execução atual.
+Conteúdo validado somente na vez da requisição: vazio/não JSON, template malformado,
+variável ausente, tipo incompatível ou JSON final inválido retornam 2 antes do envio.
+Diagnóstico aponta payload/linha/coluna originais e referência no cenário,
+sem conteúdo bruto. Anteriores permanecem; afetada e seguintes não são enviadas.
+Não promete renderização equivalente pelo Hurl.
 O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
 
 Upload multipart: salve tests/documents.hurl, crie fixtures/document.pdf e execute
@@ -408,7 +420,7 @@ Duplicação e ancestral/descendente são erros, sem merge nem sobrescrita.
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
-Capturas tipadas da resposta para entradas seguintes (URL, headers e JSON inline):
+Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo com --render-files):
   POST {{base_url}}/auth/login
   {"username":"{{username}}","password":"{{password}}"}
   HTTP 200
@@ -444,7 +456,7 @@ variáveis iniciais nem capturas anteriores; cada execução começa sem captura
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas
 valores não sigilosos ou fictícios. A proteção não cobre histórico/processos.
-Ambiente do processo, stdin e templates de arquivos externos indisponíveis.
+Ambiente do processo e stdin indisponíveis. Templates externos exigem --render-files.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.
 `

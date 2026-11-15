@@ -102,7 +102,7 @@ partem do diretório do `.hurl`, independentemente do diretório corrente;
 absolutos são aceitos. **Sem sandbox:** `..` e caminhos absolutos podem alcançar
 arquivos fora da raiz do projeto, com as permissões do usuário da CLI.
 
-Todos os bytes são enviados sem normalização, validação JSON ou renderização:
+Sem `--render-files`, todos os bytes são enviados sem normalização, validação JSON ou renderização:
 vazio, não JSON, binário e `{{placeholder}}` literal, definido ou não. Content-Type
 não é inferido. O arquivo é lido integralmente e fechado somente na vez da
 requisição, antes do envio. Falha de abertura/leitura/fechamento retorna 2 com
@@ -114,10 +114,53 @@ Não se imprimem conteúdo nem caminho operacional nos diagnósticos. A proteç�
 não descobre segredos arbitrários no payload; use somente cenários confiáveis.
 
 **Mudança de contrato:** a antiga rejeição global de `file,...;` foi removida;
-negativos específicos mantêm as restrições. `--render-files` continua
-não suportado. Renderização externa futura será extensão explícita HTTPGo,
-não uma capacidade anunciada nesta entrega. Veja [subconjunto](docs/subset.md)
-e [evidência diferencial](docs/compatibility.md).
+negativos específicos mantêm as restrições. Esse modo bytes continua sendo o
+padrão. Veja [subconjunto](docs/subset.md) e [evidência diferencial](docs/compatibility.md).
+
+## Parametrizar JSON externo — extensão HTTPGo (US-10 / issue #25)
+
+Em `payloads/product.json`:
+
+```json
+{"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}
+```
+
+Use o mesmo `tests/products.hurl` acima e execute:
+
+```sh
+bin/httpgo test tests/products.hurl --render-files \
+  --var product.name=Pizza --var product.price=45 --var product.active=true
+bin/httpgo test --render-files tests/products.hurl \
+  --var product.name=Suco --var product.price=12 --var product.active=false
+```
+
+A API recebe JSONs distintos, com string, número e booleano preservados, sem editar
+arquivos. Exemplo versionado: `testdata/scenarios/scenario_external_render.hurl`
+e `testdata/payloads/product_template.json`; funciona contra `/products` do dummy.
+
+`--render-files` vale somente para a execução atual e trata **todos** os arquivos
+usados como body completo como templates JSON, independentemente de extensão ou
+Content-Type. Não infere headers e **não renderiza arquivos multipart**. Caminhos
+continuam literais; não se interpolam nomes de arquivos nem chaves JSON.
+O mesmo renderer do inline aceita valores completos de qualquer tipo, inclusive
+na raiz (null, arrays e objetos); em strings só escalares, escapados corretamente.
+Nomes pontuados resolvem exatamente; conteúdo inserido não é reinterpretado.
+Variáveis iniciais e capturas anteriores são as únicas fontes existentes.
+JSON válido sem placeholders conserva todos os bytes, inclusive whitespace externo.
+
+A leitura, validação e renderização do payload ocorrem **somente na vez da sua
+requisição**. Vazio, whitespace sem valor, não JSON, UTF-8 inválido, dois valores,
+template malformado, variável ausente, tipo incompatível ou JSON final inválido
+retornam 2, sem enviar a entrada afetada nem as seguintes. Anteriores não são
+desfeitas. Erros de conteúdo são de renderização, identificam o payload com
+linha/coluna originais em bytes quando possível (senão 1:1) e a referência no
+cenário. Erros de I/O continuam sendo de arquivo e apontam a referência `.hurl`.
+A estrutura inválida do próprio cenário ainda impede **todos** os envios.
+Nenhum payload completo é impresso; segredos marcados e derivados/escapes conhecidos
+continuam protegidos, sem detecção universal de segredos arbitrários.
+
+Esta é uma **extensão HTTPGo**, separada do subconjunto Hurl: não se promete que
+Hurl renderize esses arquivos, nem se fornece a flag própria ao diferencial.
 
 ## Upload multipart (US-20 / issue #24)
 
@@ -146,7 +189,8 @@ adjacente em `testdata/payloads/`. Não requer frontend nem o dummy manual.
 POST/PUT/PATCH aceitam exatamente **um arquivo e zero ou mais campos textuais**.
 Nomes são estáticos/únicos; outro body na mesma requisição é erro. Só valores
 textuais interpolam, sem conversão de arrays/objetos nem interpretação JSON.
-Bytes do arquivo nunca são renderizados, inclusive placeholders indefinidos.
+Bytes do arquivo nunca são renderizados, inclusive placeholders indefinidos,
+mesmo com `--render-files` ativo.
 Caminho literal segue a US-09: relativo ao `.hurl` ou absoluto, sem sandbox.
 Filename contém só o basename, preservando espaços/Unicode, sem caminho local.
 MIME explícito prevalece; se omitido, usa tabela determinística por extensão
@@ -171,7 +215,7 @@ mas não se descobrem segredos arbitrários dentro do arquivo.
 **Mudança de contrato:** `[MultipartFormData]` deixa de ser globalmente rejeitado;
 negativos específicos preservam GET/DELETE sem multipart, exclusividade e limites.
 Sem múltiplos arquivos, repetição de campos, filename customizado, headers por
-parte, partes JSON tipadas, multipart aninhado ou `--render-files`.
+parte, partes JSON tipadas, multipart aninhado ou renderização do arquivo multipart.
 O [diferencial Hurl 8.0.0](docs/compatibility.md) registra diferenças reais de
 gramática, filename e restrições; não há promessa de compatibilidade completa.
 
@@ -236,7 +280,8 @@ JSON, aceita apenas escalares e composição textual, com escape correto de aspa
 barras invertidas e controles, preservando Unicode. Números conservam sua
 representação JSON sem arredondamento, inclusive dentro de estruturas. Conteúdo
 inserido semelhante a placeholder permanece literal. Chaves JSON são estáticas;
-renderização de arquivos externos, expressões e acesso a propriedades não são suportados.
+expressões e acesso a propriedades não são suportados. JSON externo exige
+`--render-files`, conforme a extensão US-10 acima.
 
 A interpretação tipada de `--var` é uma **extensão própria HTTPGo**, não promessa
 de equivalência com a CLI do Hurl. A sintaxe contextual compartilhada e as diferenças
@@ -290,7 +335,7 @@ Consultas não suportadas em qualquer entrada impedem todos os envios.
 
 Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
 quando esperado, e todas as assertions de headers/JSON declaradas, para URLs, valores de
-headers e JSON inline seguintes. Strings
+headers, JSON inline e JSON externo com `--render-files` seguintes. Strings
 como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
 Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
 variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada execução

@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-09 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22 e #24)
+# Subconjunto suportado e extensões — US-01 a US-10 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24 e #25)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -50,6 +50,7 @@ HTTP 201
 
 O formulário é exclusivo de outros bodies; nomes estáticos não se repetem.
 O arquivo mantém seus bytes (inclusive vazio, binário e placeholders literais),
+mesmo com a extensão `--render-files` ativa,
 usa somente o basename como filename e é enviado incrementalmente, sem buffer
 integral. O runner abre a fonte na vez da entrada e a fecha antes do resultado.
 O transporte gera boundary e Content-Type coerentes; um header explícito deve
@@ -171,9 +172,9 @@ file,../payloads/product.json;
 HTTP 201
 ```
 
-O arquivo é lido somente na vez da requisição e enviado integralmente, sem
-validar JSON, renderizar placeholders ou normalizar bytes (inclusive vazio e
-binário). Não se infere Content-Type. Falha de leitura interrompe antes do envio
+Sem `--render-files`, o arquivo é lido somente na vez da requisição e enviado
+integralmente, sem validar JSON, renderizar placeholders ou normalizar bytes
+(inclusive vazio e binário). Não se infere Content-Type. Falha de leitura interrompe antes do envio
 com código 2; requisições anteriores não são desfeitas. Inexistente, diretório e
 acesso negado têm causas controladas distintas; nenhuma causa bruta, conteúdo ou
 caminho operacional é impresso. Erros de leitura/fechamento descartam bytes parciais.
@@ -181,10 +182,59 @@ A referência é identificada pelo arquivo/linha/coluna do cenário. A proteçã
 inspeciona conteúdo para descobrir segredos arbitrários. O arquivo corrente é
 carregado integralmente em memória, sem limite de tamanho. Contexto é checado
 antes/depois da leitura; o timeout do transporte não interrompe um I/O local
-bloqueado no sistema operacional. Renderização externa e
-`--render-files` permanecem fora de escopo. Multipart usa a variante incremental
-separada descrita acima; não converte o body externo completo em streaming.
+bloqueado no sistema operacional. Multipart usa a variante incremental separada
+descrita acima; não converte o body externo completo em streaming.
 **Mudança de contrato:** a referência externa, antes rejeitada, passa a ser aceita.
+
+## Extensão HTTPGo: JSON externo com --render-files — US-10 (issue #25)
+
+Esta extensão é **separada do subconjunto compatível com Hurl**. Não se promete
+renderização externa equivalente pelo Hurl. Ative por execução, antes ou depois
+do arquivo após `test` (flag sem valor; `--render-files=false` não é aceito):
+
+```sh
+httpgo test tests/products.hurl --render-files \
+  --var product.name=Pizza --var product.price=45 --var product.active=true
+```
+
+No payload `payloads/product.json` referenciado pelo exemplo acima:
+
+```json
+{"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}
+```
+
+A flag trata **todos os arquivos usados como body completo** como templates JSON,
+mesmo sem placeholders, sem seleção por extensão/Content-Type nem inferência de
+headers. **Arquivos multipart permanecem literais**, inclusive vazios/binários e
+placeholders indefinidos. Não altera bodies inline ou o caminho literal da US-09.
+Sem flag, o contrato bytes da seção anterior permanece integralmente inalterado.
+
+Reutiliza as regras do JSON contextual inline: nomes pontuados explícitos, tipos
+preservados em valores completos (inclusive raiz), escalares escapados em strings,
+arrays/objetos não convertidos em texto e nenhuma reinterpretação do conteúdo
+inserido. Chaves e caminhos não interpolam; sem novas expressões, YAML ou fontes
+de variáveis/segredos. Variáveis iniciais e capturas anteriores usam a mesma sessão.
+JSON estático válido conserva todos os bytes, inclusive whitespace externo LF/CRLF.
+
+O parser valida o `.hurl` inteiro antes da rede **sem abrir payloads**. Ler,
+validar e renderizar o conteúdo externo ocorre só na entrada corrente, antes do
+executor e depois de fechar o arquivo. Exige um único valor JSON completo UTF-8.
+Vazio, somente whitespace, não JSON, conteúdo adicional, template malformado,
+variável ausente, tipo incompatível ou JSON final inválido produz **erro de
+renderização (2)**. A entrada afetada e seguintes não são enviadas nem contadas
+como iniciadas; resultados anteriores permanecem. Estrutura inválida do `.hurl`
+continua rejeitando todos os envios. Abertura/leitura/fechamento mantêm FileError
+com posição da referência no cenário, categoria distinta de conteúdo/renderização.
+
+Diagnósticos identificam payload e causa controlada, com linha/coluna em bytes do
+conteúdo **original** (LF/CRLF), nunca do JSON expandido. Sem offset confiável,
+usam 1:1; incluem a referência `.hurl`. Nomes são sanitizados e exibidos com quoting,
+sem despejar caminho absoluto operacional calculado, causas brutas ou payload.
+Resultados/callbacks não retêm corpos, planos ou referências operacionais.
+Segredos marcados, capturas secretas e derivados/escapes conhecidos permanecem
+protegidos em sucesso/falha, sem descobrir segredos arbitrários do arquivo.
+Permanecem os limites de memória, acesso local sem sandbox, contexto e I/O bloqueado
+já descritos; nenhuma nova goroutine/retry/limite de tamanho é introduzida.
 
 ## Variáveis tipadas e templates — US-03/US-04
 
@@ -330,7 +380,7 @@ ou objeto, inclusive na raiz. Campo ausente/índice fora do array ou percurso
 incompatível é erro; `null`, string vazia e coleções vazias existem e são válidos.
 JSON inválido ou com valores adicionais também falha, sem publicar lote parcial.
 
-Em valor JSON completo, inclusive raiz de body inline, o tipo e o conteúdo são
+Em valor JSON completo, inclusive raiz de body inline ou externo com `--render-files`, o tipo e o conteúdo são
 preservados. Números não passam por float64 e mantêm precisão, também aninhados:
 `9007199254740993` e `1.2300e+99` não sofrem arredondamento. A string decodificada
 conserva seu tipo: `"123"`/`"null"` recebidos não viram número/null. Conteúdo
@@ -555,7 +605,7 @@ compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 ## CLI e saída
 
 ```text
-httpgo test <arquivo> [--var nome=valor] [--secret nome]
+httpgo test <arquivo> [--render-files] [--var nome=valor] [--secret nome]
 httpgo --help
 httpgo test --help
 httpgo --version
@@ -701,7 +751,8 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
   precisão inteira e decimais têm pares compartilhados, sem equivalência geral.
   Avaliação inválida/percurso incompatível retorna 2 aqui contra 4 no Hurl;
   ausência de propriedade/índice retorna 1 aqui contra 4. Veja `assert_json_*`.
-- Configuração YAML hierárquica e interpolação externa, quando implementadas,
-  serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
+- `--render-files` é uma **extensão HTTPGo** implementada na US-10, não parte do
+  Hurl. Seus testes ficam separados do corpus diferencial em modo bytes, que não
+  recebe essa flag. Configuração YAML hierárquica permanece futura e fora do suporte.
 
 Veja a matriz e evidências limitadas ao corpus em `compatibility.md`.

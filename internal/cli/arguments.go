@@ -9,6 +9,7 @@ import (
 )
 
 type arguments struct {
+	renderFiles        bool
 	file               string
 	variables, secrets []string
 }
@@ -20,6 +21,11 @@ func parseArguments(args []string) (arguments, error) {
 		arg := args[i]
 		name, value, inline := strings.Cut(arg, "=")
 		switch name {
+		case "--render-files":
+			if inline {
+				invalid = true
+			}
+			result.renderFiles = true
 		case "--var", "--secret":
 			if !inline {
 				if i+1 == len(args) {
