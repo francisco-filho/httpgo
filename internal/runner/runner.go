@@ -7,6 +7,7 @@ import (
 
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/parser"
+	"capimgrosso.com/httpgo/internal/query"
 	"capimgrosso.com/httpgo/internal/template"
 )
 
@@ -18,8 +19,9 @@ type Request struct {
 	RetainBody bool
 }
 type Response struct {
-	Status int
-	Body   []byte
+	Status  int
+	Body    []byte
+	Headers []query.HeaderValue
 }
 
 // HTTPExecutor returns a response only after consuming and closing its body.
@@ -30,20 +32,22 @@ type HTTPExecutor interface {
 type Outcome string
 
 const (
-	Wildcard      Outcome = "status aceito por HTTP *"
-	Unvalidated   Outcome = "sem validação de status"
-	Passed        Outcome = "status validado"
-	Mismatch      Outcome = "status divergente"
-	Failed        Outcome = "erro de transporte"
-	RenderFailed  Outcome = "erro de renderização"
-	CaptureFailed Outcome = "erro de captura"
+	Wildcard       Outcome = "status aceito por HTTP *"
+	Unvalidated    Outcome = "sem validação de status"
+	Passed         Outcome = "status validado"
+	Mismatch       Outcome = "status divergente"
+	Failed         Outcome = "erro de transporte"
+	RenderFailed   Outcome = "erro de renderização"
+	CaptureFailed  Outcome = "erro de captura"
+	HeaderMismatch Outcome = "assertion de header divergente"
 )
 
 type EntryResult struct {
-	Entry      parser.Entry
-	Outcome    Outcome
-	Status     int
-	DisplayURL string
+	HeaderFailure *HeaderFailure
+	Entry         parser.Entry
+	Outcome       Outcome
+	Status        int
+	DisplayURL    string
 }
 
 type Summary struct {
@@ -96,6 +100,18 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
 	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
+		for _, declaration := range entry.Assertions {
+			if sensitiveHeader(declaration.Name) {
+				session.ProtectValue(declaration.Expected)
+			}
+		}
+		for _, header := range entry.Headers {
+			if sensitiveHeader(header.Name) {
+				session.ProtectValue(header.Value)
+			}
+		}
+	}
+	for _, entry := range scenario.Entries {
 		if err := ctx.Err(); err != nil {
 			result.Err, result.ErrorPosition = err, entry.Position
 			return result
@@ -103,7 +119,7 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 		request, display, renderErr := render(session, entry)
 		if renderErr != nil {
 			result.Err, result.ErrorPosition = renderErr, renderErr.Position
-			current := EntryResult{Entry: entry, Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
+			current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
 			result.Entries = append(result.Entries, current)
 			if r.report != nil {
 				if err := r.report(current); err != nil {
@@ -114,7 +130,17 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 		}
 		result.Summary.Started++
 		result.Summary.NotStarted--
+		for _, header := range request.Headers {
+			if sensitiveHeader(header.Name) {
+				session.ProtectValue(header.Value)
+			}
+		}
 		response, err := r.executor.Execute(ctx, request)
+		for _, header := range response.Headers {
+			if sensitiveHeader(header.Name) {
+				session.ProtectValue(header.Value)
+			}
+		}
 		current := EntryResult{Entry: entry, Status: response.Status, DisplayURL: display}
 		if err != nil {
 			current.Outcome, current.Status = Failed, 0
@@ -135,12 +161,19 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 				result.Diverged = true
 			}
 		}
+		if err == nil && !result.Diverged {
+			current.HeaderFailure = checkHeaders(session, entry.Assertions, response.Headers)
+			if current.HeaderFailure != nil {
+				current.Outcome, result.Diverged = HeaderMismatch, true
+			}
+		}
 		if err == nil && !result.Diverged && len(entry.Captures) > 0 {
 			if captureErr := captureResponse(session, entry.Captures, response.Body); captureErr != nil {
 				current.Outcome = CaptureFailed
 				result.Err, result.ErrorPosition = captureErr, captureErr.Position
 			}
 		}
+		current.Entry = safeEntry(session, entry)
 		current.DisplayURL = session.Sanitize(current.DisplayURL)
 		result.Entries = append(result.Entries, current)
 		if r.report != nil {

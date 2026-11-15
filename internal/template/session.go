@@ -11,6 +11,7 @@ type Session interface {
 	RenderJSON([]byte) ([]byte, error)
 	Publish([]Capture) error
 	ProtectCapture(name string, value json.RawMessage)
+	ProtectValue(string)
 	Sanitize(string) string
 }
 
@@ -47,6 +48,11 @@ func (c *Context) lookup(name string) (variable, bool) {
 	}
 	v, ok := c.captures[name]
 	return v, ok
+}
+
+// ProtectValue registers sensitive response metadata for this execution only.
+func (c *Context) ProtectValue(value string) {
+	c.protected = append(c.protected, SecretVariants(value)...)
 }
 
 // ProtectCapture remembers a discovered secret even if another declaration fails.

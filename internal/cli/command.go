@@ -92,6 +92,8 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
 	case runner.Unvalidated, runner.Wildcard:
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
+	case runner.HeaderMismatch:
+		line += ": " + headerDiagnostic(entry.HeaderFailure)
 	case runner.CaptureFailed:
 		if entry.Entry.ExpectedStatus != nil {
 			line += fmt.Sprintf(" (status validado: esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
@@ -105,8 +107,11 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed {
+	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch {
 		pos := entry.Entry.Position
+		if entry.HeaderFailure != nil {
+			pos = entry.HeaderFailure.Position
+		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
 	if _, err := io.WriteString(c.out, line+"\n"); err != nil {
@@ -139,6 +144,14 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 	}
 	if result.Diverged {
 		entry := result.Entries[len(result.Entries)-1]
+		if entry.HeaderFailure != nil {
+			failure := entry.HeaderFailure
+			pos := failure.Position
+			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure)); err != nil {
+				return 2
+			}
+			return 1
+		}
 		pos := entry.Entry.ExpectedPosition
 		if _, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status); err != nil {
 			return 2
@@ -146,6 +159,18 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 		return 1
 	}
 	return 0
+}
+
+func headerDiagnostic(failure *runner.HeaderFailure) string {
+	actual := "ausente"
+	if failure.Present {
+		actual = fmt.Sprintf("%q", failure.Actual)
+	}
+	expected := fmt.Sprintf("%q", failure.Expected)
+	if failure.Operator == "exists" {
+		expected = "presente"
+	}
+	return fmt.Sprintf("assertion header %q %s: esperado %s, recebido %s", failure.Name, failure.Operator, expected, actual)
 }
 
 func displayURL(raw string) string {
