@@ -14,7 +14,6 @@ import (
 	"capimgrosso.com/httpgo/internal/config"
 	"capimgrosso.com/httpgo/internal/parser"
 	"capimgrosso.com/httpgo/internal/runner"
-	"capimgrosso.com/httpgo/internal/template"
 	"capimgrosso.com/httpgo/internal/transport"
 )
 
@@ -53,20 +52,21 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if (len(c.args) == 1 && c.args[0] == "--help") || (len(c.args) == 2 && c.args[0] == "test" && c.args[1] == "--help") {
 		return c.writeText(help())
 	}
-	args, err := parseArguments(c.args)
-	if err != nil {
-		return c.fail(err.Error())
-	}
-	settings, err := config.Load(ctx, args.config)
-	if err != nil {
-		return c.fail(err.Error())
-	}
-	renderer, err := template.New(append(settings.Assignments(), args.variables...), append(settings.Secrets, args.secrets...))
-	if err != nil {
-		return c.fail(err.Error())
-	}
+	args, argumentErr := parseArguments(c.args)
+	settings, loadErr := config.Load(ctx, args.config)
 	initial := c.protection.initial
-	c.protection.initial = func(text string) string { return initial(renderer.Sanitize(text)) }
+	configured := settings.Protection(args.variables, args.secrets)
+	c.protection.initial = func(text string) string { return initial(configured(text)) }
+	if argumentErr != nil {
+		return c.fail(argumentErr.Error())
+	}
+	if loadErr != nil {
+		return c.fail(loadErr.Error())
+	}
+	renderer, err := settings.Compose(args.variables, args.secrets)
+	if err != nil {
+		return c.fail(err.Error())
+	}
 	if err := ctx.Err(); err != nil {
 		return c.fail("execução cancelada antes da leitura do cenário")
 	}

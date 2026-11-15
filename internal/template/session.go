@@ -40,7 +40,7 @@ func NamesConflict(a, b string) bool {
 
 // NewSession shares immutable initial values and secret declarations only.
 func (c *Context) NewSession() Session {
-	return &Context{values: c.values, secrets: c.secrets, captures: make(map[string]variable)}
+	return &Context{values: c.values, secrets: c.secrets, captures: make(map[string]variable), protected: append([]string(nil), c.protected...)}
 }
 
 func (c *Context) lookup(name string) (variable, bool) {
