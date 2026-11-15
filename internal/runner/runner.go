@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/parser"
@@ -15,6 +16,7 @@ import (
 )
 
 type Request struct {
+	Timeout    time.Duration // Zero uses the executor's default; one budget for all redirects and response I/O.
 	Multipart  *MultipartBody
 	Method     string
 	URL        string
@@ -117,6 +119,7 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 
 // Options applies to one execution only. The zero value preserves external bytes.
 type Options struct {
+	Timeout     time.Duration // Zero preserves the default ten-second transport policy.
 	RenderFiles bool
 }
 
@@ -234,6 +237,7 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 			result.Err, result.ErrorPosition = err, entry.Position
 			return result
 		}
+		request.Timeout = options.Timeout
 		result.Summary.Started++
 		result.Summary.NotStarted--
 		response, err := r.executor.Execute(ctx, request)

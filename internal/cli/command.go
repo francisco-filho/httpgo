@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"capimgrosso.com/httpgo/internal/config"
 	"capimgrosso.com/httpgo/internal/parser"
@@ -26,6 +27,7 @@ type Command struct {
 	in         io.Reader
 	out, err   io.Writer
 	protection *executionProtection
+	timeout    time.Duration
 }
 
 func NewRootCommand(executor runner.HTTPExecutor, build BuildInfo) *Command {
@@ -70,6 +72,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if err := ctx.Err(); err != nil {
 		return c.fail("execução cancelada antes da leitura do cenário")
 	}
+	c.timeout = settings.Timeout
 	file := args.file
 	absolute, err := filepath.Abs(file)
 	if err != nil {
@@ -93,7 +96,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
 	scenario.OriginDir = filepath.Dir(absolute)
-	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).RunWithOptions(ctx, scenario, runner.Options{RenderFiles: args.renderFiles})
+	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).RunWithOptions(ctx, scenario, runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout})
 	return c.renderSummary(scenario, result)
 }
 
@@ -157,7 +160,7 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 	}
 	if result.Err != nil {
 		pos := result.ErrorPosition
-		diagnostic := transportDiagnostic(result.Err)
+		diagnostic := transportDiagnostic(result.Err, c.timeout)
 		var fileErr *runner.FileError
 		if errors.As(result.Err, &fileErr) {
 			diagnostic = fileErr.Error()
@@ -242,12 +245,12 @@ func displayURL(raw string) string {
 	return text
 }
 
-func transportDiagnostic(err error) string {
+func transportDiagnostic(err error, timeout time.Duration) string {
 	switch {
 	case errors.Is(err, context.Canceled):
 		return "requisição cancelada"
 	case errors.Is(err, context.DeadlineExceeded):
-		return "timeout da requisição (limite total de 10 segundos)"
+		return fmt.Sprintf("timeout da requisição (limite total de %g segundos)", timeout.Seconds())
 	default:
 		var safe *transport.Error
 		if errors.As(err, &safe) {
