@@ -30,6 +30,7 @@ type HTTPExecutor interface {
 type Outcome string
 
 const (
+	Wildcard      Outcome = "status aceito por HTTP *"
 	Unvalidated   Outcome = "sem validação de status"
 	Passed        Outcome = "status validado"
 	Mismatch      Outcome = "status divergente"
@@ -122,6 +123,9 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 			result.Summary.Completed++
 			if entry.ExpectedStatus == nil {
 				current.Outcome = Unvalidated
+				if entry.AnyStatus {
+					current.Outcome = Wildcard
+				}
 				result.Summary.WithoutValidation++
 			} else if assertion.Status(*entry.ExpectedStatus, response.Status) {
 				current.Outcome = Passed

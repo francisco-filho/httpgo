@@ -41,6 +41,7 @@ type Entry struct {
 	BodyPlan         template.JSONPlan
 	Position         Position
 	ExpectedStatus   *int
+	AnyStatus        bool
 	ExpectedPosition Position
 	URLPosition      Position
 	HeaderPositions  []Position
@@ -146,8 +147,12 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			if len(fields) != 2 {
 				return fail("sintaxe inválida", "HTTP exige somente um status de três dígitos")
 			}
-			if entry == nil || entry.ExpectedStatus != nil || captures {
+			if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures {
 				return fail("sintaxe inválida", "expectativa HTTP sem requisição disponível")
+			}
+			if fields[1] == "*" {
+				entry.AnyStatus, entry.ExpectedPosition = true, pos
+				break
 			}
 			status, err := strconv.Atoi(fields[1])
 			if err != nil || len(fields[1]) != 3 || fields[1][0] < '1' || fields[1][0] > '5' || status < 100 || status > 599 {
@@ -167,7 +172,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				break
 			}
 			if isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
-				if entry == nil || entry.ExpectedStatus != nil || entry.Body != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil {
 					return fail("sintaxe inválida", "body JSON sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -205,7 +210,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				continue
 			}
 			if strings.Contains(text, ":") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.Body != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil {
 					return fail("sintaxe inválida", "header fora da requisição ou após body")
 				}
 				name, value, _ := strings.Cut(text, ":")

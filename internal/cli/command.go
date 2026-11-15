@@ -90,11 +90,13 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	switch entry.Outcome {
 	case runner.Passed, runner.Mismatch:
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
-	case runner.Unvalidated:
+	case runner.Unvalidated, runner.Wildcard:
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
 	case runner.CaptureFailed:
 		if entry.Entry.ExpectedStatus != nil {
 			line += fmt.Sprintf(" (status validado: esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
+		} else if entry.Entry.AnyStatus {
+			line += fmt.Sprintf(" (HTTP *, recebido %d)", entry.Status)
 		} else {
 			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
 		}
