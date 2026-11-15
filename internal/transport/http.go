@@ -11,10 +11,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"capimgrosso.com/httpgo/internal/query"
 	"capimgrosso.com/httpgo/internal/runner"
 )
 
@@ -108,7 +110,20 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 			return runner.Response{}, classify(ctx, Network, ctx.Err())
 		}
 		if final {
-			return runner.Response{Status: response.StatusCode, Body: retained}, nil
+			// net/http canonicalizes wire names and appends occurrences in order.
+			// Sort distinct names only; never reorder values or split commas.
+			keys := make([]string, 0, len(response.Header))
+			for name := range response.Header {
+				keys = append(keys, name)
+			}
+			slices.Sort(keys)
+			var headers []query.HeaderValue
+			for _, name := range keys {
+				for _, value := range response.Header[name] {
+					headers = append(headers, query.HeaderValue{Name: name, Value: value})
+				}
+			}
+			return runner.Response{Status: response.StatusCode, Body: retained, Headers: headers}, nil
 		}
 		next, err := response.Location()
 		if err != nil {

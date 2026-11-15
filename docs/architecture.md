@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-06
+# Arquitetura implementada — US-01 a US-07
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05) e #16 (US-06),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06) e #18 (US-07),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -10,13 +10,14 @@ copiar, adaptar ou traduzir código-fonte Hurl.
 ```text
 cmd/httpgo/main.go
   → internal/cli/command.go + arguments.go (flags/contexto novo e proteção)
-    → internal/parser/parser.go + capture.go (arquivo inteiro e capturas)
+    → internal/parser/parser.go + capture.go + assertion.go (arquivo inteiro)
       → internal/query/jsonpath.go (validar consultas antes da rede)
     → internal/runner/runner.go + render.go (somente cenário validado)
       → internal/template/template.go + json.go (valores tipados, texto/JSON contextual)
       → parser.ValidateURL/ValidateHeader e validação JSON final
       → internal/transport/http.go (via HTTPExecutor)
-      → internal/assertion/status.go
+      → internal/assertion/status.go (somente expectativa numérica)
+      → internal/query/header.go + internal/assertion/header.go (antes de capturas)
       → internal/query/jsonpath.go (selecionar JSON da resposta final)
       → internal/runner/capture.go (serializar seleção JSON sem float64)
       → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
@@ -31,8 +32,8 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 
 | Pacote/tipos | Responsabilidade |
 |---|---|
-| `parser.Position`, `Header`, `Capture`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, body, capturas e posições de declaração/consulta; estados de requisição, expectativa e capturas; validação completa sem cenário parcial |
-| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`) e RetainBody; Response retorna Status e Body final retido somente quando solicitado |
+| `parser.Position`, `Header`, `HeaderAssertion`, `Capture`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, body, capturas e posições de declaração/consulta; estados de requisição, expectativa e capturas; validação completa sem cenário parcial |
+| `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`) e RetainBody; Response retorna Status, Headers (`[]query.HeaderValue`, ocorrências ordenadas) e Body final retido somente quando solicitado |
 | `runner.Runner`, `EntryResult`, `Outcome`, `Summary`, `Result` | Ordem, contexto antes de cada chamada, comparação delegada e interrupção; resultado estruturado e notificação síncrona por entrada, sem escrever em streams nem chamar os.Exit |
 | `template.Context`, `Text`, `Reference`, `Error` | Contexto tipado isolado, nomes exatos/conflitos, offsets, substituição não recursiva e proveniência; não importa parser/runner/CLI/transporte |
 | `template.JSONPlan`, `JSONReference` | Reconhecimento de strings/escapes/valores e chaves estáticas, referências com intervalos originais, limite exato do body; compartilhado por parser e renderer |
@@ -40,7 +41,9 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 | `runner.Renderer`, `RenderError`, `CaptureError` | Factory consumer-owned `NewSession() template.Session` por Run; erros pré-envio e de captura com categorias/origens distintas; clones preservam cenário |
 | `template.Session`, `Capture`, `ConflictError`, `CaptureValueError` | Renderização e publicação atômica de JSON validado (`Capture.Value` é `json.RawMessage`); erro de payload/conflito indexa o lote sem expor conteúdo; variáveis iniciais imutáveis, cópia dos valores, capturas separadas e proteção dos valores descobertos |
 | `query.Path`, `query.Error` | Pacote folha sem interface: validar JSONPath limitado e selecionar valor com `UseNumber`, distinguindo ausência de null; valores JSON de qualquer tipo e números exatos |
-| `assertion.Status` | Somente igualdade esperado/recebido; não conhece runner, HTTP ou apresentação |
+| `query.HeaderValue`, `query.Header` | Ocorrências nome/valor sem net/http; seleção pura da primeira, com presença distinta de vazio e nome case-insensitive |
+| `assertion.Status`, `HeaderOperator`, `assertion.Header` | Igualdade numérica e comparação literal de headers (`==`, `contains`, `exists`); não conhece runner, HTTP ou apresentação |
+| `runner.HeaderFailure` | Falha de assertion localizada com nome/operador, esperado/recebido já sanitizados e presença explícita; sem coleção bruta |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `cli.Command`, `BuildInfo` | Argumentos e streams (`SetArgs/SetIn/SetOut/SetErr`), leitura/fechamento antes da rede, saída segura, resumo e exit code; não reavalia assertion |
 | `main.run` | Monta dependências, `signal.NotifyContext`, streams do processo; seus defers terminam antes do único os.Exit de produção em main |
@@ -133,7 +136,8 @@ O parser reconhece `[Captures]`, conserva `Capture.Position`/`QueryPosition` e u
 da resposta da entrada executada.
 
 `runner.Request.RetainBody` é verdadeiro apenas em entradas com capturas.
-Após transporte concluído, runner compara status antes de chamar `captureResponse`.
+Após transporte concluído, runner compara status numérico e depois headers antes
+de chamar `captureResponse`, independentemente da ordem das seções.
 Divergência prevalece sobre JSON inválido. Sem expectativa, qualquer status permite
 capturar sem inventar assertion. `query.Path.Select` devolve valor/found/erro seguro;
 `null` difere de ausência, e números não passam por float64. O runner serializa
@@ -166,6 +170,47 @@ arrays/objetos, sem disponibilizar propriedades como variáveis. A proteção ta
 precede falha de publicação/conflito; vazio não corrompe a saída. Não há confusão
 entre string capturada e literal CLI. Não há nova fonte de credenciais iniciais nem detecção
 universal de segredos ainda desconhecidos.
+
+## Headers e expectativa curinga — US-07
+
+`Entry.ExpectedStatus` não nulo representa comparação numérica; `Entry.AnyStatus`
+representa `HTTP *`; ambos ausentes mantêm execução sem expectativa. O parser
+rejeita duplicações e `[Asserts]` sem qualquer declaração HTTP. Estados explícitos
+permitem transições `[Captures]` ↔ `[Asserts]`, mantendo posições e rejeitando
+seções vazias/duplicadas. `parser.HeaderAssertion` contém nome, operador, esperado
+literal e `Position`; o renderer nunca recebe esse esperado como template.
+
+`transport` converte somente os headers finais após consumir/fechar todo o body.
+`net/http` canonicaliza nomes recebidos e mantém a ordem dos valores de cada nome,
+inclusive caixas diferentes no wire. A conversão ordena somente nomes distintos,
+nunca valores; não depende de iteração de mapa para escolher a primeira ocorrência,
+não concatena nem separa vírgulas. `Response.Headers` usa dados Go próprios de
+`query.HeaderValue`, sem expor `net/http.Header`. Assertions não ligam `RetainBody`.
+
+O fluxo é resposta completa → status numérico → `query.Header` → `assertion.Header`
+→ capturas → callback. `HTTP *` produz `Wildcard`, conta em `WithoutValidation`,
+não em `Validated`; continua distinto de `Unvalidated`. Falha de header produz
+`HeaderMismatch`, `Result.Diverged=true` e `HeaderFailure`, não `Result.Err` de
+transporte/captura. A CLI possui ramo próprio, sem acessar status esperado nulo.
+A comparação numérica aprovada continua contada se um header falhar. Nenhuma
+captura é avaliada/publicada após divergência; falha de escrita prevalece com 2.
+
+Antes de renderizar a primeira entrada, a sessão registra os esperados sensíveis;
+antes do callback, registra valores sensíveis de headers enviados/recebidos via
+`Session.ProtectValue`, reutilizando `SecretVariants`/`Protector`. Esses valores
+ficam na proteção local da execução, não como variáveis. `Authorization`,
+`Proxy-Authorization`, `Cookie` e `Set-Cookie` têm esperado/recebido ocultos
+integralmente; headers comuns passam pela proteção de segredos conhecidos.
+`HeaderFailure` é sanitizado antes da formatação/coleção/callback. `safeEntry`
+remove headers/body/BodyPlan da requisição do resultado, clona e sanitiza
+assertions e metadados exibíveis sem mutar o cenário. Os writers existentes da
+CLI também protegem resumos, nomes de arquivo e diagnósticos. Ausência mantém
+representação própria, distinta de string vazia; strings usam quoting seguro.
+Não se cria pacote report, interface, dependência ou mecanismo genérico de predicados.
+
+O diferencial Hurl 8.0.0 classifica três divergências deliberadas: primeira
+ocorrência em vez de lista para repetidos, esperado literal em vez de interpolado
+e headers antes de capturas. Veja os pares `headers_*` em `compatibility.md`.
 
 ## Rede e recursos
 
@@ -210,7 +255,8 @@ os valores/proteções da sessão; não há retenção de resposta em `EntryResu
 Causas sensíveis são preservadas para `errors.Is/As`, mas jamais concatenadas à
 mensagem exibida. A CLI usa categoria controlada ou diagnóstico genérico seguro;
 URL inválida não é renderizada. `displayURL` centraliza remoção de userinfo/query/
-fragmento. Headers e bodies não são apresentados, incluindo em erros, portanto
+fragmento. Coleções de headers e bodies não são apresentadas; somente valores
+comuns sanitizados podem aparecer no diagnóstico de assertion. Valores de
 Authorization/Proxy-Authorization/Cookie/Set-Cookie e credenciais do JSON ficam
 fora de ambos os streams. stdout e stderr têm papéis distintos e falhas de escrita
 geram código 2.
@@ -236,7 +282,7 @@ geram código 2.
   stdout comprova o primeiro resultado já visível enquanto o servidor mantém a
   segunda requisição bloqueada, em sucesso, divergência e body incompleto.
 - `tests/e2e/compatibility_test.go`: alvo explícito com tag `compatibility`, Hurl
-  8.0.0 exigido e 58 pares/observações versionados, incluindo bytes/métodos/headers
+  8.0.0 exigido e 79 pares/observações versionados, incluindo bytes/métodos/headers
   efetivamente recebidos no corpus US-02 e variáveis fornecidas às duas ferramentas
   sem editar cenários nos corpora US-03/US-04 (com RequestURI para verificar encoding).
   `variables_body` muda intencionalmente de rejeição para sucesso; seis novos pares
@@ -246,7 +292,9 @@ geram código 2.
   de expectativa. A US-06 acrescenta oito pares `captures_typed_*` para valores
   completos/raiz, índices, boolean/null, precisão e rejeições textuais; apenas
   `captures_non_string` muda de rejeição para sucesso entre os 50 anteriores.
-  Os outros 49 pares conservam suas observações. Sem skip em versão ausente/errada.
+  Os outros 49 pares conservam suas observações. A US-07 acrescenta 21 pares
+  `headers_*` e respostas de headers repetidos/vazios no harness; os 58 pares
+  anteriores permanecem inalterados. Sem skip em versão ausente/errada.
 
 Saída é deliberadamente sempre plain-text: os testes usam streams, arquivo, pipe e
 PTY real para verificar o contrato, sem criar detector de TTY ou dependência

@@ -90,11 +90,15 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	switch entry.Outcome {
 	case runner.Passed, runner.Mismatch:
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
-	case runner.Unvalidated:
+	case runner.Unvalidated, runner.Wildcard:
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
+	case runner.HeaderMismatch:
+		line += ": " + headerDiagnostic(entry.HeaderFailure)
 	case runner.CaptureFailed:
 		if entry.Entry.ExpectedStatus != nil {
 			line += fmt.Sprintf(" (status validado: esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
+		} else if entry.Entry.AnyStatus {
+			line += fmt.Sprintf(" (HTTP *, recebido %d)", entry.Status)
 		} else {
 			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
 		}
@@ -103,8 +107,11 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed {
+	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch {
 		pos := entry.Entry.Position
+		if entry.HeaderFailure != nil {
+			pos = entry.HeaderFailure.Position
+		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
 	if _, err := io.WriteString(c.out, line+"\n"); err != nil {
@@ -137,6 +144,14 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 	}
 	if result.Diverged {
 		entry := result.Entries[len(result.Entries)-1]
+		if entry.HeaderFailure != nil {
+			failure := entry.HeaderFailure
+			pos := failure.Position
+			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure)); err != nil {
+				return 2
+			}
+			return 1
+		}
 		pos := entry.Entry.ExpectedPosition
 		if _, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status); err != nil {
 			return 2
@@ -144,6 +159,18 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 		return 1
 	}
 	return 0
+}
+
+func headerDiagnostic(failure *runner.HeaderFailure) string {
+	actual := "ausente"
+	if failure.Present {
+		actual = fmt.Sprintf("%q", failure.Actual)
+	}
+	expected := fmt.Sprintf("%q", failure.Expected)
+	if failure.Operator == "exists" {
+		expected = "presente"
+	}
+	return fmt.Sprintf("assertion header %q %s: esperado %s, recebido %s", failure.Name, failure.Operator, expected, actual)
 }
 
 func displayURL(raw string) string {
@@ -189,7 +216,7 @@ func (c *Command) fail(message string) int {
 }
 
 func help() string {
-	return `httpgo — executa requisições HTTP e valida status
+	return `httpgo — executa requisições HTTP e valida status e headers
 
 Uso:
   httpgo test <arquivo> [--var nome=valor] [--secret nome]
@@ -214,14 +241,40 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
 Headers e um valor JSON inline são opcionais; JSON estático preserva seus bytes.
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
-status é aceito e informado como sem validação. A primeira falha interrompe.
+status é aceito e informado como sem validação. HTTP * aceita qualquer status,
+inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
+e conta em sem_validação, não em validadas. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
 Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
-Códigos: 0 sucesso, 1 status divergente, 2 entrada/captura/renderização/transporte/cancelamento/saída.
+Códigos: 0 sucesso, 1 status ou assertion de header divergente,
+2 entrada/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
-Valores de headers e bodies não são impressos, nem em erros de entrada.
+Bodies e coleções de headers não são impressos, nem em erros de entrada.
+Valores comuns sanitizados podem aparecer no diagnóstico de assertion.
+
+Assertions de headers: salve health.hurl e execute httpgo test health.hurl
+(requer resposta com Content-Type application/json e X-Request-Id req-123):
+  GET http://localhost:8080/health
+  HTTP 200
+  [Asserts]
+  header "Content-Type" contains "application/json"
+  header "X-Request-Id" exists
+  header "X-Request-Id" == "req-123"
+[Asserts] exige HTTP numérico ou HTTP *. Nomes ignoram caixa; valores não.
+Somente primeira ocorrência; não concatena nem separa vírgulas.
+Ausente falha nos três operadores; vazio existe e satisfaz == "".
+contains "" passa para qualquer valor presente, inclusive vazio.
+Esperados são strings literais: {{nome}} não interpola, mesmo se definido.
+Sem regex, filtros, captura de headers, assertions JSON ou outros operadores.
+Ordem: resposta consumida/fechada, status, headers, capturas, resultado.
+Falha de header retorna 1, não publica capturas e impede próximo envio.
+Diagnóstico localizado distingue ausente de ""; valores de Authorization,
+Proxy-Authorization, Cookie e Set-Cookie são ocultos nos dois lados.
+Segredos conhecidos também são removidos de headers comuns.
+Diferenças Hurl 8.0.0: repetidos usam primeira ocorrência, não lista;
+esperados são literais e assertions antecedem capturas. Veja docs/compatibility.md.
 
 Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
   httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
@@ -272,7 +325,7 @@ Strings como "null" ou "{{literal}}" permanecem strings, sem reinterpretação.
 Array/objeto exige valor JSON completo: URL, header ou string JSON gera erro antes do envio.
 JSON inválido, campo ausente ou índice fora do array geram erro de captura;
 null é valor existente e válido. Objetos não criam variáveis para suas propriedades.
-Status divergente impede capturas e próximos envios. Capturas não sobrescrevem
+Status ou header divergente impede capturas e próximos envios. Capturas não sobrescrevem
 variáveis iniciais nem capturas anteriores; cada execução começa sem capturas.
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas

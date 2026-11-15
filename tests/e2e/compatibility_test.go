@@ -40,12 +40,18 @@ type observation struct {
 	Requests []wireRequest `json:"requests,omitempty"`
 }
 
+type wireHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type comparison struct {
-	ResponseJSON   string      `json:"response_json,omitempty"`
-	Variables      []string    `json:"variables,omitempty"`
-	Classification string      `json:"classification"`
-	HTTPGo         observation `json:"httpgo"`
-	Hurl           observation `json:"hurl"`
+	ResponseHeaders []wireHeader `json:"response_headers,omitempty"`
+	ResponseJSON    string       `json:"response_json,omitempty"`
+	Variables       []string     `json:"variables,omitempty"`
+	Classification  string       `json:"classification"`
+	HTTPGo          observation  `json:"httpgo"`
+	Hurl            observation  `json:"hurl"`
 }
 
 func TestCompatibility(t *testing.T) {
@@ -97,6 +103,9 @@ func TestCompatibility(t *testing.T) {
 				}
 				requests = append(requests, request)
 				mu.Unlock()
+				for _, header := range expected.ResponseHeaders {
+					w.Header().Add(header.Name, header.Value)
+				}
 				switch r.URL.Path {
 				case "/capture":
 					w.Header().Set("Content-Type", "application/json")
@@ -172,7 +181,7 @@ func TestCompatibility(t *testing.T) {
 			if expected.Hurl.Requests == nil {
 				hurlRequests = nil
 			}
-			got := comparison{ResponseJSON: expected.ResponseJSON, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
+			got := comparison{ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {

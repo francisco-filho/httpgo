@@ -1,0 +1,7 @@
+{
+  "response_headers":[{"name":"X-Literal","value":"{{name}}"}],
+  "variables":["name=resolved"],
+  "classification":"intentional difference: expected strings stay literal here even with variable defined; Hurl interpolates and mismatches",
+  "httpgo":{"exit":0,"paths":["/health","/missing"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}

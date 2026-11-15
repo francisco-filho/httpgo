@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Multi","value":""},{"name":"X-Multi","value":"second"}],
+  "classification":"shared: exists accepts repeated header even with empty first value",
+  "httpgo":{"exit":0,"paths":["/health","/missing"]},
+  "hurl":{"exit":0,"paths":["/health","/missing"]}
+}

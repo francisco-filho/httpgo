@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-06 (issues #4, #6, #11, #13, #14 e #16)
+# Subconjunto suportado — US-01 a US-07 (issues #4, #6, #11, #13, #14, #16 e #18)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -8,8 +8,10 @@ Não implica suporte ao formato Hurl completo.
 Um arquivo UTF-8 contém ao menos uma request-line
 `<método> <URL absoluta HTTP/HTTPS>`. Métodos aceitos (em maiúsculas):
 `GET`, `POST`, `PUT`, `PATCH` e `DELETE`, combináveis em sequência.
-A expectativa opcional `HTTP <status>` associa-se à requisição anterior, uma única vez.
-O status tem exatamente três dígitos ASCII, entre 100 e 599.
+A expectativa opcional `HTTP <status>` ou `HTTP *` associa-se à requisição anterior,
+uma única vez. O status numérico tem exatamente três dígitos ASCII, entre 100 e 599.
+`HTTP *` aceita qualquer status recebido, inclusive 4xx/5xx, sem contar como
+comparação numérica aprovada. A saída o distingue de uma expectativa ausente.
 São aceitos espaços/tabs de indentação, linhas vazias, LF/CRLF e comentários em
 linha própria iniciados por `#`. Comentários e linhas vazias não desfazem a
 associação entre requisição e HTTP. A request-line seguinte inicia outra entrada.
@@ -73,8 +75,8 @@ rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
 
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
 sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
-templates em chaves JSON e nomes de headers, `[Asserts]` e seções além de
-`[Captures]`, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
+templates em chaves JSON e nomes de headers, seções além de `[Captures]` e
+`[Asserts]`, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
 não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
@@ -205,7 +207,8 @@ HTTP 200
 presente; também pode existir sem `HTTP`. A seção não pode ser órfã, duplicada
 na entrada ou vazia. Cada declaração tem a forma `nome: jsonpath "consulta"`.
 Comentários em linha própria e LF/CRLF mantêm a associação. A próxima request-line
-encerra a seção. Outras queries, filtros e seções não são aceitos nem ignorados.
+encerra a seção; `[Asserts]` também pode sucedê-la na mesma entrada. Outras queries
+e filtros de captura não são aceitos nem ignorados.
 Nomes seguem a mesma regra ASCII pontuada das variáveis.
 
 O subconjunto de JSONPath aceita `$`, propriedades por ponto e índices decimais
@@ -262,8 +265,9 @@ API que devolva `{"id":9007199254740993}`. O ID chega exato no path e como núme
 no body seguinte; os três status são validados. O cenário autenticado completo
 está em `scenario_capture_auth_products.hurl` e é exercitado pelos E2E.
 
-Após consumir e fechar a resposta, o status esperado é validado **antes** de
-avaliar capturas. Divergência retorna 1 mesmo se a resposta não for JSON; nenhuma
+Após consumir e fechar a resposta, o status numérico e as assertions de headers
+são validados **antes** de avaliar capturas, independentemente da ordem das seções.
+Divergência retorna 1 mesmo se a resposta não for JSON; nenhuma
 captura é publicada e não há próxima requisição. 4xx/5xx esperado corretamente
 permite capturar; sem expectativa, não se presume validação de status.
 
@@ -274,7 +278,7 @@ independentemente do tipo. O lote só fica disponível se todas as consultas,
 valores e nomes passarem. Colisão, captura inválida ou uso antecipado/ausente
 retorna 2 e interrompe as entradas seguintes. Resultados anteriores são preservados.
 Falha de captura mantém a resposta em `concluídas` e o status aprovado em
-`validadas` (ou `sem_validação` sem expectativa), sem classificá-la como transporte.
+`validadas` (ou `sem_validação` sem expectativa/com `HTTP *`), sem classificá-la como transporte.
 
 `--secret nome` pode marcar a captura antes de ela existir, sem fornecer valor.
 Um valor secreto descoberto, de qualquer tipo, é protegido antes de apresentar
@@ -285,6 +289,58 @@ execução, combina-se com a proteção inicial e cobre variantes JSON/Go/URL
 conhecidas e nomes de arquivo em diagnósticos. Vazio não causa substituição global.
 Bodies e valores selecionados nunca entram no relatório/diagnóstico. Nada permite
 identificar universalmente segredos ainda desconhecidos ou recodificações arbitrárias.
+
+## Assertions de headers — US-07 / issue #18
+
+**Ampliação intencional do contrato:** `[Asserts]`, antes rejeitada globalmente,
+aceita somente as três formas abaixo; exige `HTTP <status>` ou `HTTP *` na mesma
+entrada. A seção não pode ser órfã, vazia ou duplicada. Pode aparecer antes/depois
+de `[Captures]`; a ordem de avaliação continua status → headers → capturas.
+
+```hurl
+GET http://localhost:8080/health
+HTTP 200
+[Asserts]
+header "Content-Type" contains "application/json"
+header "X-Request-Id" exists
+header "X-Request-Id" == "req-123"
+```
+
+Execute `httpgo test health.hurl` contra uma API que devolva
+`Content-Type: application/json; charset=utf-8` e `X-Request-Id: req-123`.
+O exemplo está em `testdata/scenarios/scenario_assert_headers.hurl` e é exercitado
+pelo binário nos E2E. Trocar `HTTP 200` por `HTTP *` dispensa somente a comparação
+de status; assertions e capturas continuam obrigatórias quando declaradas.
+
+- Nomes de header são tokens HTTP estáticos entre aspas duplas, consultados sem
+  distinguir caixa. `==` compara a string exata; `contains` procura substring
+  literal; valores distinguem caixa e não recebem normalização adicional além
+  daquela feita pelo transporte HTTP (por exemplo whitespace externo do protocolo).
+- Valores esperados são strings literais entre aspas duplas. `{{nome}}` é texto
+  literal, com ou sem variável/captura definida; não passa pelo renderer.
+  `exists` não aceita valor esperado. Não há regex, filtros, captura de headers,
+  assertions JSON ou outros operadores. Construções fora desse recorte falham
+  explicitamente com posição, antes de qualquer envio do arquivo.
+- Havendo ocorrências repetidas, somente a **primeira na ordem recebida** participa
+  de `==`/`contains`, inclusive se nomes chegam com caixas diferentes. Nunca há
+  concatenação ou divisão por vírgulas: `first,second` é uma única string.
+- Ausência faz os três operadores falharem. Presente vazio satisfaz `exists` e
+  `== ""`; `contains ""` passa para qualquer valor presente, inclusive vazio.
+- A primeira falha interrompe a sequência com código 1, não avalia nem publica
+  capturas dessa resposta e mantém os resultados anteriores. Um status numérico
+  divergente impede ambas as etapas. Falha de transporte, consumo/fechamento do
+  body ou escrita continua retornando 2, nunca aprovação parcial pelos headers.
+- O diagnóstico localiza a declaração, identifica header/operador e esperado/
+  recebido. `ausente` difere de `""`. Strings comuns usam quoting seguro; valores
+  de `Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` são ocultos
+  integralmente nos dois lados, independentemente da caixa ou origem literal.
+  Segredos conhecidos também são removidos dos headers comuns antes do callback
+  e da escrita. Nenhuma coleção de headers ou body bruto fica no relatório.
+
+Compatibilidade comprovada é limitada aos pares `headers_*` em `compatibility.md`.
+**Diferenças deliberadas em relação ao Hurl 8.0.0:** primeira ocorrência em vez de
+lista em headers repetidos; esperado literal em vez de interpolado; assertions
+antes de capturas. Não se anuncia equivalência nessas combinações.
 
 ## Execução HTTP
 
@@ -311,7 +367,8 @@ identificar universalmente segredos ainda desconhecidos ou recodificações arbi
   Resposta incompleta, erro de leitura/fechamento ou timeout no body não aprova
   a expectativa só porque os headers já chegaram. Não há body em relatório.
 - Sem expectativa, inclusive 4xx/5xx é sucesso **sem validação de status**.
-  Com expectativa, a comparação é de igualdade com o status final recebido.
+  Com expectativa numérica, compara-se igualdade com o status final recebido.
+  `HTTP *` aceita esse status sem comparação numérica, mas não ignora assertions/capturas.
 - Divergência, falha de captura/renderização/transporte ou cancelamento interrompe as próximas entradas.
   Ctrl+C cancela a requisição em andamento. Evidência de sinal real: Linux;
   macOS/Windows ainda não têm aceite nativo (ver `validation.md`).
@@ -334,11 +391,12 @@ não estão implementados ou anunciados como disponíveis.
 
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
 resultado com o método declarado, URL segura e uma
-classificação: `status validado`, `sem validação de status`, `status divergente`
-ou `erro de transporte`; uma entrada que falha antes do envio recebe
+classificação: `status validado`, `sem validação de status`, `status aceito por HTTP *`,
+`status divergente`, `assertion de header divergente` ou `erro de transporte`; uma entrada que falha antes do envio recebe
 `erro de renderização`. Em sucesso, inclusive sem expectativa, a linha começa
 diretamente com o método, sem prefixo de arquivo/linha/coluna. Apenas divergências
-e erros de transporte/renderização/captura incluem esse prefixo. Divergências mostram esperado e
+e erros de transporte/renderização/captura/headers incluem esse prefixo. A falha de
+header aponta à declaração da assertion. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status. `erro de captura` mostra o status
 real concluído e se ele foi validado; o diagnóstico em stderr localiza a declaração/consulta.
 
@@ -366,7 +424,8 @@ O resumo em stdout informa:
 - `iniciadas`: chamadas ao executor — **não comprova recebimento pelo servidor**;
 - `concluídas`: respostas totalmente consumidas/fechadas, inclusive divergentes;
 - `validadas`: comparações de status aprovadas;
-- `sem_validação`: respostas concluídas sem expectativa;
+- `sem_validação`: respostas concluídas sem comparação numérica (sem expectativa ou `HTTP *`);
+  a linha individual distingue esses dois casos. Não significa que headers não foram avaliados;
 - `não_iniciadas`: entradas não iniciadas por interrupção.
 
 Erros de entrada anteriores ao runner não apresentam resumo de execução.
@@ -376,7 +435,7 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 | Exit code | Significado |
 |---|---|
 | 0 | todas as entradas concluídas sem divergência; inclui sem expectativa |
-| 1 | primeira divergência de status |
+| 1 | primeira divergência de status ou assertion de header |
 | 2 | uso, arquivo, parsing, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
@@ -403,9 +462,10 @@ query continuam disponíveis para a requisição. URL inválida recebe diagnóst
 controlado sem expor o token malformado. O caminho do arquivo é exibido com
 quoting para escapar caracteres de controle.
 
-Nenhum valor de header é apresentado, incluindo `Authorization`,
-`Proxy-Authorization`, `Cookie` e `Set-Cookie`, independentemente da caixa do nome.
-Bodies de requisição/resposta também não são impressos. JSON/header malformado
+Valores de headers comuns podem aparecer **somente** no diagnóstico de assertion,
+com quoting e sanitização. Valores de `Authorization`, `Proxy-Authorization`,
+`Cookie` e `Set-Cookie` nunca são apresentados, independentemente da caixa do nome,
+nem mesmo quando esperados literais. Bodies de requisição/resposta não são impressos. JSON/header malformado
 recebe diagnóstico controlado com arquivo/linha/coluna, sem ecoar entrada ou erro
 bruto do decoder/transporte. Isso evita vazamento também de credenciais em bodies.
 
@@ -417,8 +477,8 @@ e falhas de escrita. Declarações são consolidadas independentemente da ordem 
 flags. Formas brutas, strings JSON decodificadas e variantes conhecidas de escape
 JSON/Go/URL são protegidas também antes da construção do contexto. Constituintes
 de objetos/arrays secretos são protegidos sem disponibilizá-los como variáveis.
-Valores vazios não provocam substituição global. Headers/bodies permanecem ausentes
-das saídas; não é gerado body de diagnóstico. Codificações arbitrárias desconhecidas
+Valores vazios não provocam substituição global. Coleções de headers e bodies
+permanecem ausentes das saídas; não é gerado body de diagnóstico. Codificações arbitrárias desconhecidas
 não têm garantia de detecção.
 
 **O restante do path permanece visível: não coloque segredos arbitrários nele.** Não é possível
@@ -454,6 +514,10 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
   expectativa. Em valor JSON completo pode reinterpretar texto capturado
   (`"null"` vira null); aqui permanece string. Veja `captures_*`, inclusive
   URI, headers e bytes JSON efetivamente recebidos pela API.
+- Headers repetidos são listas no Hurl 8.0.0; aqui usa-se somente a primeira
+  ocorrência. Com uma ocorrência, caixa/ausência/vazio/vírgula e os operadores
+  têm equivalência observada. Hurl interpola o esperado e avalia capturas antes
+  das assertions; aqui o esperado é literal e headers antecedem capturas.
 - Configuração YAML hierárquica e interpolação externa, quando implementadas,
   serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
 

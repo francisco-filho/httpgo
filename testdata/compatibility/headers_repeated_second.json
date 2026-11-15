@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Multi","value":"first"},{"name":"X-Multi","value":"second"}],
+  "classification":"both fail with different value semantics: HTTPGo compares first occurrence; Hurl compares a list to a string",
+  "httpgo":{"exit":1,"paths":["/health"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}

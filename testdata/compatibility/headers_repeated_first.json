@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Multi","value":"first,whole"},{"name":"x-multi","value":"second"}],
+  "classification":"intentional difference: HTTPGo compares first occurrence; Hurl returns a list and fails scalar equality/substring",
+  "httpgo":{"exit":0,"paths":["/health","/missing"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}

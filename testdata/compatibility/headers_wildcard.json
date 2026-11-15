@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Test","value":"value"}],
+  "classification":"shared: wildcard accepts 200/404/503 while still evaluating assertions",
+  "httpgo":{"exit":0,"paths":["/health","/missing","/unavailable"]},
+  "hurl":{"exit":0,"paths":["/health","/missing","/unavailable"]}
+}

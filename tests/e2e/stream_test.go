@@ -29,6 +29,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			secondStarted, releaseSecond := make(chan struct{}), make(chan struct{})
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/first" {
+					w.Header().Set("X-Ready", "yes")
 					w.WriteHeader(200)
 					_, _ = io.WriteString(w, `{"token":"stream-token-ficticio"}`)
 					return
@@ -56,7 +57,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}))
 			defer server.Close()
 			address := strings.Replace(server.URL, "http://", "http://username-secret:password-secret@", 1)
-			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/second\nAuthorization: Bearer {{token}}\n{\"typed\":{{payload}}}\nHTTP 404")
+			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\n[Asserts]\nheader \"X-Ready\" == \"yes\"\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/second\nAuthorization: Bearer {{token}}\n{\"typed\":{{payload}}}\nHTTP 404")
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			reader, writer, err := os.Pipe()
@@ -129,7 +130,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}
 			prefix := "POST "
 			if tc.code != 0 {
-				prefix = fmt.Sprintf("%q:5:1: POST ", file)
+				prefix = fmt.Sprintf("%q:7:1: POST ", file)
 			}
 			if !strings.HasPrefix(remaining[0], prefix) {
 				t.Fatalf("second result = %q; want prefix %q", remaining[0], prefix)

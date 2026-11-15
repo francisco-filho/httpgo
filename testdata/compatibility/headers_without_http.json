@@ -1,0 +1,5 @@
+{
+  "classification":"shared: assertions require HTTP expectation; whole file rejected before first send",
+  "httpgo":{"exit":2,"paths":null},
+  "hurl":{"exit":2,"paths":null}
+}

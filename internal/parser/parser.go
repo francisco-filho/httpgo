@@ -32,6 +32,7 @@ type Capture struct {
 }
 
 type Entry struct {
+	Assertions       []HeaderAssertion
 	Captures         []Capture
 	Method           string
 	URL              string
@@ -41,6 +42,7 @@ type Entry struct {
 	BodyPlan         template.JSONPlan
 	Position         Position
 	ExpectedStatus   *int
+	AnyStatus        bool
 	ExpectedPosition Position
 	URLPosition      Position
 	HeaderPositions  []Position
@@ -70,8 +72,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "erro de leitura", Detail: "não foi possível ler o arquivo", cause: err}
 	}
 	scenario := Scenario{File: file}
-	captures := false
-	var capturesPosition Position
+	captures, asserts := false, false
+	capturesSeen, assertsSeen := false, false
+	var capturesPosition, assertsPosition Position
 	for offset := 0; offset < len(data); {
 		end := bytes.IndexByte(data[offset:], '\n')
 		if end < 0 {
@@ -101,20 +104,31 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		if len(scenario.Entries) > 0 {
 			entry = &scenario.Entries[len(scenario.Entries)-1]
 		}
-		if captures && (fields[0] == "GET" || fields[0] == "POST" || fields[0] == "PUT" || fields[0] == "PATCH" || fields[0] == "DELETE") {
-			if len(entry.Captures) == 0 {
+		boundary := fields[0] == "GET" || fields[0] == "POST" || fields[0] == "PUT" || fields[0] == "PATCH" || fields[0] == "DELETE" || strings.HasPrefix(fields[0], "[")
+		if boundary {
+			if captures && len(entry.Captures) == 0 {
 				pos = capturesPosition
 				return fail("sintaxe inválida", "seção de capturas vazia")
 			}
-			captures = false
+			if asserts && len(entry.Assertions) == 0 {
+				pos = assertsPosition
+				return fail("sintaxe inválida", "seção de assertions vazia")
+			}
+			captures, asserts = false, false
 		}
 		switch fields[0] {
+		case "[Asserts]":
+			if entry == nil || assertsSeen || len(fields) != 1 || (entry.ExpectedStatus == nil && !entry.AnyStatus) {
+				return fail("sintaxe inválida", "seção de assertions exige resposta HTTP e não pode ser duplicada")
+			}
+			asserts, assertsSeen, assertsPosition = true, true, pos
 		case "[Captures]":
-			if entry == nil || captures || len(fields) != 1 {
+			if entry == nil || capturesSeen || len(fields) != 1 {
 				return fail("sintaxe inválida", "seção de capturas sem resposta disponível ou duplicada")
 			}
-			captures, capturesPosition = true, pos
+			captures, capturesSeen, capturesPosition = true, true, pos
 		case "GET", "POST", "PUT", "PATCH", "DELETE":
+			capturesSeen, assertsSeen = false, false
 			token := strings.TrimLeft(text[len(fields[0]):], " \t")
 			urlPos := pos
 			urlPos.Column += len(text) - len(token)
@@ -146,8 +160,12 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			if len(fields) != 2 {
 				return fail("sintaxe inválida", "HTTP exige somente um status de três dígitos")
 			}
-			if entry == nil || entry.ExpectedStatus != nil || captures {
+			if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures || asserts || capturesSeen {
 				return fail("sintaxe inválida", "expectativa HTTP sem requisição disponível")
+			}
+			if fields[1] == "*" {
+				entry.AnyStatus, entry.ExpectedPosition = true, pos
+				break
 			}
 			status, err := strconv.Atoi(fields[1])
 			if err != nil || len(fields[1]) != 3 || fields[1][0] < '1' || fields[1][0] > '5' || status < 100 || status > 599 {
@@ -158,6 +176,14 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			if construction := unsupported(fields[0]); construction != "" {
 				return fail("construção não suportada", construction)
 			}
+			if asserts {
+				declaration, err := parseAssertion(text, pos)
+				if err != nil {
+					return Scenario{}, err
+				}
+				entry.Assertions = append(entry.Assertions, declaration)
+				break
+			}
 			if captures {
 				capture, err := parseCapture(text, pos)
 				if err != nil {
@@ -167,7 +193,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				break
 			}
 			if isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
-				if entry == nil || entry.ExpectedStatus != nil || entry.Body != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil {
 					return fail("sintaxe inválida", "body JSON sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -205,7 +231,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				continue
 			}
 			if strings.Contains(text, ":") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.Body != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil {
 					return fail("sintaxe inválida", "header fora da requisição ou após body")
 				}
 				name, value, _ := strings.Cut(text, ":")
@@ -246,6 +272,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			}
 		}
 		offset = end + 1
+	}
+	if asserts && len(scenario.Entries[len(scenario.Entries)-1].Assertions) == 0 {
+		return Scenario{}, &Error{Position: assertsPosition, Category: "sintaxe inválida", Detail: "seção de assertions vazia"}
 	}
 	if captures && len(scenario.Entries[len(scenario.Entries)-1].Captures) == 0 {
 		return Scenario{}, &Error{Position: capturesPosition, Category: "sintaxe inválida", Detail: "seção de capturas vazia"}
@@ -301,7 +330,7 @@ func unsupported(token string) string {
 	switch token {
 	case "HEAD", "OPTIONS", "CONNECT", "TRACE":
 		return "método " + token
-	case "[Asserts]", "[Options]", "[QueryStringParams]", "[FormParams]", "[MultipartFormData]", "[Cookies]", "[BasicAuth]":
+	case "[Options]", "[QueryStringParams]", "[FormParams]", "[MultipartFormData]", "[Cookies]", "[BasicAuth]":
 		return "seção " + token
 	default:
 		switch {

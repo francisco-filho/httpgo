@@ -269,6 +269,7 @@ func TestPublicTimeoutIncludesBody(t *testing.T) {
 					next.Add(1)
 					return
 				}
+				w.Header().Set("X-Ready", "yes")
 				if r.URL.Path == "/start" {
 					w.Header().Set("Location", "/body")
 					w.WriteHeader(307)
@@ -285,7 +286,7 @@ func TestPublicTimeoutIncludesBody(t *testing.T) {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 				captures = ""
 			}
-			code, out, stderr := run(t, "test", scenario(t, method+" {{base}}/start"+body+"\nHTTP 200"+captures+"\nDELETE {{base}}/next"), "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
+			code, out, stderr := run(t, "test", scenario(t, method+" {{base}}/start"+body+"\nHTTP *\n[Asserts]\nheader \"X-Ready\" == \"yes\""+captures+"\nDELETE {{base}}/next"), "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
 			if code != 2 || !strings.Contains(stderr, "timeout") || !strings.Contains(out, "concluídas=0") || next.Load() != 0 || time.Since(started) < 10*time.Second {
 				t.Fatalf("code=%d,out=%q,err=%q,next=%d,elapsed=%s", code, out, stderr, next.Load(), time.Since(started))
 			}

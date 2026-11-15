@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Test","value":"first,second"}],
+  "classification":"shared: comma-separated value is not split; exit codes differ",
+  "httpgo":{"exit":1,"paths":["/health"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}

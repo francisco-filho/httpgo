@@ -1,0 +1,6 @@
+{
+  "response_headers":[{"name":"X-Test","value":"value"}],
+  "classification":"shared: equality is case-sensitive and stops sequence; exit codes differ",
+  "httpgo":{"exit":1,"paths":["/health"]},
+  "hurl":{"exit":4,"paths":["/health"]}
+}

@@ -27,6 +27,7 @@ func TestRealCtrlC(t *testing.T) {
 					next.Add(1)
 					return
 				}
+				w.Header().Set("X-Ready", "yes")
 				if method == "GET" {
 					_, _ = io.WriteString(w, `{"token":"`)
 					w.(http.Flusher).Flush()
@@ -40,7 +41,7 @@ func TestRealCtrlC(t *testing.T) {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 				captures = ""
 			}
-			file := scenario(t, method+" {{base}}/wait?token=query-secret"+body+"\nHTTP 200"+captures+"\nDELETE {{base}}/next")
+			file := scenario(t, method+" {{base}}/wait?token=query-secret"+body+"\nHTTP *\n[Asserts]\nheader \"X-Ready\" == \"yes\""+captures+"\nDELETE {{base}}/next")
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")
