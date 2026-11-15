@@ -4,7 +4,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"capimgrosso.com/httpgo/internal/assertion"
@@ -40,6 +39,7 @@ const (
 	Mismatch       Outcome = "status divergente"
 	Failed         Outcome = "erro de transporte"
 	RenderFailed   Outcome = "erro de renderização"
+	FileFailed     Outcome = "erro de arquivo externo"
 	CaptureFailed  Outcome = "erro de captura"
 	HeaderMismatch Outcome = "assertion de header divergente"
 	JSONMismatch   Outcome = "assertion JSON divergente"
@@ -87,6 +87,7 @@ type Runner struct {
 	executor HTTPExecutor
 	report   func(EntryResult) error
 	renderer Renderer
+	readFile func(context.Context, string) ([]byte, error)
 }
 
 // New accepts an optional synchronous reporter, called before the next entry.
@@ -99,7 +100,7 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 	if renderer == nil {
 		renderer, _ = template.New(nil, nil)
 	}
-	return &Runner{executor: executor, renderer: renderer, report: report}
+	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload}
 }
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
@@ -139,9 +140,20 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(scenario.OriginDir, path)
 			}
-			body, err := os.ReadFile(path)
+			body, err := r.readFile(ctx, path)
+			if err == nil {
+				err = ctx.Err()
+			}
 			if err != nil {
-				result.Err, result.ErrorPosition = err, entry.ExternalBody.Position
+				failure := fileFailure(entry.ExternalBody.Position, err)
+				result.Err, result.ErrorPosition = failure, failure.Position
+				current := EntryResult{Entry: safeEntry(session, entry), Outcome: FileFailed, DisplayURL: session.Sanitize(display)}
+				current.Entry.Position = failure.Position
+				current.Entry.Position.File = session.Sanitize(current.Entry.Position.File)
+				result.Entries = append(result.Entries, current)
+				if r.report != nil {
+					result.ReportErr = r.report(current)
+				}
 				return result
 			}
 			request.Body = body

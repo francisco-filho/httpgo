@@ -112,12 +112,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		} else {
 			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
 		}
-	case runner.Failed, runner.RenderFailed:
+	case runner.Failed, runner.RenderFailed, runner.FileFailed:
 		// Headers alone are not a completed response: never invent a status.
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
+	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
@@ -148,6 +148,10 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 	if result.Err != nil {
 		pos := result.ErrorPosition
 		diagnostic := transportDiagnostic(result.Err)
+		var fileErr *runner.FileError
+		if errors.As(result.Err, &fileErr) {
+			diagnostic = fileErr.Error()
+		}
 		var renderErr *runner.RenderError
 		if errors.As(result.Err, &renderErr) {
 			diagnostic = renderErr.Error()

@@ -43,6 +43,40 @@ func TestExternalBodiesByBinary(t *testing.T) {
 	}
 }
 
+func TestExternalReadFailureByBinary(t *testing.T) {
+	for _, mode := range []string{"missing", "directory", "permission"} {
+		t.Run(mode, func(t *testing.T) {
+			var hits atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
+			defer server.Close()
+			file := scenario(t, "GET "+server.URL+"/first\nHTTP 200\nPOST "+server.URL+"/second\nAuthorization: credential-secret\nfile,credential-secret;\nGET "+server.URL+"/last")
+			payload := filepath.Join(filepath.Dir(file), "credential-secret")
+			want := "arquivo inexistente"
+			switch mode {
+			case "directory":
+				if err := os.Mkdir(payload, 0700); err != nil {
+					t.Fatal(err)
+				}
+				want = "diretório"
+			case "permission":
+				if err := os.WriteFile(payload, []byte("payload-secret"), 0000); err != nil {
+					t.Fatal(err)
+				}
+				want = "acesso negado"
+			}
+			code, out, stderr := run(t, "test", file)
+			if code != 2 || hits.Load() != 1 || !strings.Contains(stderr, want) || !strings.Contains(stderr, fmt.Sprintf("%q:5:1:", file)) || !strings.Contains(out, "iniciadas=1 concluídas=1 validadas=1 sem_validação=0 não_iniciadas=2") {
+				t.Fatalf("code=%d hits=%d out=%q err=%q", code, hits.Load(), out, stderr)
+			}
+			for _, secret := range []string{"credential-secret", "payload-secret"} {
+				if strings.Contains(out+stderr, secret) {
+					t.Fatalf("unsafe output=%q", out+stderr)
+				}
+			}
+		})
+	}
+}
+
 func TestMalformedExternalPreventsAllNetwork(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.WriteHeader(200) }))
