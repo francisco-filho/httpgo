@@ -107,7 +107,16 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload}
 }
 
+// Options applies to one execution only. The zero value preserves external bytes.
+type Options struct {
+	RenderFiles bool
+}
+
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
+	return r.RunWithOptions(ctx, scenario, Options{})
+}
+
+func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, options Options) Result {
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
 	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
@@ -164,6 +173,19 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 					result.ReportErr = r.report(current)
 				}
 				return result
+			}
+			if options.RenderFiles {
+				var failure *RenderError
+				body, failure = renderExternal(session, body, entry.ExternalBody.Position)
+				if failure != nil {
+					result.Err, result.ErrorPosition = failure, failure.Position
+					current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
+					result.Entries = append(result.Entries, current)
+					if r.report != nil {
+						result.ReportErr = r.report(current)
+					}
+					return result
+				}
 			}
 			request.Body = body
 		}

@@ -83,7 +83,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
 	scenario.OriginDir = filepath.Dir(absolute)
-	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).Run(ctx, scenario)
+	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).RunWithOptions(ctx, scenario, runner.Options{RenderFiles: args.renderFiles})
 	return c.renderSummary(scenario, result)
 }
 
@@ -263,7 +263,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
-  httpgo test <arquivo> [--var nome=valor] [--secret nome]
+  httpgo test <arquivo> [--render-files] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -297,7 +297,10 @@ Relativos partem do diretório do .hurl, não do diretório corrente; absolutos 
 Sem sandbox: .. e absolutos podem ler fora do projeto, com permissões do usuário.
 Leitura completa e fechamento só na vez da entrada, antes do envio; falha localizada
 retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeitas.
-No body externo completo, Content-Type não é inferido. Sem --render-files ou renderização externa.
+No body externo completo, Content-Type não é inferido. Sem --render-files, bytes literais.
+--render-files: extensão HTTPGo; trata bodies externos completos como templates JSON,
+com as mesmas variáveis/tipos do JSON inline. Não renderiza arquivos multipart.
+Exemplo: httpgo test tests/products.hurl --render-files --var product.name=Pizza --var product.price=45 --var product.active=true
 O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
 
 Upload multipart: salve tests/documents.hurl, crie fixtures/document.pdf e execute
@@ -444,7 +447,7 @@ variáveis iniciais nem capturas anteriores; cada execução começa sem captura
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas
 valores não sigilosos ou fictícios. A proteção não cobre histórico/processos.
-Ambiente do processo, stdin e templates de arquivos externos indisponíveis.
+Ambiente do processo e stdin indisponíveis. Templates externos exigem --render-files.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.
 `

@@ -27,6 +27,17 @@ func renderFailure(pos parser.Position, source string, err error) *RenderError {
 	return &RenderError{Position: pos, Detail: detail, cause: err}
 }
 
+func renderExternal(session template.Session, source []byte, pos parser.Position) ([]byte, *RenderError) {
+	body, err := session.RenderJSON(source)
+	if err != nil {
+		return nil, renderFailure(pos, string(source), err)
+	}
+	if !json.Valid(body) {
+		return nil, &RenderError{Position: pos, Detail: "body JSON renderizado inválido"}
+	}
+	return body, nil
+}
+
 func render(session template.Session, entry parser.Entry) (Request, string, *RenderError) {
 	pos := entry.URLPosition
 	if pos.Line == 0 {
