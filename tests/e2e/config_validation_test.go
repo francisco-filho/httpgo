@@ -50,7 +50,7 @@ func TestConfigInvalidDocumentsNeverSend(t *testing.T) {
 	dir := t.TempDir()
 	file := configFile(t, dir, "static.hurl", "GET "+server.URL+"\nHTTP 200\nGET "+server.URL+"/never\nHTTP 200")
 	for i, source := range []string{
-		"version: [", "variables: {}", "version: 99", "[]", "null", "version: 1\n---\nversion: 1", "version: 1\nversion: 1", "version: 1\nunknown: fake-private", "version: 1\nvariables: []", "version: 1\nvariables: {a: [1, !!str fake-private]}", "version: 1\nvariables: {a: 1, a.child: 2}", "version: 1\nvariables: {a: .inf}", "version: 1\nvariables: {a: 2026-11-15}", "version: 1\nsecrets: [bad-name]", "version: 1\ndefaults: {timeout: 0.0001}", "version: 1\ndefaults: {timeout: 86400.001}", "version: 1\ndefaults: {timeout: '2s'}", "version: 1\nvariables: {a: '${HOME}'}", "#" + strings.Repeat("x", 1048576),
+		"version: [", "variables: {}", "version: 99", "[]", "null", "version: 1\n---\nversion: 1", "version: 1\nversion: 1", "version: 1\nunknown: fake-private", "version: 1\nvariables: []", "version: 1\nvariables: {a: [1, !!str fake-private]}", "version: 1\nvariables: {a: 1, a.child: 2}", "version: 1\nvariables: {a: .inf}", "version: 1\nvariables: {a: 2026-11-15}", "version: 1\nsecrets: [bad-name]", "version: 1\ndefaults: {timeout: 0.0001}", "version: 1\ndefaults: {timeout: 86400.001}", "version: 1\ndefaults: {timeout: '2s'}", "version: 1\nvariables: {a: 'prefix-${HOME}'}", "#" + strings.Repeat("x", 1048576),
 	} {
 		selected := configFile(t, dir, fmt.Sprintf("invalid-%d.yaml", i), source)
 		code, out, stderr := runConfig(t, dir, "test", file, "--config", selected)

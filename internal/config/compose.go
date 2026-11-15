@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -11,6 +12,11 @@ import (
 // Compose validates CLI declarations independently, then replaces exact names.
 // It never merges opaque CLI objects or permits ancestor/descendant collisions.
 func (s Settings) Compose(assignments, secrets []string) (*template.Context, error) {
+	resolved, err := s.Resolve(context.Background(), assignments)
+	if err != nil {
+		return nil, err
+	}
+	s = resolved
 	if _, err := template.New(assignments, secrets); err != nil {
 		return nil, err
 	}
@@ -59,9 +65,7 @@ func (s Settings) protectedValues(assignments, secrets []string) []string {
 	}
 	var values []string
 	sources := s.sources
-	if len(sources) == 0 {
-		sources = []map[string]json.RawMessage{s.Variables}
-	}
+	sources = append(append([]map[string]json.RawMessage(nil), sources...), s.Variables)
 	for _, source := range sources {
 		for name, value := range source {
 			if marked[name] {

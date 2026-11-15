@@ -56,6 +56,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	args, argumentErr := parseArguments(c.args)
 	settings, loadErr := config.LoadEnvironment(ctx, args.config, args.environment)
+	settings, resolveErr := settings.Resolve(ctx, args.variables)
 	initial := c.protection.initial
 	configured := settings.Protection(args.variables, args.secrets)
 	c.protection.initial = func(text string) string { return initial(configured(text)) }
@@ -64,6 +65,9 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	if loadErr != nil {
 		return c.fail(loadErr.Error())
+	}
+	if resolveErr != nil {
+		return c.fail(resolveErr.Error())
 	}
 	renderer, err := settings.Compose(args.variables, args.secrets)
 	if err != nil {
@@ -497,7 +501,8 @@ sem texto com unidade ou arredondamento. Um orçamento cobre conexão/TLS,
 redirects e consumo da resposta; cada nova requisição recebe seu próprio limite.
 YAML: máximo 1 MiB, documento único, raiz mapa, version: 1 obrigatória.
 Rejeita campos desconhecidos, chaves/caminhos repetidos, conflitos, âncoras,
-aliases, tags explícitas e referências ${NOME}, sem mostrar entrada bruta.
+aliases e tags explícitas, sem mostrar entrada bruta.
+Referências ${NOME} seguem o contrato da extensão US-13 abaixo.
 secrets acumula marcações da base, ambiente e --secret, inclusive para capturas
 futuras e overrides; lista vazia nunca remove proteção de valores anteriores.
 Payloads permanecem relativos ao .hurl, nunca à configuração.
@@ -516,8 +521,34 @@ Mapas combinam profundamente por caminho; escalares, listas e null substituem fo
 sem concatenar listas ou remover null. Trocar mapa de caminhos por valor ou vice-versa
 é erro, inclusive com mapa vazio. Cada fonte é validada antes de aplicar overrides.
 Contexto, timeout e capturas são novos por execução; payloads seguem relativos ao .hurl.
-Ambiente nomeado NÃO é ambiente do processo: ${NOME} continua rejeitado,
-mesmo substituído por CLI. Sem HTTPGO_*, referências de processo ou stdin.
+Ambiente nomeado NÃO é ambiente do processo. Referências explícitas: US-13 abaixo.
+Sem overrides automáticos HTTPGO_* nem entrada de segredos por stdin.
+
+Credenciais pelo ambiente do processo — extensão HTTPGo (US-13):
+Em environments/local.yaml (ou em variables da base com version: 1):
+  variables:
+    auth:
+      token: ${OWNER_TOKEN}
+Em tests/profile.hurl:
+  GET http://localhost:8080/profile
+  Authorization: Bearer {{auth.token}}
+  HTTP 200
+Com OWNER_TOKEN fornecido externamente: httpgo test tests/profile.hurl --env local
+${NOME} ocupa o valor string completo; nome segue [A-Za-z_][A-Za-z0-9_]*.
+Somente folhas de variables: mapas são caminhos; listas/objetos dentro delas
+não aceitam referências. Composição parcial (Bearer ${OWNER_TOKEN}), nomes
+inválidos e delimitadores malformados são erros, mesmo com override posterior.
+Valida cada fonte; aplica base < ambiente < CLI e consulta só referências efetivas.
+Referência substituída não exige a variável do processo. Todas as efetivas são
+obrigatórias, mesmo não usadas: ausência retorna 2 antes de HTTP, com nome/chave/origem.
+Presente mas vazia é string vazia, distinta de ausência; 123, true e null são strings.
+Conteúdo recebido é literal: não expande outra referência ou {{placeholder}}.
+Destino ganha proteção automática antes dos overrides e acumula secrets/--secret.
+--var pode substituir por valor fictício, conservando precedência e proteção;
+credenciais reais em argumentos continuam proibidas. Valores conhecidos, derivados
+e esperado/recebido ecoados são sanitizados antes de resultados/callbacks/streams.
+Não importa variáveis sem referência nem oferece dotenv, stdin, listas ou JUnit.
+Não detecta segredos desconhecidos ou transformações arbitrárias.
 Templates externos exigem --render-files.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.
 Atenção: o path não protegido permanece visível; não coloque segredos arbitrários nele.

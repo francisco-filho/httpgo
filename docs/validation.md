@@ -1,4 +1,74 @@
-# Validação — US-01 a US-12 e US-20
+# Validação — US-01 a US-13 e US-20
+
+## US-13 — issue #32 / história 013
+
+Plano da issue #32 executado diretamente, sem planner e somente backend, após
+rebase sobre a US-12 (`2678e1d`). Três tasks registradas/autoaprovadas na fila 013,
+executadas na ordem: Task 1 `3184278` (referências efetivas); Task 2 `8c15319`
+(proteção prévia, substitutos e superfícies); Task 3 nesta alteração (E2E, ajuda,
+exemplos e evidências). Sem frontend/estáticos, novas dependências, alteração de
+toolchain, CI, lint ou budgets. SonarQube não executado: responsabilidade exclusiva
+do QA. Evidências locais não substituem o gate automático de revisão.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, goimports, golangci-lint e Hurl **8.0.0**
+disponíveis. Primeira tentativa de testes bloqueada pelo cache de módulos padrão
+somente leitura; nova execução bem-sucedida com `GOMODCACHE=/tmp/httpgo-013-mod` e
+`GOCACHE=/tmp/httpgo-013-cache`, sem modificar dependências ou instalar ferramentas.
+E2E reutiliza build único, `exec.CommandContext`, servidores `httptest` em portas
+dinâmicas, `Cmd.Env` explícito sem duplicatas para as variáveis testadas, distinção
+entre ausência/vazio, canais/contextos e nenhum sleep. Valores fictícios fornecidos
+no ambiente do filho, nunca credenciais reais nos argumentos/fixtures.
+
+- Task 1: `go test ./internal/config ./internal/cli` passou; o E2E nominal passou
+  na regressão completa. Expectativas antigas de rejeição global foram trocadas
+  por composição parcial inválida, preservando validações YAML/ambientes.
+- Task 2: `go test ./internal/config ./internal/template ./internal/runner ./internal/cli`
+  passou. `make fmt lint test`, `go vet ./...` e `go build ./...` passaram antes de
+  concluir cada task de implementação.
+- Final: `go test ./internal/cli ./tests/e2e -count=1`, `make fmt lint test`,
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e` passaram.
+  Lint **0 issues**; regressão com **-race -cover** sem falhas. Cobertura: config
+  **96,0%**, CLI **95,2%**, runner **93,0%**, template **95,7%**, transporte **90,4%**.
+  `gofmt -l` dos Go alterados e `git diff --check` limpos.
+- `make compatibility` passou com **Hurl 8.0.0**, sem skip: **116 pares existentes**
+  inalterados, sem regeneração de observações ou flags próprias fornecidas ao Hurl.
+  YAML continua fora do corpus diferencial; aviso de metadados de versão da libcurl
+  não impediu o gate.
+- Fuzzing sem falhas, todos com `-run '^$'`, `-fuzztime=20s` e `-parallel=2`:
+  - `go test ./internal/parser -fuzz '^FuzzParse$'`: **70.980** execuções;
+  - `go test ./internal/template -fuzz '^FuzzRender$'`: **41.703** execuções;
+  - `go test ./internal/template -fuzz '^FuzzRenderJSON$'`: **50.816** execuções.
+- macOS/Windows não executados; opcionais nesta história pelo plano v4, seção 7.
+  Não se declara execução nativa ou validação nessas plataformas.
+
+### Rastreabilidade dos cenários da issue #32
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-161 | `TestProcessEnvironmentDemonstration`, `TestProcessEnvironmentRequest` — base e ambiente, header recebido por HTTP real, streams e código 0; fixture documentada executada |
+| GO-162 | `TestProcessReferenceStrings`, `TestProcessEnvironmentJSONString`, `TestProcessEnvironmentPublicStringTypes` — strings numéricas/boolean/null, aspas, Unicode e escaping preservados |
+| GO-163 | `TestProcessReferenceMissingAndCancellation`, `TestProcessEnvironmentInvalidBeforeNetwork`, `TestProcessEnvironmentPublicInvalidBeforeNetwork` — referência efetiva não usada ausente: 2, nome/chave/origem, zero HTTP |
+| GO-164 | `TestProcessReferencePrecedence`, `TestProcessEnvironmentPublicPrecedence`, `TestProcessReferenceUnionProtectsEverySubstitute` — consultas contadas, fonte descartada ausente, overrides/união de marcas em falha e sucesso |
+| GO-165 | `TestProcessReferenceValidationPerSource`, `TestProcessEnvironmentPublicInvalidBeforeNetwork` — gramática, nomes válidos, composição/múltiplas referências/delimitadores inválidos, rejeição por fonte com override |
+| GO-166 | Mesmos testes de validação — referências em listas/objetos/listas internos rejeitadas antes de consulta/HTTP, mesmo substituídas |
+| GO-167 | `TestProcessEnvironmentRequest`, `TestProcessEnvironmentPublicStringTypes` — processo e HTTPGO_* não referenciados não substituem URL, timeout ou dados |
+| GO-168 | `TestProcessSecretIsSanitizedBeforeCallback`, `TestProcessEnvironmentEchoAssertions`, `TestProcessEnvironmentPublicEchoAssertionsAndEarlyFailures` — header comum/JSON, esperado ou recebido, comparação mantém divergência, callbacks/resultados e ambos os streams protegidos |
+| GO-169 | `TestProcessEnvironmentProtectionAcrossBodies`, `TestProcessEnvironmentPublicMultipartAndExternal`, `TestProcessReferenceUnionProtectsEverySubstitute` — marcas automáticas/explícitas/CLI, capturas futuras, URL/header/inline/externo/multipart e arquivo literal |
+| GO-170 | `TestProcessEnvironmentRequest`, `TestProcessReferenceStrings`, regressões `TestEnvironmentTypedComposition`, `TestEnvironmentStructuralConflicts`, testes YAML/timeout — tipos/irmãos/listas/null/prazo e conflitos preservados |
+| GO-171 | Testes de strings em config/CLI/E2E — vazio presente enviado como string vazia, não ausência, sem substituição global de texto vazio |
+| GO-172 | Mesmos testes de strings — `${OTHER}` e `{{other}}` chegam literalmente, sem expansão/consulta adicional |
+| GO-173 | `TestProcessReferenceProtectionBeforeMissingDiagnostic`, `TestProcessEnvironmentEarlyProtection`, `TestProcessEnvironmentPublicEchoAssertionsAndEarlyFailures` — disponível coletado antes de informar ausente, nas duas ordens, inclusive em caminho de diagnóstico |
+| GO-174 | `TestProcessEnvironmentEarlyProtection`, `TestProcessReferenceProtectionOnMergeConflict`, `TestProcessEnvironmentPublicEchoAssertionsAndEarlyFailures` — argumento/composição/parsing/arquivo ausente, segredo conhecido e substitutos protegidos antes da primeira sessão; conflito de merge não consulta referência descartada |
+| GO-175 | `TestProcessReferenceLookupIsolation`, `TestProcessEnvironmentReuseIsolation` — mesmo comando, ambiente alterado e depois sem referências, sem cache de valores/marcas/capturas |
+| GO-176 | `TestProcessReferenceMissingAndCancellation`, `TestProcessEnvironmentInvalidBeforeNetwork`, `TestProcessEnvironmentOutputAndTransportFailures`, `TestProcessEnvironmentRealCancellation`; regressões de fechamento de config/runner — cancelamento durante preparação, antes de rede e SIGINT real, sem próxima requisição ou contexto parcial |
+| GO-177 | `TestProcessEnvironmentOutputAndTransportFailures`, `TestProcessEnvironmentRealOutputFailure`, `TestProcessEnvironmentPublicEchoAssertionsAndEarlyFailures` — erro/short write de writers, /dev/full Linux e conexão encerrada: 2, sem retry/próximo envio nem vazamento |
+| GO-178 | `TestProcessEnvironmentHelp`, `TestProcessEnvironmentDemonstration` — ajuda, README/subset/arquitetura/matriz, exemplos versionados positivos e negativos; extensão e limites publicados sem anunciar dotenv/stdin/JUnit |
+
+As seções US-11/US-12 abaixo são registros históricos: suas rejeições globais de
+`${NOME}` foram intencionalmente substituídas na US-13. Permanecem negativas as
+referências parciais/aninhadas/malformadas; os demais contratos seguem válidos.
 
 ## US-12 — issue #29 / história 012
 

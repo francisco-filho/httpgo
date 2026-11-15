@@ -52,7 +52,7 @@ func TestEnvironmentDocuments(t *testing.T) {
 			t.Fatalf("source=%q err=%v", source, err)
 		}
 	}
-	for _, source := range []string{"version: 2", "version: '1'", "[]", "---", "variables: null", "variables: {a: '${TOKEN}'}", "variables: {a: &x 1}", "variables: {a: !!str 1}", "variables: {a: 1, a: 2}", "variables: {bad-name: 1}", "unknown: hidden-fixture", "variables: [", "variables: {}\n---\n"} {
+	for _, source := range []string{"version: 2", "version: '1'", "[]", "---", "variables: null", "variables: {a: 'prefix-${TOKEN}'}", "variables: {a: &x 1}", "variables: {a: !!str 1}", "variables: {a: 1, a: 2}", "variables: {bad-name: 1}", "unknown: hidden-fixture", "variables: [", "variables: {}\n---\n"} {
 		if _, err := decodeDocument("local.yaml", []byte(source), true); err == nil || strings.Contains(err.Error(), "hidden-fixture") {
 			t.Fatalf("source=%q err=%v", source, err)
 		}

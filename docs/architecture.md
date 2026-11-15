@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-12 e US-20
+# Arquitetura implementada — US-01 a US-13 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -10,7 +10,7 @@ copiar, adaptar ou traduzir código-fonte Hurl.
 ```text
 cmd/httpgo/main.go
   → internal/cli/command.go + arguments.go (flags/contexto novo e proteção)
-    → internal/config/config.go + value.go + compose.go + environment.go (YAML seguro e composição)
+    → internal/config/config.go + value.go + compose.go + environment.go + reference.go (YAML, composição e resolução explícita)
     → internal/parser/parser.go + capture.go + assertion.go + multipart.go (arquivo inteiro)
       → internal/query/jsonpath.go (validar consultas antes da rede)
     → internal/runner/runner.go + render.go (somente cenário validado)
@@ -75,7 +75,8 @@ Ausência opcional/vazio mantém defaults, falhas explícitas não têm fallback
 
 O decoder YAML produz **nós**, nunca unmarshal irrestrito em objetos. Antes de
 converter, valida árvore completa, chaves únicas/string, aliases/âncoras/tags,
-referências de processo e documento único. O schema aceita somente version 1,
+documento único e recursos YAML proibidos. A validação contextual de referências
+da US-13 é feita nas folhas de variables, separadamente da conversão JSON. O schema aceita somente version 1,
 defaults.timeout, variables e secrets. Mensagens brutas da biblioteca, trechos,
 valores e nomes arbitrários não são expostos. `flatten` converte mapas variables
 em caminhos usando `template.ValidName/NamesConflict`; arrays são valores JSON
@@ -104,10 +105,9 @@ TLS, redirects e consumo/fechamento. Dial/TLS não possuem mais teto fixo de dez
 segundos; o contexto menor/cancelamento do chamador prevalece. O executor não é
 mutado. Não há goroutines novas nem promessa de interromper I/O local bloqueado.
 
-Configuração inválida termina com 2 antes de parsing/HTTP. Não há
-`HTTPGO_*`, referências ao ambiente do processo, stdin ou hooks; `${NOME}` é
-rejeitado mesmo quando o nome teria override. YAML é extensão HTTPGo, com testes
-próprios separados do diferencial Hurl e no máximo 1 MiB lido.
+Configuração inválida termina com 2 antes de parsing/HTTP. Não há overrides
+`HTTPGO_*`, stdin ou hooks. `${NOME}` segue o fluxo US-13 abaixo. YAML é extensão
+HTTPGo, com testes próprios separados do diferencial Hurl e no máximo 1 MiB lido.
 
 ## Ambientes nomeados — US-12
 
@@ -140,10 +140,50 @@ proteção dinâmica seguem na sessão já existente, sem compartilhar estado en
 invocações. `timeoutSet` diferencia omissão de timeout do valor default: ambiente
 só substitui quando declarado. O prazo efetivo segue pelo fluxo US-11, sem mudar
 parser, transporte ou seus contratos. Nenhuma dependência, goroutine ou camada
-adicionada. `${NOME}` continua rejeitado por fonte, sem consultar o processo.
+adicionada. Referências explícitas de processo seguem a US-13 abaixo.
 
 Testes `TestEnvironment*` em config/CLI/E2E cobrem GO-141–GO-160; extensões
 continuam separadas do corpus Hurl. Evidências por cenário em `validation.md`.
+
+## Referências de processo — US-13
+
+`config.Settings.references` associa nomes de destinos achatados a
+`processReference` (nome do processo, arquivo, linha e coluna), separadamente dos
+valores JSON. `flatten` aceita a referência completa somente em folha string,
+valida nome ASCII e acrescenta o destino a `Secrets` antes de qualquer override.
+`jsonValue` rejeita referências aninhadas em listas; `rejectReferences` recusa-as
+fora de variables. Nenhum valor inválido é ocultado por fonte posterior. As demais
+proteções do decoder YAML e o limite de leitura permanecem iguais.
+
+`mergeEnvironment` substitui referências por nome exato, acumulando marcas e
+fontes de proteção antes de detectar conflito estrutural. `Settings.Resolve(ctx,
+assignments)` cria cópia dos valores, descarta referências substituídas pela CLI,
+ordena os destinos e consulta somente as efetivas. O ponto privado por instância
+`Settings.lookupEnv` permite fake com contagem; produção usa `os.LookupEnv`, nunca
+Getenv/Environ. Distingue vazio de ausência e serializa sempre com json.Marshal
+string antes de template.New, sem interpretar JSON, `${OUTRA}` ou `{{outra}}` do
+conteúdo. Não há nova dependência, interface pública de ambiente ou estado global.
+
+A resolução coleta os valores efetivos disponíveis mesmo se outra referência
+estiver ausente. Retorna Settings para proteção, mas `resolveErr` impede que
+Compose publique um contexto parcial. Erros são `config.Error` com nome de
+referência, chave e posição da fonte, nunca valores ou conteúdo bruto.
+`Settings.Compose` também resolve para consumidores diretos; na CLI, os metadados
+já foram consumidos por Resolve, sem nova consulta. Settings original é imutável;
+uma próxima invocação carrega/responde ao ambiente atual.
+
+`cli.Command.executeContext` carrega base/ambiente, resolve e conecta
+`Settings.Protection` antes de apresentar erro de argumento, carga, resolução,
+composição ou parsing. `protectedValues` inclui fontes originais, valores
+resolvidos e substitutos marcados; reutiliza SecretVariants/Protector e
+Context.ProtectValue/NewSession. Valores reais ficam somente no caminho operacional.
+Runner já sanitiza operandos de headers/JSON e metadados antes de callback/coleção,
+sem reavaliar assertions ou criar report/sanitizador novo. As sessões conservam
+proteção dinâmica de capturas/derivados e isolamento, timeout e prioridade de
+falha de escrita. Contexto é checado durante preparação e antes do envio; não há
+goroutine, enumeração de ambiente, dotenv, stdin ou promessa de interromper I/O
+local bloqueado. Testes `TestProcess*` cobrem GO-161–GO-178; YAML continua extensão
+HTTPGo fora do diferencial Hurl.
 
 ## Arquivos externos — US-09
 
@@ -334,7 +374,8 @@ userinfo/query/fragmento. O valor vazio nunca dispara substituição global de
 texto vazio. Valores conhecidos e variantes escapadas também são removidos dos
 streams. Isso não é detecção universal de credenciais ou codificações arbitrárias.
 `--secret` não fornece valor, e a CLI proíbe credenciais reais em argumentos na
-documentação: não há entrada segura por ambiente/stdin nesta entrega.
+documentação: credenciais iniciais podem vir de referências explícitas ao ambiente
+do processo (US-13); stdin permanece não implementado.
 
 ## Sessão e capturas
 

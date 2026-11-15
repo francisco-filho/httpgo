@@ -1,4 +1,26 @@
-# Matriz de compatibilidade — US-01 a US-12 e US-20
+# Matriz de compatibilidade — US-01 a US-13 e US-20
+
+## Extensão US-13 — referências ao ambiente do processo (issue #32)
+
+`${NOME}` como folha string completa de `variables` em YAML base/ambiente é
+**extensão HTTPGo**, não construção `.hurl` nem promessa de equivalência de
+configuração/segredos com Hurl. Nomes ASCII `[A-Za-z_][A-Za-z0-9_]*`; sem composição
+parcial ou referências em listas. Valida cada fonte, aplica base < ambiente < CLI,
+consulta somente referências efetivas e obrigatórias. Ausente falha com 2 antes de
+HTTP; vazio presente e literais numéricos/boolean/null permanecem strings. Conteúdo
+recebido não é expandido novamente. Destinos são marcados antes de overrides,
+acumulando `secrets`/`--secret`; protege valores conhecidos, substitutos e derivados
+nos resultados/assertions/callbacks/streams. Credenciais reais em flags continuam
+proibidas. Sem dotenv, stdin, overrides `HTTPGO_*`, cofres ou JUnit.
+
+`TestProcess*` em config, CLI, runner e E2E comprova o contrato separadamente,
+com consulta falsa contada e HTTP real no binário, ambiente de filho controlado,
+strings/escaping, ausência/vazio, precedência, rejeições antes de rede, eco de
+segredo e falhas precoces. Fixtures positivas/negativas em `testdata/config` e
+cenário `scenario_process_profile.hurl`. Os **116 pares existentes** de
+`testdata/compatibility/` permanecem inalterados: sem regenerar observações,
+passar YAML/flags próprias ao Hurl ou copiar/adaptar fontes Hurl. O diferencial
+continua exigindo **Hurl 8.0.0**, sem skip.
 
 ## Extensão US-12 — ambientes nomeados (issue #29)
 
@@ -6,8 +28,9 @@
 selecionada, mesmo vazia (sem base, cwd). É **extensão HTTPGo**, não sintaxe
 Hurl nem equivalência com ambientes da outra ferramenta. Versão 1 opcional no
 ambiente; validação YAML reutilizada da US-11. Precedência base < ambiente < CLI,
-merge tipado por caminho e união das marcas de segredos. `${NOME}`, `HTTPGO_*`,
-stdin e composição de vários ambientes continuam fora do suporte.
+merge tipado por caminho e união das marcas de segredos. `${NOME}` segue a
+extensão US-13 acima; overrides `HTTPGO_*`, stdin e composição de vários ambientes
+continuam fora do suporte.
 
 Os testes `TestEnvironment*` exercitam seleção, fontes inválidas, tipos, prazo,
 segurança, isolamento e modos inline/externo/multipart pelo binário real. Exemplos
@@ -33,9 +56,10 @@ o diferencial continua usando os defaults anteriores em ambas as ferramentas.
 
 Os **116 pares existentes** de `testdata/compatibility/` permanecem inalterados.
 Não se fornece `--config`/`--render-files` ao Hurl e não se regeneram observações
-para forçar equivalência. Referências de processo, stdin e sandbox continuam
-fora do suporte; ambientes nomeados têm o contrato US-12 separado acima. YAML inválido, recursos YAML proibidos e `${NOME}`
-são rejeições explícitas antes de qualquer HTTP, verificadas nos testes próprios.
+para forçar equivalência. Stdin e sandbox continuam fora do suporte; ambientes
+nomeados e referências de processo têm os contratos US-12/US-13 separados acima.
+YAML inválido, recursos YAML proibidos e referências parciais/aninhadas são
+rejeições explícitas antes de qualquer HTTP, verificadas nos testes próprios.
 
 
 ## Extensão US-10 — JSON externo opt-in (issue #25)

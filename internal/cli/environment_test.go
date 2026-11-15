@@ -35,7 +35,7 @@ func TestEnvironmentInvalidBeforeHTTP(t *testing.T) {
 			t.Fatalf("flags=%v code=%d out=%q err=%q calls=%v", flags, code, out, stderr, fake.calls)
 		}
 	}
-	for _, source := range []string{"version: 2", "variables: {a: '${TOKEN}'}", "variables: {a: &a hidden-fixture}", "variables: [", "variables: {}\n---", "unknown: hidden-fixture"} {
+	for _, source := range []string{"version: 2", "variables: {a: 'partial-${TOKEN}'}", "variables: {a: &a hidden-fixture}", "variables: [", "variables: {}\n---", "unknown: hidden-fixture"} {
 		t.Setenv("TOKEN", "must-not-resolve")
 		writeEnvironment(t, base, "local", source)
 		fake := &fakeExecutor{}
