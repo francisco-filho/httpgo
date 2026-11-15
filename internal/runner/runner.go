@@ -40,9 +40,13 @@ const (
 	RenderFailed   Outcome = "erro de renderização"
 	CaptureFailed  Outcome = "erro de captura"
 	HeaderMismatch Outcome = "assertion de header divergente"
+	JSONMismatch   Outcome = "assertion JSON divergente"
+	JSONFailed     Outcome = "erro de avaliação JSON"
 )
 
 type EntryResult struct {
+	JSONFailure   *JSONFailure
+	JSONError     *JSONError
 	HeaderFailure *HeaderFailure
 	Entry         parser.Entry
 	Outcome       Outcome
@@ -101,11 +105,6 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
 		for _, declaration := range entry.Assertions {
-			if declaration.JSON != nil {
-				result.Err = fmt.Errorf("execução de assertion JSON ainda não suportada")
-				result.ErrorPosition = declaration.JSON.Position
-				return result
-			}
 			if declaration.Header != nil && sensitiveHeader(declaration.Header.Name) {
 				session.ProtectValue(declaration.Header.Expected)
 			}
@@ -167,12 +166,14 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 			}
 		}
 		if err == nil && !result.Diverged {
-			current.HeaderFailure = checkHeaders(session, entry.Assertions, response.Headers)
-			if current.HeaderFailure != nil {
-				current.Outcome, result.Diverged = HeaderMismatch, true
+			if assertionErr := checkAssertions(session, entry, response, &current); assertionErr != nil {
+				current.JSONError = assertionErr
+				result.Err = assertionErr
+				result.ErrorPosition = assertionErr.Position
 			}
+			result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil
 		}
-		if err == nil && !result.Diverged && len(entry.Captures) > 0 {
+		if err == nil && result.Err == nil && !result.Diverged && len(entry.Captures) > 0 {
 			if captureErr := captureResponse(session, entry.Captures, response.Body); captureErr != nil {
 				current.Outcome = CaptureFailed
 				result.Err, result.ErrorPosition = captureErr, captureErr.Position

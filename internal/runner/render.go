@@ -72,5 +72,9 @@ func render(session template.Session, entry parser.Entry) (Request, string, *Ren
 			return Request{}, "", &RenderError{Position: pos, Detail: "body JSON renderizado inválido"}
 		}
 	}
-	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: len(entry.Captures) > 0}, url.Display, nil
+	retainBody := len(entry.Captures) > 0
+	for _, declaration := range entry.Assertions {
+		retainBody = retainBody || declaration.JSON != nil
+	}
+	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: retainBody}, url.Display, nil
 }

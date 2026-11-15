@@ -12,6 +12,7 @@ type Session interface {
 	Publish([]Capture) error
 	ProtectCapture(name string, value json.RawMessage)
 	ProtectValue(string)
+	IsSecret(string) bool
 	Sanitize(string) string
 }
 
@@ -54,6 +55,9 @@ func (c *Context) lookup(name string) (variable, bool) {
 func (c *Context) ProtectValue(value string) {
 	c.protected = append(c.protected, SecretVariants(value)...)
 }
+
+// IsSecret inspects only the declaration, without resolving or publishing a value.
+func (c *Context) IsSecret(name string) bool { return c.secrets[name] }
 
 // ProtectCapture remembers a discovered secret even if another declaration fails.
 func (c *Context) ProtectCapture(name string, value json.RawMessage) {
