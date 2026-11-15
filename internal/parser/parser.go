@@ -12,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"capimgrosso.com/httpgo/internal/query"
 	"capimgrosso.com/httpgo/internal/template"
 )
 
@@ -23,7 +24,15 @@ type Position struct {
 
 type Header struct{ Name, Value string }
 
+type Capture struct {
+	Name          string
+	Path          query.Path
+	Position      Position
+	QueryPosition Position
+}
+
 type Entry struct {
+	Captures         []Capture
 	Method           string
 	URL              string
 	Headers          []Header
@@ -61,6 +70,8 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "erro de leitura", Detail: "não foi possível ler o arquivo", cause: err}
 	}
 	scenario := Scenario{File: file}
+	captures := false
+	var capturesPosition Position
 	for offset := 0; offset < len(data); {
 		end := bytes.IndexByte(data[offset:], '\n')
 		if end < 0 {
@@ -90,7 +101,19 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		if len(scenario.Entries) > 0 {
 			entry = &scenario.Entries[len(scenario.Entries)-1]
 		}
+		if captures && (fields[0] == "GET" || fields[0] == "POST" || fields[0] == "PUT" || fields[0] == "PATCH" || fields[0] == "DELETE") {
+			if len(entry.Captures) == 0 {
+				pos = capturesPosition
+				return fail("sintaxe inválida", "seção de capturas vazia")
+			}
+			captures = false
+		}
 		switch fields[0] {
+		case "[Captures]":
+			if entry == nil || captures || len(fields) != 1 {
+				return fail("sintaxe inválida", "seção de capturas sem resposta disponível ou duplicada")
+			}
+			captures, capturesPosition = true, pos
 		case "GET", "POST", "PUT", "PATCH", "DELETE":
 			token := strings.TrimLeft(text[len(fields[0]):], " \t")
 			urlPos := pos
@@ -123,7 +146,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			if len(fields) != 2 {
 				return fail("sintaxe inválida", "HTTP exige somente um status de três dígitos")
 			}
-			if entry == nil || entry.ExpectedStatus != nil {
+			if entry == nil || entry.ExpectedStatus != nil || captures {
 				return fail("sintaxe inválida", "expectativa HTTP sem requisição disponível")
 			}
 			status, err := strconv.Atoi(fields[1])
@@ -134,6 +157,14 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		default:
 			if construction := unsupported(fields[0]); construction != "" {
 				return fail("construção não suportada", construction)
+			}
+			if captures {
+				capture, err := parseCapture(text, pos)
+				if err != nil {
+					return Scenario{}, err
+				}
+				entry.Captures = append(entry.Captures, capture)
+				break
 			}
 			if isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
 				if entry == nil || entry.ExpectedStatus != nil || entry.Body != nil {
@@ -216,6 +247,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		}
 		offset = end + 1
 	}
+	if captures && len(scenario.Entries[len(scenario.Entries)-1].Captures) == 0 {
+		return Scenario{}, &Error{Position: capturesPosition, Category: "sintaxe inválida", Detail: "seção de capturas vazia"}
+	}
 	if len(scenario.Entries) == 0 {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "sintaxe inválida", Detail: "o arquivo precisa conter ao menos uma requisição"}
 	}
@@ -267,7 +301,7 @@ func unsupported(token string) string {
 	switch token {
 	case "HEAD", "OPTIONS", "CONNECT", "TRACE":
 		return "método " + token
-	case "[Captures]", "[Asserts]", "[Options]", "[QueryStringParams]", "[FormParams]", "[MultipartFormData]", "[Cookies]", "[BasicAuth]":
+	case "[Asserts]", "[Options]", "[QueryStringParams]", "[FormParams]", "[MultipartFormData]", "[Cookies]", "[BasicAuth]":
 		return "seção " + token
 	default:
 		switch {

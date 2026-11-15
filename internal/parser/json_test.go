@@ -59,6 +59,9 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, seed := range []string{"GET http://example.test/\n[Captures]\na.b: jsonpath \"$.items[0].token\"\nGET {{a.b}}", "POST http://example.test\n{\"section\":\"[Captures]\"}\nHTTP 200\n[Captures]\ntoken: jsonpath \"$\"", "GET http://example.test\r\n[Captures]\r\ntoken: jsonpath \"$..x\""} {
+		f.Add(seed)
+	}
 	for _, body := range []string{`{{root}}`, `{"a":{},"b":{{x}}}`, "{\r\n\"a\":\"{{x}}\\n\"\r\n}", `{"{{key}}":1}`, `"bad\\{{x}}"`} {
 		f.Add("POST http://example.test/\n" + body + "\nHTTP 201\nGET http://example.test/next")
 	}
