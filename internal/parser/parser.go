@@ -38,6 +38,7 @@ type FileBody struct {
 }
 
 type Entry struct {
+	Multipart        *MultipartForm
 	ExternalBody     *FileBody
 	Assertions       []Assertion
 	Captures         []Capture
@@ -81,6 +82,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 	}
 	scenario := Scenario{File: file}
 	captures, asserts := false, false
+	multipartActive := false
 	capturesSeen, assertsSeen := false, false
 	var capturesPosition, assertsPosition Position
 	for offset := 0; offset < len(data); {
@@ -124,7 +126,28 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			}
 			captures, asserts = false, false
 		}
+		if boundary || fields[0] == "HTTP" {
+			multipartActive = false
+		}
+		if multipartActive {
+			part, err := parseMultipartPart(text, pos)
+			if err != nil {
+				return Scenario{}, err
+			}
+			entry.Multipart.Parts = append(entry.Multipart.Parts, part)
+			offset = end + 1
+			continue
+		}
 		switch fields[0] {
+		case "[MultipartFormData]":
+			if entry == nil || len(fields) != 1 || entry.Multipart != nil || entry.Body != nil || entry.ExternalBody != nil || entry.ExpectedStatus != nil || entry.AnyStatus || capturesSeen || assertsSeen {
+				return fail("sintaxe inválida", "seção multipart fora da requisição ou body duplicado")
+			}
+			if entry.Method != "POST" && entry.Method != "PUT" && entry.Method != "PATCH" {
+				return fail("construção não suportada", "multipart exige POST, PUT ou PATCH")
+			}
+			entry.Multipart = &MultipartForm{Position: pos}
+			multipartActive = true
 		case "[Asserts]":
 			if entry == nil || assertsSeen || len(fields) != 1 || (entry.ExpectedStatus == nil && !entry.AnyStatus) {
 				return fail("sintaxe inválida", "seção de assertions exige resposta HTTP e não pode ser duplicada")
@@ -182,7 +205,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			entry.ExpectedStatus, entry.ExpectedPosition = &status, pos
 		default:
 			if strings.HasPrefix(text, "file,") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures || asserts || capturesSeen || entry.Body != nil || entry.ExternalBody != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures || asserts || capturesSeen || entry.Body != nil || entry.ExternalBody != nil || entry.Multipart != nil {
 					return fail("sintaxe inválida", "body externo sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -218,7 +241,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				break
 			}
 			if isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil || entry.Multipart != nil {
 					return fail("sintaxe inválida", "body JSON sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -256,7 +279,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				continue
 			}
 			if strings.Contains(text, ":") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil || entry.Multipart != nil {
 					return fail("sintaxe inválida", "header fora da requisição ou após body")
 				}
 				name, value, _ := strings.Cut(text, ":")
@@ -307,6 +330,11 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 	if len(scenario.Entries) == 0 {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "sintaxe inválida", Detail: "o arquivo precisa conter ao menos uma requisição"}
 	}
+	for _, entry := range scenario.Entries {
+		if err := validateMultipart(entry); err != nil {
+			return Scenario{}, err
+		}
+	}
 	return scenario, nil
 }
 
@@ -355,7 +383,7 @@ func unsupported(token string) string {
 	switch token {
 	case "HEAD", "OPTIONS", "CONNECT", "TRACE":
 		return "método " + token
-	case "[Options]", "[QueryStringParams]", "[FormParams]", "[MultipartFormData]", "[Cookies]", "[BasicAuth]":
+	case "[Options]", "[QueryStringParams]", "[FormParams]", "[Cookies]", "[BasicAuth]":
 		return "seção " + token
 	default:
 		switch {

@@ -3,7 +3,9 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"capimgrosso.com/httpgo/internal/assertion"
@@ -13,6 +15,7 @@ import (
 )
 
 type Request struct {
+	Multipart  *MultipartBody
 	Method     string
 	URL        string
 	Headers    []parser.Header
@@ -84,10 +87,11 @@ func (e *RenderError) Error() string { return fmt.Sprintf("erro de renderizaçã
 func (e *RenderError) Unwrap() error { return e.cause }
 
 type Runner struct {
-	executor HTTPExecutor
-	report   func(EntryResult) error
-	renderer Renderer
-	readFile func(context.Context, string) ([]byte, error)
+	executor   HTTPExecutor
+	report     func(EntryResult) error
+	renderer   Renderer
+	readFile   func(context.Context, string) ([]byte, error)
+	openUpload func(string) (uploadFile, error)
 }
 
 // New accepts an optional synchronous reporter, called before the next entry.
@@ -100,7 +104,7 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 	if renderer == nil {
 		renderer, _ = template.New(nil, nil)
 	}
-	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload}
+	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload}
 }
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
@@ -163,13 +167,46 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 			}
 			request.Body = body
 		}
+		var upload io.Closer
+		if entry.Multipart != nil {
+			var err error
+			upload, err = r.prepareMultipart(ctx, session, entry, scenario.OriginDir, &request)
+			if err != nil {
+				pos, outcome := entry.Multipart.Position, FileFailed
+				var fileErr *FileError
+				var renderErr *RenderError
+				if errors.As(err, &fileErr) {
+					pos = fileErr.Position
+				}
+				if errors.As(err, &renderErr) {
+					pos, outcome = renderErr.Position, RenderFailed
+				}
+				result.Err, result.ErrorPosition = err, pos
+				current := EntryResult{Entry: safeEntry(session, entry), Outcome: outcome, DisplayURL: session.Sanitize(display)}
+				current.Entry.Position = pos
+				current.Entry.Position.File = session.Sanitize(pos.File)
+				result.Entries = append(result.Entries, current)
+				if r.report != nil {
+					result.ReportErr = r.report(current)
+				}
+				return result
+			}
+		}
 		if err := ctx.Err(); err != nil {
+			if upload != nil {
+				err = errors.Join(err, upload.Close())
+			}
 			result.Err, result.ErrorPosition = err, entry.Position
 			return result
 		}
 		result.Summary.Started++
 		result.Summary.NotStarted--
 		response, err := r.executor.Execute(ctx, request)
+		if upload != nil {
+			if closeErr := upload.Close(); closeErr != nil {
+				err = errors.Join(err, fileFailure(entry.Multipart.Position, closeErr))
+			}
+		}
 		for _, header := range response.Headers {
 			if sensitiveHeader(header.Name) {
 				session.ProtectValue(header.Value)

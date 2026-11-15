@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
@@ -72,12 +73,30 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 	current.Scheme = strings.ToLower(current.Scheme)
 	origin := current
 	method, body := request.Method, request.Body
+	form := request.Multipart
+	boundary := ""
+	if form != nil {
+		boundary = multipart.NewWriter(io.Discard).Boundary()
+	}
 	if method == "" {
 		method = http.MethodGet
 	}
 	for hops := 0; ; hops++ {
-		req, err := http.NewRequestWithContext(ctx, method, current.String(), bytes.NewReader(body))
+		var reader io.Reader = bytes.NewReader(body)
+		var upload *uploadReader
+		var length int64
+		if form != nil {
+			upload, length, err = multipartReader(form, boundary)
+			if err != nil {
+				return runner.Response{}, classify(ctx, Network, err)
+			}
+			reader = upload
+		}
+		req, err := http.NewRequestWithContext(ctx, method, current.String(), reader)
 		if err != nil {
+			if upload != nil {
+				_ = upload.Close()
+			}
 			return runner.Response{}, classify(ctx, Network, err)
 		}
 		for _, header := range request.Headers {
@@ -87,8 +106,15 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 				req.Header.Add(header.Name, header.Value)
 			}
 		}
+		if upload != nil {
+			req.ContentLength = length
+			req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+		}
 		response, err := e.transport.RoundTrip(req)
 		if err != nil {
+			if upload != nil {
+				err = errors.Join(err, upload.finished())
+			}
 			return runner.Response{}, classify(ctx, Network, err)
 		}
 		final := !isRedirect(response.StatusCode) || response.Header.Get("Location") == ""
@@ -100,6 +126,11 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 			_, readErr = io.Copy(io.Discard, response.Body)
 		}
 		closeErr := response.Body.Close()
+		if upload != nil {
+			if uploadErr := upload.finished(); uploadErr != nil {
+				return runner.Response{}, classify(ctx, Network, uploadErr)
+			}
+		}
 		if readErr != nil {
 			return runner.Response{}, classify(ctx, Body, readErr)
 		}
@@ -135,7 +166,7 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		}
 		if response.StatusCode == 301 || response.StatusCode == 302 || response.StatusCode == 303 {
 			if method != http.MethodGet && method != http.MethodHead {
-				method, body = http.MethodGet, nil
+				method, body, form = http.MethodGet, nil, nil
 			}
 		}
 		current = next

@@ -53,6 +53,7 @@ func pendingSecret(session template.Session, entry parser.Entry) bool {
 
 func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	// Reports need metadata, not request bodies or raw response/header collections.
+	entry.Multipart = nil
 	entry.ExternalBody = nil
 	entry.Body = nil
 	entry.BodyPlan = template.JSONPlan{}

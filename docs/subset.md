@@ -35,6 +35,27 @@ Arquivo vazio/com só comentários, URL inválida, status inválido, expectativa
 órfã/duplicada e instrução desconhecida são erros de entrada. Nada do arquivo é
 enviado nesses casos, mesmo quando o erro aparece depois de GETs válidos.
 
+### Upload multipart básico — US-20 (issue #24)
+
+`POST`, `PUT` e `PATCH` aceitam `[MultipartFormData]` após os headers,
+com exatamente um arquivo e zero ou mais campos textuais, em ordem:
+
+```hurl
+POST http://localhost:8080/documents
+[MultipartFormData]
+description: Documento de teste
+document: file,../fixtures/document.pdf; application/pdf
+HTTP 201
+```
+
+O formulário é exclusivo de outros bodies; nomes estáticos não se repetem.
+O arquivo mantém seus bytes (inclusive vazio, binário e placeholders literais),
+usa somente o basename como filename e é enviado incrementalmente, sem buffer
+integral. O runner abre a fonte na vez da entrada e a fecha antes do resultado.
+O transporte gera boundary e Content-Type coerentes; um header explícito deve
+ser `multipart/form-data`, sem parâmetros. Caminhos seguem as regras de arquivo
+externo abaixo. Conteúdo e descrição operacional não entram nos resultados.
+
 ### Headers e JSON inline
 
 Depois da request-line, podem ser declarados headers `Nome: valor`, antes do
