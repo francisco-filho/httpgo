@@ -55,7 +55,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.writeText(help())
 	}
 	args, argumentErr := parseArguments(c.args)
-	settings, loadErr := config.Load(ctx, args.config)
+	settings, loadErr := config.LoadEnvironment(ctx, args.config, args.environment)
 	initial := c.protection.initial
 	configured := settings.Protection(args.variables, args.secrets)
 	c.protection.initial = func(text string) string { return initial(configured(text)) }

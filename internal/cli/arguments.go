@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"capimgrosso.com/httpgo/internal/config"
 	"capimgrosso.com/httpgo/internal/template"
 )
 
@@ -12,12 +13,14 @@ type arguments struct {
 	renderFiles        bool
 	file               string
 	config             string
+	environment        string
 	variables, secrets []string
 }
 
 func parseArguments(args []string) (arguments, error) {
 	var result arguments
 	invalid := len(args) == 0 || args[0] != "test"
+	environmentSeen := false
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
 		name, value, inline := strings.Cut(arg, "=")
@@ -27,7 +30,7 @@ func parseArguments(args []string) (arguments, error) {
 				invalid = true
 			}
 			result.renderFiles = true
-		case "--config", "--var", "--secret":
+		case "--config", "--env", "--var", "--secret":
 			if !inline {
 				if i+1 == len(args) {
 					invalid = true
@@ -42,6 +45,12 @@ func parseArguments(args []string) (arguments, error) {
 					invalid = true
 				}
 				result.config = value
+			case "--env":
+				if environmentSeen || !config.ValidEnvironmentName(value) {
+					invalid = true
+				}
+				environmentSeen = true
+				result.environment = value
 			case "--var":
 				result.variables = append(result.variables, value)
 			case "--secret":

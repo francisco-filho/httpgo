@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,9 +27,10 @@ const DefaultTimeout = 10 * time.Second
 // Settings contains exact variable names and canonical typed JSON values.
 // A hierarchy is flattened only in variables, never inside array values.
 type Settings struct {
-	Variables map[string]json.RawMessage
-	Secrets   []string
-	Timeout   time.Duration
+	Variables  map[string]json.RawMessage
+	Secrets    []string
+	Timeout    time.Duration
+	timeoutSet bool
 }
 
 // Error preserves an I/O cause but displays only controlled diagnostics.
@@ -52,12 +54,61 @@ func failure(file string, node *yaml.Node, detail string, cause error) error {
 	return &Error{File: file, Line: line, Column: column, Detail: detail, cause: cause}
 }
 
+// LoadEnvironment loads the base and, only when selected, environments/name.yaml.
+// The base path fixes the environment root even when its document is empty.
+func LoadEnvironment(ctx context.Context, path, name string) (Settings, error) {
+	return loadEnvironment(ctx, path, name, func(name string) (io.ReadCloser, error) { return os.Open(name) })
+}
+
+func loadEnvironment(ctx context.Context, path, name string, open func(string) (io.ReadCloser, error)) (Settings, error) {
+	base, err := load(ctx, path, open)
+	if err != nil || name == "" {
+		return base, err
+	}
+	if !ValidEnvironmentName(name) {
+		return base, failure(path, nil, "nome de ambiente inválido; use letras ASCII, números, _ ou -", nil)
+	}
+	environmentPath := filepath.Join(filepath.Dir(path), "environments", name+".yaml")
+	environment, err := loadDocument(ctx, environmentPath, true, open)
+	if err != nil {
+		return base, err
+	}
+	for key, value := range environment.Variables {
+		base.Variables[key] = value
+	}
+	base.Secrets = append(base.Secrets, environment.Secrets...)
+	if environment.timeoutSet {
+		base.Timeout = environment.Timeout
+	}
+	return base, nil
+}
+
+// ValidEnvironmentName excludes paths, whitespace and non-ASCII characters.
+func ValidEnvironmentName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, c := range name {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '_', c == '-':
+			continue
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // Load discovers only .httpgo.yaml in the current directory if path is empty.
 func Load(ctx context.Context, path string) (Settings, error) {
 	return load(ctx, path, func(name string) (io.ReadCloser, error) { return os.Open(name) })
 }
 
 func load(ctx context.Context, path string, open func(string) (io.ReadCloser, error)) (Settings, error) {
+	return loadDocument(ctx, path, false, open)
+}
+
+func loadDocument(ctx context.Context, path string, environment bool, open func(string) (io.ReadCloser, error)) (Settings, error) {
 	empty := Settings{Variables: make(map[string]json.RawMessage), Timeout: DefaultTimeout}
 	optional := path == ""
 	if optional {
@@ -84,7 +135,7 @@ func load(ctx context.Context, path string, open func(string) (io.ReadCloser, er
 	if len(data) > MaxBytes {
 		return empty, failure(path, nil, "arquivo excede o limite de 1 MiB", nil)
 	}
-	settings, err := decode(path, data)
+	settings, err := decodeDocument(path, data, environment)
 	if err != nil {
 		return empty, err
 	}
@@ -95,6 +146,10 @@ func load(ctx context.Context, path string, open func(string) (io.ReadCloser, er
 }
 
 func decode(file string, data []byte) (Settings, error) {
+	return decodeDocument(file, data, false)
+}
+
+func decodeDocument(file string, data []byte, environment bool) (Settings, error) {
 	result := Settings{Variables: make(map[string]json.RawMessage), Timeout: DefaultTimeout}
 	empty := true
 	for _, line := range strings.Split(string(data), "\n") {
@@ -177,12 +232,13 @@ func decode(file string, data []byte) (Settings, error) {
 					return result, failure(file, value.Content[j+1], "timeout deve ser número de segundos entre 0.001 e 86400, em milissegundos inteiros", nil)
 				}
 				result.Timeout = timeout
+				result.timeoutSet = true
 			}
 		default:
 			return result, failure(file, key, "campo não suportado na raiz", nil)
 		}
 	}
-	if !version {
+	if !version && !environment {
 		return result, failure(file, root, "version: 1 é obrigatória", nil)
 	}
 	return result, nil
