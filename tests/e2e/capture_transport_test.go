@@ -21,7 +21,7 @@ func TestCaptureFinalRedirectResponseByBinary(t *testing.T) {
 				case "/login":
 					w.Header().Set("Location", "/final")
 					w.WriteHeader(status)
-					_, _ = io.WriteString(w, `{"token":"wrong-token"}`)
+					_, _ = io.WriteString(w, `{"token":"wrong-token","id":12,"data":[]}`)
 				case "/final":
 					want := "GET"
 					if status == 307 || status == 308 {
@@ -31,17 +31,18 @@ func TestCaptureFinalRedirectResponseByBinary(t *testing.T) {
 					if r.Method != want || want == "GET" && len(body) != 0 || want == "POST" && string(body) != `{"login":true}` {
 						t.Errorf("method=%s body=%s", r.Method, body)
 					}
-					_, _ = io.WriteString(w, `{"token":"final-token"}`)
-				case "/protected":
-					if r.Header.Get("Authorization") != "Bearer final-token" {
-						t.Error("intermediate response captured")
+					_, _ = io.WriteString(w, `{"token":"final-token","id":9007199254740993,"data":[null,true,1.2300e+99]}`)
+				case "/protected/9007199254740993":
+					body, _ := io.ReadAll(r.Body)
+					if r.Header.Get("Authorization") != "Bearer final-token" || r.Method != "POST" || string(body) != `{"id":9007199254740993,"data":[null,true,1.2300e+99]}` {
+						t.Errorf("intermediate response captured or precision lost: headers=%v body=%s", r.Header, body)
 					}
 				default:
 					t.Error("unexpected request")
 				}
 			}))
 			defer server.Close()
-			code, out, stderr := run(t, "test", scenario(t, "POST {{base}}/login\n{\"login\":true}\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\nGET {{base}}/protected\nAuthorization: Bearer {{token}}\nHTTP 200"), "--var", "base="+server.URL, "--secret", "token")
+			code, out, stderr := run(t, "test", scenario(t, "POST {{base}}/login\n{\"login\":true}\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\nid: jsonpath \"$.id\"\ndata: jsonpath \"$.data\"\nPOST {{base}}/protected/{{id}}\nAuthorization: Bearer {{token}}\n{\"id\":{{id}},\"data\":{{data}}}\nHTTP 200"), "--var", "base="+server.URL, "--secret", "token")
 			if code != 0 || stderr != "" || hits.Load() != 3 || !strings.Contains(out, "validadas=2") || strings.Contains(out, "final-token") || strings.Contains(out, "wrong-token") {
 				t.Fatalf("code=%d out=%q err=%q hits=%d", code, out, stderr, hits.Load())
 			}

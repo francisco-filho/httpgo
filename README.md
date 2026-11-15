@@ -153,7 +153,8 @@ somente valores não sigilosos ou fictícios. `--secret nome` apenas marca prote
 nas saídas; não fornece valor nem protege histórico de shell/listagem de processos.
 Marcar um nome ainda ausente é permitido, mas não resolve sua referência. A fonte
 segura para credenciais iniciais pelo ambiente do processo chega na US-13;
-stdin não está implementado. Capturas string de respostas estão disponíveis na US-05.
+stdin não está implementado. Capturas de respostas estão disponíveis desde a US-05,
+ampliadas para qualquer tipo JSON na US-06.
 
 ## Autenticar e reutilizar token (US-05 / issue #14)
 
@@ -188,10 +189,10 @@ proibidas.
 
 `[Captures]` associa-se à resposta anterior, depois de `HTTP` quando declarado.
 JSONPath aceita somente raiz `$`, propriedades por ponto (`$.product.id`) e
-índices de array não negativos (`$.items[0]`). O resultado deve ser string,
-inclusive vazia. JSON inválido, caminho ausente, null ou outro tipo é erro de
-captura (código 2); não há conversão implícita. Consultas não suportadas em qualquer
-entrada impedem todos os envios.
+índices de array não negativos (`$.items[0]`). Desde a US-06, o resultado aceita
+qualquer tipo JSON, inclusive raiz, `null`, string vazia, arrays/objetos vazios.
+JSON inválido, caminho ausente ou índice fora do array é erro de captura (código 2).
+Consultas não suportadas em qualquer entrada impedem todos os envios.
 
 Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
 quando esperado, para URLs, valores de headers e JSON inline seguintes. Strings
@@ -202,6 +203,53 @@ começa sem capturas, e continua aceitando exatamente um arquivo. `--secret` pod
 marcar uma captura futura sem criá-la; valores descobertos ficam ocultos nos
 streams e diagnósticos, inclusive variantes de escape conhecidas. Não há garantia
 de reconhecer segredos arbitrários antes de descobri-los ou codificações desconhecidas.
+
+## Encadear operações com capturas tipadas (US-06 / issue #16)
+
+Salve como `products.hurl` (também em
+`testdata/scenarios/scenario_capture_products.hurl`):
+
+```hurl
+POST {{base_url}}/products
+Content-Type: application/json
+{"name":"Pizza"}
+
+HTTP 201
+[Captures]
+productId: jsonpath "$.id"
+
+GET {{base_url}}/products/{{productId}}
+HTTP 200
+
+POST {{base_url}}/echo
+Content-Type: application/json
+{"productId":{{productId}}}
+HTTP 200
+```
+
+```sh
+bin/httpgo test products.hurl --var base_url=http://localhost:8080
+```
+
+Uma API que retorna `{"id":9007199254740993}` recebe o caminho
+`/products/9007199254740993` e o último body com esse mesmo ID **numérico**, sem
+arredondamento. Os três status são validados. Os E2E verificam esses bytes por
+HTTP real e também o fluxo login → token → criação → ID → consulta → echo de
+`testdata/scenarios/scenario_capture_auth_products.hurl`. O dummy manual não
+implementa esse contrato dinâmico de ID/autenticação.
+
+**Ampliação intencional do contrato US-05:** capturas agora preservam string,
+número, booleano, `null`, array e objeto em posição de valor JSON completo,
+inclusive na raiz. Números mantêm precisão também dentro de estruturas; strings
+semelhantes a JSON ou placeholders não são reinterpretadas. Em URL, header ou
+string JSON, escalares usam sua representação textual (string decodificada,
+número JSON, `true`/`false`, `null`); arrays/objetos falham antes do envio dependente.
+Não há percent-encoding automático; escape JSON e restrições de headers continuam.
+Capturar `product` como objeto não cria `product.id`: declare outra captura com
+nome não conflitante, por exemplo `productId: jsonpath "$.id"`. Colisões seguem
+proibidas em qualquer tipo; publicação do lote é atômica. `--secret` acompanha
+capturas escalares e compostas e protege também seus constituintes e escapes
+conhecidos sem mudar os dados enviados nem criar variáveis para as propriedades.
 
 A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
 valores finais inválidos falham imediatamente antes da requisição dependente,
@@ -241,12 +289,15 @@ make fmt lint test
 go vet ./...
 make build
 make compatibility
+# Opcional durante as histórias; build cruzado não comprova execução nativa:
 make portable
 ```
 
 Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
 **desenvolvimento**, não no binário entregue. O gate local com race já passou;
-o aceite nativo pendente em macOS/Windows está registrado em
-`docs/validation.md`, que distingue a evidência local US-05 dos históricos anteriores.
-Cross-build não comprova execução nessas plataformas. A aprovação da história
+a evidência Linux da US-06 está registrada em `docs/validation.md`, separada dos
+históricos anteriores. Conforme o plano v4, seção 7, cross-build e testes nativos
+macOS/Windows são opcionais nesta história e ficam para a validação final de
+portabilidade/release, sem bloquear a entrega. Não foi executado runtime nessas
+plataformas nesta história; cross-build não o comprovaria. A aprovação da história
 passa pelo gate de revisão; não há alegação de compatibilidade Hurl completa.

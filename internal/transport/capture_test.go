@@ -67,12 +67,12 @@ func (b *captureBody) Close() error { b.closed = true; return b.closeErr }
 
 func TestRetainedBodyReadAndCloseErrors(t *testing.T) {
 	for _, mode := range []string{"read", "close", "success"} {
-		b := &captureBody{Reader: strings.NewReader(`"token"`)}
+		b := &captureBody{Reader: strings.NewReader(`{"id":9007199254740993,"nested":[null,true,1.2300e+99]}`)}
 		if mode == "close" {
 			b.closeErr = errors.New("secret close cause")
 		}
 		if mode == "read" {
-			b.Reader = io.MultiReader(strings.NewReader(`"token"`), errorReader{})
+			b.Reader = io.MultiReader(strings.NewReader(`{"id":9007199254740993,"nested":[null,true,1.2300e+99]}`), errorReader{})
 		}
 		executor := NewNetHTTPExecutor()
 		executor.transport.RegisterProtocol("capture", captureRoundTripper(func(r *http.Request) (*http.Response, error) {
@@ -83,7 +83,7 @@ func TestRetainedBodyReadAndCloseErrors(t *testing.T) {
 			t.Fatal("body left open")
 		}
 		if mode == "success" {
-			if err != nil || string(got.Body) != `"token"` {
+			if err != nil || string(got.Body) != `{"id":9007199254740993,"nested":[null,true,1.2300e+99]}` {
 				t.Fatalf("%+v %v", got, err)
 			}
 		} else {
@@ -113,10 +113,12 @@ func TestCaptureReadDeadlineAndCancellation(t *testing.T) {
 				}
 				if mode == "incomplete" {
 					w.Header().Set("Content-Length", "100")
-					_, _ = io.WriteString(w, `"token"`)
+					_, _ = io.WriteString(w, `{"id":9007199254740993}`)
 					return
 				}
+				w.Header().Set("Content-Length", "100")
 				w.WriteHeader(200)
+				_, _ = io.WriteString(w, `{"id":9007199254740993}`)
 				w.(http.Flusher).Flush()
 				close(received)
 				<-r.Context().Done()

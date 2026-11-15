@@ -1,0 +1,37 @@
+{
+  "response_json": "{\"a\":1}",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "objeto em header: HTTPGo rejeita antes do segundo envio com exit 2; Hurl termina com exit 3 após /capture",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

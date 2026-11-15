@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-05
+# Arquitetura implementada — US-01 a US-06
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04) e #14 (US-05),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05) e #16 (US-06),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -18,7 +18,8 @@ cmd/httpgo/main.go
       → internal/transport/http.go (via HTTPExecutor)
       → internal/assertion/status.go
       → internal/query/jsonpath.go (selecionar JSON da resposta final)
-      → internal/template/session.go (publicar capturas string atomicamente)
+      → internal/runner/capture.go (serializar seleção JSON sem float64)
+      → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
       → apresentação segura de cada resultado na CLI (callback síncrono)
     → resumo final na CLI
 ```
@@ -37,8 +38,8 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 | `template.JSONPlan`, `JSONReference` | Reconhecimento de strings/escapes/valores e chaves estáticas, referências com intervalos originais, limite exato do body; compartilhado por parser e renderer |
 | `template.SecretVariants`, `Protector` | Proteção de valores brutos, decodificados e escapes conhecidos, inclusive antes de validar contexto; sem substituição de texto vazio |
 | `runner.Renderer`, `RenderError`, `CaptureError` | Factory consumer-owned `NewSession() template.Session` por Run; erros pré-envio e de captura com categorias/origens distintas; clones preservam cenário |
-| `template.Session`, `Capture`, `ConflictError` | Renderização e publicação atômica de strings; variáveis iniciais imutáveis e capturas separadas; conflitos compartilhados por `NamesConflict`; proteção de valores descobertos |
-| `query.Path`, `query.Error` | Pacote folha sem interface: validar JSONPath limitado e selecionar valor com `UseNumber`, distinguindo ausência de null; runner exige string |
+| `template.Session`, `Capture`, `ConflictError`, `CaptureValueError` | Renderização e publicação atômica de JSON validado (`Capture.Value` é `json.RawMessage`); erro de payload/conflito indexa o lote sem expor conteúdo; variáveis iniciais imutáveis, cópia dos valores, capturas separadas e proteção dos valores descobertos |
+| `query.Path`, `query.Error` | Pacote folha sem interface: validar JSONPath limitado e selecionar valor com `UseNumber`, distinguindo ausência de null; valores JSON de qualquer tipo e números exatos |
 | `assertion.Status` | Somente igualdade esperado/recebido; não conhece runner, HTTP ou apresentação |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `cli.Command`, `BuildInfo` | Argumentos e streams (`SetArgs/SetIn/SetOut/SetErr`), leitura/fechamento antes da rede, saída segura, resumo e exit code; não reavalia assertion |
@@ -135,10 +136,18 @@ da resposta da entrada executada.
 Após transporte concluído, runner compara status antes de chamar `captureResponse`.
 Divergência prevalece sobre JSON inválido. Sem expectativa, qualquer status permite
 capturar sem inventar assertion. `query.Path.Select` devolve valor/found/erro seguro;
-`null` difere de ausência, e números não passam por float64. O runner exige string,
-monta um lote e `Session.Publish` verifica nomes/conflitos antes de disponibilizá-lo.
-Strings recebidas são serializadas como strings, não passam pela interpretação de
-`--var` e não são reinterpretadas como templates.
+`null` difere de ausência, e números não passam por float64. O runner serializa
+cada seleção com `json.Marshal`, preservando `json.Number` inclusive nas estruturas;
+`nil` encontrado vira JSON `null`. O lote usa `template.Capture.Value` como
+`json.RawMessage`. `Session.Publish` valida todo payload JSON e nomes/conflitos
+antes de disponibilizá-lo atomicamente. Payload inválido é erro controlado de
+captura, nunca fallback textual de `--var`. A sessão reutiliza `parseVariable`
+somente após validação: strings são decodificadas, estruturas permanecem opacas,
+valores são copiados sem alias do buffer do chamador. Strings recebidas são
+serializadas como strings, sem reinterpretação de literais ou templates.
+O renderer contextual existente preserva tipos completos/raiz e rejeita
+arrays/objetos em texto antes do próximo envio; não há ampliação de JSONPath,
+pacotes, dependências, goroutines ou contrato HTTP.
 
 `CaptureFailed` não desfaz Completed, Validated ou WithoutValidation: a resposta
 terminou e sua eventual comparação passou. `CaptureError` localiza declaração ou
@@ -146,13 +155,16 @@ consulta sem reproduzir JSON, valor selecionado ou causa bruta. Falha impede as
 próximas entradas; callback síncrono e prioridade de ReportErr permanecem.
 `EntryResult` não carrega o body da resposta nem os valores publicados.
 
-A sessão registra proteção de strings secretas assim que descobertas, inclusive
+A sessão registra proteção de valores JSON secretos assim que descobertos, inclusive
 antes de uma eventual falha em outra declaração. Runner sanitiza DisplayURL antes
 do callback; os writers da CLI combinam `argumentProtection` e `Session.Sanitize`
 antes de escrever resultados/diagnósticos/resumos. `executionProtection` é local a
 ExecuteContext, sem sobreviver na instância do comando original. Variantes para
-capturas partem da string já decodificada, serializada como string JSON, evitando
-confusão com literais CLI. Não há nova fonte de credenciais iniciais nem detecção
+capturas partem de JSON validado: `ProtectCapture(name, json.RawMessage)` reutiliza
+`SecretVariants`/`Protector`, inclusive constituintes e escapes conhecidos de
+arrays/objetos, sem disponibilizar propriedades como variáveis. A proteção também
+precede falha de publicação/conflito; vazio não corrompe a saída. Não há confusão
+entre string capturada e literal CLI. Não há nova fonte de credenciais iniciais nem detecção
 universal de segredos ainda desconhecidos.
 
 ## Rede e recursos
@@ -192,8 +204,8 @@ no mesmo contexto/deadline. O body é fechado em sucesso ou erro; falhas de leit
 ou fechamento continuam sendo transporte, sem publicação parcial de capturas.
 O retorno só ocorre depois desse consumo e sem cancelamento pendente. Runner
 conhece somente bytes fechados de resposta, nunca leitores ou tipos net/http.
-Após avaliação, os bytes não são acumulados no resultado. Memória adicional cresce
-com o tamanho da resposta final somente nas entradas que pedem capturas.
+Após avaliação, os bytes não são acumulados no resultado. Memória adicional acompanha a resposta final retida nas entradas com captura e
+os valores/proteções da sessão; não há retenção de resposta em `EntryResult`.
 
 Causas sensíveis são preservadas para `errors.Is/As`, mas jamais concatenadas à
 mensagem exibida. A CLI usa categoria controlada ou diagnóstico genérico seguro;
@@ -224,15 +236,17 @@ geram código 2.
   stdout comprova o primeiro resultado já visível enquanto o servidor mantém a
   segunda requisição bloqueada, em sucesso, divergência e body incompleto.
 - `tests/e2e/compatibility_test.go`: alvo explícito com tag `compatibility`, Hurl
-  8.0.0 exigido e 50 pares/observações versionados, incluindo bytes/métodos/headers
+  8.0.0 exigido e 58 pares/observações versionados, incluindo bytes/métodos/headers
   efetivamente recebidos no corpus US-02 e variáveis fornecidas às duas ferramentas
   sem editar cenários nos corpora US-03/US-04 (com RequestURI para verificar encoding).
   `variables_body` muda intencionalmente de rejeição para sucesso; seis novos pares
   distinguem semântica compartilhada e extensões de tipagem CLI. Nove pares US-05
   `captures_*` registram JSON retornado pelo harness e token efetivamente recebido
   em Authorization, além das diferenças de nomes, sobrescrita, tipos e ausência
-  de expectativa. Os 41 pares antigos conservam suas observações. Não há skip em
-  versão ausente/errada.
+  de expectativa. A US-06 acrescenta oito pares `captures_typed_*` para valores
+  completos/raiz, índices, boolean/null, precisão e rejeições textuais; apenas
+  `captures_non_string` muda de rejeição para sucesso entre os 50 anteriores.
+  Os outros 49 pares conservam suas observações. Sem skip em versão ausente/errada.
 
 Saída é deliberadamente sempre plain-text: os testes usam streams, arquivo, pipe e
 PTY real para verificar o contrato, sem criar detector de TTY ou dependência

@@ -1,0 +1,45 @@
+{
+  "response_json": "{\"nested\":[9007199254740993,1.2300e+99,null,\"{{missing}}\"]}",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "HTTPGo preserva objeto raiz, números aninhados e placeholder literal; Hurl termina com exit 3 após /capture",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"nested\":[9007199254740993,1.2300e+99,null,\"{{missing}}\"]}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

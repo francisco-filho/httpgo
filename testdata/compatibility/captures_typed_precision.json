@@ -1,0 +1,53 @@
+{
+  "response_json": "{\"id\":9007199254740993}",
+  "variables": [
+    "base=http://example.invalid"
+  ],
+  "classification": "compartilhado neste par: ID 9007199254740993 exato em URI, header e JSON numérico, exit 0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/products/9007199254740993"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/products/9007199254740993",
+        "method": "POST",
+        "body": "{\"id\":9007199254740993}",
+        "content_type": "application/json",
+        "probe": "9007199254740993"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/products/9007199254740993"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/products/9007199254740993",
+        "method": "POST",
+        "body": "{\"id\":9007199254740993}",
+        "content_type": "application/json",
+        "probe": "9007199254740993"
+      }
+    ]
+  }
+}

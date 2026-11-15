@@ -78,15 +78,17 @@ func TestCaptureFailuresAndStatusPriority(t *testing.T) {
 	}{
 		{"invalid JSON", "sensitive", "HTTP 200\n", `token: jsonpath "$"`, 200, CaptureFailed, 1, 0},
 		{"missing", `{}`, "HTTP 200\n", `token: jsonpath "$.token"`, 200, CaptureFailed, 1, 0},
-		{"null", `null`, "HTTP 200\n", `token: jsonpath "$"`, 200, CaptureFailed, 1, 0},
-		{"number", `123`, "", `token: jsonpath "$"`, 200, CaptureFailed, 0, 1},
-		{"bool", `false`, "", `token: jsonpath "$"`, 200, CaptureFailed, 0, 1},
-		{"array", `[]`, "", `token: jsonpath "$"`, 200, CaptureFailed, 0, 1},
-		{"object", `{}`, "", `token: jsonpath "$"`, 200, CaptureFailed, 0, 1},
+		{"null", `null`, "HTTP 200\n", `token: jsonpath "$"`, 200, Passed, 1, 0},
+		{"number", `123`, "", `token: jsonpath "$"`, 200, Unvalidated, 0, 1},
+		{"bool", `false`, "", `token: jsonpath "$"`, 200, Unvalidated, 0, 1},
+		{"array", `[]`, "", `token: jsonpath "$"`, 200, Unvalidated, 0, 1},
+		{"object", `{}`, "", `token: jsonpath "$"`, 200, Unvalidated, 0, 1},
 		{"index", `[]`, "", `token: jsonpath "$[0]"`, 200, CaptureFailed, 0, 1},
 		{"mismatch wins", "not JSON", "HTTP 200\n", `token: jsonpath "$"`, 503, Mismatch, 0, 0},
-		{"404 allowed", `"token"`, "HTTP 404\n", `token: jsonpath "$"`, 404, Passed, 1, 0},
-		{"no expectation", `"token"`, "", `token: jsonpath "$"`, 500, Unvalidated, 0, 1},
+		{"404 allowed", `{"id":9007199254740993}`, "HTTP 404\n", `token: jsonpath "$"`, 404, Passed, 1, 0},
+		{"no expectation", `[null,true]`, "", `token: jsonpath "$"`, 500, Unvalidated, 0, 1},
+		{"extra JSON", `null true`, "", `token: jsonpath "$"`, 200, CaptureFailed, 0, 1},
+		{"incompatible traversal", `null`, "", `token: jsonpath "$.child"`, 200, CaptureFailed, 0, 1},
 		{"batch collision", `"token"`, "", "token: jsonpath \"$\"\ntoken.child: jsonpath \"$\"", 200, CaptureFailed, 0, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -165,7 +167,7 @@ func TestCaptureFailureReportStopsAndPreservesCounts(t *testing.T) {
 	calls := 0
 	got := New(executorFunc(func(context.Context, Request) (Response, error) {
 		calls++
-		return Response{Status: 200, Body: []byte(`null`)}, nil
+		return Response{Status: 200, Body: []byte(`null true`)}, nil
 	}), func(e EntryResult) error {
 		if e.Outcome != CaptureFailed || e.Status != 200 {
 			t.Fatalf("%+v", e)

@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-05
+# Matriz de compatibilidade — US-01 a US-06
 
 ## Escopo da evidência
 
@@ -145,7 +145,7 @@ registro de tráfego fictício.
 | `captures_dotted` | 0; token recebido em X-Probe | 3; somente login | nome pontuado resolve exatamente aqui; Hurl não resolve o exemplo |
 | `captures_collision` | 2; somente login | 0; login e /health com token novo | HTTPGo não sobrescreve variável inicial; Hurl sobrescreve |
 | `captures_missing` | 2; somente login | 3; somente login | caminho ausente interrompe; códigos próprios |
-| `captures_non_string` | 2; somente /capture | 0; /capture e /health, X-Probe `123` | restrição HTTPGo: capturas somente string, sem coerção numérica |
+| `captures_non_string` | **0 na US-06**; /capture e /health, X-Probe `123` | 0; mesmos requests | antiga restrição string removida intencionalmente na issue #16 |
 | `captures_unsupported` | 2; zero envios | 0; /health, login e /health | wildcard reconhecido e não suportado impede todo envio HTTPGo |
 | `captures_mismatch` | 1; somente /unavailable | 4; mesmo path | status divergente prevalece sobre captura de body não JSON |
 
@@ -153,6 +153,34 @@ Os testes próprios httpgo cobrem também strings semelhantes a placeholders,
 controles/Unicode/escapes, URL/headers inválidos após captura, múltiplas capturas,
 conflitos hierárquicos e de lote, isolamento de execução e proteção dinâmica.
 Não se deduz compatibilidade geral de JSONPath/capturas a partir desses pares.
+
+## Ampliação US-06 — capturas tipadas (issue #16)
+
+**Mudança intencional de contrato:** `captures_non_string.json` passa de exit 2
+com somente `/capture` para exit 0 com `/capture` → `/health`, header `X-Probe: 123`.
+O `.hurl` não mudou. A captura numérica usa representação JSON em contexto textual;
+isso não é conversão implícita de estruturas para strings. **Os outros 49 pares
+antigos não mudaram.** Oito pares novos ampliam a matriz para **58 pares**,
+reutilizando `response_json` e as observações de URI, headers e bytes do body.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/diferença observada |
+|---|---|---|---|
+| `captures_typed_precision` | 0; ID `9007199254740993` em URI/header/JSON numérico | 0; mesmos bytes | precisão exata compartilhada neste par, sem extrapolar outros números |
+| `captures_typed_boolean` | 0; `true` raiz, JSON booleano e texto em URI/header/string | 0; mesmos bytes | representação escalar contextual compartilhada neste par |
+| `captures_typed_null` | 0; null raiz, JSON null e texto `null` em URI/header/string | 0; mesmos bytes | null encontrado não é ausência neste par |
+| `captures_typed_values` | 0; booleano, null, string/array/objeto vazios preservados | 3; somente /capture | Hurl não envia a segunda entrada deste conjunto; não se deduz qual tipo isolado causou a falha |
+| `captures_typed_root` | 0; objeto raiz com `9007199254740993`, `1.2300e+99`, null e placeholder literal | 3; somente /capture | HTTPGo preserva números aninhados e conteúdo literal; sem equivalência composta presumida |
+| `captures_typed_index` | 0; `$[0].items` produz array raiz com tipos e precisão | 3; somente /capture | seleção por índice/propriedade e inserção de array completo comprovadas aqui |
+| `captures_typed_text_rejected` | 2; somente /capture | 3; somente /capture | HTTPGo exige valor JSON completo para array, sem coerção para string JSON |
+| `captures_typed_header_rejected` | 2; somente /capture | 3; somente /capture | HTTPGo rejeita objeto em header antes do envio dependente |
+
+Essas observações não implicam equivalência geral de tipos JSON, JSONPath,
+precisão ou conversão textual com Hurl. Os pares de string anteriores permanecem:
+`captures_literal` ainda conserva `"null"` como string aqui enquanto o Hurl envia
+null JSON. Nenhuma observação antiga foi atualizada para esconder divergências.
+O teste diferencial não avalia proteção de credenciais: usa só valores fictícios;
+E2E próprios cobrem capturas secretas escalares/compostas, constituintes, escapes
+conhecidos, falhas posteriores e ausência de mutação dos dados enviados.
 
 ## Extensões e restrições
 
@@ -170,4 +198,7 @@ saída/exit codes próprios e restrição de redirects estão detalhados em `sub
 A execução local usou Hurl 8.0.0 com libcurl 8.18.0. O binário da sandbox emite um
 aviso de versionamento de libcurl em stderr ao iniciar; o harness não o confunde
 com falha de HTTP ou altera os resultados para escondê-lo. A matriz acima passou
-contra esse binário. Evidência de portabilidade e gate pendente: `validation.md`.
+contra esse binário. Evidência Linux da US-06 em `validation.md`. Conforme o
+plano v4, seção 7, builds cruzados e runtime macOS/Windows ficam opcionais nesta
+história, para validação final de portabilidade/release; não bloqueiam seu gate.
+Nenhuma execução nativa nessas plataformas foi declarada.

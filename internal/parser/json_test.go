@@ -59,6 +59,14 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, seed := range []string{
+		"POST http://example.test/products\n{\"name\":\"Pizza\"}\nHTTP 201\n[Captures]\nid: jsonpath \"$.id\"\nGET http://example.test/products/{{id}}\nHTTP 200\nPOST http://example.test/echo\n{\"id\":{{id}}}",
+		"GET http://example.test/capture\r\nHTTP 200\r\n[Captures]\r\nvalue: jsonpath \"$[0].items\"\r\nPOST http://example.test/echo\r\n{{value}}\r\nHTTP 200",
+		"GET http://example.test/capture\nHTTP 200\n[Captures]\nobject: jsonpath \"$\"\nname: jsonpath \"$.name\"\nPOST http://example.test/echo\n{\"object\":{{object}},\"name\":{{name}}}",
+		"GET http://example.test/capture\n[Captures]\nvalue: jsonpath \"$.array[*]\"\nPOST http://example.test/echo\n{{value}}",
+	} {
+		f.Add(seed)
+	}
 	for _, seed := range []string{"GET http://example.test/\n[Captures]\na.b: jsonpath \"$.items[0].token\"\nGET {{a.b}}", "POST http://example.test\n{\"section\":\"[Captures]\"}\nHTTP 200\n[Captures]\ntoken: jsonpath \"$\"", "GET http://example.test\r\n[Captures]\r\ntoken: jsonpath \"$..x\""} {
 		f.Add(seed)
 	}

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -25,12 +26,12 @@ func captureResponse(session template.Session, declarations []parser.Capture, bo
 		if !found {
 			return &CaptureError{Position: declaration.QueryPosition, Detail: "consulta não encontrou valor"}
 		}
-		text, ok := value.(string)
-		if !ok {
-			return &CaptureError{Position: declaration.QueryPosition, Detail: "consulta exige resultado string"}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return &CaptureError{Position: declaration.QueryPosition, Detail: "não foi possível serializar valor da captura"}
 		}
-		session.ProtectCapture(declaration.Name, text)
-		batch = append(batch, template.Capture{Name: declaration.Name, Value: text})
+		session.ProtectCapture(declaration.Name, raw)
+		batch = append(batch, template.Capture{Name: declaration.Name, Value: raw})
 	}
 	if err := session.Publish(batch); err != nil {
 		pos := declarations[0].Position
@@ -38,7 +39,11 @@ func captureResponse(session template.Session, declarations []parser.Capture, bo
 		if errors.As(err, &conflict) && conflict.Index >= 0 && conflict.Index < len(declarations) {
 			pos = declarations[conflict.Index].Position
 		}
-		return &CaptureError{Position: pos, Detail: "nome de captura inválido, repetido ou em conflito ancestral/descendente"}
+		var invalid *template.CaptureValueError
+		if errors.As(err, &invalid) && invalid.Index >= 0 && invalid.Index < len(declarations) {
+			pos = declarations[invalid.Index].QueryPosition
+		}
+		return &CaptureError{Position: pos, Detail: "não foi possível publicar captura; verifique os valores e nomes inválidos, repetidos ou em conflito ancestral/descendente"}
 	}
 	return nil
 }

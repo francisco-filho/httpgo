@@ -5,16 +5,25 @@ import (
 	"strings"
 )
 
-// Session owns response-derived strings for exactly one execution.
+// Session owns response-derived JSON values for exactly one execution.
 type Session interface {
 	Render(string) (Text, error)
 	RenderJSON([]byte) ([]byte, error)
 	Publish([]Capture) error
-	ProtectCapture(name, value string)
+	ProtectCapture(name string, value json.RawMessage)
 	Sanitize(string) string
 }
 
-type Capture struct{ Name, Value string }
+// Capture carries one complete JSON value, never a CLI literal with text fallback.
+type Capture struct {
+	Name  string
+	Value json.RawMessage
+}
+
+// CaptureValueError identifies invalid JSON without exposing its content.
+type CaptureValueError struct{ Index int }
+
+func (e *CaptureValueError) Error() string { return "valor de captura não contém JSON válido" }
 
 // ConflictError identifies the declaration within a publication batch.
 type ConflictError struct{ Index int }
@@ -41,11 +50,9 @@ func (c *Context) lookup(name string) (variable, bool) {
 }
 
 // ProtectCapture remembers a discovered secret even if another declaration fails.
-// Marshaling first prevents interpreting a received string as a CLI JSON literal.
-func (c *Context) ProtectCapture(name, value string) {
-	if c.secrets[name] {
-		raw, _ := json.Marshal(value)
-		c.protected = append(c.protected, SecretVariants(string(raw))...)
+func (c *Context) ProtectCapture(name string, value json.RawMessage) {
+	if c.secrets[name] && json.Valid(value) {
+		c.protected = append(c.protected, SecretVariants(string(value))...)
 	}
 }
 
@@ -54,7 +61,12 @@ func (c *Context) Publish(batch []Capture) error {
 	for _, capture := range batch {
 		c.ProtectCapture(capture.Name, capture.Value)
 	}
+	values := make([]variable, len(batch))
 	for i, capture := range batch {
+		if !json.Valid(capture.Value) {
+			return &CaptureValueError{Index: i}
+		}
+		values[i] = parseVariable(string(capture.Value))
 		if !ValidName(capture.Name) {
 			return &ConflictError{Index: i}
 		}
@@ -77,9 +89,8 @@ func (c *Context) Publish(batch []Capture) error {
 	if c.captures == nil {
 		c.captures = make(map[string]variable)
 	}
-	for _, capture := range batch {
-		raw, _ := json.Marshal(capture.Value)
-		c.captures[capture.Name] = variable{raw: raw, text: capture.Value, original: string(raw)}
+	for i, capture := range batch {
+		c.captures[capture.Name] = values[i]
 	}
 	return nil
 }

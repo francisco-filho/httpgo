@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-05 (issues #4, #6, #11, #13 e #14)
+# Subconjunto suportado — US-01 a US-06 (issues #4, #6, #11, #13, #14 e #16)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -146,7 +146,7 @@ globalmente. Valores derivados conservam proteção, inclusive path e header com
 **Credenciais reais em argumentos são proibidas, inclusive em `--var`.** Apenas
 valores não sigilosos/fictícios são adequados aqui. A fonte segura pelo ambiente
 do processo chega na US-13; não há entrada de segredos por stdin, configuração
-YAML nesta entrega. Capturas string de respostas não são uma nova fonte de
+YAML nesta entrega. Capturas de respostas não são uma nova fonte de
 credenciais iniciais. Proteção de streams não protege histórico do shell,
 listagem de processos, arquivos em disco nem segredos arbitrários não marcados.
 
@@ -186,7 +186,7 @@ httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
 - Sem placeholders, bytes e validação permanecem os da US-02. A expectativa e a
   entrada seguinte começam em nova linha, inclusive depois de placeholder raiz.
 
-## Capturas string — US-05
+## Capturas tipadas — US-05/US-06
 
 ```hurl
 POST {{base_url}}/auth/login
@@ -216,13 +216,51 @@ descida recursiva, slices, união, propriedades entre colchetes ou índices nega
 Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
 **todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
 
-A resposta final deve conter exatamente um valor JSON válido e a seleção deve
-produzir string, inclusive vazia. Campo ausente/índice fora do array difere de
-null, mas ambos falham; números, booleanos, arrays e objetos também são erros de
-captura, sem conversão para texto. A string decodificada conserva seu tipo em JSON
-completo: `"123"`/`"null"` recebidos não viram número/null. Conteúdo semelhante a
-placeholder não é reinterpretado. Escapes contextuais e validações finais de
-URL/header/JSON são os mesmos das variáveis iniciais.
+A resposta final deve conter exatamente um valor JSON válido. **Ampliação
+intencional da US-06:** a seleção aceita string, número, booleano, `null`, array
+ou objeto, inclusive na raiz. Campo ausente/índice fora do array ou percurso
+incompatível é erro; `null`, string vazia e coleções vazias existem e são válidos.
+JSON inválido ou com valores adicionais também falha, sem publicar lote parcial.
+
+Em valor JSON completo, inclusive raiz de body inline, o tipo e o conteúdo são
+preservados. Números não passam por float64 e mantêm precisão, também aninhados:
+`9007199254740993` e `1.2300e+99` não sofrem arredondamento. A string decodificada
+conserva seu tipo: `"123"`/`"null"` recebidos não viram número/null. Conteúdo
+semelhante a placeholder não é reinterpretado, nem dentro de estruturas.
+
+Em URL, valor de header ou string JSON, strings usam seu conteúdo, números sua
+representação JSON, booleanos `true`/`false` e `null` o texto `null`. Arrays/objetos
+exigem valor JSON completo; uso textual falha com código 2 e posição no template
+original, inclusive LF/CRLF, sem enviar a entrada afetada ou as seguintes.
+Escapes JSON, validação da URL final, encoding explícito não duplicado e rejeição
+de controles indevidos em headers são os mesmos das variáveis iniciais.
+Capturar um objeto não cria variáveis para suas propriedades; uma declaração
+separada exige nome não conflitante (por exemplo `productId`, não `product.id`
+quando `product` já existe).
+
+Exemplo mínimo (`scenario_capture_products.hurl`):
+
+```hurl
+POST {{base_url}}/products
+Content-Type: application/json
+{"name":"Pizza"}
+HTTP 201
+[Captures]
+productId: jsonpath "$.id"
+
+GET {{base_url}}/products/{{productId}}
+HTTP 200
+
+POST {{base_url}}/echo
+Content-Type: application/json
+{"productId":{{productId}}}
+HTTP 200
+```
+
+Execute `httpgo test products.hurl --var base_url=http://localhost:8080` contra
+API que devolva `{"id":9007199254740993}`. O ID chega exato no path e como número
+no body seguinte; os três status são validados. O cenário autenticado completo
+está em `scenario_capture_auth_products.hurl` e é exercitado pelos E2E.
 
 Após consumir e fechar a resposta, o status esperado é validado **antes** de
 avaliar capturas. Divergência retorna 1 mesmo se a resposta não for JSON; nenhuma
@@ -232,15 +270,17 @@ permite capturar; sem expectativa, não se presume validação de status.
 Capturas têm escopo separado das variáveis iniciais e uma sessão nova por execução.
 Não há sobrescrita: duplicações e conflitos ancestral/descendente com qualquer
 valor inicial, captura anterior ou outra declaração da resposta falham,
-independentemente do tipo inicial. O lote só fica disponível se todas as consultas,
-tipos e nomes passarem. Colisão, consulta/tipo inválido ou uso antecipado/ausente
+independentemente do tipo. O lote só fica disponível se todas as consultas,
+valores e nomes passarem. Colisão, captura inválida ou uso antecipado/ausente
 retorna 2 e interrompe as entradas seguintes. Resultados anteriores são preservados.
 Falha de captura mantém a resposta em `concluídas` e o status aprovado em
 `validadas` (ou `sem_validação` sem expectativa), sem classificá-la como transporte.
 
 `--secret nome` pode marcar a captura antes de ela existir, sem fornecer valor.
-Uma string secreta descoberta é protegida antes de apresentar o resultado,
-inclusive se outra declaração da resposta falhar. A proteção dinâmica é local à
+Um valor secreto descoberto, de qualquer tipo, é protegido antes de apresentar
+o resultado, inclusive se outra declaração da resposta falhar. Constituintes de
+arrays/objetos também são protegidos nas formas conhecidas, sem virarem variáveis
+nem alterar dados enviados. A proteção dinâmica é local à
 execução, combina-se com a proteção inicial e cobre variantes JSON/Go/URL
 conhecidas e nomes de arquivo em diagnósticos. Vazio não causa substituição global.
 Bodies e valores selecionados nunca entram no relatório/diagnóstico. Nada permite
@@ -405,11 +445,15 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 - Nomes pontuados são aceitos aqui, mas `api.baseUrl` falhou no Hurl 8.0.0.
   Duplicações/conflitos são erros aqui; Hurl permite sobrescrita no corpus.
   Hurl aceita templates em nomes de headers/chaves JSON; esta entrega não.
-- Capturas aqui são somente strings, sem sobrescrita. Hurl 8.0.0 aceita outros
-  tipos e sobrescreve variáveis no corpus. Nomes pontuados não resolvem nele;
-  seção sem expectativa é rejeitada. Em valor JSON completo Hurl pode reinterpretar
-  o texto capturado (`"null"` vira null); aqui permanece string. Veja os pares
-  `captures_*`, que verificam inclusive Authorization recebido pela API.
+- Capturas aqui aceitam todos os tipos JSON desde a US-06, sem sobrescrita.
+  Hurl 8.0.0 compartilha número de alta precisão, booleano e null nos pares
+  escalares observados, mas os pares de estruturas terminam nele com código 3
+  após `/capture`; aqui estruturas completas são preservadas. Não se presume
+  equivalência geral de tipos ou conversão textual. Hurl sobrescreve variáveis
+  no corpus, não resolve os nomes pontuados dos exemplos e rejeita seção sem
+  expectativa. Em valor JSON completo pode reinterpretar texto capturado
+  (`"null"` vira null); aqui permanece string. Veja `captures_*`, inclusive
+  URI, headers e bytes JSON efetivamente recebidos pela API.
 - Configuração YAML hierárquica e interpolação externa, quando implementadas,
   serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
 
