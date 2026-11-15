@@ -4,6 +4,8 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/parser"
@@ -130,6 +132,22 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 					result.ReportErr = err
 				}
 			}
+			return result
+		}
+		if entry.ExternalBody != nil {
+			path := entry.ExternalBody.Path
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(scenario.OriginDir, path)
+			}
+			body, err := os.ReadFile(path)
+			if err != nil {
+				result.Err, result.ErrorPosition = err, entry.ExternalBody.Position
+				return result
+			}
+			request.Body = body
+		}
+		if err := ctx.Err(); err != nil {
+			result.Err, result.ErrorPosition = err, entry.Position
 			return result
 		}
 		result.Summary.Started++

@@ -76,10 +76,35 @@ rejeita **todo o arquivo**, inclusive requisições anteriores válidas.
 Construções reconhecidas e não suportadas são diagnosticadas separadamente de
 sintaxe inválida. Não são aceitos: HEAD/OPTIONS/CONNECT/TRACE, body em GET,
 templates em chaves JSON e nomes de headers, seções além de `[Captures]` e
-`[Asserts]`, `file,...;`, multipart/form-urlencoded, bodies binários/string multilinha
+`[Asserts]`, multipart/form-urlencoded, bodies binários/string multilinha
 não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instruções.
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
+
+### Body de arquivo externo — US-09 (issue #22)
+
+Alternativamente ao JSON inline, `POST`, `PUT`, `PATCH` e `DELETE` aceitam
+`file,<caminho>;` como body completo. O caminho é literal entre `file,` e o
+`;` final, incluindo espaços, aspas e barras, sem escapes nem interpolação.
+Vírgula e ponto e vírgula no nome não são aceitos. GET continua sem body;
+body duplicado/misturado ou header após body rejeita todo o cenário.
+Caminhos relativos partem do diretório do `.hurl`, não do diretório corrente;
+absolutos são aceitos. Não há sandbox: `..` e absolutos alcançam arquivos fora
+da raiz do projeto, usando as permissões do usuário.
+
+```hurl
+POST http://localhost:8080/products
+Content-Type: application/json
+file,../payloads/product.json;
+HTTP 201
+```
+
+O arquivo é lido somente na vez da requisição e enviado integralmente, sem
+validar JSON, renderizar placeholders ou normalizar bytes (inclusive vazio e
+binário). Não se infere Content-Type. Falha de leitura interrompe antes do envio
+com código 2; requisições anteriores não são desfeitas. Renderização externa,
+`--render-files` e multipart permanecem fora de escopo.
+**Mudança de contrato:** a referência externa, antes rejeitada, passa a ser aceita.
 
 ## Variáveis tipadas e templates — US-03/US-04
 

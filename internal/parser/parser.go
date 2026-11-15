@@ -31,7 +31,14 @@ type Capture struct {
 	QueryPosition Position
 }
 
+// FileBody is a literal local file reference, not a template.
+type FileBody struct {
+	Path     string
+	Position Position
+}
+
 type Entry struct {
+	ExternalBody     *FileBody
 	Assertions       []Assertion
 	Captures         []Capture
 	Method           string
@@ -49,8 +56,9 @@ type Entry struct {
 }
 
 type Scenario struct {
-	File    string
-	Entries []Entry
+	OriginDir string
+	File      string
+	Entries   []Entry
 }
 
 // Error contains only controlled diagnostic text, never input tokens.
@@ -173,6 +181,23 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			}
 			entry.ExpectedStatus, entry.ExpectedPosition = &status, pos
 		default:
+			if strings.HasPrefix(text, "file,") {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures || asserts || capturesSeen || entry.Body != nil || entry.ExternalBody != nil {
+					return fail("sintaxe inválida", "body externo sem requisição disponível ou body duplicado")
+				}
+				if entry.Method == "GET" {
+					return fail("construção não suportada", "body em GET")
+				}
+				if !strings.HasSuffix(text, ";") {
+					return fail("sintaxe inválida", "referência file exige terminador ;")
+				}
+				path := text[len("file,") : len(text)-1]
+				if path == "" || strings.ContainsAny(path, ",;") {
+					return fail("sintaxe inválida", "referência file exige caminho não vazio, sem vírgula ou ponto e vírgula")
+				}
+				entry.ExternalBody = &FileBody{Path: path, Position: pos}
+				break
+			}
 			if construction := unsupported(fields[0]); construction != "" {
 				return fail("construção não suportada", construction)
 			}
@@ -193,7 +218,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				break
 			}
 			if isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil {
 					return fail("sintaxe inválida", "body JSON sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -231,7 +256,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				continue
 			}
 			if strings.Contains(text, ":") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil {
 					return fail("sintaxe inválida", "header fora da requisição ou após body")
 				}
 				name, value, _ := strings.Cut(text, ":")
@@ -336,8 +361,6 @@ func unsupported(token string) string {
 		switch {
 		case strings.HasPrefix(token, "HTTP/"):
 			return "versão HTTP na resposta esperada"
-		case strings.HasPrefix(token, "file,"):
-			return "body externo"
 		case strings.HasPrefix(token, "```"):
 			return "body binário ou string multilinha"
 		case strings.HasPrefix(token, "[") && len(token) > 1 && ((token[1] >= 'A' && token[1] <= 'Z') || (token[1] >= 'a' && token[1] <= 'z' && token[1] != 't' && token[1] != 'f' && token[1] != 'n')):

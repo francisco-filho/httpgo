@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"capimgrosso.com/httpgo/internal/parser"
@@ -60,7 +61,11 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail(err.Error())
 	}
 	file := args.file
-	input, err := os.Open(file)
+	absolute, err := filepath.Abs(file)
+	if err != nil {
+		return c.fail("não foi possível determinar o diretório do cenário")
+	}
+	input, err := os.Open(absolute)
 	if err != nil {
 		return c.fail(fmt.Sprintf("%q: não foi possível abrir o arquivo; verifique o caminho e a permissão de leitura", file))
 	}
@@ -77,6 +82,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if closeErr != nil {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
+	scenario.OriginDir = filepath.Dir(absolute)
 	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).Run(ctx, scenario)
 	return c.renderSummary(scenario, result)
 }
