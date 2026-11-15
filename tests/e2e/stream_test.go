@@ -57,7 +57,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}))
 			defer server.Close()
 			address := strings.Replace(server.URL, "http://", "http://username-secret:password-secret@", 1)
-			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\n[Asserts]\nheader \"X-Ready\" == \"yes\"\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/second\nAuthorization: Bearer {{token}}\n{\"typed\":{{payload}}}\nHTTP 404")
+			file := scenario(t, "GET {{first}}/first?token=query-secret#fragment-secret\nHTTP 200\n[Asserts]\njsonpath \"$.token\" == \"stream-token-ficticio\"\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/second\nAuthorization: Bearer {{token}}\n{\"typed\":{{payload}}}\nHTTP 404")
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			reader, writer, err := os.Pipe()

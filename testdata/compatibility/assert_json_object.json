@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"b\":[true,null],\"a\":1}",
+  "classification":"structural object equality independent of key order here; Hurl rejects expected object literal",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
+  "hurl":{"exit":2,"paths":null}
+}

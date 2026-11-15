@@ -1,4 +1,4 @@
-# Subconjunto suportado — US-01 a US-07 (issues #4, #6, #11, #13, #14, #16 e #18)
+# Subconjunto suportado — US-01 a US-08 (issues #4, #6, #11, #13, #14, #16, #18 e #20)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -265,9 +265,10 @@ API que devolva `{"id":9007199254740993}`. O ID chega exato no path e como núme
 no body seguinte; os três status são validados. O cenário autenticado completo
 está em `scenario_capture_auth_products.hurl` e é exercitado pelos E2E.
 
-Após consumir e fechar a resposta, o status numérico e as assertions de headers
+Após consumir e fechar a resposta, o status numérico e as assertions de headers/JSON
 são validados **antes** de avaliar capturas, independentemente da ordem das seções.
-Divergência retorna 1 mesmo se a resposta não for JSON; nenhuma
+Entre assertions, vale a ordem escrita: um header divergente anterior ao JSON
+inválido retorna 1; invertendo a ordem, a avaliação JSON retorna 2. Nenhuma
 captura é publicada e não há próxima requisição. 4xx/5xx esperado corretamente
 permite capturar; sem expectativa, não se presume validação de status.
 
@@ -287,15 +288,17 @@ arrays/objetos também são protegidos nas formas conhecidas, sem virarem variá
 nem alterar dados enviados. A proteção dinâmica é local à
 execução, combina-se com a proteção inicial e cobre variantes JSON/Go/URL
 conhecidas e nomes de arquivo em diagnósticos. Vazio não causa substituição global.
-Bodies e valores selecionados nunca entram no relatório/diagnóstico. Nada permite
+Bodies e valores capturados nunca entram no relatório/diagnóstico; valores
+selecionados para assertions podem aparecer somente sanitizados conforme abaixo. Nada permite
 identificar universalmente segredos ainda desconhecidos ou recodificações arbitrárias.
 
 ## Assertions de headers — US-07 / issue #18
 
 **Ampliação intencional do contrato:** `[Asserts]`, antes rejeitada globalmente,
-aceita somente as três formas abaixo; exige `HTTP <status>` ou `HTTP *` na mesma
+passou a aceitar as três formas de header abaixo; exige `HTTP <status>` ou `HTTP *` na mesma
 entrada. A seção não pode ser órfã, vazia ou duplicada. Pode aparecer antes/depois
-de `[Captures]`; a ordem de avaliação continua status → headers → capturas.
+de `[Captures]`; a ordem de avaliação é status → assertions (headers/JSON na
+ordem escrita) → capturas.
 
 ```hurl
 GET http://localhost:8080/health
@@ -318,8 +321,8 @@ de status; assertions e capturas continuam obrigatórias quando declaradas.
   daquela feita pelo transporte HTTP (por exemplo whitespace externo do protocolo).
 - Valores esperados são strings literais entre aspas duplas. `{{nome}}` é texto
   literal, com ou sem variável/captura definida; não passa pelo renderer.
-  `exists` não aceita valor esperado. Não há regex, filtros, captura de headers,
-  assertions JSON ou outros operadores. Construções fora desse recorte falham
+  `exists` não aceita valor esperado. Não há regex, filtros, captura de headers
+  ou outros operadores de header. Construções fora desse recorte falham
   explicitamente com posição, antes de qualquer envio do arquivo.
 - Havendo ocorrências repetidas, somente a **primeira na ordem recebida** participa
   de `==`/`contains`, inclusive se nomes chegam com caixas diferentes. Nunca há
@@ -342,6 +345,73 @@ Compatibilidade comprovada é limitada aos pares `headers_*` em `compatibility.m
 lista em headers repetidos; esperado literal em vez de interpolado; assertions
 antes de capturas. Não se anuncia equivalência nessas combinações.
 
+## Igualdade JSON — US-08 / issue #20
+
+**Ampliação intencional:** `[Asserts]` passa a aceitar também
+`jsonpath "consulta" == <literal JSON>`, na mesma lista ordenada das assertions de
+headers. Exige `HTTP <status>` ou `HTTP *`; não muda o contrato das capturas.
+
+```hurl
+GET {{base_url}}/products/1
+HTTP 200
+[Asserts]
+jsonpath "$.name" == "Pizza"
+jsonpath "$.price" == 4500
+jsonpath "$.active" == true
+```
+
+Salve como `product.hurl` e execute
+`httpgo test product.hurl --var base_url=http://localhost:8080` contra uma API que
+retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
+`testdata/scenarios/scenario_assert_json.hurl`; fluxo autenticado com headers e ID
+`9007199254740993` em `scenario_assert_json_auth_products.hurl`, ambos nos E2E.
+
+- Consulta estática usa exatamente o subconjunto de capturas: `$`, propriedades
+  por ponto e índices não negativos combináveis (`$.items[0].name`). Sem
+  interpolação de consulta, wildcard, filtros, descida recursiva ou expansão.
+- Esperado é **um único literal JSON completo na mesma linha**: string, número,
+  booleano, null, array ou objeto, inclusive vazios. Escapes/Unicode seguem JSON.
+  Nunca passa pelo renderer: `"{{nome}}"` e placeholders aninhados em strings
+  permanecem texto com a variável definida ou ausente. Placeholder sem aspas
+  não é literal JSON. Literal inválido/adicional, query/operador fora do recorte
+  ou seção sem HTTP em qualquer entrada retorna 2 **antes de qualquer envio**.
+- Igualdade preserva tipos, sem coerção: `"4500"` difere de `4500`; `false` difere
+  de `0`; `[]` difere de `{}`. Números usam valor decimal exato: `1`, `1.0` e `1e0`
+  são iguais; grafias de zero também. Inteiros/decimais grandes e números
+  aninhados não arredondam; expoentes não provocam expansão de potências em
+  memória. Arrays exigem mesma ordem/comprimento; objetos comparam chaves e
+  conteúdo recursivamente, independentemente da ordem das chaves.
+- Valor/tipo diferente, propriedade ausente ou índice fora do array é divergência
+  (**1**). `null` presente satisfaz `null`; ausência tem representação própria.
+  JSON vazio/malformado/com valores adicionais ou percurso por tipo incompatível
+  (`$.price.value` com price numérico, propriedade em array ou índice em objeto)
+  gera **erro de avaliação JSON (2)**, não de captura/transporte. Capturas
+  continuam classificando ausência e percurso incompatível como erro de captura.
+- Ordem: resposta consumida/fechada → status numérico, se declarado → assertions
+  de headers e JSON na ordem escrita → avaliar/publicar capturas → callback.
+  JSON é decodificado somente ao chegar à primeira assertion JSON, reutilizado
+  na resposta e descartado depois. A primeira falha interrompe assertions,
+  capturas e próximos envios, sem lote publicado. `HTTP *` dispensa só comparação
+  numérica; contagens e prioridade de erro de escrita (2) permanecem iguais.
+- Diagnóstico localiza a assertion (arquivo/linha/coluna), identifica consulta e
+  apresenta esperado/real como JSON sanitizado: string com aspas, número, booleano,
+  null ou estrutura. `ausente` difere de `null` e `""`. Nunca despeja o body,
+  documento inteiro não selecionado ou coleção de headers. O resultado/callback
+  não guarda body, documento decodificado ou literal esperado bruto.
+- Segredos marcados, capturas anteriores secretas e derivados/escapes conhecidos
+  são removidos de consulta, posição e operandos antes da coleção/formatação.
+  Se houver **captura secreta pendente na mesma resposta**, esperado e real de
+  falhas de headers **e** JSON ficam integralmente ocultos, inclusive nos metadados
+  do callback. A marcação é consultada sem avaliar/resolver/publicar a captura;
+  até uma consulta de captura que falharia não altera a primeira falha. A ausência
+  continua identificável junto à ocultação. Essa política não reconhece segredos
+  arbitrários não marcados e não substitui os limites de segurança documentados.
+
+Continuam fora do recorte: `count`, `exists` JSON, comparações ordenadas, regex,
+filtros e interpolação de consultas ou esperados. A gramática de literais
+compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
+`compatibility.md`. A semântica aprovada não é alterada para forçar equivalência.
+
 ## Execução HTTP
 
 - Cada requisição é iniciada em ordem. Não há paralelismo ou retry, inclusive retry
@@ -360,10 +430,12 @@ antes de capturas. Não se anuncia equivalência nessas combinações.
   porta efetiva numérica (80 para HTTP e 443 para HTTPS, quando omitida).
   Não se usa DNS para equiparar hosts: localhost não equivale a 127.0.0.1.
   Mudar scheme/host/porta é erro de transporte, sem contato ao destino proibido.
-- Bodies intermediários e respostas sem capturas são consumidos em streaming,
-  sem retenção. Somente o body final de entrada com capturas é lido em memória,
-  sob o mesmo prazo, e fechado antes de avaliar o status final. Os bytes são
-  usados na captura e não ficam acumulados nos resultados.
+- Bodies intermediários e respostas sem capturas/assertions JSON são consumidos
+  em streaming, sem retenção. Somente o body final de entrada com capturas ou
+  assertions JSON é lido em memória, sob o mesmo prazo, e fechado antes de avaliar
+  o status final. Headers isolados continuam sem retenção. Bytes e documento
+  decodificado não ficam acumulados nos resultados; memória adicional acompanha
+  o body final e suas estruturas.
   Resposta incompleta, erro de leitura/fechamento ou timeout no body não aprova
   a expectativa só porque os headers já chegaram. Não há body em relatório.
 - Sem expectativa, inclusive 4xx/5xx é sucesso **sem validação de status**.
@@ -392,11 +464,12 @@ não estão implementados ou anunciados como disponíveis.
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
 resultado com o método declarado, URL segura e uma
 classificação: `status validado`, `sem validação de status`, `status aceito por HTTP *`,
-`status divergente`, `assertion de header divergente` ou `erro de transporte`; uma entrada que falha antes do envio recebe
+`status divergente`, `assertion de header divergente`, `assertion JSON divergente`,
+`erro de avaliação JSON` ou `erro de transporte`; uma entrada que falha antes do envio recebe
 `erro de renderização`. Em sucesso, inclusive sem expectativa, a linha começa
 diretamente com o método, sem prefixo de arquivo/linha/coluna. Apenas divergências
-e erros de transporte/renderização/captura/headers incluem esse prefixo. A falha de
-header aponta à declaração da assertion. Divergências mostram esperado e
+e erros de transporte/renderização/captura/headers/JSON incluem esse prefixo.
+A falha de header/JSON aponta à declaração da assertion. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status. `erro de captura` mostra o status
 real concluído e se ele foi validado; o diagnóstico em stderr localiza a declaração/consulta.
 
@@ -425,7 +498,7 @@ O resumo em stdout informa:
 - `concluídas`: respostas totalmente consumidas/fechadas, inclusive divergentes;
 - `validadas`: comparações de status aprovadas;
 - `sem_validação`: respostas concluídas sem comparação numérica (sem expectativa ou `HTTP *`);
-  a linha individual distingue esses dois casos. Não significa que headers não foram avaliados;
+  a linha individual distingue esses dois casos. Não significa que headers/JSON não foram avaliados;
 - `não_iniciadas`: entradas não iniciadas por interrupção.
 
 Erros de entrada anteriores ao runner não apresentam resumo de execução.
@@ -435,8 +508,8 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 | Exit code | Significado |
 |---|---|
 | 0 | todas as entradas concluídas sem divergência; inclui sem expectativa |
-| 1 | primeira divergência de status ou assertion de header |
-| 2 | uso, arquivo, parsing, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
+| 1 | primeira divergência de status ou assertion de header/JSON |
+| 2 | uso, arquivo, parsing, avaliação JSON, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
 Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
 em sucesso. Falha na escrita de um resultado interrompe o arquivo antes da requisição
@@ -517,7 +590,12 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 - Headers repetidos são listas no Hurl 8.0.0; aqui usa-se somente a primeira
   ocorrência. Com uma ocorrência, caixa/ausência/vazio/vírgula e os operadores
   têm equivalência observada. Hurl interpola o esperado e avalia capturas antes
-  das assertions; aqui o esperado é literal e headers antecedem capturas.
+  das assertions; aqui o esperado é literal e headers/JSON antecedem capturas.
+- Igualdade JSON aqui aceita literais esperados compostos e expoentes exatos;
+  Hurl 8.0.0 rejeitou array/objeto e `125e-2` nos pares observados. Tipos escalares,
+  precisão inteira e decimais têm pares compartilhados, sem equivalência geral.
+  Avaliação inválida/percurso incompatível retorna 2 aqui contra 4 no Hurl;
+  ausência de propriedade/índice retorna 1 aqui contra 4. Veja `assert_json_*`.
 - Configuração YAML hierárquica e interpolação externa, quando implementadas,
   serão **extensões httpgo**, não parte do Hurl; ambas continuam fora desta história.
 

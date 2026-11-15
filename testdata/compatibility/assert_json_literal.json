@@ -1,0 +1,7 @@
+{
+  "response_json":"{\"x\":\"{{name}}\"}",
+  "variables":["name=resolved"],
+  "classification":"intentional literal expected string here; Hurl interpolates the expected string",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}

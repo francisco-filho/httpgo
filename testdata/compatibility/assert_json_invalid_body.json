@@ -1,0 +1,6 @@
+{
+  "response_json":"invalid JSON",
+  "classification":"invalid response JSON stops execution; evaluation error here",
+  "httpgo":{"exit":2,"paths":["/capture"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}

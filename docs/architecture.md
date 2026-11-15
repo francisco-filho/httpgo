@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-07
+# Arquitetura implementada — US-01 a US-08
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06) e #18 (US-07),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07) e #20 (US-08),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -17,7 +17,9 @@ cmd/httpgo/main.go
       → parser.ValidateURL/ValidateHeader e validação JSON final
       → internal/transport/http.go (via HTTPExecutor)
       → internal/assertion/status.go (somente expectativa numérica)
-      → internal/query/header.go + internal/assertion/header.go (antes de capturas)
+      → internal/runner/assertions.go (headers/JSON na ordem escrita, antes de capturas)
+        → internal/query/header.go + internal/assertion/header.go
+        → internal/query/jsonpath.go + internal/assertion/json.go (sob demanda)
       → internal/query/jsonpath.go (selecionar JSON da resposta final)
       → internal/runner/capture.go (serializar seleção JSON sem float64)
       → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
@@ -32,7 +34,7 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 
 | Pacote/tipos | Responsabilidade |
 |---|---|
-| `parser.Position`, `Header`, `HeaderAssertion`, `Capture`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, body, capturas e posições de declaração/consulta; estados de requisição, expectativa e capturas; validação completa sem cenário parcial |
+| `parser.Position`, `Header`, `Assertion`, `HeaderAssertion`, `JSONAssertion`, `Capture`, `Entry`, `Scenario`, `Error` | Modelo ordenado com método, URL, headers, body, capturas e posições de declaração/consulta; estados de requisição, expectativa e capturas; validação completa sem cenário parcial |
 | `runner.Request`, `Response`, `HTTPExecutor` | Contrato mínimo definido no consumidor, sem net/http: `Execute(context.Context, Request) (Response, error)`; Request carrega Method, URL, Headers (`[]parser.Header`), Body (`[]byte`) e RetainBody; Response retorna Status, Headers (`[]query.HeaderValue`, ocorrências ordenadas) e Body final retido somente quando solicitado |
 | `runner.Runner`, `EntryResult`, `Outcome`, `Summary`, `Result` | Ordem, contexto antes de cada chamada, comparação delegada e interrupção; resultado estruturado e notificação síncrona por entrada, sem escrever em streams nem chamar os.Exit |
 | `template.Context`, `Text`, `Reference`, `Error` | Contexto tipado isolado, nomes exatos/conflitos, offsets, substituição não recursiva e proveniência; não importa parser/runner/CLI/transporte |
@@ -40,10 +42,10 @@ reservados para capacidades futuras. Toda a implementação usa biblioteca padr�
 | `template.SecretVariants`, `Protector` | Proteção de valores brutos, decodificados e escapes conhecidos, inclusive antes de validar contexto; sem substituição de texto vazio |
 | `runner.Renderer`, `RenderError`, `CaptureError` | Factory consumer-owned `NewSession() template.Session` por Run; erros pré-envio e de captura com categorias/origens distintas; clones preservam cenário |
 | `template.Session`, `Capture`, `ConflictError`, `CaptureValueError` | Renderização e publicação atômica de JSON validado (`Capture.Value` é `json.RawMessage`); erro de payload/conflito indexa o lote sem expor conteúdo; variáveis iniciais imutáveis, cópia dos valores, capturas separadas e proteção dos valores descobertos |
-| `query.Path`, `query.Error` | Pacote folha sem interface: validar JSONPath limitado e selecionar valor com `UseNumber`, distinguindo ausência de null; valores JSON de qualquer tipo e números exatos |
+| `query.Path`, `query.Error`, `query.Decode` | Pacote folha sem interface: validar JSONPath limitado; decodificar exatamente um JSON com UseNumber; SelectValue distingue presença/ausência/percurso incompatível e Select mantém contrato de capturas |
 | `query.HeaderValue`, `query.Header` | Ocorrências nome/valor sem net/http; seleção pura da primeira, com presença distinta de vazio e nome case-insensitive |
-| `assertion.Status`, `HeaderOperator`, `assertion.Header` | Igualdade numérica e comparação literal de headers (`==`, `contains`, `exists`); não conhece runner, HTTP ou apresentação |
-| `runner.HeaderFailure` | Falha de assertion localizada com nome/operador, esperado/recebido já sanitizados e presença explícita; sem coleção bruta |
+| `assertion.Status`, `HeaderOperator`, `assertion.Header`, `assertion.JSONEqual` | Comparação de status/headers e igualdade JSON tipada recursiva, sem coerção nem float64; não conhece runner, HTTP ou apresentação |
+| `runner.HeaderFailure`, `JSONFailure`, `JSONError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `cli.Command`, `BuildInfo` | Argumentos e streams (`SetArgs/SetIn/SetOut/SetErr`), leitura/fechamento antes da rede, saída segura, resumo e exit code; não reavalia assertion |
 | `main.run` | Monta dependências, `signal.NotifyContext`, streams do processo; seus defers terminam antes do único os.Exit de produção em main |
@@ -74,7 +76,7 @@ Se o callback falhar, `Result.ReportErr` preserva a causa e o runner não inicia
 envio seguinte. A CLI diagnostica a falha de escrita em stderr com texto controlado,
 retorna 2 (também se houve divergência) e não tenta escrever o resumo no stdout
 que falhou. `Result.Err` carrega transporte/cancelamento, `*runner.RenderError`
-ou `*runner.CaptureError`;
+ou `*runner.CaptureError`/`*runner.JSONError`;
 a CLI distingue a categoria com `errors.As`, sem ecoar causas brutas.
 
 ## Validação em duas etapas e segredos
@@ -135,10 +137,11 @@ O parser reconhece `[Captures]`, conserva `Capture.Position`/`QueryPosition` e u
 `query.Parse` para validar toda consulta antes da rede; resolução depende somente
 da resposta da entrada executada.
 
-`runner.Request.RetainBody` é verdadeiro apenas em entradas com capturas.
-Após transporte concluído, runner compara status numérico e depois headers antes
-de chamar `captureResponse`, independentemente da ordem das seções.
-Divergência prevalece sobre JSON inválido. Sem expectativa, qualquer status permite
+`runner.Request.RetainBody` é verdadeiro em entradas com capturas **ou** assertions
+JSON; headers isolados continuam sem retenção. Após transporte concluído, runner
+compara status numérico e depois percorre headers/JSON na ordem escrita antes
+de chamar `captureResponse`, independentemente da ordem das seções. Header
+anterior divergente prevalece sobre JSON inválido; JSON anterior inválido é erro. Sem expectativa, qualquer status permite
 capturar sem inventar assertion. `query.Path.Select` devolve valor/found/erro seguro;
 `null` difere de ausência, e números não passam por float64. O runner serializa
 cada seleção com `json.Marshal`, preservando `json.Number` inclusive nas estruturas;
@@ -185,10 +188,11 @@ literal e `Position`; o renderer nunca recebe esse esperado como template.
 inclusive caixas diferentes no wire. A conversão ordena somente nomes distintos,
 nunca valores; não depende de iteração de mapa para escolher a primeira ocorrência,
 não concatena nem separa vírgulas. `Response.Headers` usa dados Go próprios de
-`query.HeaderValue`, sem expor `net/http.Header`. Assertions não ligam `RetainBody`.
+`query.HeaderValue`, sem expor `net/http.Header`. Assertions de headers isolados
+não ligam `RetainBody`.
 
-O fluxo é resposta completa → status numérico → `query.Header` → `assertion.Header`
-→ capturas → callback. `HTTP *` produz `Wildcard`, conta em `WithoutValidation`,
+O fluxo é resposta completa → status numérico → assertions ordenadas
+(`query.Header`/`assertion.Header` ou JSON) → capturas → callback. `HTTP *` produz `Wildcard`, conta em `WithoutValidation`,
 não em `Validated`; continua distinto de `Unvalidated`. Falha de header produz
 `HeaderMismatch`, `Result.Diverged=true` e `HeaderFailure`, não `Result.Err` de
 transporte/captura. A CLI possui ramo próprio, sem acessar status esperado nulo.
@@ -211,6 +215,57 @@ Não se cria pacote report, interface, dependência ou mecanismo genérico de pr
 O diferencial Hurl 8.0.0 classifica três divergências deliberadas: primeira
 ocorrência em vez de lista para repetidos, esperado literal em vez de interpolado
 e headers antes de capturas. Veja os pares `headers_*` em `compatibility.md`.
+
+## Igualdade JSON e lista ordenada — US-08
+
+`Entry.Assertions` passa a `[]parser.Assertion`, com variantes concretas
+`Header *HeaderAssertion` e `JSON *JSONAssertion`. O parser produz exatamente uma
+por item, preservando a ordem; consumidores rejeitam variante desconhecida em
+vez de ignorá-la. `JSONAssertion` conserva consulta, `query.Path`, esperado JSON
+decodificado e posições de declaração/consulta. Esperados nunca passam pelo
+renderer: `query.Decode` exige exatamente um literal com UseNumber e `query.Parse`
+valida consultas integralmente antes de retornar cenário. Não há mecanismo genérico
+de predicados, novo pacote/interface de executor ou dependência.
+
+`runner.checkAssertions` valida headers/JSON na ordem escrita após o status.
+Decodifica a resposta **somente** ao alcançar a primeira assertion JSON, usando
+`query.Decode`, e reutiliza o documento nessa entrada. `Path.SelectValue` separa
+presença (inclusive null), ausência (propriedade/índice) e percurso incompatível
+(erro seguro). O adapter `Path.Select` mantém o contrato anterior das capturas:
+incompatibilidade conta como ausência para aquela API. Não há leitores no runner,
+decode antecipado, retry nem documento acumulado nos resultados.
+
+`assertion.JSONEqual` compara tipos concretos recursivamente; arrays em ordem e
+objetos por chaves/conteúdo, sem considerar a ordem das chaves. `json.Number` é
+normalizado em dígitos significativos com sinal e expoente decimal usando big.Int
+apenas para o expoente. Zeros são normalizados. Não expande potências de dez nem
+converte para float64: a memória depende do tamanho da representação, não do valor
+do expoente. Validação do JSON permanece separada da comparação.
+
+Divergência de valor/tipo ou ausência produz `JSONMismatch`, `JSONFailure` seguro
+e `Result.Diverged` (1). JSON inválido/adicional ou percurso incompatível produz
+`JSONFailed` e `*JSONError` controlado (2), com consulta/posição, sem causa bruta.
+A CLI apresenta esses ramos sem reavaliar igualdade nem acessar ExpectedStatus
+nulo em HTTP *. Completed e contagens de status continuam válidas mesmo se JSON
+falhar; falha impede capturas e próximos envios. ReportErr continua prioritário (2).
+
+`Session.IsSecret` expõe **somente** a marcação de um nome: `pendingSecret` inspeciona
+as capturas da resposta sem resolver/consultar seus valores. Havendo uma marcada,
+falhas de headers/JSON ocultam integralmente ambos os operandos, sem antecipar
+qualquer erro de captura. `safeEntry` clona variantes, remove literais JSON,
+consultas compiladas, capturas, headers, body e plano do callback/resultado;
+metadados exibíveis, posição, consulta e valores de falha são sanitizados antes
+da coleção. Headers esperados também ficam inteiramente ocultos nesse caso.
+Sem captura pendente secreta, usa proteção de segredos conhecidos/derivados e
+variantes escapadas existentes, além da ocultação integral de headers sensíveis.
+A proteção é local à execução, não muda comparação/envio nem promete detectar
+segredos arbitrários não marcados.
+
+O diferencial reutiliza `response_json`/`response_headers`; não há mudança de rede
+de produção. `headers_query_unsupported.json` muda intencionalmente de rejeição
+para sucesso; os outros 78 pares antigos não mudam. Vinte e um novos pares
+`assert_json_*` classificam tipos, precisão, estruturas, ausência, literais,
+precedência e restrições frente ao Hurl 8.0.0; total 100. Veja `compatibility.md`.
 
 ## Rede e recursos
 
@@ -243,13 +298,14 @@ pooling para impedir os caminhos de retry implícito de GETs em conexões
 reutilizadas e de streams HTTP/2. O teste de warm-up + falha encerra a segunda
 conexão e comprova ausência de replay e do GET seguinte.
 
-`io.Copy(io.Discard, body)` consome intermediárias e respostas sem capturas em
+`io.Copy(io.Discard, body)` consome intermediárias e respostas sem capturas/JSON em
 streaming. `io.ReadAll` retém apenas a resposta final quando RetainBody foi pedido,
 no mesmo contexto/deadline. O body é fechado em sucesso ou erro; falhas de leitura
 ou fechamento continuam sendo transporte, sem publicação parcial de capturas.
 O retorno só ocorre depois desse consumo e sem cancelamento pendente. Runner
 conhece somente bytes fechados de resposta, nunca leitores ou tipos net/http.
-Após avaliação, os bytes não são acumulados no resultado. Memória adicional acompanha a resposta final retida nas entradas com captura e
+Após avaliação, os bytes/documento não são acumulados no resultado. Memória adicional
+acompanha a resposta final e suas estruturas nas entradas com captura/JSON e
 os valores/proteções da sessão; não há retenção de resposta em `EntryResult`.
 
 Causas sensíveis são preservadas para `errors.Is/As`, mas jamais concatenadas à
@@ -282,7 +338,7 @@ geram código 2.
   stdout comprova o primeiro resultado já visível enquanto o servidor mantém a
   segunda requisição bloqueada, em sucesso, divergência e body incompleto.
 - `tests/e2e/compatibility_test.go`: alvo explícito com tag `compatibility`, Hurl
-  8.0.0 exigido e 79 pares/observações versionados, incluindo bytes/métodos/headers
+  8.0.0 exigido e 100 pares/observações versionados, incluindo bytes/métodos/headers
   efetivamente recebidos no corpus US-02 e variáveis fornecidas às duas ferramentas
   sem editar cenários nos corpora US-03/US-04 (com RequestURI para verificar encoding).
   `variables_body` muda intencionalmente de rejeição para sucesso; seis novos pares
@@ -294,7 +350,9 @@ geram código 2.
   `captures_non_string` muda de rejeição para sucesso entre os 50 anteriores.
   Os outros 49 pares conservam suas observações. A US-07 acrescenta 21 pares
   `headers_*` e respostas de headers repetidos/vazios no harness; os 58 pares
-  anteriores permanecem inalterados. Sem skip em versão ausente/errada.
+  anteriores permanecem inalterados naquela história. A US-08 acrescenta 21 pares
+  `assert_json_*` e amplia intencionalmente `headers_query_unsupported`, mantendo
+  os demais 78 antigos. Sem skip em versão ausente/errada.
 
 Saída é deliberadamente sempre plain-text: os testes usam streams, arquivo, pipe e
 PTY real para verificar o contrato, sem criar detector de TTY ou dependência

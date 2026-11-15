@@ -94,6 +94,10 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
 	case runner.HeaderMismatch:
 		line += ": " + headerDiagnostic(entry.HeaderFailure)
+	case runner.JSONMismatch:
+		line += ": " + jsonDiagnostic(entry.JSONFailure)
+	case runner.JSONFailed:
+		line += fmt.Sprintf(": consulta %q: %s", entry.JSONError.Query, entry.JSONError.Detail)
 	case runner.CaptureFailed:
 		if entry.Entry.ExpectedStatus != nil {
 			line += fmt.Sprintf(" (status validado: esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
@@ -107,10 +111,16 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch {
+	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
+		}
+		if entry.JSONFailure != nil {
+			pos = entry.JSONFailure.Position
+		}
+		if entry.JSONError != nil {
+			pos = entry.JSONError.Position
 		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
@@ -140,6 +150,10 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 		if errors.As(result.Err, &captureErr) {
 			diagnostic = captureErr.Error()
 		}
+		var jsonErr *runner.JSONError
+		if errors.As(result.Err, &jsonErr) {
+			diagnostic = jsonErr.Error()
+		}
 		return c.fail(fmt.Sprintf("%q:%d:%d: %s; execução interrompida", pos.File, pos.Line, pos.Column, diagnostic))
 	}
 	if result.Diverged {
@@ -148,6 +162,14 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 			failure := entry.HeaderFailure
 			pos := failure.Position
 			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure)); err != nil {
+				return 2
+			}
+			return 1
+		}
+		if entry.JSONFailure != nil {
+			failure := entry.JSONFailure
+			pos := failure.Position
+			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure)); err != nil {
 				return 2
 			}
 			return 1
@@ -161,13 +183,25 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 	return 0
 }
 
+func jsonDiagnostic(failure *runner.JSONFailure) string {
+	actual := "ausente"
+	if failure.Present {
+		actual = failure.Actual
+	} else if failure.Actual == "[oculto]" {
+		actual = "[oculto] (ausente)"
+	}
+	return fmt.Sprintf("assertion jsonpath %q ==: esperado %s, recebido %s", failure.Query, failure.Expected, actual)
+}
+
 func headerDiagnostic(failure *runner.HeaderFailure) string {
 	actual := "ausente"
 	if failure.Present {
 		actual = fmt.Sprintf("%q", failure.Actual)
+	} else if failure.Actual == "[oculto]" {
+		actual = "[oculto] (ausente)"
 	}
 	expected := fmt.Sprintf("%q", failure.Expected)
-	if failure.Operator == "exists" {
+	if failure.Operator == "exists" && failure.Expected != "[oculto]" {
 		expected = "presente"
 	}
 	return fmt.Sprintf("assertion header %q %s: esperado %s, recebido %s", failure.Name, failure.Operator, expected, actual)
@@ -216,7 +250,7 @@ func (c *Command) fail(message string) int {
 }
 
 func help() string {
-	return `httpgo — executa requisições HTTP e valida status e headers
+	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
   httpgo test <arquivo> [--var nome=valor] [--secret nome]
@@ -247,8 +281,8 @@ e conta em sem_validação, não em validadas. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
 Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
-Códigos: 0 sucesso, 1 status ou assertion de header divergente,
-2 entrada/captura/renderização/transporte/cancelamento/saída.
+Códigos: 0 sucesso, 1 status ou assertion de header/JSON divergente,
+2 entrada/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Bodies e coleções de headers não são impressos, nem em erros de entrada.
@@ -267,14 +301,43 @@ Somente primeira ocorrência; não concatena nem separa vírgulas.
 Ausente falha nos três operadores; vazio existe e satisfaz == "".
 contains "" passa para qualquer valor presente, inclusive vazio.
 Esperados são strings literais: {{nome}} não interpola, mesmo se definido.
-Sem regex, filtros, captura de headers, assertions JSON ou outros operadores.
-Ordem: resposta consumida/fechada, status, headers, capturas, resultado.
+Sem regex, filtros, captura de headers ou outros operadores de header.
+Ordem: resposta consumida/fechada, status, assertions na ordem escrita, capturas, resultado.
 Falha de header retorna 1, não publica capturas e impede próximo envio.
 Diagnóstico localizado distingue ausente de ""; valores de Authorization,
 Proxy-Authorization, Cookie e Set-Cookie são ocultos nos dois lados.
 Segredos conhecidos também são removidos de headers comuns.
 Diferenças Hurl 8.0.0: repetidos usam primeira ocorrência, não lista;
 esperados são literais e assertions antecedem capturas. Veja docs/compatibility.md.
+
+Assertions JSON: salve product.hurl e execute
+  httpgo test product.hurl --var base_url=http://localhost:8080
+(requer resposta {"name":"Pizza","price":4500,"active":true}):
+  GET {{base_url}}/products/1
+  HTTP 200
+  [Asserts]
+  jsonpath "$.name" == "Pizza"
+  jsonpath "$.price" == 4500
+  jsonpath "$.active" == true
+jsonpath "consulta" == <literal JSON>: string, número, booleano, null, array ou objeto,
+inclusive vazios, na mesma linha. Exige HTTP numérico ou HTTP *.
+Consultas estáticas: $, propriedades por ponto e índices não negativos combináveis.
+Esperados nunca interpolam: "{{nome}}" é texto literal, inclusive aninhado.
+Igualdade preserva tipos: "4500" difere de 4500. 1, 1.0 e 1e0 são iguais,
+com precisão exata, também aninhada, sem float64 nem expansão de potências.
+Arrays exigem a mesma ordem; objetos ignoram a ordem das chaves.
+Ausência e índice fora do array falham com 1, distinguíveis de null presente.
+JSON inválido/vazio/adicional ou percurso incompatível gera erro de avaliação JSON (2).
+Status vem primeiro; headers e JSON seguem a ordem escrita; capturas só depois.
+JSON é decodificado sob demanda: header anterior pode falhar antes do JSON inválido.
+Primeira falha impede capturas e próximos envios. Sintaxe inválida rejeita todo arquivo.
+Diagnóstico: consulta, arquivo/linha/coluna, esperado/real tipados e sanitizados.
+Captura secreta pendente na mesma resposta oculta integralmente os dois valores
+em falhas de headers/JSON, sem avaliar/publicar a captura antecipadamente.
+Proteção não detecta segredos arbitrários não marcados. Sem dumps de body/documento.
+Sem count, exists JSON, comparações ordenadas, regex, filtros ou JSONPath ampliado.
+Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
+pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
 
 Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
   httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
@@ -325,7 +388,7 @@ Strings como "null" ou "{{literal}}" permanecem strings, sem reinterpretação.
 Array/objeto exige valor JSON completo: URL, header ou string JSON gera erro antes do envio.
 JSON inválido, campo ausente ou índice fora do array geram erro de captura;
 null é valor existente e válido. Objetos não criam variáveis para suas propriedades.
-Status ou header divergente impede capturas e próximos envios. Capturas não sobrescrevem
+Status ou assertion de header/JSON divergente impede capturas e próximos envios. Capturas não sobrescrevem
 variáveis iniciais nem capturas anteriores; cada execução começa sem capturas.
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas

@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"items\":[{\"id\":9007199254740993}]}",
+  "classification":"exact high precision numeric mismatch; codes differ",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":4,"paths":["/capture"]}
+}

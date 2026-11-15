@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"one\":1e0,\"decimal\":125e-2,\"zero\":0}",
+  "classification":"shared numeric value equality for integer, decimal, exponent response and signed zero in this pair",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
+  "hurl":{"exit":0,"paths":["/capture","/health"]}
+}

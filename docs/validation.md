@@ -1,4 +1,87 @@
-# Validação — US-01 a US-07
+# Validação — US-01 a US-08
+
+## US-08 — issue #20 / história 008
+
+Plano da issue #20 executado diretamente, sem planner, somente backend. Quatro
+tasks registradas e autoaprovadas na fila 008 antes de implementar. Tasks 1–3
+nos commits `8f2b454`, `4dc224d` e `da677d9`; contrato, ajuda, corpus e validação
+da task 4 nesta alteração. Nenhum frontend/estático, dependência, versão de Go,
+CI ou lint alterado. Não foi executado SonarQube (responsabilidade exclusiva QA).
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64; Go `go1.26.10-X:nodwarf5`, CGO/compilador C para race, goimports,
+golangci-lint e Hurl 8.0.0/libcurl 8.18.0 já disponíveis, sem instalação. HTTP/TLS
+local em portas dinâmicas, sem depender de dummy/8080. Conforme plano v4, seção 7,
+cross-builds e execução nativa macOS/Windows são opcionais nesta história; não
+foram executados nem anunciados. Linux é o gate obrigatório.
+
+- Task 1: `go test ./internal/query ./internal/assertion ./internal/parser` passou.
+  Lista ordenada com variantes concretas; JSONPath validado antes da rede;
+  literais tipados, escapes/Unicode e placeholders literais; erros tardios,
+  operadores/queries fora do recorte e posições LF/CRLF. Seleção detalhada separa
+  presença/ausência/percurso incompatível e mantém o adapter das capturas.
+  Igualdade recursiva sem coerção/float64; normalização decimal compara números
+  grandes e expoentes além do inteiro de máquina, sem expandir potências.
+- Task 2: `go test ./internal/template ./internal/runner ./internal/cli` e
+  `go test ./internal/parser ./internal/query ./internal/assertion` passaram.
+  Status → assertions na ordem escrita → capturas, decode sob demanda, retenção
+  só quando necessária, códigos 0/1/2, interrupção e contagens. Callback recebe
+  somente metadados/diagnósticos seguros: nenhum literal JSON esperado bruto,
+  body, consulta compilada ou documento. Captura secreta pendente oculta ambos
+  os operandos de headers/JSON, até quando sua própria consulta falharia, sem
+  antecipá-la. Cenário não mutado, publicação atômica e sessões isoladas mantidos.
+- Task 3: `go test ./internal/transport` e `go test ./tests/e2e -count=1` passaram.
+  Build único do binário, CommandContext, HTTP real, contadores e sincronização
+  sem sleeps. Demonstração e login → token protegido → criação → ID exato
+  `9007199254740993` → consulta com headers/JSON → echo numérico. Tipos/precisão,
+  estruturas, literais e falhas verificam stdout/stderr/exit code e envios.
+  Apenas body final de redirect é avaliado; falhas de leitura/fechamento, body
+  incompleto, timeout/cancelamento impedem aprovação/envio seguinte, sem retry.
+  Timeout público real de 10s e Ctrl+C Linux agora incluem assertion JSON;
+  regressões de transporte com capturas continuam. Pipe comprova resultado com
+  assertion JSON/captura visível enquanto o envio seguinte está bloqueado.
+- Fuzz: `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s
+  -parallel=2` passou, 61.545 execuções, novas seeds de literais/assertions JSON,
+  CRLF e negativos. Nenhum caso de falha encontrado.
+- `make fmt lint test` passou antes de concluir cada task anterior e na validação
+  integrada: **0 issues** de lint, `go test ./... -race -cover`. A suíte completa
+  foi repetida sem cache com `go test ./... -race -cover -count=1`, passando
+  inclusive pelos E2E do binário atualizado. `go vet ./...` e `go build ./...`
+  executados explicitamente; `make build` também passou.
+  `gofmt -l` dos Go alterados e `git diff --check` sem pendências. Links Markdown
+  locais conferidos, 100 pares JSON/classificações conferidos e somente o par
+  antigo autorizado tem observações alteradas.
+- `make compatibility` passou com Hurl **8.0.0** obrigatório, sem skip:
+  **100 pares**, 21 novos `assert_json_*`. `headers_query_unsupported.json` muda
+  intencionalmente de rejeição para sucesso; os outros **78 pares antigos não
+  mudam**. Observações novas escritas/revisadas individualmente, sem `-update`
+  indiscriminado. Primeira rodada revelou rejeição do literal esperado `125e-2`
+  no Hurl e aceitação do wildcard; somente essas duas novas observações foram
+  corrigidas e a matriz completa reexecutada. Arrays/objetos esperados também
+  são rejeitados no Hurl observado, sem alterar a regra aprovada aqui. A matriz
+  distingue códigos/categorias, literal não interpolado, precedência de captura
+  e restrições, sem prometer equivalência geral ou mensagens iguais.
+
+### Rastreabilidade dos cenários da issue
+
+| Cenários | Evidência automatizada (nível pertinente) |
+|---|---|
+| GO-100 | `TestJSONDemonstrationByBinary`, `TestJSONAssertionOrder`, `TestJSONAssertionCLI`; fixture `scenario_assert_json.hurl` |
+| GO-101 | `TestJSONAuthenticatedProductsByBinary`, `TestJSONLiteralAndCapturePublication`; fixture autenticada com ID de alta precisão e headers |
+| GO-102 | `TestJSONEqual`, `TestTypedSelectionPrecisionAndPresence`, `TestJSONEqualityAndEvaluationByBinary`: seis tipos/vazios, raiz/propriedades/índices e não coerção |
+| GO-103–104 | `TestJSONEqual`, `TestJSONEqualityAndEvaluationByBinary`: números exatos/expoentes grandes, tipos/conteúdo aninhado, ordem de arrays e chaves de objetos |
+| GO-105–107 | `TestDetailedSelection`, `TestJSONAssertionOrder`, `TestJSONAssertionCLI`, `TestJSONEqualityAndEvaluationByBinary`: ausência/null, tipos incompatíveis, JSON vazio/inválido/adicional e categorias |
+| GO-108–109 | `TestInvalidJSONAssertions`, `TestJSONAssertions`, `TestJSONInvalidLateNeverSendsByBinary`, `TestJSONLiteralAndCapturePublication`: zero envios, consultas/operadores, LF/CRLF, literais/Unicode sem renderer |
+| GO-110–111 | `TestJSONAssertionOrder`, `TestJSONPrecedenceByBinary`, `TestJSONLiteralAndCapturePublication` e regressões de publicação atômica: primeira falha, status/HTTP *, captura apenas após assertions |
+| GO-112 | `TestJSONAssertionRequiresSuccessfulReadAndClose`, `TestJSONAssertionFinalBodyDeadlineAndCancellation`, `TestJSONFinalResponseAndIncompleteBodyByBinary`, `TestPublicTimeoutIncludesBody`, `TestRealCtrlC`; regressão de headers sem retenção e deadlines únicos do transporte |
+| GO-113–115 | `TestJSONKnownSecretsAreSanitizedBeforeCallback`, `TestPendingSecretConcealsAssertionsAndMetadata`, `TestJSONAndHeaderPendingSecretCLI`, `TestJSONSecretsByBinary`; regressões de variantes/derivados em template e capturas tipadas |
+| GO-116 | `TestJSONWriteFailureHasPriority`, `TestJSONAssertionOrder`, `TestResultsStreamWhileNextRequestIsPending`: callback síncrono, contagens/interrupção, erro/short write com prioridade 2 |
+| GO-117 | `TestCompatibility`, 100 pares, Hurl 8.0.0 sem skip; diferenças classificadas em `compatibility.md` |
+| GO-118 | `TestJSONAssertionHelp`, `TestHeaderHelpContract`, regressões de ajuda/versão/flags/streams/PTY/NO_COLOR; exemplos JSON executados pelo binário |
+
+Esta evidência local não é aprovação de review. O handoff final solicita revisão
+pelo code-reviewer; não se declara compatibilidade Hurl completa.
 
 ## US-07 — issue #18 / história 007
 

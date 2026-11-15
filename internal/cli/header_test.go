@@ -19,7 +19,7 @@ func TestHeaderHelpContract(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%q", code, stderr)
 		}
-		for _, want := range []string{"HTTP *", "[Asserts]", `header "Content-Type" contains "application/json"`, `header "X-Request-Id" exists`, `header "X-Request-Id" == "req-123"`, "primeira ocorrência", "ausente de", "não interpola", "headers, capturas", "Set-Cookie", "Diferenças Hurl 8.0.0"} {
+		for _, want := range []string{"HTTP *", "[Asserts]", `header "Content-Type" contains "application/json"`, `header "X-Request-Id" exists`, `header "X-Request-Id" == "req-123"`, "primeira ocorrência", "ausente de", "não interpola", "assertions na ordem escrita, capturas", "Set-Cookie", "Diferenças Hurl 8.0.0"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("help lacks %q", want)
 			}
@@ -100,7 +100,7 @@ func TestHeaderWriteFailuresTakePriority(t *testing.T) {
 }
 
 func TestHeaderInvalidLateNeverSends(t *testing.T) {
-	for _, suffix := range []string{"[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private", "HTTP *\n[Asserts]\njsonpath \"$\" == \"private\""} {
+	for _, suffix := range []string{"[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private", "HTTP *\n[Asserts]\njsonpath \"$[*]\" == \"private\""} {
 		fake := &fakeExecutor{}
 		code, out, stderr := execute(t, context.Background(), fake, "test", writeScenario(t, "GET http://example.test/first\nHTTP 200\nGET http://example.test/late\n"+suffix))
 		if code != 2 || out != "" || len(fake.calls) != 0 || strings.Contains(stderr, "private") || !strings.Contains(stderr, ":4:") && !strings.Contains(stderr, ":6:") {

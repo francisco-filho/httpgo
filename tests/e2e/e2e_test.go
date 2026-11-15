@@ -281,7 +281,7 @@ func TestPublicTimeoutIncludesBody(t *testing.T) {
 			}))
 			defer server.Close()
 			started := time.Now()
-			body, captures := "", "\n[Captures]\ntoken: jsonpath \"$\""
+			body, captures := "", "\njsonpath \"$\" == null"
 			if method == "POST" {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 				captures = ""

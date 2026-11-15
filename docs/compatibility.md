@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-07
+# Matriz de compatibilidade — US-01 a US-08
 
 ## Escopo da evidência
 
@@ -212,7 +212,7 @@ As observações novas foram escritas/revisadas individualmente e confirmadas co
 | `headers_comma` | 1; somente /health | 4; somente /health | uma ocorrência não é dividida por vírgula para igualdade |
 | `headers_wildcard`, `headers_wildcard_alone` | 0; /health → /missing → /unavailable | 0; mesmos paths | `HTTP *` aceita 200/404/503, com e sem assertions; resumo próprio não conta comparação numérica |
 | `headers_without_http`, `headers_invalid_late` | 2; zero envios | 2; zero envios | exigência de HTTP para `[Asserts]` e sintaxe inválida tardia rejeitam arquivo integral |
-| `headers_query_unsupported` | 2; zero envios | 0; /capture → /health | restrição explícita: assertions JSON fora do subconjunto |
+| `headers_query_unsupported` | **0 na US-08**; /capture → /health | 0; mesmos paths | antiga rejeição de igualdade JSON removida intencionalmente na issue #20 |
 | `headers_operator_unsupported` | 2; zero envios | 0; /health → /missing | restrição explícita: `!=` fora do subconjunto |
 | `headers_literal_missing`, `headers_literal_defined` | 0; /health → /missing | 4; somente /health | esperado `{{name}}` permanece literal aqui; Hurl tenta resolver variável (ausente: Undefined variable; definida: divergência) |
 | `headers_capture_precedence` | 1; somente /capture | 3; somente /capture | **divergência deliberada**: headers falham antes de examinar JSON/capturas aqui; Hurl falha primeiro na captura |
@@ -220,9 +220,57 @@ As observações novas foram escritas/revisadas individualmente e confirmadas co
 Não se anuncia compatibilidade de comparação escalar com headers repetidos nem
 interpolação de esperado. A regra da história de primeira ocorrência e precedência
 não foi alterada para forçar equivalência. Segurança de diagnósticos, prioridade de
-escrita, ausência de retenção do body sem capturas, redirects finais, timeout e
+escrita, ausência de retenção do body em headers isolados sem capturas/JSON, redirects finais, timeout e
 cancelamento são verificados nos testes próprios; o diferencial não exige mensagens
 iguais nem generaliza equivalência entre net/http e libcurl.
+
+## Ampliação US-08 — igualdade JSON (issue #20)
+
+**Mudança intencional de contrato:** `headers_query_unsupported.json` passa de
+exit 2/zero envios para exit 0 com `/capture` → `/health`. O `.hurl` não muda: era
+uma igualdade JSON válida, agora implementada. A antiga rejeição global no corpus
+de cenários passa a wildcard explicitamente não suportado, acompanhada de
+negativos específicos de literal, operador, filtro e consulta dinâmica.
+**Os outros 78 pares antigos não mudam.** São **21 pares novos**, total **100**,
+reutilizando o harness `response_json` e `response_headers`, sem dependência nova
+nem atualização automática indiscriminada das observações.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/diferença observada |
+|---|---|---|---|
+| `assert_json_scalars` | 0; /capture → /health | 0; mesmos paths | string/número/booleano, string vazia, false e null presente compartilhados neste par |
+| `assert_json_type` | 1; somente /capture | 4; somente /capture | string `"4500"` difere de número 4500; interrupção compartilhada, códigos próprios |
+| `assert_json_decimals` | 0; /capture → /health | 0; mesmos paths | esperado decimal, resposta com expoente e zero com sinal comparam por valor neste par |
+| `assert_json_numbers` | 0; /capture → /health | 2; zero envios | **diferença de gramática**: Hurl rejeita o literal esperado `125e-2` antes da rede; HTTPGo compara expoentes exatamente |
+| `assert_json_precision` | 1; somente /capture | 4; somente /capture | seleção `$.items[0].id`: 9007199254740993 difere de 9007199254740992, sem arredondamento neste par |
+| `assert_json_object` | 0; /capture → /health | 2; zero envios | igualdade estrutural ignora ordem das chaves aqui; Hurl rejeita literal esperado objeto |
+| `assert_json_array_order` | 1; somente /capture | 2; zero envios | ordem de arrays importa aqui; Hurl rejeita literal esperado array |
+| `assert_json_empty_structures` | 0; /capture → /health | 2; zero envios | arrays/objetos vazios aceitos aqui; literal composto rejeitado no Hurl |
+| `assert_json_nested_precision` | 1; somente /capture | 2; zero envios | diferença numérica aninhada preservada aqui; literal objeto rejeitado no Hurl, sem equivalência presumida |
+| `assert_json_missing`, `assert_json_index_missing` | 1; somente /capture | 4; somente /capture | propriedade/índice ausentes falham contra null; não se deduz equivalência geral das categorias de avaliação |
+| `assert_json_incompatible` | 2; somente /capture | 4; somente /capture | percurso por número é erro de avaliação aqui, distinto de ausência; ambos interrompem |
+| `assert_json_invalid_body` | 2; somente /capture | 4; somente /capture | resposta JSON inválida é erro de avaliação aqui, não transporte |
+| `assert_json_header_first` | 1; somente /capture | 4; somente /capture | header divergente anterior prevalece sobre body inválido aqui; não compara texto/categoria das mensagens do Hurl |
+| `assert_json_json_first` | 2; somente /capture | 4; somente /capture | invertendo a ordem, JSON inválido prevalece aqui; códigos/categorias próprios |
+| `assert_json_capture_precedence` | 1; somente /capture | 3; somente /capture | **divergência deliberada**: assertion JSON falha antes de captura ausente aqui; Hurl avalia captura primeiro |
+| `assert_json_literal` | 0; /capture → /health | 4; somente /capture | esperado `{{name}}` é literal aqui, mesmo definido; Hurl interpola |
+| `assert_json_invalid_late`, `assert_json_without_http` | 2; zero envios | 2; zero envios | literal malformado/ausência de HTTP em entrada tardia rejeita arquivo integral |
+| `assert_json_query_unsupported` | 2; zero envios | 0; /health → /capture | wildcard fora do subconjunto HTTPGo; Hurl aceita o exemplo |
+| `assert_json_operator_unsupported` | 2; zero envios | 0; /capture → /health | `!=` continua fora do recorte aqui |
+
+A primeira rodada encontrou a rejeição do esperado com expoente e a aceitação
+do wildcard no Hurl; somente as duas novas observações foram corrigidas e os
+100 pares foram reexecutados sem `-update`. Não se alterou a semântica aprovada
+para imitar a referência. Valores esperados compostos/expoentes, literais sem
+interpolação e classificações 0/1/2 são o contrato HTTPGo; não se anuncia
+compatibilidade Hurl geral dessas combinações nem dos motores HTTP.
+
+Evidência própria adicional cobre expoentes muito grandes sem expansão de memória,
+comparação recursiva exata, seis tipos na raiz/propriedades/índices, escapes,
+strings literais aninhadas, ordem de falhas, proteção anterior ao callback e
+captura secreta pendente. Neste último caso **ambos** os operandos de falhas de
+headers/JSON são integralmente ocultos sem avaliar a captura antecipadamente,
+inclusive quando ela falharia. O diferencial usa dados fictícios e não é evidência
+de proteção de credenciais: isso é exercitado por runner/CLI/E2E próprios.
 
 ## Extensões e restrições
 

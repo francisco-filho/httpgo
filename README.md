@@ -195,7 +195,7 @@ JSON inválido, caminho ausente ou índice fora do array é erro de captura (có
 Consultas não suportadas em qualquer entrada impedem todos os envios.
 
 Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
-quando esperado, e as assertions de headers declaradas, para URLs, valores de
+quando esperado, e todas as assertions de headers/JSON declaradas, para URLs, valores de
 headers e JSON inline seguintes. Strings
 como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
 Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
@@ -255,12 +255,13 @@ conhecidos sem mudar os dados enviados nem criar variáveis para as propriedades
 A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
 valores finais inválidos falham imediatamente antes da requisição dependente,
 sem contá-la como iniciada e sem enviar as seguintes. As requisições são
-sequenciais e a primeira falha de status, header, captura, renderização ou transporte
+sequenciais e a primeira falha de status, header, JSON, captura, renderização ou transporte
 interrompe a execução. Uma falha de captura preserva a resposta concluída e o
 status aprovado nas contagens, mas impede o próximo envio. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
-- `0`: sucesso; `1`: status ou assertion de header divergente; `2`: demais erros.
+- `0`: sucesso; `1`: status ou assertion de header/JSON divergente; `2`: demais erros,
+  inclusive avaliação de JSON inválido ou percurso incompatível.
 - Timeout total de 10 segundos por requisição, incluindo redirects e leitura do body.
 - TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
 - Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
@@ -293,10 +294,11 @@ header "X-Request-Id" == "req-123"
 O cenário também está em `testdata/scenarios/scenario_assert_headers.hurl` e é
 verificado por HTTP real nos E2E. O dummy manual não promete esses headers.
 Esta é uma **ampliação intencional**: `[Asserts]`, antes rejeitada globalmente,
-agora aceita somente essas três formas, com strings literais entre aspas duplas.
+passou a aceitar essas três formas, com strings literais entre aspas duplas.
+A US-08 acrescenta igualdade JSON na mesma lista ordenada (abaixo).
 Nomes são case-insensitive; igualdade e substring distinguem caixa dos valores.
-`{{nome}}` no esperado permanece literal, sem interpolação. Regex, assertions
-JSON, filtros, captura de headers e outros operadores continuam não suportados.
+`{{nome}}` no esperado permanece literal, sem interpolação. Regex, filtros,
+captura de headers e outros operadores de header continuam não suportados.
 
 Só a primeira ocorrência de cada header participa da comparação, sem concatenar
 ou separar vírgulas. Ausência faz todos os operadores falharem; presente vazio
@@ -307,19 +309,76 @@ assertions/capturas e permite qualquer status, inclusive 404/503. Sua linha most
 `status aceito por HTTP *`; o resumo conta em `sem_validação`, não em `validadas`.
 Isso dispensa **só a comparação numérica**, não headers nem capturas declarados.
 
-Após consumo/fechamento da resposta final, a ordem é status numérico → headers →
-capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
+Após consumo/fechamento da resposta final, a ordem é status numérico → assertions
+(headers/JSON na ordem escrita) → capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
 localiza a assertion e esperado/recebido (ausência difere de `""`), não publica
 capturas nem envia a próxima requisição. Erro estrutural tardio retorna 2 sem
 qualquer envio. Escrita, consumo incompleto, timeout e cancelamento continuam 2.
 Valores sensíveis de Authorization/Proxy-Authorization/Cookie/Set-Cookie são
 ocultos nos dois lados, inclusive esperados literais; headers comuns usam a
-proteção de segredos conhecidos. Nenhum body ou coleção de headers é exibido.
+proteção de segredos conhecidos. Havendo captura secreta pendente na mesma
+resposta, ambos os operandos são ocultos integralmente, sem antecipar a captura.
+Nenhum body ou coleção de headers é exibido.
 
 Equivalência com Hurl 8.0.0 é limitada aos pares observados: **repetidos são listas
 no Hurl**, que também interpola esperados e avalia capturas antes das assertions.
 Essas divergências são deliberadas, preservando as regras da história; veja
 [matriz de compatibilidade](docs/compatibility.md).
+
+## Validar dados JSON da resposta (US-08 / issue #20)
+
+Salve como `product.hurl` e execute
+`bin/httpgo test product.hurl --var base_url=http://localhost:8080` contra uma API
+que devolva `{"name":"Pizza","price":4500,"active":true}`:
+
+```hurl
+GET {{base_url}}/products/1
+
+HTTP 200
+[Asserts]
+jsonpath "$.name" == "Pizza"
+jsonpath "$.price" == 4500
+jsonpath "$.active" == true
+```
+
+O cenário é `testdata/scenarios/scenario_assert_json.hurl`. O fluxo autenticado
+com headers, ID de alta precisão, consulta e reutilização tipada está em
+`testdata/scenarios/scenario_assert_json_auth_products.hurl`; ambos são executados
+contra HTTP real pelos E2E. O dummy manual não promete esse contrato JSON.
+
+**Ampliação intencional:** `jsonpath "consulta" == <literal JSON>` aceita string,
+número, booleano, null, array ou objeto, inclusive vazios. JSONPath mantém somente
+raiz `$`, propriedades por ponto e índices não negativos combináveis. Consultas
+são estáticas; os esperados são literais JSON completos na mesma linha, nunca
+templates: `"{{nome}}"` permanece texto mesmo com a variável definida.
+
+A igualdade preserva tipos: `"4500"` difere de `4500`. Números são comparados
+exatamente por valor (`1`, `1.0`, `1e0` são iguais), inclusive aninhados e com
+expoentes grandes, sem float64 ou expansão de potências. Arrays exigem a mesma
+ordem; objetos ignoram somente a ordem das chaves. Valor diferente, propriedade
+ausente ou índice fora do array retorna **1**; ausência difere de null presente.
+JSON vazio/inválido/adicional ou percurso por tipo incompatível retorna **2**,
+como erro de avaliação JSON, não de transporte/captura. Sintaxe ou construção
+não suportada em qualquer entrada rejeita o arquivo inteiro antes da rede.
+
+A avaliação é status numérico → headers e JSON **na ordem escrita** → capturas.
+A primeira falha impede capturas e próximos envios; `HTTP *` dispensa só a
+comparação numérica. O JSON da resposta é decodificado sob demanda, portanto um
+header divergente anterior prevalece sobre JSON inválido, não o inverso.
+
+Diagnósticos mostram consulta, arquivo/linha/coluna e valores tipados sanitizados,
+com ausência distinguível de null. Segredos conhecidos/derivados são protegidos.
+Com captura marcada secreta pendente **na mesma resposta**, ambos os operandos de
+falhas de headers e JSON ficam integralmente ocultos, inclusive nos metadados do
+callback, sem avaliar nem publicar a captura antes da hora. Isso não detecta
+segredos arbitrários não marcados. Body, documento e coleções de headers não
+são despejados nem acumulados no resultado.
+
+Não há `count`, `exists` JSON, comparações ordenadas, regex, filtros, ampliação de
+JSONPath nem interpolação de consultas/esperados. Hurl 8.0.0 rejeita os literais
+esperados compostos e o literal com expoente testados; a gramática e os códigos
+próprios estão classificados em [compatibilidade](docs/compatibility.md), sem
+promessa de equivalência geral.
 
 ## Documentação e desenvolvimento
 

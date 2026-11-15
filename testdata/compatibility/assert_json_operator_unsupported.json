@@ -1,0 +1,6 @@
+{
+  "response_json":"1",
+  "classification":"intentional operator restriction here; Hurl supports !=",
+  "httpgo":{"exit":2,"paths":null},
+  "hurl":{"exit":0,"paths":["/capture","/health"]}
+}

@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"value\":1}",
+  "classification":"intentional precedence: JSON assertion mismatch before missing capture here; Hurl evaluates capture first",
+  "httpgo":{"exit":1,"paths":["/capture"]},
+  "hurl":{"exit":3,"paths":["/capture"]}
+}

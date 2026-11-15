@@ -1,0 +1,6 @@
+{
+  "response_json":"{\"one\":1e0,\"decimal\":1.25,\"zero\":0}",
+  "classification":"intentional literal grammar difference: exact exponent operands supported here; Hurl rejects expected 125e-2 before any send",
+  "httpgo":{"exit":0,"paths":["/capture","/health"]},
+  "hurl":{"exit":2,"paths":null}
+}

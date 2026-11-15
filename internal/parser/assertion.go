@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"capimgrosso.com/httpgo/internal/assertion"
+	"capimgrosso.com/httpgo/internal/query"
 )
 
 // HeaderAssertion contains literal values, never template expressions.
@@ -15,7 +16,68 @@ type HeaderAssertion struct {
 	Position Position
 }
 
-func parseAssertion(text string, pos Position) (HeaderAssertion, error) {
+// Assertion is one of the concrete header/JSON variants, in source order.
+type Assertion struct {
+	Header *HeaderAssertion
+	JSON   *JSONAssertion
+}
+
+// JSONAssertion owns an already validated literal, never a template plan.
+type JSONAssertion struct {
+	Query         string
+	Path          query.Path
+	Expected      any
+	Position      Position
+	QueryPosition Position
+}
+
+func parseAssertion(text string, pos Position) (Assertion, error) {
+	fields := strings.Fields(text)
+	if len(fields) > 0 && fields[0] == "jsonpath" {
+		declaration, err := parseJSONAssertion(text, pos)
+		return Assertion{JSON: &declaration}, err
+	}
+	declaration, err := parseHeaderAssertion(text, pos)
+	return Assertion{Header: &declaration}, err
+}
+
+func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
+	fail := func(position Position, category, detail string) (JSONAssertion, error) {
+		return JSONAssertion{}, &Error{Position: position, Category: category, Detail: detail}
+	}
+	rest := strings.TrimLeft(text[len("jsonpath"):], " \t")
+	source, tail, ok := assertionString(rest)
+	if !ok {
+		return fail(pos, "sintaxe inválida", "assertion exige consulta JSONPath entre aspas duplas")
+	}
+	queryPos := pos
+	queryPos.Column += len(text) - len(rest) + 1
+	path, err := query.Parse(source)
+	if err != nil {
+		category := "sintaxe inválida"
+		if located, ok := err.(*query.Error); ok && located.Unsupported {
+			category = "construção não suportada"
+		}
+		return fail(queryPos, category, err.Error())
+	}
+	if tail == "" || (tail[0] != ' ' && tail[0] != '\t') {
+		return fail(pos, "sintaxe inválida", "assertion exige operador separado por espaço")
+	}
+	fields := strings.Fields(tail)
+	if len(fields) == 0 {
+		return fail(pos, "sintaxe inválida", "assertion exige operador")
+	}
+	if fields[0] != "==" {
+		return fail(pos, "construção não suportada", "operador ou filtro de assertion JSON não suportado; use ==")
+	}
+	expected, err := query.Decode([]byte(strings.TrimSpace(strings.TrimLeft(tail, " \t")[2:])))
+	if err != nil {
+		return fail(pos, "sintaxe inválida", "assertion exige um único literal JSON esperado válido")
+	}
+	return JSONAssertion{Query: source, Path: path, Expected: expected, Position: pos, QueryPosition: queryPos}, nil
+}
+
+func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 	fail := func(category, detail string) (HeaderAssertion, error) {
 		return HeaderAssertion{}, &Error{Position: pos, Category: category, Detail: detail}
 	}
@@ -27,7 +89,7 @@ func parseAssertion(text string, pos Position) (HeaderAssertion, error) {
 		rest = strings.TrimLeft(text[len(token):], " \t")
 	}
 	if token != "header" {
-		return fail("construção não suportada", "consulta de assertion não suportada; use header")
+		return fail("construção não suportada", "consulta de assertion não suportada; use header ou jsonpath")
 	}
 	name, rest, ok := assertionString(rest)
 	if !ok || !validHeaderName(name) {
