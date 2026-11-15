@@ -56,6 +56,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	args, argumentErr := parseArguments(c.args)
 	settings, loadErr := config.LoadEnvironment(ctx, args.config, args.environment)
+	settings, resolveErr := settings.Resolve(ctx, args.variables)
 	initial := c.protection.initial
 	configured := settings.Protection(args.variables, args.secrets)
 	c.protection.initial = func(text string) string { return initial(configured(text)) }
@@ -64,6 +65,9 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	if loadErr != nil {
 		return c.fail(loadErr.Error())
+	}
+	if resolveErr != nil {
+		return c.fail(resolveErr.Error())
 	}
 	renderer, err := settings.Compose(args.variables, args.secrets)
 	if err != nil {

@@ -1,2 +1,2 @@
 variables:
-  token: ${HTTPGO_TEST_TOKEN}
+  token: prefix-${HTTPGO_TEST_TOKEN}

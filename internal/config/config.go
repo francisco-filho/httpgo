@@ -33,6 +33,9 @@ type Settings struct {
 	timeoutSet bool
 	paths      map[string]variablePath
 	sources    []map[string]json.RawMessage
+	references map[string]processReference
+	lookupEnv  func(string) (string, bool)
+	resolveErr error
 }
 
 // Error preserves an I/O cause but displays only controlled diagnostics.
@@ -145,7 +148,7 @@ func decode(file string, data []byte) (Settings, error) {
 }
 
 func decodeDocument(file string, data []byte, environment bool) (Settings, error) {
-	result := Settings{Variables: make(map[string]json.RawMessage), Timeout: DefaultTimeout, paths: make(map[string]variablePath)}
+	result := Settings{Variables: make(map[string]json.RawMessage), Timeout: DefaultTimeout, paths: make(map[string]variablePath), references: make(map[string]processReference)}
 	empty := true
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.Trim(line, " \t\r")
@@ -191,6 +194,11 @@ func decodeDocument(file string, data []byte, environment bool) (Settings, error
 	version := false
 	for i := 0; i < len(root.Content); i += 2 {
 		key, value := root.Content[i], root.Content[i+1]
+		if key.Value != "variables" {
+			if err := rejectReferences(file, value); err != nil {
+				return result, err
+			}
+		}
 		switch key.Value {
 		case "version":
 			if value.Kind != yaml.ScalarNode || value.Tag != "!!int" || value.Value != "1" {
@@ -201,7 +209,7 @@ func decodeDocument(file string, data []byte, environment bool) (Settings, error
 			if value.Kind != yaml.MappingNode {
 				return result, failure(file, value, "variables deve ser um mapa", nil)
 			}
-			if err := flatten(file, value, "", result.Variables, result.paths); err != nil {
+			if err := flatten(file, value, "", &result); err != nil {
 				return result, err
 			}
 		case "secrets":
@@ -261,9 +269,6 @@ func validateTree(file string, node *yaml.Node) error {
 			seen[key.Value] = true
 		}
 	}
-	if node.Kind == yaml.ScalarNode && bytes.Contains([]byte(node.Value), []byte("${")) {
-		return failure(file, node, "referências ${NOME} ao ambiente do processo ainda não são suportadas", nil)
-	}
 	for _, child := range node.Content {
 		if err := validateTree(file, child); err != nil {
 			return err
@@ -272,7 +277,8 @@ func validateTree(file string, node *yaml.Node) error {
 	return nil
 }
 
-func flatten(file string, node *yaml.Node, prefix string, values map[string]json.RawMessage, paths map[string]variablePath) error {
+func flatten(file string, node *yaml.Node, prefix string, settings *Settings) error {
+	values, paths := settings.Variables, settings.paths
 	for i := 0; i < len(node.Content); i += 2 {
 		key, value := node.Content[i], node.Content[i+1]
 		name := key.Value
@@ -286,7 +292,7 @@ func flatten(file string, node *yaml.Node, prefix string, values map[string]json
 			return err
 		}
 		if value.Kind == yaml.MappingNode {
-			if err := flatten(file, value, name, values, paths); err != nil {
+			if err := flatten(file, value, name, settings); err != nil {
 				return err
 			}
 			continue
@@ -295,6 +301,16 @@ func flatten(file string, node *yaml.Node, prefix string, values map[string]json
 			if template.NamesConflict(name, existing) {
 				return failure(file, key, "caminhos de variáveis repetidos ou em conflito", nil)
 			}
+		}
+		if value.Kind == yaml.ScalarNode && strings.Contains(value.Value, "${") {
+			reference, err := parseProcessReference(file, value, name)
+			if err != nil {
+				return err
+			}
+			settings.references[name] = reference
+			settings.Secrets = append(settings.Secrets, name)
+			values[name] = nil // Reference metadata is separate from JSON values.
+			continue
 		}
 		converted, err := jsonValue(file, value)
 		if err != nil {

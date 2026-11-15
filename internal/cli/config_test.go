@@ -44,7 +44,7 @@ variables:
 
 func TestConfigInvalidBeforeHTTP(t *testing.T) {
 	file := writeScenario(t, "GET http://example.test/first\nGET http://example.test/last")
-	for _, source := range []string{"version: 1\nvariables: {a: '${TOKEN}'}", "version: 1\n---\nversion: 1", "version: 2", "version: 1\nvariables: {a: &x hidden-fixture}", "version: 1\nunknown: hidden-fixture", "version: ["} {
+	for _, source := range []string{"version: 1\nvariables: {a: 'prefix-${TOKEN}'}", "version: 1\n---\nversion: 1", "version: 2", "version: 1\nvariables: {a: &x hidden-fixture}", "version: 1\nunknown: hidden-fixture", "version: ["} {
 		fake := &fakeExecutor{}
 		path := writeConfig(t, source)
 		code, out, stderr := execute(t, context.Background(), fake, "test", file, "--config="+path)

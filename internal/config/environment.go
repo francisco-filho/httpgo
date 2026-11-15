@@ -58,7 +58,17 @@ func mergeEnvironment(base, environment Settings) (Settings, error) {
 	for name, path := range environment.paths {
 		paths[name] = path
 	}
-	base.Variables, base.paths = values, paths
+	references := make(map[string]processReference, len(base.references)+len(environment.references))
+	for name, reference := range base.references {
+		references[name] = reference
+	}
+	for name := range environment.Variables {
+		delete(references, name)
+	}
+	for name, reference := range environment.references {
+		references[name] = reference
+	}
+	base.Variables, base.paths, base.references = values, paths, references
 	if environment.timeoutSet {
 		base.Timeout = environment.Timeout
 	}

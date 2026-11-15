@@ -23,7 +23,7 @@ func TestEnvironmentInvalidDocumentsNeverSend(t *testing.T) {
 		"variables: []", "variables: {a: [!!str fake-private]}", "variables: {a: &a 1, b: *a}", "variables: {a: 1, a: 2}",
 		"variables: {a: {child: 1}}", "variables: {bad-name: 1}", "variables: {a: .inf}", "variables: {a: 2026-11-15}",
 		"secrets: [bad-name]", "defaults: {timeout: 0.0001}", "defaults: {timeout: 86400.001}", "defaults: {timeout: '2s'}",
-		"variables: {a: '${HTTPGO_ENV_TOKEN}'}", "#" + strings.Repeat("x", 1048576),
+		"variables: {a: 'partial-${HTTPGO_ENV_TOKEN}'}", "#" + strings.Repeat("x", 1048576),
 	} {
 		selected := environmentFile(t, dir, "local", source)
 		code, out, stderr := runConfig(t, dir, "test", file, "--config", base, "--env", "local", "--var", "a=override")

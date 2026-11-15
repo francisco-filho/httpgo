@@ -81,7 +81,7 @@ func TestRejectedDocuments(t *testing.T) {
 		{"secret name", "version: 1\nsecrets: [bad-name]", "nome"},
 		{"defaults type", "version: 1\ndefaults: null", "defaults"},
 		{"defaults field", "version: 1\ndefaults: {retries: 3}", "campo"},
-		{"environment", "version: 1\nvariables: {a: 'prefix-${TOKEN}'}", "referências"},
+		{"environment", "version: 1\nvariables: {a: 'prefix-${TOKEN}'}", "referência inválida"},
 		{"environment nested", "version: 1\nvariables: {a: [{b: '${TOKEN}'}]}", "referências"},
 		{"anchor", "version: 1\nvariables: {a: &a hidden-fixture}", "âncoras"},
 		{"alias", "version: 1\nvariables: {a: &a [1], b: *a}", "âncoras"},

@@ -12,6 +12,9 @@ import (
 )
 
 func jsonValue(file string, node *yaml.Node) (any, error) {
+	if node.Kind == yaml.ScalarNode && strings.Contains(node.Value, "${") {
+		return nil, failure(file, node, "referências ${NOME} dentro de listas não são suportadas", nil)
+	}
 	switch node.Kind {
 	case yaml.SequenceNode:
 		values := make([]any, 0, len(node.Content))
@@ -26,6 +29,9 @@ func jsonValue(file string, node *yaml.Node) (any, error) {
 	case yaml.MappingNode:
 		values := make(map[string]any)
 		for i := 0; i < len(node.Content); i += 2 {
+			if err := rejectReferences(file, node.Content[i]); err != nil {
+				return nil, err
+			}
 			value, err := jsonValue(file, node.Content[i+1])
 			if err != nil {
 				return nil, err
