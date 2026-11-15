@@ -68,7 +68,7 @@ func TestMultipartDocumentedScenario(t *testing.T) {
 	}
 	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
 		code, out, stderr = run(t, args...)
-		for _, text := range []string{"[MultipartFormData]", "document: file,../fixtures/document.pdf; application/pdf", "basename", "application/octet-stream", "413 esperado passa", "Sem --render-files"} {
+		for _, text := range []string{"[MultipartFormData]", "document: file,../fixtures/document.pdf; application/pdf", "basename", "application/octet-stream", "413 esperado passa", "Não renderiza arquivos multipart"} {
 			if code != 0 || stderr != "" || !strings.Contains(out, text) {
 				t.Fatalf("help missing %q code=%d out=%q err=%q", text, code, out, stderr)
 			}

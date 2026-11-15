@@ -1,4 +1,91 @@
-# Validação — US-01 a US-09 e US-20
+# Validação — US-01 a US-10 e US-20
+
+## US-10 — issue #25 / história 010
+
+Plano da issue #25 executado diretamente, sem planner, somente backend. Quatro
+tasks registradas e autoaprovadas na fila 010 antes da implementação, executadas
+sequencialmente. Tasks 1–3 nos commits `9d8aa73`, `835b737` e `060b905`;
+documentação, exemplos, ajuda e validação integrada da task 4 nesta alteração.
+Sem frontend/estáticos, dependências, toolchain, CI ou gates alterados. Não foi
+executado SonarQube (responsabilidade QA). Evidência local não substitui review.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, goimports, golangci-lint e Hurl **8.0.0**
+já disponíveis, sem instalação. HTTP/TLS local em portas dinâmicas; build único
+do binário nos E2E, `exec.CommandContext`, arquivos temporários e diretório do
+processo filho, sem chdir global ou sleeps. Sem dependência do dummy/porta 8080.
+Cross-builds e execução nativa macOS/Windows não realizados: opcionais para esta
+história pelo plano v4, seção 7; não há alegação de validação nessas plataformas.
+
+- Task 1: `go test ./internal/template ./internal/runner ./internal/cli` e
+  `go test ./tests/e2e -run 'TestExternal' -count=1` passaram. Demonstração Pizza/45/true
+  e Suco/12/false com a flag antes/depois do arquivo; invocação seguinte sem flag
+  mantém placeholders literais. Valores completos/raiz, alta precisão, null,
+  arrays/objetos, escalares em strings, escapes/Unicode e inserção não recursiva.
+  JSON estático preserva whitespace externo LF/CRLF; nomes/caminhos literais,
+  absolutos e relativos, sem seleção por extensão ou inferência de Content-Type.
+- Task 2: `go test ./internal/template ./internal/parser ./internal/runner
+  ./internal/cli` e `go test ./tests/e2e -run 'TestExternal' -count=1` passaram.
+  Falhas na segunda entrada preservam a primeira resposta e suas contagens,
+  sem enviar a afetada/seguintes. Vazio, whitespace, não JSON, UTF-8 inválido,
+  múltiplos valores, instrução Hurl no payload, template malformado, variável
+  ausente, objeto opaco, array/objeto em string e chave dinâmica são rejeitados.
+  LF/CRLF e expansão anterior não deslocam a origem; renderer falso exercita a
+  defesa de JSON final inválido com fallback 1:1. I/O mantém FileError, causas
+  inspecionáveis e bytes parciais descartados; fakes cobrem leitura/fechamento.
+  Descritor real fechado antes do envio; cancelamento no renderer impede executor.
+- Task 3: `go test ./internal/runner ./internal/transport ./internal/cli -race`
+  e `make e2e` passaram. Capturas anteriores de todos os tipos, inclusive raiz,
+  alta precisão e texto semelhante a placeholder; callbacks síncronos sem body,
+  headers, planos ou referência operacional. Segredos fictícios iniciais e
+  capturados/derivados/escapes conhecidos não aparecem em callbacks ou streams
+  de sucesso, divergência, renderização, transporte ou writer. Origem externa e
+  referência do cenário também são sanitizadas. Writer conserva prioridade 2.
+  Fluxo captura → inline → externo → multipart → GET com a flag preserva modos;
+  arquivo multipart binário com placeholder indefinido permanece literal.
+  Status/assertion divergente retorna 1; consumo incompleto/renderização retorna
+  2 e impede próxima entrada. Redirects 301/302/303/307/308 HTTP e TLS local
+  verificam método/bytes renderizados, sem mudanças de produção no adapter.
+- Task 4: `go test ./internal/cli ./tests/e2e` passou. Ajuda root/test distingue
+  modo bytes de extensão HTTPGo e multipart; exemplo versionado e negativos de
+  chave dinâmica/template malformado são executados pelo binário, com posição,
+  código e contatos verificados. Seeds de parser e JSON renderer ampliados.
+- `make compatibility` passou com Hurl **8.0.0** obrigatório, sem skip:
+  **116 pares anteriores inalterados**, sem qualquer alteração em
+  `testdata/compatibility/`, sem `-update` ou flag própria passada ao Hurl.
+  A extensão tem testes separados, não promete renderização equivalente.
+  Hurl imprime aviso local de versionamento da libcurl ao iniciar, sem impedir
+  identificação da versão ou os resultados do diferencial.
+- Fuzzing executado separadamente, sem falhas encontradas:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`:
+    passou, **64.348** execuções.
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`:
+    passou, **214.366** execuções.
+- `make fmt lint test` passou antes de concluir cada task e na validação integrada:
+  lint **0 issues**, `go test ./... -race -cover` sem falhas. Cobertura integrada:
+  runner **93,0%**, CLI **95,0%**, template **95,7%**. Também passaram explicitamente
+  `go vet ./...`, `go build ./...` e `make e2e`. `gofmt -l` dos Go alterados e
+  `git diff --check` sem pendências. Nenhum gate removido/reduzido ou ferramenta
+  instalada para contornar validação.
+
+### Rastreabilidade dos cenários da issue
+
+| Cenários | Evidência automatizada |
+|---|---|
+| GO-01 | `TestRenderFilesPerInvocation`, `TestExternalRenderedDemoByBinary`, `TestExternalRenderedDocumentedScenarios` |
+| GO-02 | `TestExternalJSONValuesAndStaticBytes`, `TestExternalCapturedRootTypes`, `TestExternalRenderedMixedModesByBinary` |
+| GO-03 | `TestExternalJSONValuesAndStaticBytes`, `TestExternalCapturedRootTypes`, `TestExternalRenderedRedirectsAndTLS` |
+| GO-04–06 | `TestExternalRenderFailuresUseOriginalPayloadPositions`, `TestExternalDefensiveFinalJSONValidation`, `TestExternalRenderedFailuresByBinary` |
+| GO-07 | `TestRenderFilesPayloadDiagnostic`, `TestExternalRenderFailuresUseOriginalPayloadPositions`, `TestExternalRenderedStructuralErrorPreventsAllNetwork` |
+| GO-08 | `TestExternalBytes`, `TestExternalBodiesByBinary`, invocação sem flag em `TestRenderFilesPerInvocation` |
+| GO-09 | `TestExternalJSONValuesAndStaticBytes`, `TestExternalRenderedOriginAcrossProcessDirectories` |
+| GO-10 | `TestExternalRenderedReadAndCloseFailures`, `TestPayloadReadFailureClosesAndDiscardsPartialBytes`, `TestPayloadCloseFailureAndCanceledRead`, `TestExternalRenderedDescriptorClosedBeforeSend`, `TestExternalCancellationAfterRendering` |
+| GO-11 | `TestExternalSecretsAndOperationalMetadataNeverReachReports`, `TestExternalRenderOriginIsSanitized`, `TestRenderFilesSecretsAndWriterPriority`, `TestExternalRenderedMixedModesByBinary` |
+| GO-12 | `TestExternalRenderedMixedModesByBinary` (inline/external/multipart binário literal) |
+| GO-13 | `TestExternalRenderedRedirectsAndTLS`, `TestExternalRenderReporterFailure`, `TestRenderFilesSecretsAndWriterPriority`, `TestExternalRenderedMixedModesByBinary` |
+| GO-14 | `TestExternalFileHelp`, `TestExternalRenderedDocumentedScenarios`, `TestMultipartDocumentedScenario`, `TestCompatibility` |
+
 
 ## US-20 — issue #24 / história 020
 
@@ -87,8 +174,10 @@ execução nativa macOS/Windows não realizados: opcionais pelo plano v4, seçã
 | GO-15 | `TestMultipartMixedBodiesAndCaptures`, `TestMultipartMixedProcess`, `TestMultipartResourceFailurePaths/report` |
 | GO-16 | `TestCompatibility`, dez pares multipart com Hurl 8.0.0, diferenças explícitas em `compatibility.md` |
 
-Evidência local não substitui review. Multipart avançado, renderização externa,
-`--render-files`, sandbox e detecção arbitrária de segredos não são anunciados.
+Registro histórico da US-20: renderização externa e `--render-files` não eram
+anunciados naquela entrega; a US-10 acima implementa a extensão somente para body
+externo completo. Multipart avançado, renderização de arquivo multipart, sandbox
+e detecção arbitrária de segredos continuam fora do suporte.
 
 ## US-09 — issue #22 / história 009
 

@@ -29,7 +29,7 @@ func TestExternalFileHelp(t *testing.T) {
 		if code := cmd.ExecuteContext(context.Background()); code != 0 || stderr.Len() != 0 {
 			t.Fatalf("code=%d err=%q", code, stderr.String())
 		}
-		for _, text := range []string{"file,<caminho>;", "file,../payloads/product.json;", "diretório do .hurl", "Sem sandbox", "sem aspas/escapes especiais", "Sem --render-files", "binário", "falha localizada"} {
+		for _, text := range []string{"file,<caminho>;", "file,../payloads/product.json;", "diretório do .hurl", "Sem sandbox", "sem aspas/escapes especiais", "Sem --render-files", "extensão HTTPGo", "Não renderiza arquivos multipart", "conteúdo bruto", "binário", "falha localizada"} {
 			if !strings.Contains(out.String(), text) {
 				t.Fatalf("help missing %q", text)
 			}

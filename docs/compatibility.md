@@ -1,4 +1,20 @@
-# Matriz de compatibilidade — US-01 a US-09 e US-20
+# Matriz de compatibilidade — US-01 a US-10 e US-20
+
+## Extensão US-10 — JSON externo opt-in (issue #25)
+
+`--render-files` é uma **extensão HTTPGo**, não um recurso declarado compatível
+com Hurl. Trata todos os arquivos usados como body completo como templates JSON,
+sem seleção por extensão/Content-Type. Reutiliza JSON contextual tipado, sessão,
+variáveis iniciais/capturas anteriores e proteção de segredos; arquivos multipart
+continuam literais. Sem flag, os bytes da US-09 permanecem inalterados.
+
+Os testes da extensão ficam em `render_files*_test.go` de runner/CLI/transporte e
+E2E, **separados** do diferencial. Comprovam tipos/escapes, JSON estático exato,
+validação tardia, origem original segura, modos mistos e políticas HTTP. Não se
+passa `--render-files` ao Hurl nem se alteram observações para forçar equivalência.
+Os **116 pares existentes** continuam exercitando o modo bytes e o subconjunto
+anterior, sem mudanças em `testdata/compatibility/`. A nova capacidade não implica
+renderização externa equivalente pelo Hurl; YAML e sandbox continuam fora do suporte.
 
 ## Ampliação US-20 — multipart (issue #24)
 
@@ -38,8 +54,8 @@ prometer igualdade de gramática Hurl. Inferência em outras extensões segue a 
 HTTPGo documentada em `subset.md`, não se deduz igualdade de bancos MIME do SO.
 
 Continuam fora do recorte: multipart avançado, campos repetidos, arquivo renderizado,
-filename customizado, headers de parte, sandbox e `--render-files`. Renderização
-externa futura permanece extensão HTTPGo, não uma capacidade desta entrega.
+filename customizado, headers de parte e sandbox. A flag `--render-files` da
+US-10 não altera esse contrato nem renderiza arquivos multipart.
 
 ## Ampliação US-09 — payload externo literal (issue #22)
 
@@ -68,8 +84,8 @@ Acesso negado real é verificado pelo E2E Linux sob usuário sem privilégios;
 o diferencial acima observa inexistente/diretório, não anuncia equivalência de
 mensagem de permissão. Não há sandbox automática, renderização externa,
 `--render-files`, multipart ou inferência de MIME **na entrega US-09** (multipart
-agora tem o contrato separado acima). Interpolação
-externa futura é extensão HTTPGo, não capacidade atual.
+agora tem o contrato separado acima). A US-10 implementa renderização externa
+como extensão HTTPGo separada, sem mudar o diferencial do modo bytes.
 
 ## Escopo da evidência
 
@@ -190,7 +206,7 @@ falha da sua CLI em aceitar o valor; registra-se somente o comportamento observa
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. Templates em chaves JSON/nomes de headers,
-seções além de `[Captures]`, `[Asserts]` e `[MultipartFormData]`, renderização externa,
+seções além de `[Captures]`, `[Asserts]` e `[MultipartFormData]`,
 bodies inline binários e multipart avançado, headers de enquadramento e
 demais construções fora de escopo continuam explicitamente não suportadas.
 
@@ -350,10 +366,10 @@ Interpretação tipada de literais JSON na CLI é uma extensão implementada na 
 com mudança intencional do contrato textual temporário da US-03. Não há conversão
 implícita de objetos/arrays em texto nem navegação de propriedades.
 
-YAML hierárquico e interpolação em arquivos externos são extensões futuras do
-httpgo, **não capacidades do formato Hurl implementadas nesta história**.
-Não há configuração YAML ou interpolação **externa** nesta entrega. A gramática menor,
-saída/exit codes próprios e restrição de redirects estão detalhados em `subset.md`.
+Interpolação JSON em arquivos externos com `--render-files` é extensão HTTPGo
+implementada na US-10, **não parte do subconjunto Hurl**. YAML hierárquico permanece
+uma extensão futura, não implementada. A gramática menor, saída/exit codes próprios
+e restrição de redirects estão detalhados em `subset.md`.
 
 ## Ambiente usado
 

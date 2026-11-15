@@ -284,8 +284,9 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
 Headers e um body são opcionais: JSON inline, file,<caminho>; ou multipart (exclusivos).
-JSON inline estático preserva seus bytes. Arquivo externo preserva todos os bytes,
-inclusive vazio, binário e {{placeholder}} literal, sem validar JSON nem renderizar.
+JSON inline estático preserva seus bytes. Sem --render-files, arquivo externo
+preserva todos os bytes, inclusive vazio, binário e {{placeholder}} literal,
+sem validar JSON nem renderizar.
 Exemplo: salve tests/products.hurl e execute httpgo test tests/products.hurl
   POST http://localhost:8080/products
   Content-Type: application/json
@@ -300,7 +301,15 @@ retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeit
 No body externo completo, Content-Type não é inferido. Sem --render-files, bytes literais.
 --render-files: extensão HTTPGo; trata bodies externos completos como templates JSON,
 com as mesmas variáveis/tipos do JSON inline. Não renderiza arquivos multipart.
+Independe de extensão/Content-Type; JSON estático preserva inclusive whitespace externo.
+No payload: {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}
 Exemplo: httpgo test tests/products.hurl --render-files --var product.name=Pizza --var product.price=45 --var product.active=true
+Flag sem valor, antes/depois do arquivo após test, somente na execução atual.
+Conteúdo validado somente na vez da requisição: vazio/não JSON, template malformado,
+variável ausente, tipo incompatível ou JSON final inválido retornam 2 antes do envio.
+Diagnóstico aponta payload/linha/coluna originais e referência no cenário,
+sem conteúdo bruto. Anteriores permanecem; afetada e seguintes não são enviadas.
+Não promete renderização equivalente pelo Hurl.
 O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
 
 Upload multipart: salve tests/documents.hurl, crie fixtures/document.pdf e execute
@@ -411,7 +420,7 @@ Duplicação e ancestral/descendente são erros, sem merge nem sobrescrita.
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
-Capturas tipadas da resposta para entradas seguintes (URL, headers e JSON inline):
+Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo com --render-files):
   POST {{base_url}}/auth/login
   {"username":"{{username}}","password":"{{password}}"}
   HTTP 200

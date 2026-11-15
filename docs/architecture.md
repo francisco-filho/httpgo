@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-09 e US-20
+# Arquitetura implementada — US-01 a US-10 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09) e #24 (US-20),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -15,7 +15,8 @@ cmd/httpgo/main.go
     → internal/runner/runner.go + render.go (somente cenário validado)
       → internal/template/template.go + json.go (valores tipados, texto/JSON contextual)
       → parser.ValidateURL/ValidateHeader e validação JSON final
-      → internal/runner/file.go (leitura integral literal para body externo)
+      → internal/runner/file.go (leitura integral e fechamento de body externo)
+      → internal/runner/render.go (JSON externo opt-in com a mesma sessão)
       → internal/runner/multipart.go + multipart_mime.go (fonte aberta e textos preparados)
       → internal/transport/http.go + multipart.go (via HTTPExecutor)
       → fechamento da fonte multipart antes da avaliação/apresentação
@@ -76,8 +77,8 @@ compõe erros com `errors.Join`; `FileError.Unwrap` conserva as causas para
 é um ponto privado de substituição por instância para testes determinísticos;
 não há interface pública de filesystem nem dependência nova.
 
-O conteúdo externo não passa por `BodyPlan`, `Session.RenderJSON` ou validação
-JSON: é entregue como `Request.Body []byte`. Transport não conhece caminhos e
+No modo bytes padrão, o conteúdo externo não passa por `BodyPlan`,
+`Session.RenderJSON` ou validação JSON: é entregue como `Request.Body []byte`. Transport não conhece caminhos e
 continua responsável somente por HTTP/redirects/consumo/fechamento de resposta.
 Template não conhece arquivos. Não há sandbox, tamanho máximo ou inferência de
 Content-Type; memória adicional acompanha o payload corrente, sem retenção nos
@@ -93,6 +94,44 @@ Headers sensíveis já renderizados entram na proteção antes da leitura, inclu
 para sanitizar DisplayURL e writers se o arquivo falhar antes do transporte.
 CLI reconhece FileError sem classificar como transporte/renderização nem imprimir
 erro bruto/linha do cenário. ReportErr ainda prevalece com código 2.
+
+## JSON externo opt-in — US-10
+
+`cli.arguments.renderFiles` reconhece a flag sem valor `--render-files` após
+`test`, antes/depois do arquivo, e a encaminha a `Runner.RunWithOptions` como
+`runner.Options{RenderFiles: true}` por valor. `Run` conserva o modo bytes padrão
+via opções zero. Nenhum estado mutável do runner/comando retém a ativação; cada
+chamada continua criando sessão nova. HTTPExecutor/Request.Body e o adapter de
+transporte não mudam; não há novos pacotes, interfaces de filesystem ou dependências.
+
+Após URL/headers, somente para `Entry.ExternalBody` e com a opção ativa, o runner
+resolve/lê/fecha como na US-09 e chama `renderExternal` em `render.go`. Essa função
+reutiliza `Session.RenderJSON` com variáveis iniciais/capturas anteriores, exige um
+valor completo e valida defensivamente o JSON final antes do executor. `template`
+continua sem conhecer arquivos; o parser conserva referência literal, sem abrir
+ou pré-validar payload. JSON estático preserva bytes externos, inclusive whitespace.
+Não há seleção por extensão/Content-Type, inferência de header, interpolação de
+caminhos/chaves ou renderização de arquivos multipart. O fluxo inline permanece
+inalterado; multipart continua no caminho incremental da US-20.
+
+Conteúdo inválido, inclusive vazio/template malformado, produz `RenderFailed` e
+`RenderError`, separado de `FileFailed`/`FileError` para I/O. `RenderError.Position`
+parte de 1:1 do payload e mapeia offsets sobre os bytes originais LF/CRLF; sem
+offset confiável (inclusive defesa do JSON final), permanece 1:1. O campo opcional
+`RenderError.Reference` identifica a declaração no `.hurl`. Nomes são sanitizados
+pela sessão antes de entrar em resultado/callback; a CLI aplica quoting e proteção
+nos writers. Nunca se usa o caminho absoluto operacional calculado ou posição do
+resultado expandido. Causas brutas e payload não entram no texto de diagnóstico.
+
+Contexto é verificado antes/depois da leitura, depois da renderização e antes do
+executor. Não há nova goroutine, retry ou interrupção prometida para leitura local
+bloqueada pelo SO. Recursos fecham antes do envio mesmo no modo JSON; memória
+acompanha somente o payload corrente e sua renderização. Erros são tardios e locais:
+contagens pré-envio, resultados anteriores, callback síncrono e prioridade de
+ReportErr (2) permanecem. `safeEntry` remove bodies, planos e referências;
+não se gera body de diagnóstico ou detecção arbitrária de segredos no arquivo.
+A proteção existente da sessão acompanha capturas secretas/derivados e variantes
+escapadas nos callbacks e writers, sem novas fontes de credenciais.
 
 ## Multipart incremental — US-20
 
