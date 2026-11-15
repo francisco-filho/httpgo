@@ -72,6 +72,22 @@ func TestProcessReferenceUnionProtectsEverySubstitute(t *testing.T) {
 	}
 }
 
+func TestProcessReferenceProtectionOnMergeConflict(t *testing.T) {
+	s, err := environmentSettings(t, "version: 1\nvariables: {token: '${DISCARDED}', shape: 1}", "variables: {token: '${AVAILABLE}', shape: {child: true}}")
+	if err == nil {
+		t.Fatal("accepted structural conflict")
+	}
+	var calls []string
+	s.lookupEnv = func(name string) (string, bool) {
+		calls = append(calls, name)
+		return "available-fiction", name == "AVAILABLE"
+	}
+	resolved, err := s.Resolve(context.Background(), nil)
+	if err != nil || len(calls) != 1 || calls[0] != "AVAILABLE" || resolved.Protection(nil, nil)("available-fiction") != "[oculto]" {
+		t.Fatalf("calls=%v err=%v", calls, err)
+	}
+}
+
 func TestProcessReferenceLookupIsolation(t *testing.T) {
 	s := referenceSettings(t, "variables: {token: '${TOKEN}'}")
 	value := "first-fiction"

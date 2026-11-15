@@ -29,7 +29,7 @@ func TestEnvironmentHelp(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%q", code, stderr)
 		}
-		for _, text := range []string{"--env local", "--env staging", "seleção única", "mesmo nome", "environments/<nome>.yaml", "inclusive vazia", "defaults internos < YAML base < ambiente selecionado < CLI", "extensão HTTPGo (US-12)", "NÃO é ambiente do processo", "${NOME} continua rejeitado", "null substituem folhas", "lista vazia nunca remove proteção"} {
+		for _, text := range []string{"--env local", "--env staging", "seleção única", "mesmo nome", "environments/<nome>.yaml", "inclusive vazia", "defaults internos < YAML base < ambiente selecionado < CLI", "extensão HTTPGo (US-12)", "NÃO é ambiente do processo", "Referências explícitas: US-13 abaixo", "null substituem folhas", "lista vazia nunca remove proteção"} {
 			if !strings.Contains(out, text) {
 				t.Errorf("missing %q", text)
 			}

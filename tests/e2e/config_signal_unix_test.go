@@ -16,6 +16,15 @@ import (
 )
 
 func TestConfigRealCancellation(t *testing.T) {
+	testConfiguredCancellation(t, false)
+}
+
+func TestProcessEnvironmentRealCancellation(t *testing.T) {
+	testConfiguredCancellation(t, true)
+}
+
+func testConfiguredCancellation(t *testing.T, process bool) {
+	t.Helper()
 	started := make(chan struct{})
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,11 +37,18 @@ func TestConfigRealCancellation(t *testing.T) {
 	defer server.Close()
 	dir := t.TempDir()
 	configFile(t, dir, ".httpgo.yaml", "version: 1\ndefaults: {timeout: 60}\nvariables: {token: fake-cancel-token}\nsecrets: [token]")
+	if process {
+		configFile(t, dir, ".httpgo.yaml", "version: 1\ndefaults: {timeout: 60}\nvariables: {token: '${OWNER_TOKEN}'}")
+	}
 	file := configFile(t, dir, "cancel.hurl", "GET "+server.URL+"/{{token}}\nHTTP 200\nGET "+server.URL+"/never\nHTTP 200")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	command := exec.CommandContext(ctx, binary(t), "test", file)
 	command.Dir = dir
+	if process {
+		token := "fake-cancel-token"
+		command.Env = childEnvironment(map[string]*string{"OWNER_TOKEN": &token})
+	}
 	var out, stderr bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &stderr

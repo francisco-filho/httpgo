@@ -140,8 +140,8 @@ recebe um novo orçamento. Não interrompe I/O local bloqueado pelo SO.
 Limite YAML: **1 MiB (1.048.576 bytes)**, um documento, raiz mapa, `version: 1`
 obrigatória; opcionais somente `defaults.timeout`, `variables` e `secrets`.
 Rejeita campos/chaves/tipos/nomes inválidos, duplicações, âncoras, aliases e tags
-explícitas, inclusive aninhados. Referências `${NOME}` ainda são rejeitadas,
-mesmo com override CLI: não são resolvidas nem enviadas literalmente.
+explícitas, inclusive aninhados. Referências `${NOME}` seguem a extensão US-13
+abaixo: somente valores string completos de folhas de `variables`, fora de listas.
 Erros controlados incluem arquivo/posição quando identificáveis, sem trecho bruto.
 
 `secrets` une marcações com `--secret`; overrides não removem proteção. Pode
@@ -150,9 +150,9 @@ capturados e derivados permanecem protegidos em stdout/stderr/diagnósticos,
 inclusive antes da sessão. Não há detecção universal de segredos arbitrários.
 **Credenciais reais em flags continuam proibidas**: a proteção não cobre histórico
 ou listagem de processos. YAML em disco não é um cofre; proteja arquivos com
-permissões `0600`. `HTTPGO_*`, referências ao ambiente do processo, stdin e hooks
-continuam fora do suporte. YAML é **extensão HTTPGo**,
-não parte do formato Hurl. Contrato completo: [subconjunto](docs/subset.md).
+permissões `0600`. Overrides automáticos `HTTPGO_*`, stdin e hooks
+continuam fora do suporte. Referências explícitas de processo: seção US-13 abaixo.
+YAML é **extensão HTTPGo**, não parte do formato Hurl. Contrato completo: [subconjunto](docs/subset.md).
 
 ## Selecionar ambientes — extensão HTTPGo (US-12 / issue #29)
 
@@ -218,10 +218,71 @@ acumulam base + ambiente + CLI: listas vazias e substituições não desprotegem
 valores conhecidos anteriores, novos valores ou capturas futuras. Contexto,
 marcas, timeout e capturas não vazam entre execuções.
 
-**Ambiente nomeado não é ambiente do processo.** `${NOME}` continua rejeitado,
-mesmo com variável do processo definida ou override CLI. Sem composição de vários
-ambientes, seleção automática, fontes `HTTPGO_*` ou stdin. Configuração hierárquica
+**Ambiente nomeado não é ambiente do processo.** Referências explícitas `${NOME}`
+são resolvidas conforme a US-13 abaixo. Sem composição de vários ambientes,
+seleção automática, fontes `HTTPGO_*` ou stdin. Configuração hierárquica
 e seleção nomeada são extensões HTTPGo, não sintaxe Hurl.
+
+## Injetar credenciais pelo ambiente do processo — extensão HTTPGo (US-13 / issue #32)
+
+Em `environments/local.yaml`:
+
+```yaml
+variables:
+  auth:
+    token: ${OWNER_TOKEN}
+```
+
+Em `tests/profile.hurl`:
+
+```hurl
+GET http://localhost:8080/profile
+Authorization: Bearer {{auth.token}}
+HTTP 200
+```
+
+Forneça `OWNER_TOKEN` externamente ao processo (por exemplo, pela configuração
+segura do job de CI) e execute, **sem credencial nos argumentos**:
+
+```sh
+bin/httpgo test tests/profile.hurl --env local
+# Exemplo versionado; requer servidor com /profile:
+bin/httpgo test testdata/scenarios/scenario_process_profile.hurl \
+  --config testdata/config/process_base.yaml --env process
+```
+
+Também funciona na configuração base, em `variables`, com `version: 1`, sem
+`--env`. O servidor recebe o token no header; status 200 retorna **0**.
+Divergência de assertion retorna **1**, com esperado/recebido sanitizados, inclusive
+se a resposta ecoar o segredo em header comum ou JSON.
+
+- `${NOME}` ocupa o **valor string completo**, com nome `[A-Za-z_][A-Za-z0-9_]*`.
+  Mapas continuam definindo caminhos como `auth.token`; referências em listas,
+  inclusive objetos/listas internos, não são suportadas.
+- `Bearer ${OWNER_TOKEN}`, várias referências no mesmo valor, nomes inválidos e
+  delimitadores malformados retornam **2**, mesmo com override posterior.
+  Cada fonte é validada antes do merge.
+- Aplica **base < ambiente < CLI**, depois consulta **somente referências efetivas**.
+  Referência substituída não exige a variável do processo. Todas as efetivas são
+  obrigatórias, mesmo não utilizadas no cenário. Ausência retorna **2 antes de HTTP**,
+  com nome da referência, chave de configuração e origem/posição identificável,
+  sem valores nem dump do ambiente.
+- Resultado é sempre **string**: `123`, `true`, `null` e JSON recebido não viram
+  números, booleanos, null ou objetos. Presente mas vazio é string vazia, diferente
+  de ausência e sujeita às validações do contexto de uso. Conteúdo `${OUTRA}` ou
+  `{{outra}}` é literal, sem segunda consulta/expansão.
+- O destino ganha **proteção automática antes dos overrides**. A marca persiste
+  em substituições e se une a `secrets`/`--secret`. `--var auth.token=ficticio`
+  pode fornecer substituto não sigiloso, mantendo precedência e proteção;
+  **credenciais reais em argumentos continuam proibidas**, inclusive `--var`.
+- Valores conhecidos, substitutos e derivados são protegidos antes da primeira
+  sessão e de diagnósticos, assertions e callbacks, preservando dados operacionais.
+  A proteção cobre variantes conhecidas, não segredos desconhecidos ou transformações
+  arbitrárias; não protege o ambiente contra acesso por outros processos privilegiados.
+
+Sem importar outras variáveis do sistema, overrides automáticos `HTTPGO_*`, dotenv,
+stdin, composição parcial, referências em listas ou JUnit. É **extensão HTTPGo**,
+não sintaxe Hurl; YAML continua fora do corpus diferencial.
 
 ## Payload de arquivo externo (US-09 / issue #22)
 
@@ -434,9 +495,10 @@ observadas contra Hurl 8.0.0 estão em [compatibilidade](docs/compatibility.md).
 somente valores não sigilosos ou fictícios. `--secret nome` apenas marca proteção
 nas saídas; não fornece valor nem protege histórico de shell/listagem de processos.
 Marcar um nome ainda ausente é permitido, mas não resolve sua referência. A fonte
-segura para credenciais iniciais pelo ambiente do processo chega na US-13;
-stdin não está implementado. Capturas de respostas estão disponíveis desde a US-05,
-ampliadas para qualquer tipo JSON na US-06.
+para credenciais iniciais pelo ambiente do processo está disponível por referências
+explícitas `${NOME}` em YAML (extensão US-13 acima); stdin não está implementado.
+Capturas de respostas estão disponíveis desde a US-05, ampliadas para qualquer
+tipo JSON na US-06.
 
 ## Autenticar e reutilizar token (US-05 / issue #14)
 

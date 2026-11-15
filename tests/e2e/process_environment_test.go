@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,17 +21,7 @@ func runProcessEnvironment(t *testing.T, dir string, environment map[string]*str
 	defer cancel()
 	command := exec.CommandContext(ctx, binary(t), args...)
 	command.Dir = dir
-	for _, entry := range os.Environ() {
-		name, _, _ := strings.Cut(entry, "=")
-		if _, overridden := environment[name]; !overridden {
-			command.Env = append(command.Env, entry)
-		}
-	}
-	for name, value := range environment {
-		if value != nil {
-			command.Env = append(command.Env, name+"="+*value)
-		}
-	}
+	command.Env = childEnvironment(environment)
 	var out, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &out, &stderr
 	err := command.Run()
@@ -45,6 +36,22 @@ func runProcessEnvironment(t *testing.T, dir string, environment map[string]*str
 		code = command.ProcessState.ExitCode()
 	}
 	return code, out.String(), stderr.String()
+}
+
+func childEnvironment(overrides map[string]*string) []string {
+	var environment []string
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		if _, overridden := overrides[name]; !overridden {
+			environment = append(environment, entry)
+		}
+	}
+	for name, value := range overrides {
+		if value != nil {
+			environment = append(environment, name+"="+*value)
+		}
+	}
+	return environment
 }
 
 func TestProcessEnvironmentDemonstration(t *testing.T) {
@@ -77,7 +84,20 @@ func TestProcessEnvironmentDemonstration(t *testing.T) {
 			t.Fatalf("code=%d safe=%v", code, !strings.Contains(out+stderr, token))
 		}
 	}
-	if hits.Load() != 2 {
-		t.Fatalf("hits=%d", hits.Load())
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(root, "testdata", "scenarios", "scenario_process_profile.hurl")
+	value := token
+	code, out, stderr := runProcessEnvironment(t, t.TempDir(), map[string]*string{"OWNER_TOKEN": &value}, "test", file, "--config", filepath.Join(root, "testdata", "config", "process_base.yaml"), "--env", "process", "--var", "api.baseUrl="+server.URL)
+	if code != 0 || stderr != "" || strings.Contains(out+stderr, token) || hits.Load() != 3 {
+		t.Fatalf("documented example code=%d hits=%d", code, hits.Load())
+	}
+	for _, name := range []string{"invalid_process_reference.yaml", "unsupported_process_list.yaml", "unsupported_environment.yaml"} {
+		code, out, stderr := runProcessEnvironment(t, t.TempDir(), map[string]*string{"OWNER_TOKEN": &value}, "test", file, "--config", filepath.Join(root, "testdata", "config", name), "--var", "auth.token=fiction", "--var", "tokens=fiction")
+		if code != 2 || out != "" || stderr == "" || hits.Load() != 3 || strings.Contains(stderr, token) {
+			t.Fatalf("negative fixture %s code=%d hits=%d", name, code, hits.Load())
+		}
 	}
 }

@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-12 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27 e #29)
+# Subconjunto suportado e extensões — US-01 a US-13 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29 e #32)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -291,10 +291,10 @@ acrescente `--var api.baseUrl=http://localhost:9090` (valor não sigiloso).
   Strings numéricas entre aspas mantêm tipo string. Números usam a representação
   original/canônica sem passar seus valores por float64; precisão inteira,
   decimal e aninhada não é arredondada. `.inf`/`.nan` são rejeitados.
-- Qualquer referência `${NOME}` em valor é rejeitada explicitamente **antes de
-  overrides**, inclusive aninhada e com variável de processo definida.
-  Nada é resolvido nem enviado como credencial literal. Não há `HTTPGO_*`,
-  referências de processo, stdin ou hooks. Ambientes nomeados: seção US-12 abaixo.
+- Referências explícitas `${NOME}` seguem a extensão US-13 abaixo: somente folhas
+  string completas de `variables`, nunca listas ou objetos nelas contidos.
+  Sintaxe inválida/não suportada é rejeitada por fonte, mesmo com override.
+  Não há overrides automáticos `HTTPGO_*`, stdin ou hooks. Ambientes: US-12 abaixo.
 
 ### Composição, prazo e proteção
 
@@ -356,9 +356,9 @@ Ambiente usa o schema e proteções da base, exceto `version: 1` que é **opcion
 Somente `defaults.timeout`, `variables` e `secrets`; arquivo vazio/whitespace/só
 comentários não acrescenta overrides. Limite de **1 MiB por arquivo**, documento
 único, chaves únicas, mesmos tipos/nomes e timeout exato entre 1 ms e 24 horas.
-Versão diferente, campo desconhecido, recursos YAML proibidos e `${NOME}` são
-rejeitados com arquivo/posição e mensagem segura antes de qualquer envio. A
-referência é rejeitada mesmo se substituída pela CLI ou definida no processo.
+Versão diferente, campo desconhecido e recursos YAML proibidos são rejeitados
+com arquivo/posição e mensagem segura antes de qualquer envio. Referências
+`${NOME}` seguem a extensão US-13 abaixo, com validação independente por fonte.
 
 Base → ambiente → CLI preserva folhas irmãs, strings numéricas e precisão dos
 números. Mapas são caminhos e combinam profundamente; escalares, listas e `null`
@@ -374,9 +374,70 @@ invocação tem configuração/contexto/capturas novos, sem estado compartilhado
 Exemplo completo e demonstração Pizza/Suco: `README.md`,
 `testdata/config/environment_base.yaml`, `testdata/config/environments/{local,staging}.yaml`
 e `testdata/scenarios/scenario_environment_products.hurl`.
-Sem múltiplos ambientes, seleção automática, referências de processo (US-13),
-stdin ou mudanças nos caminhos de payloads. Não é uma capacidade Hurl; testes
-separados do corpus diferencial, sem fornecer `--env` à outra ferramenta.
+Sem múltiplos ambientes, seleção automática, stdin ou mudanças nos caminhos de
+payloads. Referências de processo: US-13 abaixo. Não é uma capacidade Hurl;
+testes separados do corpus diferencial, sem fornecer `--env` à outra ferramenta.
+
+## Extensão HTTPGo: referências ao ambiente do processo — US-13 (issue #32)
+
+```yaml
+# Configuração base: version: 1 obrigatória; no ambiente selecionado é opcional.
+version: 1
+variables:
+  auth:
+    token: ${OWNER_TOKEN}
+```
+
+```hurl
+GET http://localhost:8080/profile
+Authorization: Bearer {{auth.token}}
+HTTP 200
+```
+
+Com `OWNER_TOKEN` fornecido externamente, `httpgo test tests/profile.hurl --config base.yaml`
+entrega o header e retorna 0 para status 200. Em `environments/local.yaml`, omita
+`version` se desejar e use `httpgo test tests/profile.hurl --env local`.
+Exemplos versionados: `testdata/config/process_base.yaml`,
+`testdata/config/environments/process.yaml`, `scenario_process_profile.hurl`.
+
+**Sintaxe e validação por fonte:** aceita somente `${NOME}` ocupando todo o valor
+string de uma folha em `variables`. O nome é ASCII `[A-Za-z_][A-Za-z0-9_]*`, sem
+espaços ou pontos. Mapas continuam sendo caminhos hierárquicos. Listas e quaisquer
+objetos/listas internos não admitem referências. Composição parcial, múltiplas
+referências, nomes inválidos ou delimitadores malformados falham antes de HTTP,
+mesmo se ambiente/CLI substituir a declaração. Outros campos YAML não resolvem
+referências. Não é linguagem de templates nem sintaxe do formato Hurl.
+
+**Ordem e tipos:** validar cada fonte, compor base < ambiente < CLI e consultar
+apenas referências ainda efetivas. Uma referência descartada pode estar ausente;
+não é consultada. Todas as efetivas são obrigatórias, inclusive sem uso no cenário.
+Ausência gera 2 antes de parsing/HTTP, identificando referência, chave de configuração
+e arquivo/linha/coluna quando disponíveis. Não publica contexto parcialmente resolvido.
+Consulta distingue ausência de presença vazia. Vazio é string vazia, podendo falhar
+em contexto incompatível (como URL), não ausência nem substituição global de texto
+vazio na saída. Sempre serializa como **string JSON**: `123`, `true`, `null` e
+`{"x":1}` permanecem strings. Conteúdo `${OUTRA}`/`{{outra}}` nunca é reinterpretado.
+Não importa variáveis não referenciadas nem introduz opções `HTTPGO_*`.
+
+**Proteção:** cada destino é marcado antes dos overrides; a união com `secrets` e
+`--secret` não é removida por substituição. `--var` pode fornecer substituto
+fictício/não sigiloso, mantendo precedência e marca; credenciais reais em argumentos
+seguem proibidas. Só os valores efetivos referenciados são consultados/conhecidos;
+não se consultam segredos descartados só para proteger sua grafia desconhecida.
+Valores conhecidos/substitutos/variantes são registrados antes de diagnósticos,
+inclusive se outra referência estiver ausente ou houver erro de argumento/composição/
+parsing antes da primeira sessão. A comparação não muda; operandos de assertions,
+resultados/callbacks, stdout/stderr são sanitizados, inclusive diante de eco em
+header comum/JSON. Sessão continua protegendo capturas e derivados em URL, headers,
+JSON inline/externo opt-in e campos multipart, sem alterar bytes de arquivo.
+Mesma política para um futuro relatório JUnit, não implementado aqui.
+
+Cada invocação lê seu próprio ambiente, sem cache global, dotenv ou herança de
+valores/marcas/capturas da execução anterior. Cancelamento é verificado na preparação
+e antes do envio, sem novo timeout de resolução nem promessa de interromper I/O
+local bloqueado. Falha de saída/short write continua prioritária (2), sem retry ou
+próximo envio. Não há stdin, cofres, composição parcial, referências em listas ou
+identificação garantida de segredos desconhecidos/transformações arbitrárias.
 
 ## Variáveis tipadas e templates — US-03/US-04
 
@@ -444,8 +505,9 @@ vazio explicitamente fornecido existe e sua proteção não substitui texto vazi
 globalmente. Valores derivados conservam proteção, inclusive path e header comum.
 
 **Credenciais reais em argumentos são proibidas, inclusive em `--var`.** Apenas
-valores não sigilosos/fictícios são adequados aqui. A fonte segura pelo ambiente
-do processo chega na US-13; não há entrada de segredos por stdin.
+valores não sigilosos/fictícios são adequados aqui. A fonte pelo ambiente do
+processo usa referências explícitas `${NOME}` na extensão US-13 acima; não há
+entrada de segredos por stdin.
 Configuração YAML é a extensão US-11 descrita acima. Capturas de respostas não são uma nova fonte de
 credenciais iniciais. Proteção de streams não protege histórico do shell,
 listagem de processos, arquivos em disco nem segredos arbitrários não marcados.
