@@ -18,11 +18,18 @@ import (
 )
 
 func TestRealCtrlC(t *testing.T) {
-	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "external"} {
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "external", "multipart"} {
 		t.Run(method, func(t *testing.T) {
 			started := make(chan struct{})
 			var next atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if method == "multipart" && r.URL.Path != "/next" {
+					var first [1]byte
+					_, _ = r.Body.Read(first[:])
+					close(started)
+					_, _ = io.Copy(io.Discard, r.Body)
+					return
+				}
 				_, _ = io.Copy(io.Discard, r.Body)
 				if r.URL.Path == "/next" {
 					next.Add(1)
@@ -46,10 +53,24 @@ func TestRealCtrlC(t *testing.T) {
 			if method == "external" {
 				wireMethod, body = "POST", "\nAuthorization: auth-secret\nfile,payload;"
 			}
+			if method == "multipart" {
+				wireMethod, body = "POST", "\nAuthorization: auth-secret\n[MultipartFormData]\ndescription: {{password}}\ndocument: file,payload;"
+			}
 			file := scenario(t, wireMethod+" {{base}}/wait?token=query-secret"+body+"\nHTTP *\n[Asserts]\nheader \"X-Ready\" == \"yes\""+captures+"\nDELETE {{base}}/next")
 			if method == "external" {
 				if err := os.WriteFile(filepath.Join(filepath.Dir(file), "payload"), []byte("body-secret {{literal}}"), 0600); err != nil {
 					t.Fatal(err)
+				}
+			}
+			if method == "multipart" {
+				payload, err := os.Create(filepath.Join(filepath.Dir(file), "payload"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				truncateErr := payload.Truncate(128 << 20)
+				closeErr := payload.Close()
+				if truncateErr != nil || closeErr != nil {
+					t.Fatalf("truncate=%v close=%v", truncateErr, closeErr)
 				}
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

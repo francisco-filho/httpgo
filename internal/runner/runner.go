@@ -216,6 +216,10 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 		if err != nil {
 			current.Outcome, current.Status = Failed, 0
 			result.Err, result.ErrorPosition = err, entry.Position
+			var fileErr *FileError
+			if errors.As(err, &fileErr) {
+				result.ErrorPosition = fileErr.Position
+			}
 		} else {
 			result.Summary.Completed++
 			if entry.ExpectedStatus == nil {

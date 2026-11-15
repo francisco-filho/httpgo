@@ -100,6 +100,9 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 			return runner.Response{}, classify(ctx, Network, err)
 		}
 		for _, header := range request.Headers {
+			if request.Multipart != nil && form == nil && strings.EqualFold(header.Name, "Content-Type") {
+				continue
+			}
 			if strings.EqualFold(header.Name, "Host") {
 				req.Host = header.Value
 			} else {
