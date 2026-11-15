@@ -1,4 +1,33 @@
-# Matriz de compatibilidade — US-01 a US-08
+# Matriz de compatibilidade — US-01 a US-09
+
+## Ampliação US-09 — payload externo literal (issue #22)
+
+**Mudança de contrato:** `file,...;` passa de rejeitado a suportado para métodos
+com body. O negativo global `unsupported_external_body.hurl` vira
+`unsupported_get_external_body.hurl`; novos positivos/negativos detalham o recorte.
+São **106 pares**, seis novos `external_*`; as 100 observações anteriores não mudam.
+O harness copia `payloads/` junto de cada cenário temporário, em árvores isoladas
+para httpgo e Hurl. As referências relativas do corpus não viram caminhos
+absolutos artificiais. Cada ferramenta resolve os arquivos a partir de seu cenário.
+O corpo registrado é exatamente o recebido pelo servidor, não uma leitura presumida.
+
+| Corpus novo | httpgo | Hurl 8.0.0 | Evidência/classificação observada em Linux |
+|---|---|---|---|
+| `external_relative` | 0; POST /health | 0; mesmo contato | bytes JSON incluindo espaços/LF e Content-Type explícito idênticos |
+| `external_empty` | 0; POST /health | 0; mesmo contato | body vazio, sem Content-Type inferido neste par |
+| `external_literal` | 0; POST /health | 0; mesmo contato | não JSON com whitespace/LF e `{{placeholder}}` literal sem variável |
+| `external_missing` | 2; somente GET /health | 3; somente GET /health | falha na vez da segunda entrada, sem enviar segunda/terceira; códigos distintos |
+| `external_directory` | 2; nenhum contato | 3; nenhum contato | diretório não é body legível; códigos distintos |
+| `external_spaces` | 0; POST /health, bytes `not JSON` + LF | 2; nenhum contato | gramática deliberadamente diferente: nome literal com espaço aceito aqui, rejeitado neste par Hurl |
+
+Não se deduz igualdade geral da gramática de caminhos, aspas, escapes,
+interpolação de nomes ou códigos. Os testes próprios cobrem absolutos, `..` fora
+do projeto, nomes com espaços/placeholders e diretórios correntes distintos.
+Acesso negado real é verificado pelo E2E Linux sob usuário sem privilégios;
+o diferencial acima observa inexistente/diretório, não anuncia equivalência de
+mensagem de permissão. Não há sandbox automática, renderização externa,
+`--render-files`, multipart ou inferência de MIME nesta história. Interpolação
+externa futura é extensão HTTPGo, não capacidade atual.
 
 ## Escopo da evidência
 
@@ -119,7 +148,7 @@ falha da sua CLI em aceitar o valor; registra-se somente o comportamento observa
 Estas observações **não** anunciam compatibilidade geral com Hurl ou equivalência
 dos motores net/http e libcurl. Timeout, certificados, pooling, headers implícitos,
 DNS e diagnósticos podem diferir. Templates em chaves JSON/nomes de headers,
-seções além de `[Captures]` e `[Asserts]`, bodies externos/binários/multipart, headers de enquadramento e
+seções além de `[Captures]` e `[Asserts]`, renderização externa, bodies inline binários/multipart, headers de enquadramento e
 demais construções fora de escopo continuam explicitamente não suportadas.
 
 ## Ampliação US-05 — capturas string (issue #14)

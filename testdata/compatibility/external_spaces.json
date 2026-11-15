@@ -1,0 +1,9 @@
+{
+  "classification": "intentional grammar: HTTPGo accepts literal spaces in file paths",
+  "httpgo": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{ "method": "POST", "body": "not JSON\n", "content_type": "", "probe": "" }]
+  },
+  "hurl": { "exit": 2, "paths": null }
+}

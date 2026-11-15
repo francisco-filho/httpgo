@@ -1,0 +1,23 @@
+{
+  "classification": "shared: relative external file and explicit content type preserve bytes",
+  "httpgo": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{
+      "method": "POST",
+      "body": "{ \"name\": \"Pizza\", \"price\": 4500 }\n",
+      "content_type": "application/json",
+      "probe": ""
+    }]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{
+      "method": "POST",
+      "body": "{ \"name\": \"Pizza\", \"price\": 4500 }\n",
+      "content_type": "application/json",
+      "probe": ""
+    }]
+  }
+}

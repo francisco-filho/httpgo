@@ -1,0 +1,23 @@
+{
+  "classification": "shared: external content stays literal without variable resolution",
+  "httpgo": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{
+      "method": "POST",
+      "body": " raw bytes \n{{placeholder}}\n",
+      "content_type": "",
+      "probe": ""
+    }]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": ["/health"],
+    "requests": [{
+      "method": "POST",
+      "body": " raw bytes \n{{placeholder}}\n",
+      "content_type": "",
+      "probe": ""
+    }]
+  }
+}

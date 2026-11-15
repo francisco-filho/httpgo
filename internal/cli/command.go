@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"capimgrosso.com/httpgo/internal/parser"
@@ -60,7 +61,11 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail(err.Error())
 	}
 	file := args.file
-	input, err := os.Open(file)
+	absolute, err := filepath.Abs(file)
+	if err != nil {
+		return c.fail("não foi possível determinar o diretório do cenário")
+	}
+	input, err := os.Open(absolute)
 	if err != nil {
 		return c.fail(fmt.Sprintf("%q: não foi possível abrir o arquivo; verifique o caminho e a permissão de leitura", file))
 	}
@@ -77,6 +82,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if closeErr != nil {
 		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
 	}
+	scenario.OriginDir = filepath.Dir(absolute)
 	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).Run(ctx, scenario)
 	return c.renderSummary(scenario, result)
 }
@@ -106,12 +112,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		} else {
 			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
 		}
-	case runner.Failed, runner.RenderFailed:
+	case runner.Failed, runner.RenderFailed, runner.FileFailed:
 		// Headers alone are not a completed response: never invent a status.
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
+	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
@@ -142,6 +148,10 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 	if result.Err != nil {
 		pos := result.ErrorPosition
 		diagnostic := transportDiagnostic(result.Err)
+		var fileErr *runner.FileError
+		if errors.As(result.Err, &fileErr) {
+			diagnostic = fileErr.Error()
+		}
 		var renderErr *runner.RenderError
 		if errors.As(result.Err, &renderErr) {
 			diagnostic = renderErr.Error()
@@ -273,7 +283,22 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
   HTTP 201
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
-Headers e um valor JSON inline são opcionais; JSON estático preserva seus bytes.
+Headers e um body são opcionais: JSON inline ou file,<caminho>; (exclusivos).
+JSON inline estático preserva seus bytes. Arquivo externo preserva todos os bytes,
+inclusive vazio, binário e {{placeholder}} literal, sem validar JSON nem renderizar.
+Exemplo: salve tests/products.hurl e execute httpgo test tests/products.hurl
+  POST http://localhost:8080/products
+  Content-Type: application/json
+  file,../payloads/product.json;
+  HTTP 201
+Caminho literal entre file, e ; final, incluindo espaços, sem aspas/escapes especiais
+nem interpolação. Vírgula/ponto e vírgula no nome não são aceitos.
+Relativos partem do diretório do .hurl, não do diretório corrente; absolutos aceitos.
+Sem sandbox: .. e absolutos podem ler fora do projeto, com permissões do usuário.
+Leitura completa e fechamento só na vez da entrada, antes do envio; falha localizada
+retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeitas.
+Content-Type não é inferido. Sem --render-files, renderização externa ou multipart.
+O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
 Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
 status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
@@ -282,7 +307,7 @@ Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo 
 Timeout total: 10 segundos por requisição. Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
 Códigos: 0 sucesso, 1 status ou assertion de header/JSON divergente,
-2 entrada/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
+2 entrada/arquivo externo/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Bodies e coleções de headers não são impressos, nem em erros de entrada.

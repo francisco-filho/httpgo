@@ -54,6 +54,21 @@ type comparison struct {
 	Hurl            observation  `json:"hurl"`
 }
 
+// Each executable gets an independent scenario/payload tree. References stay
+// relative, exactly as in the corpus, rather than becoming absolute test paths.
+func compatibilityScenario(t *testing.T, name, text string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.CopyFS(filepath.Join(dir, "payloads"), os.DirFS("../../testdata/compatibility/payloads")); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, name)
+	if err := os.WriteFile(file, []byte(text), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return file
+}
+
 func TestCompatibility(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -138,7 +153,8 @@ func TestCompatibility(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			generated := scenario(t, strings.ReplaceAll(string(input), "http://example.invalid", server.URL))
+			text := strings.ReplaceAll(string(input), "http://example.invalid", server.URL)
+			generated := compatibilityScenario(t, filepath.Base(file), text)
 			httpgoArgs := []string{"test", generated}
 			var variableArgs []string
 			for _, variable := range expected.Variables {
@@ -156,7 +172,7 @@ func TestCompatibility(t *testing.T) {
 			defer hurlCancel()
 			hurlArgs := []string{"--no-color", "--no-output", "--location", "--max-redirs", "10", "--max-time", "10", "--retry", "0", "--no-cookie-store", "--no-proxy", "*"}
 			hurlArgs = append(hurlArgs, variableArgs...)
-			hurlArgs = append(hurlArgs, generated)
+			hurlArgs = append(hurlArgs, compatibilityScenario(t, filepath.Base(file), text))
 			command := exec.CommandContext(hurlContext, "hurl", hurlArgs...)
 			hurlOutput, hurlErr := command.CombinedOutput()
 			hurlCode := 0

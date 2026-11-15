@@ -1,0 +1,5 @@
+{
+  "classification": "shared: directory reference fails without sending; distinct exit codes",
+  "httpgo": { "exit": 2, "paths": null },
+  "hurl": { "exit": 3, "paths": null }
+}

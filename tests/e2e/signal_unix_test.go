@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestRealCtrlC(t *testing.T) {
-	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "external"} {
 		t.Run(method, func(t *testing.T) {
 			started := make(chan struct{})
 			var next atomic.Int32
@@ -41,7 +42,16 @@ func TestRealCtrlC(t *testing.T) {
 				body = "\nAuthorization: auth-secret\n{\"password\":{{password}}}"
 				captures = ""
 			}
-			file := scenario(t, method+" {{base}}/wait?token=query-secret"+body+"\nHTTP *\n[Asserts]\nheader \"X-Ready\" == \"yes\""+captures+"\nDELETE {{base}}/next")
+			wireMethod := method
+			if method == "external" {
+				wireMethod, body = "POST", "\nAuthorization: auth-secret\nfile,payload;"
+			}
+			file := scenario(t, wireMethod+" {{base}}/wait?token=query-secret"+body+"\nHTTP *\n[Asserts]\nheader \"X-Ready\" == \"yes\""+captures+"\nDELETE {{base}}/next")
+			if method == "external" {
+				if err := os.WriteFile(filepath.Join(filepath.Dir(file), "payload"), []byte("body-secret {{literal}}"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			command := exec.CommandContext(ctx, binary(t), "test", file, "--var", "base="+server.URL, "--var", `password="body-secret"`, "--secret", "password")

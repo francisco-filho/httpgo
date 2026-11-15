@@ -59,6 +59,9 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, reference := range []string{"../payloads/a b.bin;", "{{missing}};", `C:\payloads\a.bin;`, ";", "a,b;", "a;b;", "unterminated", "a;\n{}", "a;\nX-Late: v"} {
+		f.Add("POST http://example.test\r\n  file," + reference + "\r\nHTTP 201")
+	}
 	for _, literal := range []string{`null`, `"{{literal}}"`, `{"x":[1e999999999999999999,true]}`, `1 2`, `{{value}}`} {
 		f.Add("GET http://example.test\r\nHTTP *\r\n[Asserts]\r\n  jsonpath \"$.items[0]\" == " + literal)
 	}

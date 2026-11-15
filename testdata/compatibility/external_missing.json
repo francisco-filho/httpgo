@@ -1,0 +1,13 @@
+{
+  "classification": "shared: missing payload stops before second send; distinct exit codes",
+  "httpgo": {
+    "exit": 2,
+    "paths": ["/health"],
+    "requests": [{ "method": "GET", "body": "", "content_type": "", "probe": "" }]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": ["/health"],
+    "requests": [{ "method": "GET", "body": "", "content_type": "", "probe": "" }]
+  }
+}
