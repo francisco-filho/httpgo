@@ -31,7 +31,7 @@ func TestMixedMethodsForwardedAndInterrupted(t *testing.T) {
 				if calls == 2 {
 					switch mode {
 					case "mismatch":
-						return Response{503}, nil
+						return Response{Status: 503}, nil
 					case "transport":
 						return Response{}, failure
 					case "cancel":
@@ -39,7 +39,7 @@ func TestMixedMethodsForwardedAndInterrupted(t *testing.T) {
 						return Response{}, gotCtx.Err()
 					}
 				}
-				return Response{statuses[calls-1]}, nil
+				return Response{Status: statuses[calls-1]}, nil
 			})
 			got := New(executor, nil).Run(ctx, scenario)
 			if mode == "success" {

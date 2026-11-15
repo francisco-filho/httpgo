@@ -27,12 +27,12 @@ func renderFailure(pos parser.Position, source string, err error) *RenderError {
 	return &RenderError{Position: pos, Detail: detail, cause: err}
 }
 
-func (r *Runner) render(entry parser.Entry) (Request, string, *RenderError) {
+func render(session template.Session, entry parser.Entry) (Request, string, *RenderError) {
 	pos := entry.URLPosition
 	if pos.Line == 0 {
 		pos = entry.Position
 	}
-	url, err := r.renderer.Render(entry.URL)
+	url, err := session.Render(entry.URL)
 	if err != nil {
 		return Request{}, "", renderFailure(pos, entry.URL, err)
 	}
@@ -49,7 +49,7 @@ func (r *Runner) render(entry parser.Entry) (Request, string, *RenderError) {
 		if i < len(entry.HeaderPositions) {
 			pos = entry.HeaderPositions[i]
 		}
-		text, err := r.renderer.Render(headers[i].Value)
+		text, err := session.Render(headers[i].Value)
 		if err != nil {
 			return Request{}, "", renderFailure(pos, headers[i].Value, err)
 		}
@@ -64,7 +64,7 @@ func (r *Runner) render(entry parser.Entry) (Request, string, *RenderError) {
 		if pos.Line == 0 {
 			pos = entry.Position
 		}
-		body, err = r.renderer.RenderJSON(body)
+		body, err = session.RenderJSON(body)
 		if err != nil {
 			return Request{}, "", renderFailure(pos, string(entry.Body), err)
 		}
@@ -72,5 +72,5 @@ func (r *Runner) render(entry parser.Entry) (Request, string, *RenderError) {
 			return Request{}, "", &RenderError{Position: pos, Detail: "body JSON renderizado inválido"}
 		}
 	}
-	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body}, url.Display, nil
+	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: len(entry.Captures) > 0}, url.Display, nil
 }

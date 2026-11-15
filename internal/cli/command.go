@@ -91,12 +91,14 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
 	case runner.Unvalidated:
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
+	case runner.CaptureFailed:
+		line += fmt.Sprintf(" (recebido %d)", entry.Status)
 	case runner.Failed, runner.RenderFailed:
 		// Headers alone are not a completed response: never invent a status.
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed {
+	if entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed {
 		pos := entry.Entry.Position
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
@@ -121,6 +123,10 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 		var renderErr *runner.RenderError
 		if errors.As(result.Err, &renderErr) {
 			diagnostic = renderErr.Error()
+		}
+		var captureErr *runner.CaptureError
+		if errors.As(result.Err, &captureErr) {
+			diagnostic = captureErr.Error()
 		}
 		return c.fail(fmt.Sprintf("%q:%d:%d: %s; execução interrompida", pos.File, pos.Line, pos.Column, diagnostic))
 	}

@@ -13,6 +13,10 @@ import (
 
 type invalidJSONRenderer struct{ *template.Context }
 
+func (r invalidJSONRenderer) NewSession() template.Session {
+	return invalidJSONRenderer{r.Context.NewSession().(*template.Context)}
+}
+
 func (r invalidJSONRenderer) RenderJSON([]byte) ([]byte, error) {
 	return []byte(`{"invalid":secret}`), nil
 }
@@ -44,7 +48,7 @@ func TestJSONRenderFailuresStopBeforeSend(t *testing.T) {
 					wantPos.Line, wantPos.Column = 4, 1
 				}
 				calls, reports := 0, 0
-				result := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) { calls++; return Response{200}, nil }), renderer, func(entry EntryResult) error { reports++; return nil }).Run(context.Background(), scenario)
+				result := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) { calls++; return Response{Status: 200}, nil }), renderer, func(entry EntryResult) error { reports++; return nil }).Run(context.Background(), scenario)
 				var located *RenderError
 				if !errors.As(result.Err, &located) || result.ErrorPosition != wantPos || calls != 1 || reports != 2 || result.Summary != (Summary{3, 1, 1, 1, 0, 2}) || result.Entries[1].Outcome != RenderFailed || strings.Contains(result.Err.Error(), "private") || strings.Contains(result.Err.Error(), "secret") {
 					t.Fatalf("result=%+v calls=%d reports=%d wantPos=%+v", result, calls, reports, wantPos)
@@ -81,7 +85,7 @@ func TestJSONRenderedCloneAndIncrementalOrder(t *testing.T) {
 				t.Fatalf("got=%s want=%s", req.Body, want)
 			}
 			req.Body[0] = 'X'
-			return Response{201}, nil
+			return Response{Status: 201}, nil
 		}), c, func(EntryResult) error { reports++; return nil }).Run(context.Background(), scenario)
 		if result.Err != nil || calls != 2 || !reflect.DeepEqual(scenario, before) || result.Summary.WithoutValidation != 1 {
 			t.Fatalf("result=%+v mutated=%v", result, !reflect.DeepEqual(scenario, before))

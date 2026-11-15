@@ -194,7 +194,7 @@ func (c *Context) RenderJSON(source []byte) ([]byte, error) {
 	}
 	replacements := make(map[int]string, len(plan.References))
 	for _, ref := range plan.References {
-		v, ok := c.values[ref.Name]
+		v, ok := c.lookup(ref.Name)
 		if !ok {
 			return nil, jsonError(ref.Start, "variável ausente; forneça seu valor com --var")
 		}

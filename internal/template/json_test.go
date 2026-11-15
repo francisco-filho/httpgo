@@ -96,6 +96,16 @@ func FuzzRenderJSON(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		s := c.NewSession()
+		captureValue := strings.ToValidUTF8(value, "\ufffd")
+		if err := s.Publish([]Capture{{"captured", captureValue}}); err != nil {
+			t.Fatal(err)
+		}
+		captured, err := s.RenderJSON([]byte(`{{captured}}`))
+		var decoded string
+		if err != nil || json.Unmarshal(captured, &decoded) != nil || decoded != captureValue {
+			t.Fatal("captured string changed type or content")
+		}
 		original := []byte(source)
 		saved := bytes.Clone(original)
 		got, err := c.RenderJSON(original)
