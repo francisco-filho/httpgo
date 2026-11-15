@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"capimgrosso.com/httpgo/internal/config"
 	"capimgrosso.com/httpgo/internal/parser"
 	"capimgrosso.com/httpgo/internal/runner"
 	"capimgrosso.com/httpgo/internal/template"
@@ -56,9 +57,18 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if err != nil {
 		return c.fail(err.Error())
 	}
-	renderer, err := template.New(args.variables, args.secrets)
+	settings, err := config.Load(ctx, args.config)
 	if err != nil {
 		return c.fail(err.Error())
+	}
+	renderer, err := template.New(append(settings.Assignments(), args.variables...), append(settings.Secrets, args.secrets...))
+	if err != nil {
+		return c.fail(err.Error())
+	}
+	initial := c.protection.initial
+	c.protection.initial = func(text string) string { return initial(renderer.Sanitize(text)) }
+	if err := ctx.Err(); err != nil {
+		return c.fail("execução cancelada antes da leitura do cenário")
 	}
 	file := args.file
 	absolute, err := filepath.Abs(file)
