@@ -101,8 +101,13 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
 		for _, declaration := range entry.Assertions {
-			if sensitiveHeader(declaration.Name) {
-				session.ProtectValue(declaration.Expected)
+			if declaration.JSON != nil {
+				result.Err = fmt.Errorf("execução de assertion JSON ainda não suportada")
+				result.ErrorPosition = declaration.JSON.Position
+				return result
+			}
+			if declaration.Header != nil && sensitiveHeader(declaration.Header.Name) {
+				session.ProtectValue(declaration.Header.Expected)
 			}
 		}
 		for _, header := range entry.Headers {

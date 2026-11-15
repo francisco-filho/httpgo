@@ -69,7 +69,7 @@ func TestHeaderReporterSanitized(t *testing.T) {
 			})
 			got := r.Run(context.Background(), s)
 			failure := got.Entries[0].HeaderFailure
-			if !got.Diverged || failure.Expected != "[oculto]" || failure.Actual != "[oculto]" || got.Entries[0].DisplayURL != "http://example.test/[oculto]" || s.Entries[0].Assertions[0].Expected != "expected-private" {
+			if !got.Diverged || failure.Expected != "[oculto]" || failure.Actual != "[oculto]" || got.Entries[0].DisplayURL != "http://example.test/[oculto]" || s.Entries[0].Assertions[0].Header.Expected != "expected-private" {
 				t.Fatalf("got=%+v", got)
 			}
 		})
@@ -89,7 +89,7 @@ func TestCommonHeaderKnownSecretsAndLiteral(t *testing.T) {
 	}
 	// Known initial values are protected even on ordinary headers.
 	c, _ := template.New([]string{"token=known-private"}, []string{"token"})
-	s := parser.Scenario{Entries: []parser.Entry{{Assertions: []parser.HeaderAssertion{{Name: "X", Expected: "known-private", Operator: "=="}}}}}
+	s := parser.Scenario{Entries: []parser.Entry{{Assertions: []parser.Assertion{{Header: &parser.HeaderAssertion{Name: "X", Expected: "known-private", Operator: "=="}}}}}}
 	got := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) { return Response{Status: 200}, nil }), c, nil).Run(context.Background(), s)
 	if got.Entries[0].HeaderFailure.Expected != "[oculto]" {
 		t.Fatalf("got=%+v", got)

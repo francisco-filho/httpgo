@@ -59,6 +59,9 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, literal := range []string{`null`, `"{{literal}}"`, `{"x":[1e999999999999999999,true]}`, `1 2`, `{{value}}`} {
+		f.Add("GET http://example.test\r\nHTTP *\r\n[Asserts]\r\n  jsonpath \"$.items[0]\" == " + literal)
+	}
 	for _, seed := range []string{
 		"GET http://example.test\nHTTP *",
 		"GET http://example.test\r\nHTTP *\r\n[Asserts]\r\nheader \"X\" == \"{{literal}}\"\r\nheader \"X\" contains \"\"\r\nheader \"X\" exists",

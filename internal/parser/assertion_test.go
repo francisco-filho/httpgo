@@ -17,7 +17,7 @@ func TestParseHeaderAssertions(t *testing.T) {
 				t.Fatal(err)
 			}
 			first := got.Entries[0]
-			if len(first.Assertions) != 3 || len(first.Captures) != 1 || first.Assertions[0].Operator != assertion.HeaderContains || first.Assertions[0].Position.Column != 3 || first.Assertions[2].Expected != "{{absent}}" || len(got.Entries[1].Assertions) != 1 {
+			if len(first.Assertions) != 3 || len(first.Captures) != 1 || first.Assertions[0].Header.Operator != assertion.HeaderContains || first.Assertions[0].Header.Position.Column != 3 || first.Assertions[2].Header.Expected != "{{absent}}" || len(got.Entries[1].Assertions) != 1 {
 				t.Fatalf("scenario=%+v", got)
 			}
 		}
@@ -40,7 +40,7 @@ func TestInvalidHeaderAssertions(t *testing.T) {
 		{"HTTP 200\n[Asserts]\nheader \"X\" exists \"secret-value\"", "sintaxe inválida"},
 		{"HTTP 200\n[Asserts]\nheader \"X\" matches \"secret-value\"", "construção não suportada"},
 		{"HTTP 200\n[Asserts]\nheader \"X\" count == 1", "construção não suportada"},
-		{"HTTP 200\n[Asserts]\njsonpath \"$.secret-value\" == \"x\"", "construção não suportada"},
+		{"HTTP 200\n[Asserts]\njsonpath \"$[*]\" == \"x\"", "construção não suportada"},
 	} {
 		input := "GET http://example.test/first\nHTTP 200\nGET http://example.test/late\n" + tc.suffix
 		got, err := Parse("late.hurl", strings.NewReader(input))

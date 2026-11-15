@@ -32,7 +32,7 @@ type Capture struct {
 }
 
 type Entry struct {
-	Assertions       []HeaderAssertion
+	Assertions       []Assertion
 	Captures         []Capture
 	Method           string
 	URL              string

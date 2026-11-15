@@ -77,29 +77,51 @@ func Parse(source string) (Path, error) {
 	return p, nil
 }
 
-// Select preserves JSON numbers and distinguishes a missing path from JSON null.
-func (p Path) Select(body []byte) (any, bool, error) {
+// Decode reads exactly one JSON value, preserving numbers without float conversion.
+func Decode(body []byte) (any, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	var value any
 	if err := decoder.Decode(&value); err != nil {
-		return nil, false, fmt.Errorf("resposta não contém JSON válido")
+		return nil, fmt.Errorf("resposta não contém JSON válido")
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
-		return nil, false, fmt.Errorf("resposta não contém JSON válido")
+		return nil, fmt.Errorf("resposta não contém JSON válido")
 	}
+	return value, nil
+}
+
+// Select preserves the capture contract: incompatible traversal counts as absence.
+func (p Path) Select(body []byte) (any, bool, error) {
+	value, err := Decode(body)
+	if err != nil {
+		return nil, false, err
+	}
+	value, present, err := p.SelectValue(value)
+	if err != nil {
+		return nil, false, nil
+	}
+	return value, present, nil
+}
+
+// SelectValue distinguishes absence from traversal through an incompatible type.
+// A present null is a value; traversing through it is an evaluation error.
+func (p Path) SelectValue(value any) (any, bool, error) {
 	for _, s := range p.steps {
 		if s.array {
 			array, ok := value.([]any)
-			if !ok || s.index >= len(array) {
+			if !ok {
+				return nil, false, fmt.Errorf("percurso JSONPath exige array")
+			}
+			if s.index >= len(array) {
 				return nil, false, nil
 			}
 			value = array[s.index]
 		} else {
 			object, ok := value.(map[string]any)
 			if !ok {
-				return nil, false, nil
+				return nil, false, fmt.Errorf("percurso JSONPath exige objeto")
 			}
 			value, ok = object[s.property]
 			if !ok {

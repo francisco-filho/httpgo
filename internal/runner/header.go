@@ -28,8 +28,12 @@ func sensitiveHeader(name string) bool {
 	}
 }
 
-func checkHeaders(session template.Session, declarations []parser.HeaderAssertion, headers []query.HeaderValue) *HeaderFailure {
-	for _, declaration := range declarations {
+func checkHeaders(session template.Session, declarations []parser.Assertion, headers []query.HeaderValue) *HeaderFailure {
+	for _, item := range declarations {
+		declaration := item.Header
+		if declaration == nil {
+			continue // JSON execution is guarded by Run until its integration.
+		}
 		actual, present := query.Header(headers, declaration.Name)
 		if assertion.Header(declaration.Operator, declaration.Expected, actual, present) {
 			continue
@@ -52,7 +56,21 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	entry.Headers = nil
 	entry.Assertions = slices.Clone(entry.Assertions)
 	for i := range entry.Assertions {
-		declaration := &entry.Assertions[i]
+		if entry.Assertions[i].JSON != nil {
+			declaration := *entry.Assertions[i].JSON
+			declaration.Expected = nil // Never deliver the raw literal to reports.
+			declaration.Query = session.Sanitize(declaration.Query)
+			declaration.Position.File = session.Sanitize(declaration.Position.File)
+			declaration.QueryPosition.File = session.Sanitize(declaration.QueryPosition.File)
+			entry.Assertions[i].JSON = &declaration
+			continue
+		}
+		if entry.Assertions[i].Header == nil {
+			continue
+		}
+		copy := *entry.Assertions[i].Header
+		entry.Assertions[i].Header = &copy
+		declaration := &copy
 		if sensitiveHeader(declaration.Name) {
 			declaration.Expected = "[oculto]"
 		} else {
