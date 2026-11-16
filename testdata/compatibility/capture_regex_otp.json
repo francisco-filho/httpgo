@@ -1,0 +1,46 @@
+{
+  "response_body": "U2V1IGPDs2RpZ28gZGUgdmVyaWZpY2HDp8OjbyDDqTogMTIzNDU2",
+  "classification": "extração OTP: string do primeiro grupo enviada explicitamente",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"code\":\"123456\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"code\":\"123456\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

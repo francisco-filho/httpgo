@@ -1,0 +1,35 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "code"
+    }
+  ],
+  "response_body": "Y29kZQ==",
+  "classification": "pipeline arbitrário não suportado HTTPGo; Hurl aceita filtros encadeados",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "precodepost"
+      }
+    ]
+  }
+}

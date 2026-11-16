@@ -99,7 +99,7 @@ próximas requisições. Condição falsa retorna `1`, sucesso `0`.
 Diagnósticos localizados identificam operador e esperado protegido, nunca body
 ou fragmentos recebidos. Captura secreta pendente oculta o esperado sem antecipar
 sua avaliação. Busca literal não detecta todas as codificações de dados sensíveis.
-Regex de body, filtros, outros predicados e interpolação de esperados não são suportados.
+Assertions regex de body, filtros, outros predicados e interpolação de esperados não são suportados. Extração regex de body em `[Captures]` é o recorte US-25.
 Os 19 pares `body_*` confrontados com Hurl 8.0.0 são publicados em
 [compatibilidade](compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
 ISO-8859-1 resolve para windows-1252 (incluindo byte 0x80 → €), conforme esse
@@ -644,7 +644,7 @@ a resposta ainda é consumida e fechada integralmente antes das validações.
 Header ausente é erro de captura (2). Status e assertions antecedem capturas;
 lotes mistos de header/JSONPath são atômicos e mantêm as mesmas regras de nomes,
 isolamento e colisões abaixo. Sintaxe inválida tardia impede todos os envios.
-Filtros, índices, todas as ocorrências e captura por regex não são suportados.
+Índices e todas as ocorrências não são suportados. O único filtro de captura de header suportado é `regex`, descrito na US-25 abaixo.
 
 `Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` são protegidos
 sem distinguir caixa, incluindo a proveniência do nome capturado em composição
@@ -658,6 +658,52 @@ com cache condicional; exemplo versionado em `testdata/scenarios/scenario_captur
 A [matriz diferencial](compatibility.md#capturas-literais-de-headers--us-22--issue-42)
 registra as diferenças observadas de repetição, interpolação JSON, ordem e colisões
 com Hurl 8.0.0; não há promessa de equivalência geral.
+
+## Extração regex de body e header — US-25 (issue #48)
+
+```hurl
+GET {{mailbox_url}}/message/123
+HTTP 200
+[Captures]
+otp_code: regex "verificação é: ([0-9]{6})"
+
+POST {{base_url}}/verify
+Content-Type: application/json
+{"code":"{{otp_code}}"}
+HTTP 200
+```
+
+Marque `otp_code` com `--secret otp_code` ou `secrets` na configuração.
+Para compor cookie explicitamente, sem atributos de resposta nem cookie jar:
+
+```hurl
+GET {{base_url}}/session
+HTTP 200
+[Captures]
+refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"
+
+GET {{base_url}}/next
+Cookie: refresh={{refresh_token}}
+HTTP 200
+```
+
+O padrão é uma string JSON estática, usando a sintaxe e os limites de regex Go
+da US-15, nunca interpolada. Extrai **somente o primeiro grupo da primeira
+correspondência**, como string, sem coerção ou expansão recursiva. Grupo vazio
+participante publica `""`; ausência de correspondência, falta de grupo ou primeiro
+grupo não participante são erros de captura (2). Padrão/escape inválido ou regex
+não suportada rejeita o arquivo inteiro antes da rede; regex válida sem grupo
+só falha na etapa de captura.
+
+Body usa a decodificação estrita da US-21 (UTF-8 por padrão, charset declarado,
+sem normalização); header seleciona somente a primeira ocorrência da US-22, sem
+decodificar body nem exigir JSON. Ausência de header e falha textual geram 2.
+Preservam-se status → assertions → capturas e publicação atômica sem sobrescrita.
+Capturas de headers sensíveis protegem também o grupo extraído imediatamente,
+mesmo se outra captura falhar; dados secretos do body exigem marcação explícita.
+Resultados não conservam padrões, expressões compiladas ou texto da resposta.
+Escolha de grupo, substituição, regex dinâmica, pipelines arbitrários e assertions
+sobre a captura da própria resposta continuam fora do recorte.
 
 ## Capturas tipadas — US-05/US-06
 
@@ -873,8 +919,8 @@ formato divergente ou header ausente falham com **1**, sem captura/próximo envi
 - Placeholders `{{nome}}` permanecem **literais e estáticos**, definidos ou não;
   continuam sujeitos à sintaxe regex, não são automaticamente escapados e não
   passam pelo renderer. Não há flag `--render-asserts` nem antecipação da US-30.
-  Regex de body/variável, captura por regex, filtros e todas as ocorrências ficam
-  fora do suporte.
+  Assertions regex de body/variável, filtros e todas as ocorrências ficam
+  fora do suporte. Extração regex de body/header é o recorte US-25.
 
 Os **30 pares `header_matches_*`** com Hurl **8.0.0** estão classificados na
 [matriz diferencial](compatibility.md#regex-de-headers--us-24--issue-46).
@@ -961,7 +1007,7 @@ O padrão é um literal string JSON em aspas duplas; escapes são interpretados 
 
 String divergente, consulta ausente ou valor selecionado não string falha como assertion (**1**), sem coerção. Ausência e tipo incompatível são diagnosticados separadamente; arrays/objetos não são impressos. JSON inválido e percurso incompatível permanecem erro de avaliação (**2**). Regex inválida/não suportada ou escape JSON inválido rejeita o arquivo inteiro antes de qualquer HTTP, inclusive se a declaração for tardia. A ordem continua status → assertions na ordem escrita → capturas; a primeira falha interrompe capturas e próximos envios. Padrão e valor são sanitizados, e captura secreta pendente oculta os dois integralmente sem avaliação antecipada. Resultados não conservam padrão operacional nem regexp compilada.
 
-O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. A US-24 acrescenta `matches` em headers; body/variáveis, captura por regex e interpolação continuam fora do suporte.
+O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. A US-24 acrescenta `matches` em headers; `matches` em body/variáveis e interpolação continuam fora do suporte. Extração por regex de body/header tem o recorte separado da US-25.
 
 ### Presença, quantidade e limites — US-14 / issue #34
 

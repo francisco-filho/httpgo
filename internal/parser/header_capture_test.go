@@ -31,7 +31,7 @@ func TestHeaderCaptureRejectsWholeFile(t *testing.T) {
 		{`x: header "X:Bad"`, "sintaxe inválida"},
 		{`x: header "ETag`, "sintaxe inválida"},
 		{`x: header "ETag"[0]`, "sintaxe inválida"},
-		{`x: header "ETag" regex "x"`, "construção não suportada"},
+		{`x: header "ETag" regex "x" regex "y"`, "construção não suportada"},
 		{`x: header "ETag" count`, "construção não suportada"},
 		{`x: header "ETag" nth 1`, "construção não suportada"},
 		{`1x: header "ETag"`, "sintaxe inválida"},

@@ -463,11 +463,11 @@ compartilha apenas as variáveis iniciais imutáveis, clonando as marcações de
 segredo e criando um mapa separado de capturas. Não há mutação do cenário nem vazamento para o próximo Run.
 O parser reconhece `[Captures]`, conserva `Capture.Position`/`QueryPosition` e usa
 `query.Parse` para validar consultas JSONPath antes da rede. `Capture.Kind`
-distingue `JSONPathCapture` e `HeaderCapture`; a segunda variante guarda o nome
+distingue `JSONPathCapture`, `HeaderCapture` e `RegexCapture` (body, US-25); header guarda o nome
 literal em `Capture.Header`, validado pelas mesmas regras das assertions.
 Resolução depende somente da resposta final da entrada executada.
 
-`runner.Request.RetainBody` é verdadeiro quando há captura JSONPath ou assertion
+`runner.Request.RetainBody` é verdadeiro quando há captura JSONPath/regex de body ou assertion
 JSON/body; capturas e assertions exclusivamente de header não retêm body. Após transporte concluído, runner
 compara status numérico e depois percorre headers/JSON na ordem escrita antes
 de chamar `captureResponse(session, declarations, response)`, independentemente da ordem das seções. Header
@@ -576,7 +576,36 @@ O harness diferencial existente usa `response_headers`, Hurl 8.0.0 obrigatório 
 [matriz](compatibility.md#regex-de-headers--us-24--issue-46) e
 [evidência](validation.md#us-24--issue-46--história-0024).
 Repetição/lista, interpolação, gramática e códigos permanecem diferenças explícitas.
-Não há regex de body/variável/captura nem seleção de todas as ocorrências.
+Não há assertion regex de body/variável nem seleção de todas as ocorrências.
+Extração de body/header é o recorte US-25 abaixo.
+
+## Extração regex — US-25 / issue #48
+
+`parser.Capture` acrescenta `Pattern`, `Compiled` (`*regexp.Regexp`) e
+`PatternPosition`. `parseCaptureRegex` usa `jsonString`, compilação Go e
+`unsupportedRegexp` da US-15: exatamente uma string JSON estática, sem renderer,
+seletor de grupo ou pipeline. Todas as declarações são validadas antes da rede;
+regex válida sem grupo permanece erro de execução. Posições indexam os bytes
+originais do arquivo, inclusive LF/CRLF, não os escapes decodificados.
+
+`query.Regex` usa `FindStringSubmatchIndex`: índices do primeiro grupo da primeira
+correspondência distinguem grupo vazio de não participante. Não recompila nem
+busca matches posteriores. Falhas retornam mensagens controladas sem texto,
+padrão ou causa bruta. Em `captureResponse`, `RegexCapture` obtém texto via
+`query.BodyText` somente quando alcançado; capturas de body da mesma resposta
+reutilizam o texto local. `HeaderCapture` com `Compiled` aplica a regex à string
+da primeira ocorrência, sem decoder nem JSON. O grupo vira string JSON no lote
+existente; `Session.Publish` continua único e atômico após todas as seleções.
+
+Marcação de origem sensível é feita antes de status/assertions; padrão sensível
+é registrado para sanitização, sem avaliar a captura antecipadamente. O grupo
+extraído passa imediatamente por `ProtectCapture`: proteger somente o header
+inteiro não cobre seus fragmentos. Body usa as marcações explícitas existentes.
+Uma captura posterior inválida ou colisão não desfaz essa proteção. `safeEntry`
+remove capturas por completo, inclusive regex compilada e padrão, sem acumular
+resposta nos resultados. Proteção da invocação continua entre arquivos; resolução
+de capturas e marcas dinâmicas não atravessam sessões. Transporte/interfaces,
+ordem, prazos, redirects, recursos e prioridade de escrita permanecem intactos.
 
 ## Headers e expectativa curinga — US-07
 

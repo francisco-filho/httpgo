@@ -1,4 +1,4 @@
-# Validação — US-01 a US-16, US-20 a US-24
+# Validação — US-01 a US-16, US-20 a US-25
 
 ## US-24 — issue #46 / história 0024
 
@@ -72,6 +72,114 @@ Aviso local de metadados libcurl não impediu identificação/execução.
 | GO-284 | mesmos testes de transporte/E2E e `TestHeaderMatchesConsumptionRealCancellation`: read/close/timeout/cancel/incomplete são 2, zero concluídas, recursos fechados e sem aprovação/captura/retry/próximo envio |
 | GO-285 | `TestHeaderMatchesReportFailurePreservesCounts`, `TestHeaderMatchesWriterFailureOverridesAllOutcomes`, `TestHeaderMatchesRealOutputFailure`: write/short write prioritário, contagens/resultados anteriores preservados, sem envio extra ou repetição no writer falho |
 | GO-286 | `TestHeaderMatchesMetadataAndIsolation`, `TestHeaderMatchesKnownDerivedSecrets`, callbacks de segurança: regex original reutilizável, nenhuma compilada em metadados de sucesso/falha; sessões e proteção dinâmicas independentes |
+
+## US-25 — issue #48 / história 0025
+
+Plano da issue #48 executado sem planner, somente backend, na ordem da fila
+0025: `back:1` no commit `99f3f8b` (extração ponta a ponta, parser/query/runner,
+sigilo e recorte inicial), `back:2` no commit `3c278c7` (regressões de falhas,
+recursos e isolamento), `back:3` nesta alteração (corpus, ajuda, documentação e
+gates integrados). US-21/22 estavam disponíveis na base. Sem frontend/estáticos,
+nova dependência, alteração de Go, CI/lint, transporte de produção, interfaces,
+concorrência ou fonte de segredos. Nenhuma fonte Hurl consultada/copiada/adaptada.
+Esta evidência local não substitui review; backdev não executou SonarQube.
+
+### Ambiente e comandos efetivamente executados antes do rebase
+
+Os commits acima foram reaplicados sobre a US-24 (`develop` em `537ea01`).
+A rodada inicial abaixo ocorreu antes desse rebase; a revalidação da base
+integrada é registrada separadamente.
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports` e `golangci-lint` existentes
+em `/home/ff/go/bin` expostos no PATH. Hurl **8.0.0** existente em
+`/tmp/httpgo-0021-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` selecionado no PATH
+somente para o diferencial, sem substituir Hurl padrão 8.0.1 nem instalar tools.
+Aviso de metadados libcurl não impediu execução.
+
+- Task 1: passaram `go test ./internal/parser ./internal/query ./internal/template
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram `go test ./internal/template ./internal/runner ./internal/cli
+  ./internal/suite ./internal/transport`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` antes do commit.
+  Lint inicialmente apontou switch simplificável em teste novo: corrigido sem
+  desabilitar regra, e gate completo executado novamente com sucesso.
+- Task 3: **30 novos pares** `capture_regex_*` confrontados com Hurl **8.0.0**,
+  fixtures independentes. `-update` restrito aos novos pares e ao único contrato
+  antigo intencionalmente alterado: `capture_header_filter.json` passa de 2/zero
+  envios a 0 com grupo literal enviado. Demais **212 pares antigos inalterados**.
+  Resultado integrado: `make compatibility` passou com **243 pares**, sem skip
+  ou update. Read/charset/headers reutilizam protocolo existente; somente Cookie
+  recebido foi acrescentado à observação opcional, com dados fictícios.
+- Gate integrado executado: `make compatibility`, `make fmt lint test`,
+  `go vet ./...`, `go build ./...` e `make e2e`, todos com sucesso. Lint **0 issues**;
+  testes com **race e cobertura**. Cobertura: parser **97,3%**, query **95,8%**,
+  runner **93,7%**, CLI **97,5%**, transport **90,4%**, template **95,7%**,
+  assertion **94,2%**, config **96,0%**, suite **95,4%**. E2E usa build único,
+  `exec.CommandContext` e HTTP local; verifica streams, código e envios reais.
+- Parser recebeu seeds regex de body/header, escapes, grupos e formas não
+  suportadas/tardias em CRLF. Passaram sem crash, com limites de **20s** e
+  **parallel=2**: `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$'`
+  (**65.086 execuções**), `go test ./internal/template -run '^$' -fuzz '^FuzzRender$'`
+  (**36.225**) e `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$'`
+  (**54.286**), todos com `-fuzztime=20s -parallel=2`. Contagens são desta rodada,
+  não meta de cobertura.
+- Ajuda root/test e os dois exemplos publicados são conferidos e executados
+  pelo binário real. Corpus negativo exercita LF/CRLF e zero envios do arquivo.
+  `gofmt -l` dos Go alterados, `git diff --check` e conferência dos destinos de
+  links locais em README/subset/architecture/compatibility/validation passaram.
+- Cross-builds e execução nativa macOS/Windows não realizados: opcionais conforme
+  plano v4, não bloqueios. Corpus sintético não homologa suíte real nem prova
+  equivalência geral de engines, charset, diagnóstico ou segurança com Hurl.
+
+### Revalidação após rebase sobre a US-24
+
+Por solicitação do responsável, a branch foi rebaseada sobre `develop` em
+`537ea01`, que contém a US-24 (`f7ddfe5`). Mapeamento dos commits reescritos:
+`81d4100` → `99f3f8b`, `8a429cd` → `3c278c7`, `7563cc9` → `aee9f6c`.
+Conflitos em README, documentação e seeds foram resolvidos preservando ambas
+as histórias; `header matches`, extração de capturas e seeds das duas histórias
+permanecem ativos. Sem regenerar goldens para acomodar a integração.
+
+Passaram novamente na base integrada:
+
+- `go test ./internal/parser ./internal/query ./internal/template ./internal/runner ./internal/cli`.
+- `make compatibility`: **273 pares**, Hurl **8.0.0**, sem skip ou update.
+  Dos **243 pares da base US-24**, somente `capture_header_filter.json` muda
+  intencionalmente na US-25; os outros **242** permanecem inalterados.
+- `make fmt lint test` (lint **0 issues**, race/cover), `go vet ./...`,
+  `go build ./...` e `make e2e`. Cobertura do parser integrado: **97,5%**;
+  demais percentuais iguais aos registrados na rodada inicial da US-25.
+- `TestHeaderMatchesBeforeRegexCaptureByBinary` combina US-24/25 na mesma
+  resposta: assertion sensível antes da captura mesmo com seções invertidas;
+  somente token no Cookie explícito, body indecodificável não consultado,
+  mismatch impede próxima requisição e regex inválida tardia impede todo HTTP.
+- Fuzzers repetidos com `-fuzztime=20s -parallel=2`: `FuzzParse` **27.290**,
+  `FuzzRender` **17.407**, `FuzzRenderJSON` **53.127** execuções, todos sem crash.
+- `git diff --check`, `gofmt -l` dos Go alterados e destinos dos links locais
+  conferidos. Nenhum push nem análise SonarQube realizado pelo backdev.
+
+### Rastreabilidade GO-287–GO-303
+
+| GO | Evidência executada |
+|---|---|
+| GO-287 | CLI `TestRegexCaptureCLI`, E2E `TestRegexCaptureOTPAndCookieByBinary`, exemplo `scenario_capture_otp.hurl`, par `otp`: string exata protegida, ausência impede POST |
+| GO-288 | mesmo E2E nos modos cookie/no implicit cookie, exemplo `scenario_capture_refresh.hurl`, pares `cookie`/`no_cookie_store`: somente token em Cookie explícito |
+| GO-289 | query `TestRegexFirstGroup`, runner `TestRegexCaptureSelectionAndPrecedence`, par `first_group`: primeiro grupo da primeira correspondência, sem correspondência inteira |
+| GO-290 | query/runner acima, runner `TestRegexCaptureStringsAndStaticPatterns`, pares `empty`, `optional`, `header_empty`: vazio participante válido, opcional ausente falha |
+| GO-291 | parser `TestRegexCaptureStaticValidation`, runner de seleção/precedência, pares `no_group`/`no_match`: sem grupo aceita parsing e falha na captura |
+| GO-292 | runner `TestRegexCaptureStringsAndStaticPatterns`, pares `number`, `boolean`, `json`, `placeholder`, `escapes`, `static_defined`, `static_missing`: strings e padrão estático, sem recursão |
+| GO-293 | runner de seleção, pares `utf8`, `latin1`, `invalid_utf8`, `unknown_charset`; US-21 decoder reutilizado sem normalização/fallback |
+| GO-294 | runner de strings/seleção, pares `header_*`, `cookie`: caixa, primeira ocorrência, vírgula, ausência/vazio e independência do decoder de body |
+| GO-295 | parser `TestRegexCaptureModelAndPositions`/`TestRegexCaptureStaticValidation`, CLI de sintaxe tardia, E2E `TestRegexCaptureStructuralCorpusByBinary`: localização LF/CRLF, zero envios e diagnósticos sem padrão |
+| GO-296 | runner `TestRegexCaptureSelectionAndPrecedence`/`TestRegexCaptureProtectionAndAtomicityOnFailure`, pares `status_first`/`assertion_first`: status/assertions antes de captura |
+| GO-297 | runner `TestRegexCaptureAtomicMixedBatches`/`TestRegexCaptureProtectionAndAtomicityOnFailure`, pares `mixed`/`collision`: lote atômico, iniciais/anteriores/lote não sobrescritos |
+| GO-298 | runner de proteção com sessão observável/callbacks, CLI `TestRegexCaptureWritersAndDerivedProtection`, E2E `TestRegexCaptureFinalAndFailureByBinary`: grupo protegido imediatamente, inclusive lote falho/pending, resultado sem dados operacionais |
+| GO-299 | 30 pares novos/273 totais após integração da US-24, `TestRegexCaptureHelpAndPublishedExamples`, matriz revisada: diferenças de tipagem/ordem/pré-validação/charset/headers explícitas |
+| GO-300 | transport `TestRegexCapturesRequireCompleteFinalResponse`/`TestRegexCaptureConsumesAndClosesBeforeEvaluation`, E2E final/failure: final completa, retenção só no body |
+| GO-301 | mesmos testes de transporte nos modos read/close/incomplete/timeout/cancel: 2, sem próxima requisição/retry e zero concluídas em falha de consumo |
+| GO-302 | runner de proteção modo report e CLI writers: erro/short write prevalece, preserva contagens, sem reimpressão/resumo no writer falho nem próximo envio |
+| GO-303 | runner `TestRegexCaptureReusedRunnerAndEarlyReferences`, CLI `TestRegexSuiteProtectionWithoutResolutionSharing`: imutabilidade, referência prematura, nova sessão/invocação; suíte só acumula proteção, não resolução |
 
 
 ## US-23 — issue #44 / história 0023

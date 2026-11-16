@@ -1,3 +1,3 @@
 GET http://localhost/health
 [Captures]
-etag: header "ETag" regex "(.*)"
+etag: header "ETag" regex "(.*)" regex "(.*)"

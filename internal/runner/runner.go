@@ -139,6 +139,9 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 			if capture.Kind == parser.HeaderCapture && sensitiveHeader(capture.Header) {
 				session.MarkSecret(capture.Name)
 			}
+			if session.IsSecret(capture.Name) && capture.Compiled != nil {
+				session.ProtectValue(capture.Pattern)
+			}
 		}
 		for _, declaration := range entry.Assertions {
 			if declaration.Header != nil && sensitiveHeader(declaration.Header.Name) {

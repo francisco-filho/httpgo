@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-24
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-25
 
 ## Regex de headers — US-24 / issue #46
 
@@ -45,10 +45,58 @@ captura secreta pendente, remoção da regex compilada de resultados/callbacks,
 isolamento, consumo/fechamento/contexto e falhas de writers são cobertos pelos
 testes HTTPGo, não por comparação de diagnósticos com Hurl. Evidências em
 [validation.md](validation.md#us-24--issue-46--história-0024).
-Regex de body/variável, captura por regex e todas as ocorrências continuam fora
-do suporte; placeholders permanecem estáticos, sem `--render-asserts`.
+Assertions regex de body/variável e todas as ocorrências continuam fora
+do suporte; extração regex de body/header é a US-25 abaixo. Placeholders permanecem
+estáticos, sem `--render-asserts`.
 Corpus sintético não é homologação da suíte real. Extensões YAML hierárquico e
 interpolação de arquivos externos continuam explicitamente próprias do HTTPGo.
+
+## Extração regex — US-25 / issue #48
+
+**Ampliação intencional de contrato:** `[Captures]` aceita regex de body e um
+único sufixo regex em header. São **30 novos pares `capture_regex_*`**, total
+**273 pares**, sobre a base com US-24 integrada. Dos 243 anteriores,
+**somente `capture_header_filter.json` muda
+intencionalmente**: HTTPGo passa de 2/zero envios para 0 e `/capture → /health`,
+enviando `X-Probe: literal`. Nenhuma outra observação antiga foi regenerada.
+Reutilizam-se `response_headers`, `response_body` (bytes base64) e fixtures
+independentes; harness acrescenta somente observação opcional de `Cookie`
+recebido, com dados fictícios. Não se compara stdout nem códigos idênticos de falha.
+
+| Par `capture_regex_*` | HTTPGo | Hurl 8.0.0 | Observação real / classificação |
+|---|---|---|---|
+| `otp` | 0; /capture → /health | 0; mesmos paths | POST JSON envia string `123456` em ambos |
+| `cookie` | 0; /capture → /health | 0; mesmos paths | `Cookie: refresh=fiction-token`, sem atributos; body inválido/charset desconhecido não interfere |
+| `no_cookie_store` | 0; /capture → /health | 0; mesmos paths | nenhum Cookie implícito; Hurl com --no-cookie-store |
+| `first_group` | 0; /capture → /health | 0; mesmos paths | somente `001`, primeiro grupo da primeira correspondência |
+| `empty`, `header_empty` | 0; /capture → /health | 0; mesmos paths | grupo participante vazio envia `prepost`; header vazio não é ausente |
+| `optional`, `no_group`, `no_match` | 2; /capture | 3; /capture | não participante não busca grupo/match posterior; sem grupo/match é erro |
+| `number` | 0; /capture → /health | 0; mesmos paths | HTTPGo envia `{"value":"001"}`; Hurl envia bytes `{"value":001}`; sucesso não prova JSON equivalente |
+| `boolean` | 0; /capture → /health | 0; mesmos paths | string `"true"` no HTTPGo, booleano `true` nos bytes Hurl |
+| `json`, `placeholder` | 0; /capture → /health | 3; /capture | HTTPGo mantém string em valor JSON completo, inclusive placeholder sem recursão; Hurl não envia POST destes templates |
+| `escapes` | 0; /capture → /health | 0; mesmos paths | aspas, barras, newline e Unicode escapados em string JSON |
+| `static_defined`, `static_missing` | 0; /capture → /health | 3; /capture | padrão permanece literal no HTTPGo, com variável definida ou ausente; Hurl interpola |
+| `latin1`, `utf8` | 0; /capture → /health | 0; mesmos paths | acentos, Unicode e multiline; charset explicitamente declarado |
+| `invalid_utf8`, `unknown_charset` | 2; /capture | 3; /capture | erros textuais, nunca fallback/ausência; sem promessa geral de equivalência de charset |
+| `header_first` | 0; /capture → /health | 3; /capture | primeira ocorrência `first,whole`, sem dividir vírgula; Hurl não fornece escalar neste header multivalorado |
+| `header_second`, `header_missing` | 2; /capture | 3; /capture | segunda ocorrência não corrige a primeira; ausência não equivale a vazio |
+| `invalid_late` | 2; zero envios | 3; /health → /capture | HTTPGo pré-compila todo arquivo; Hurl avalia padrão inválido depois dos envios |
+| `unsupported_late` | 2; zero envios | 3; /health → /capture | lookahead com grupo rejeitado por ambos; HTTPGo rejeita antes da rede, Hurl após envios |
+| `pipeline` | 2; zero envios | 0; /capture → /health | encadeamento arbitrário de filtros não suportado no recorte HTTPGo |
+| `status_first` | 1; /capture | 4; /capture | divergência de status prevalece; não infere ordem interna Hurl pelo exit |
+| `assertion_first` | 1; /capture | 3; /capture | HTTPGo assertion antes da captura; Hurl falha na captura |
+| `collision` | 2; /capture | 0; /capture → /health | sem sobrescrita no HTTPGo; Hurl substitui inicial e envia `prenewpost` |
+| `mixed` | 0; /capture → /health | 0; mesmos paths | HTTPGo envia regex `"42"` e JSONPath `42`; Hurl envia ambos `42` |
+
+Primeiro grupo/correspondência e participação vazia são compatíveis nestes pares,
+não uma promessa de equivalência de engines ou interpolação JSON. Diferenças de
+primeira ocorrência, ordem, pré-validação, tipagem e colisão são deliberadas.
+Segurança (grupo derivado, padrão sensível, captura pendente e lotes falhos),
+isolamento, recursos e writers têm regressões próprias, não são homologados pela
+segurança Hurl. Não há escolha de grupo, substituição, regex dinâmica ou assertions
+da captura na própria resposta. YAML hierárquico/renderização externa continuam
+**extensões HTTPGo**. Corpus sintético não homologa suíte real. Evidências em
+[validation.md](validation.md#us-25--issue-48--história-0025).
 
 ## Inclusão e ausência — US-23 / issue #44
 
@@ -138,7 +186,7 @@ numérico de falha. Paths omitidos do segundo envio significam interrupção rea
 | `assertion_first` | 1; /capture | 3; /capture | HTTPGo assertion antes da captura ausente; Hurl erro de captura |
 | `status_first` | 1; /capture | 4; /capture | ambos interrompem na divergência de status; exit não prova se Hurl avaliou captura ausente |
 | `invalid_late` | 2; zero envios | 2; zero envios | header sem aspas na entrada tardia rejeita o arquivo inteiro |
-| `filter` | 2; zero envios | 0; /capture → /health | filtro regex fora do recorte HTTPGo; Hurl envia `X-Probe: literal` |
+| `filter` | **0; /capture → /health (US-25)** | 0; /capture → /health | contrato ampliado na US-25: ambos enviam `X-Probe: literal`; era não suportado na US-22 |
 
 São diferenças deliberadas de **primeira ocorrência**, **interpolação JSON
 contextual**, **ordem** e **não sobrescrita**, não motivos para alargar o recorte
@@ -147,7 +195,7 @@ equivalência semântica. Capturas de header não ampliam o JSONPath suportado.
 
 Proteção automática de headers sensíveis e sua proveniência são contrato próprio
 HTTPGo, comprovado por testes de runner/CLI/E2E, não por equivalência de segurança
-com Hurl. Não há cookie jar nem extração de cookie/atributos; Hurl é executado com
+com Hurl. Não há cookie jar nem extração implícita de cookie/atributos (extração explícita via regex é US-25); Hurl é executado com
 `--no-cookie-store`. O corpus sintético não homologa uma suíte real. Recursos,
 redirect final, falhas de consumo/saída e isolamento são rastreados em
 [validation.md](validation.md#us-22--issue-42--história-0022).

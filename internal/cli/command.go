@@ -437,7 +437,8 @@ Todo texto contém "", inclusive body vazio; not contains "" sempre falha.
 Charset do primeiro Content-Type; omitido usa UTF-8 estrito. ISO-8859-1 usa índice web.
 Charset desconhecido ou sequência inválida: erro de avaliação de body (2), inclusive na negação.
 Condição falsa retorna 1. Exige HTTP numérico ou HTTP * e uma única string literal.
-Esperado nunca interpola; sem opt-in de interpolação, regex de body ou inspeção de binários.
+Esperado nunca interpola; sem opt-in de interpolação ou inspeção de binários.
+Regex de body é suportada somente em capturas (US-25), não como assertion.
 Status → assertions de header/JSON/body na ordem escrita → capturas.
 Texto só decodifica na primeira assertion de body, independente do JSON e sem antecipar erros.
 Falha impede capturas e próxima requisição; sintaxe inválida tardia impede todo HTTP do arquivo.
@@ -473,7 +474,8 @@ Ausente falha com 1; matches vazio passa em todo header presente, inclusive vazi
 ^$ passa somente no vazio presente. Somente primeira ocorrência, sem juntar valores.
 Regex/escape inválido, lookaround e backreferences: 2 antes de qualquer HTTP do arquivo.
 Padrão e real de Set-Cookie e demais nomes sensíveis ficam integralmente ocultos.
-Sem regex de body/variável, captura por regex, filtros ou seleção de todas as ocorrências.
+Sem regex de body/variável em assertions, filtros ou seleção de todas as ocorrências.
+Extração regex de body/header é suportada em capturas (US-25, exemplo abaixo).
 Capturas literais de headers são suportadas em [Captures] (exemplo abaixo).
 Ordem: resposta consumida/fechada, status, assertions na ordem escrita, capturas, resultado.
 Falha de header retorna 1, não publica capturas e impede próximo envio.
@@ -586,8 +588,29 @@ Ausente: erro de captura 2. Somente resposta final completa, após status/assert
 Lotes header/JSONPath são atômicos, sem sobrescrita. Header isolado não retém body.
 Authorization, Proxy-Authorization, Cookie e Set-Cookie marcam a captura como secreta
 na sessão, inclusive em composição posterior; --secret continua acumulando proteção.
-Sem filtros/seletores/regex. Não há cookie jar: capturar Set-Cookie não cria Cookie
+Somente sufixo regex estático (US-25), sem outros filtros/seletores.
+Não há cookie jar: capturar Set-Cookie não cria Cookie
 nem extrai atributos; essa extração pertence à US-25. Diferenças Hurl em docs/compatibility.md.
+Extração regex — salve otp.hurl e marque --secret otp_code:
+GET {{mailbox_url}}/message/123
+HTTP 200
+[Captures]
+otp_code: regex "verificação é: ([0-9]{6})"
+
+POST {{base_url}}/verify
+Content-Type: application/json
+{"code":"{{otp_code}}"}
+HTTP 200
+
+Header com regex: refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"
+Na próxima requisição: Cookie: refresh={{refresh_token}} (sem atributos de resposta).
+Extrai string do primeiro grupo da primeira correspondência. Grupo participante vazio
+é válido; sem grupo, sem correspondência ou grupo não participante: erro de captura 2.
+Padrão string JSON estático, regex Go/US-15, sem interpolação; inválido rejeita todo
+arquivo antes da rede. Body usa charset/UTF-8 estrito; header não decodifica body.
+Headers sensíveis protegem também o grupo; body exige --secret ou secrets YAML.
+Sem escolha de grupo, substituição, pipelines ou assertions da captura da própria resposta.
+
 Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo com --render-files):
   POST {{base_url}}/auth/login
   {"username":"{{username}}","password":"{{password}}"}

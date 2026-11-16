@@ -1,0 +1,46 @@
+{
+  "response_body": "dmFsdWU9dHJ1ZQ==",
+  "classification": "diferença de bytes JSON: HTTPGo envia string true; Hurl envia booleano true; ambos completam os envios",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"true\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":true}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}
