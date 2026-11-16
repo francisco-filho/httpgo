@@ -19,14 +19,14 @@ func parseCapture(text string, pos Position) (Capture, error) {
 	rest = strings.TrimLeft(rest, " \t")
 	fields := strings.Fields(rest)
 	if len(fields) == 0 {
-		return fail("captura exige consulta jsonpath entre aspas")
+		return fail("captura exige consulta jsonpath ou header entre aspas")
 	}
-	if fields[0] != "jsonpath" {
-		return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "consulta de captura não suportada; use jsonpath"}
+	if fields[0] != "jsonpath" && fields[0] != "header" {
+		return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "consulta de captura não suportada; use jsonpath ou header"}
 	}
-	quoted := strings.TrimSpace(rest[len("jsonpath"):])
+	quoted := strings.TrimSpace(rest[len(fields[0]):])
 	if len(quoted) < 2 || quoted[0] != '"' {
-		return fail("captura exige consulta jsonpath entre aspas")
+		return fail("captura exige consulta jsonpath ou header entre aspas")
 	}
 	source, tail, valid := assertionString(quoted)
 	if !valid {
@@ -36,10 +36,19 @@ func parseCapture(text string, pos Position) (Capture, error) {
 		if (tail[0] == ' ' || tail[0] == '\t') && suffix[0] == "count" {
 			return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "count em captura não suportado; use count em assertion"}
 		}
+		if fields[0] == "header" && (tail[0] == ' ' || tail[0] == '\t') {
+			return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "filtro ou seletor em captura de header não suportado"}
+		}
 		return fail("consulta de captura entre aspas inválida")
 	}
 	queryPos := pos
 	queryPos.Column += strings.Index(text, quoted) + 1
+	if fields[0] == "header" {
+		if !validHeaderName(source) {
+			return fail("captura exige nome de header literal válido entre aspas")
+		}
+		return Capture{Kind: HeaderCapture, Header: source, Name: name, Position: pos, QueryPosition: queryPos}, nil
+	}
 	path, err := query.Parse(source)
 	if err != nil {
 		category := "sintaxe inválida"

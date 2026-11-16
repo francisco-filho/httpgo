@@ -1,4 +1,74 @@
-# Validação — US-01 a US-16, US-20 e US-21
+# Validação — US-01 a US-16, US-20, US-21 e US-22
+
+## US-22 — issue #42 / história 0022
+
+Plano da issue #42 executado sem planner, somente backend e na ordem da fila
+0022: `back:1` no commit `eb31916` (captura literal, sessão/proteção, testes e
+recorte inicial), `back:2` no commit `a06bd7c` (segurança, recursos e falhas),
+`back:3` nesta alteração (corpus, ajuda, documentação e validação integrada).
+Sem frontend/estáticos, fonte Hurl, dependências novas, alteração de Go,
+transporte de produção ou configuração de CI/lint. A implementação reutiliza
+`query.Header`, lote tipado e sanitização existentes. Esta evidência local não
+substitui o gate de revisão; nenhuma análise SonarQube foi executada pelo backdev.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`. `goimports` e `golangci-lint` existentes
+em `/home/ff/go/bin` foram antepostos ao PATH. Hurl **8.0.0** já disponível em
+`/tmp/httpgo-0021-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` foi selecionado
+somente pelo PATH do diferencial; o Hurl padrão 8.0.1 não foi substituído.
+Nenhuma ferramenta foi instalada. Aviso de metadados da libcurl não impediu
+execução. Não foi consultado código-fonte Hurl.
+
+- Task 1: passaram `go test ./internal/parser ./internal/query ./internal/template
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram `go test ./internal/template ./internal/runner ./internal/cli
+  ./internal/transport`, `go test ./tests/e2e -count=1`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` antes do commit.
+- Task 3: **18 novos pares** gerados com `-update` limitado a `capture_header_*`,
+  inspecionados quanto a códigos, fluxo, headers e bytes JSON. O gate
+  `make compatibility` passou com **176 pares**, Hurl **8.0.0**, sem skip e sem
+  update. Nenhum dos **158 pares anteriores** foi alterado/regenerado.
+  `TestCompatibilityBodyFixture` também passou com a tag compatibility.
+- Gate final: `make fmt lint test`, `go vet ./...`, `go build ./...`, `make e2e`
+  e `make compatibility` passaram. Lint **0 issues**; testes com **race e cobertura**.
+  Cobertura observada: parser **96,5%**, query **95,6%**, template **95,7%**,
+  runner **93,4%**, CLI **97,5%**, transport **90,4%**, assertion **92,7%**,
+  config **96,0%**, suite **95,4%**. E2E usa build único, servidores HTTP locais
+  com portas dinâmicas, stdout/stderr e exit codes, sem rede externa/dummy.
+- Fuzzing com seeds de headers/capturas ampliados e marcas dinâmicas na sessão:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**76.264 execuções**), `go test ./internal/template -run '^$' -fuzz '^FuzzRender$'
+  -fuzztime=20s -parallel=2` (**46.232**) e `go test ./internal/template -run '^$'
+  -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2` (**35.717**) passaram sem crash.
+  Contagens são apenas desta execução, não meta de cobertura.
+- `gofmt -l` dos **21 arquivos Go alterados** e `git diff --check` sem
+  apontamentos; links Markdown locais de README/subset/compatibility conferidos.
+- Builds cruzados e execução nativa macOS/Windows não realizados: opcionais
+  durante esta história conforme plano v4. O corpus sintético não é homologação
+  da suíte real. Proteção própria HTTPGo não é equivalência de segurança Hurl.
+
+### Rastreabilidade dos cenários
+
+| GO | Evidência executada |
+|---|---|
+| GO-240 | `TestHeaderCaptureCacheByBinary` executa `scenario_capture_cache.hurl` com três caixas de ETag; `capture_header_cache` observa `If-None-Match` e 304 em ambos os binários |
+| GO-241 | `TestHeaderCaptureLiteralStrings`, `TestHeaderCaptureLiteralAndNoCookieStoreByBinary`; pares `strings`, `boolean`, `null`, `mixed`, `literal` e `literal_text`: string tipada, aspas/escapes e nenhuma recursão |
+| GO-242 | `TestHeaderCaptureLiteralStrings`, `TestHeaderCaptureGatesAndMixedBatch`, query `TestHeader`; pares `repeated`, `repeated_empty`, `comma`: primeira ocorrência, caixa, vazio e vírgula |
+| GO-243 | `TestHeaderCaptureGatesAndMixedBatch`, `TestHeaderCaptureAtomicPublicationAndConflicts`, CLI `TestHeaderCaptureCLI`; pares `empty`, `empty_text`, `missing` |
+| GO-244 | `TestHeaderCaptureGatesAndMixedBatch`, `TestHeaderCaptureFailuresNeverPublish`; pares `status_first`, `assertion_first`: primeira falha, erro JSON, curinga e sem expectativa |
+| GO-245 | `TestMixedHeaderCapturePublishesTypedValues`, `TestHeaderCaptureGatesAndMixedBatch`, `TestHeaderCaptureAtomicPublicationAndConflicts`; par `mixed`: publicação tipada ou lote inteiro rejeitado |
+| GO-246 | `TestHeaderCaptureAtomicPublicationAndConflicts`, `TestHeaderCaptureFailuresNeverPublish` e regressões de colisão de `Session.Publish`/US-06; par `collision`: valores anteriores preservados |
+| GO-247 | `TestHeaderCaptureLiteralAndPositions`, `TestHeaderCaptureRejectsWholeFile`, `TestHeaderCaptureLateSyntaxPreventsAllRequests`, `TestCaptureStructuralCorpusByBinary`; novos negativos e pares `invalid_late`, `filter`, LF/CRLF |
+| GO-248 | `TestSensitiveHeaderCaptureProvenanceAndPendingProtection`, `TestHeaderCaptureCLI`, `TestHeaderCaptureWritersAndDerivedProtection`, `TestSensitiveHeaderCaptureLaterFailureByBinary`: quatro nomes sensíveis, composição/escapes, marcas explícitas, lote rejeitado e operandos pendentes |
+| GO-249 | `TestHeaderCaptureLiteralAndNoCookieStoreByBinary`, `TestHeaderCapturesUseOnlyCompleteFinalResponse`, `TestHeaderCaptureFinalAndIncompleteByBinary`: sem Cookie implícito, valor Set-Cookie só em contexto explicitamente declarado |
+| GO-250 | 18 novos pares diferenciais e corpus completo, `TestHeaderCaptureHelpAndPublishedExample`, cache versionado e documentação atualizada; diferenças de tipagem, repetição, ordem e colisões registradas em `compatibility.md` |
+| GO-251 | `TestHeaderCapturesUseOnlyCompleteFinalResponse`, `TestHeaderOnlyCaptureConsumesClosesAndDiscardsBody`, `TestHeaderCaptureFinalAndIncompleteByBinary`: somente final completa, body não retido e consumo/close antes de callback |
+| GO-252 | Mesmos testes de transporte, modos read/close/timeout/cancel/incomplete; `TestHeaderCaptureFailuresNeverPublish`: sem publicação/resposta concluída/envio extra/retry |
+| GO-253 | `TestHeaderCaptureWritersAndDerivedProtection`, `TestHeaderCaptureReportFailurePreservesCounts`: write/short write após sucesso, divergência e captura falha, 2 prioritário e writer não reutilizado |
+| GO-254 | `TestDynamicSecretDeclarationsAreSessionLocal`, `TestHeaderCaptureReusedRunnerStartsClean`, callbacks das tabelas de segurança: uso antecipado, sessão nova, cenário/contexto imutáveis e sem coleções operacionais |
+
 
 ## US-21 — issue #40 / história 0021
 

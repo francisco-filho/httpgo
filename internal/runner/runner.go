@@ -135,6 +135,11 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
 	session := r.renderer.NewSession()
 	for _, entry := range scenario.Entries {
+		for _, capture := range entry.Captures {
+			if capture.Kind == parser.HeaderCapture && sensitiveHeader(capture.Header) {
+				session.MarkSecret(capture.Name)
+			}
+		}
 		for _, declaration := range entry.Assertions {
 			if declaration.Header != nil && sensitiveHeader(declaration.Header.Name) {
 				session.ProtectValue(declaration.Header.Expected)
@@ -297,7 +302,7 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 			result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil
 		}
 		if err == nil && result.Err == nil && !result.Diverged && len(entry.Captures) > 0 {
-			if captureErr := captureResponse(session, entry.Captures, response.Body); captureErr != nil {
+			if captureErr := captureResponse(session, entry.Captures, response); captureErr != nil {
 				current.Outcome = CaptureFailed
 				result.Err, result.ErrorPosition = captureErr, captureErr.Position
 			}

@@ -24,7 +24,16 @@ type Position struct {
 
 type Header struct{ Name, Value string }
 
+type CaptureKind int
+
+const (
+	JSONPathCapture CaptureKind = iota
+	HeaderCapture
+)
+
 type Capture struct {
+	Kind          CaptureKind
+	Header        string
 	Name          string
 	Path          query.Path
 	Position      Position

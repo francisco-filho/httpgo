@@ -59,6 +59,10 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, declaration := range []string{`etag: header "eTaG"`, `cookie: header "Set-Cookie"`, `x: header ""`, `x: header X`, `x: header "X" regex "(.*)"`, `x: header "X" nth 1`, `x: header "X" count`, `x: header "X"[0]`, `x: header "{{name}}"`} {
+		f.Add("GET http://example.test/first\r\nHTTP 200\r\nGET http://example.test/late\r\nHTTP *\r\n[Captures]\r\n  " + declaration)
+	}
+	f.Add("GET http://example.test/catalog\nHTTP 200\n[Captures]\netag: header \"ETag\"\nid: jsonpath \"$.id\"\nGET http://example.test/next\nIf-None-Match: {{etag}}\nHTTP 304")
 	for _, expression := range []string{`contains ""`, `not contains "passwordHash"`, `contains "{{literal}}\n雪"`, `contains unquoted`, `contains "x" "extra"`, `not`, `matches "x"`, `not exists`} {
 		f.Add("GET http://example.test/first\r\nHTTP 200\r\nGET http://example.test/late\r\nHTTP *\r\n[Asserts]\r\n  body " + expression)
 	}

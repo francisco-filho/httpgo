@@ -422,16 +422,18 @@ do processo (US-13); stdin permanece não implementado.
 ## Sessão e capturas
 
 Cada `Run` pede uma nova `template.Session` ao `runner.Renderer`. `template.Context`
-compartilha apenas as variáveis iniciais e marcações imutáveis, criando um mapa
-separado de capturas. Não há mutação do cenário nem vazamento para o próximo Run.
+compartilha apenas as variáveis iniciais imutáveis, clonando as marcações de
+segredo e criando um mapa separado de capturas. Não há mutação do cenário nem vazamento para o próximo Run.
 O parser reconhece `[Captures]`, conserva `Capture.Position`/`QueryPosition` e usa
-`query.Parse` para validar toda consulta antes da rede; resolução depende somente
-da resposta da entrada executada.
+`query.Parse` para validar consultas JSONPath antes da rede. `Capture.Kind`
+distingue `JSONPathCapture` e `HeaderCapture`; a segunda variante guarda o nome
+literal em `Capture.Header`, validado pelas mesmas regras das assertions.
+Resolução depende somente da resposta final da entrada executada.
 
-`runner.Request.RetainBody` é verdadeiro em entradas com capturas **ou** assertions
-JSON; headers isolados continuam sem retenção. Após transporte concluído, runner
+`runner.Request.RetainBody` é verdadeiro quando há captura JSONPath ou assertion
+JSON/body; capturas e assertions exclusivamente de header não retêm body. Após transporte concluído, runner
 compara status numérico e depois percorre headers/JSON na ordem escrita antes
-de chamar `captureResponse`, independentemente da ordem das seções. Header
+de chamar `captureResponse(session, declarations, response)`, independentemente da ordem das seções. Header
 anterior divergente prevalece sobre JSON inválido; JSON anterior inválido é erro. Sem expectativa, qualquer status permite
 capturar sem inventar assertion. `query.Path.Select` devolve valor/found/erro seguro;
 `null` difere de ausência, e números não passam por float64. O runner serializa
@@ -467,6 +469,33 @@ arrays/objetos, sem disponibilizar propriedades como variáveis. A proteção ta
 precede falha de publicação/conflito; vazio não corrompe a saída. Não há confusão
 entre string capturada e literal CLI. Não há nova fonte de credenciais iniciais nem detecção
 universal de segredos ainda desconhecidos.
+
+### Capturas de headers — US-22 / issue #42
+
+`captureResponse` despacha explicitamente pelo `Capture.Kind`. JSONPath usa o
+seletor existente; header usa `query.Header(response.Headers, declaration.Header)`,
+primeira ocorrência e presença separada de vazio, sem `net/http` no runner.
+`json.Marshal` converte a string selecionada em valor JSON explícito para o mesmo
+lote tipado/`Session.Publish`, sem coerção de literais CLI. Qualquer consulta ou
+colisão falha o lote inteiro, sem desfazer valores previamente publicados.
+Variante desconhecida é erro explícito, nunca ignorada.
+
+Antes da execução, declarações de captura de headers sensíveis são classificadas
+com `sensitiveHeader` e `Session.MarkSecret`. `Context.NewSession` clona o mapa de
+marcações com `maps.Clone`; marcas explícitas e dinâmicas acumulam sem alterar o
+contexto inicial. Classificar não seleciona nem publica valores e não muda a
+precedência: `pendingSecret` oculta operandos de assertions mesmo se a captura
+falharia. Valores sensíveis recebidos passam pelo `ProtectValue` existente;
+`ProtectCapture` preserva variantes JSON/Go/URL e proveniência para composições.
+`safeEntry`, proteção de invocação e writers permanecem o único caminho de saída,
+sem headers/capturas/body operacionais nos callbacks. Vazio não aciona redação
+global; codificações arbitrárias não são detectadas.
+
+O transporte de produção e `HTTPExecutor` não mudam: a resposta final é consumida
+e fechada antes do retorno, mesmo com `RetainBody=false`. Read/close/timeout/cancel
+impedem toda publicação e contagem de resposta completa. Redirects mantêm mesma
+origem, um prazo e nenhum retry. Captura de `Set-Cookie` não instala cookie jar,
+não transforma atributos nem sintetiza `Cookie` em requisições seguintes.
 
 ## Headers e expectativa curinga — US-07
 
@@ -628,14 +657,14 @@ pooling para impedir os caminhos de retry implícito de GETs em conexões
 reutilizadas e de streams HTTP/2. O teste de warm-up + falha encerra a segunda
 conexão e comprova ausência de replay e do GET seguinte.
 
-`io.Copy(io.Discard, body)` consome intermediárias e respostas sem capturas/JSON em
+`io.Copy(io.Discard, body)` consome intermediárias e respostas sem consultas que precisem do body em
 streaming. `io.ReadAll` retém apenas a resposta final quando RetainBody foi pedido,
 no mesmo contexto/deadline. O body é fechado em sucesso ou erro; falhas de leitura
 ou fechamento continuam sendo transporte, sem publicação parcial de capturas.
 O retorno só ocorre depois desse consumo e sem cancelamento pendente. Runner
 conhece somente bytes fechados de resposta, nunca leitores ou tipos net/http.
 Após avaliação, os bytes/documento não são acumulados no resultado. Memória adicional
-acompanha a resposta final e suas estruturas nas entradas com captura/JSON e
+acompanha a resposta final e suas estruturas nas entradas com captura JSONPath/assertion JSON/body e
 os valores/proteções da sessão; não há retenção de resposta em `EntryResult`.
 
 Causas sensíveis são preservadas para `errors.Is/As`, mas jamais concatenadas à

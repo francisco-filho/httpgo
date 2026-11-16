@@ -586,6 +586,46 @@ nas saídas; não fornece valor nem protege histórico de shell/listagem de proc
 Marcar um nome ainda ausente é permitido, mas não resolve sua referência. A fonte
 para credenciais iniciais pelo ambiente do processo está disponível por referências
 explícitas `${NOME}` em YAML (extensão US-13 acima); stdin não está implementado.
+
+### Capturas literais de headers — US-22 / issue #42
+
+Salve `cache.hurl` (também em
+[`testdata/scenarios/scenario_capture_cache.hurl`](testdata/scenarios/scenario_capture_cache.hurl)):
+
+```hurl
+GET {{base_url}}/catalog
+HTTP 200
+[Captures]
+catalog_etag: header "ETag"
+
+GET {{base_url}}/catalog
+If-None-Match: {{catalog_etag}}
+HTTP 304
+```
+
+Execute `httpgo test cache.hurl --var base_url=http://localhost:8080` contra uma
+API que ofereça cache condicional em `/catalog` (o dummy manual não promete esse
+endpoint). O segundo envio recebe o ETag real, incluindo aspas.
+
+O nome é literal e consultado sem distinguir caixa. Somente a **primeira
+ocorrência**, inclusive vazia, é capturada; não junta valores nem divide vírgulas.
+O valor permanece string, mesmo se parecer número, booleano, JSON ou placeholder,
+sem interpolação recursiva. Body não JSON não impede uma captura só de header.
+Ausência gera erro de captura **2**; vazio publica string vazia. Só a resposta
+final completa participa, após status e assertions; lotes mistos com JSONPath são
+atômicos, sem sobrescrita e com isolamento por execução.
+
+`Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` protegem também o
+nome capturado e seus usos compostos/escapes conhecidos, sem alterar o valor
+enviado. Marcações explícitas continuam acumulando. Não há detecção universal de
+segredos ou codificações arbitrárias. Capturar `Set-Cookie` **não** ativa cookie
+jar, não extrai atributos nem cria `Cookie`; extração de cookie é escopo da US-25.
+Filtros/seletores/regex em captura de header continuam fora do recorte.
+
+Há diferenças deliberadas frente ao Hurl 8.0.0 em repetição, interpolação JSON,
+ordem de assertions e colisões: veja [a matriz diferencial](docs/compatibility.md#capturas-literais-de-headers--us-22--issue-42).
+A proteção HTTPGo não é anúncio de equivalência de segurança com Hurl.
+
 Capturas de respostas estão disponíveis desde a US-05, ampliadas para qualquer
 tipo JSON na US-06.
 
@@ -732,8 +772,9 @@ Esta é uma **ampliação intencional**: `[Asserts]`, antes rejeitada globalment
 passou a aceitar essas três formas, com strings literais entre aspas duplas.
 A US-08 acrescenta igualdade JSON na mesma lista ordenada (abaixo).
 Nomes são case-insensitive; igualdade e substring distinguem caixa dos valores.
-`{{nome}}` no esperado permanece literal, sem interpolação. Regex, filtros,
-captura de headers e outros operadores de header continuam não suportados.
+`{{nome}}` no esperado permanece literal, sem interpolação. Regex, filtros e
+outros operadores de assertion de header continuam não suportados. Capturas de
+headers são suportadas separadamente em `[Captures]` desde a US-22.
 
 Só a primeira ocorrência de cada header participa da comparação, sem concatenar
 ou separar vírgulas. Ausência faz todos os operadores falharem; presente vazio

@@ -1,0 +1,45 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": ""
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "diferença contextual JSON: HTTPGo envia string vazia; Hurl termina com 3 antes do POST com placeholder não entre aspas",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"\",\"text\":\"prepost\"}",
+        "content_type": "application/json",
+        "probe": "prepost"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

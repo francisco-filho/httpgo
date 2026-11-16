@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{`"catalog-v1"`, `session=private; Path=/; HttpOnly`, "first,whole", "", `{{missing}}`} {
+		f.Add("If-None-Match: {{captured}}", value)
+	}
 	for _, value := range []string{"", "{{missing}}", "雪\r\ntext", "application/pdf", "multipart/form-data; boundary=manual", "[]", "{}"} {
 		f.Add("description-prefix-{{x}}-suffix", value)
 	}
@@ -69,6 +72,7 @@ func FuzzRender(f *testing.F) {
 			t.Fatal(err)
 		}
 		s := c.NewSession()
+		s.MarkSecret("captured")
 		if err := s.Publish([]Capture{{"captured", captureString(value)}}); err != nil {
 			t.Fatal(err)
 		}
@@ -86,7 +90,7 @@ func FuzzRender(f *testing.F) {
 				t.Fatal("invalid typed capture", err)
 			}
 		}
-		_, err = c.Render(source)
+		_, err = s.Render(source)
 		if err != nil && strings.Contains(err.Error(), "notRecursive") {
 			t.Fatal("unsafe error")
 		}

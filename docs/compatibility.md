@@ -1,4 +1,54 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 e US-21
+# Matriz de compatibilidade — US-01 a US-16, US-20, US-21 e US-22
+
+## Capturas literais de headers — US-22 / issue #42
+
+**Ampliação intencional do contrato:** `[Captures]` aceita
+`nome: header "nome-do-header"`, sempre string, primeira ocorrência e publicação
+atômica após status/assertions. Os **18 pares `capture_header_*`** abaixo ampliam
+o corpus para **176 pares**. Os **158 anteriores permanecem inalterados**;
+nenhuma observação antiga foi regenerada. Novos goldens foram obtidos com
+`-update` restrito aos novos pares, revisados e confirmados por `make compatibility`
+sem update, Hurl **8.0.0** obrigatório e sem skip, em Linux.
+
+O harness existente reutiliza `response_headers` e fixtures independentes. A
+observação de requisição acrescenta somente `etag` e `if_none_match` opcionais;
+`/catalog` responde 304 quando o `If-None-Match` corresponde ao ETag configurado.
+Corpos e `X-Probe` fictícios já observados comprovam conteúdo/tipo, não apenas
+exit codes. A tabela não exige igualdade de stdout, diagnósticos ou código
+numérico de falha. Paths omitidos do segundo envio significam interrupção real.
+
+| Par `capture_header_*` | HTTPGo | Hurl 8.0.0 | Classificação / dado observado |
+|---|---|---|---|
+| `cache` | 0; /catalog → /catalog | 0; mesmos paths | nome `eTaG`; ambos enviam `If-None-Match: "catalog-v1"` com aspas e aprovam 304 |
+| `comma` | 0; /capture → /health | 0; mesmos paths | `X-Probe: first,whole`, sem dividir a vírgula |
+| `empty_text` | 0; /capture → /health | 0; mesmos paths | captura vazia existe, composição textual envia `prepost` |
+| `literal_text` | 0; /capture → /health | 0; mesmos paths | `X-Probe: {{missing}}` permanece literal, sem recursão |
+| `missing` | 2; /capture | 3; /capture | ausência é erro de captura, sem próximo envio |
+| `repeated` | 0; /capture → /health | 3; /capture | HTTPGo envia primeira ocorrência `first,whole`; Hurl não fornece escalar utilizável neste par multivalorado |
+| `repeated_empty` | 0; /capture → /health | 3; /capture | primeira vazia não é substituída por `second`; HTTPGo envia `prepost` |
+| `boolean` | 0; /capture → /health | 0; mesmos paths | JSON enviado é `{"value":"true"}` aqui e `{"value":true}` no Hurl |
+| `null` | 0; /capture → /health | 0; mesmos paths | JSON enviado é `{"value":"null"}` aqui e `{"value":null}` no Hurl |
+| `mixed` | 0; /capture → /health | 0; mesmos paths | lote header/JSONPath envia `{"header":"123","id":42}` aqui; Hurl envia `{"header":123,"id":42}` |
+| `strings` | 0; /capture → /health | 3; /capture | strings numérica/booleana/semelhante a objeto preservadas aqui; Hurl não envia o POST deste template JSON |
+| `empty` | 0; /capture → /health | 3; /capture | aqui JSON com string vazia e texto composto; Hurl falha com placeholder vazio em valor JSON sem aspas, não prova falha de captura vazia |
+| `literal` | 0; /capture → /health | 3; /capture | aqui placeholder recebido vira string JSON; Hurl não envia este POST com placeholder JSON não entre aspas; comparar `literal_text` separadamente |
+| `collision` | 2; /capture | 0; /capture → /health | HTTPGo mantém inicial `x=original`, sem sobrescrita; Hurl envia `X-Probe: new` |
+| `assertion_first` | 1; /capture | 3; /capture | HTTPGo assertion antes da captura ausente; Hurl erro de captura |
+| `status_first` | 1; /capture | 4; /capture | ambos interrompem na divergência de status; exit não prova se Hurl avaliou captura ausente |
+| `invalid_late` | 2; zero envios | 2; zero envios | header sem aspas na entrada tardia rejeita o arquivo inteiro |
+| `filter` | 2; zero envios | 0; /capture → /health | filtro regex fora do recorte HTTPGo; Hurl envia `X-Probe: literal` |
+
+São diferenças deliberadas de **primeira ocorrência**, **interpolação JSON
+contextual**, **ordem** e **não sobrescrita**, não motivos para alargar o recorte
+ou remover verificações. Um sucesso de ambos com bytes JSON diferentes não é
+equivalência semântica. Capturas de header não ampliam o JSONPath suportado.
+
+Proteção automática de headers sensíveis e sua proveniência são contrato próprio
+HTTPGo, comprovado por testes de runner/CLI/E2E, não por equivalência de segurança
+com Hurl. Não há cookie jar nem extração de cookie/atributos; Hurl é executado com
+`--no-cookie-store`. O corpus sintético não homologa uma suíte real. Recursos,
+redirect final, falhas de consumo/saída e isolamento são rastreados em
+[validation.md](validation.md#us-22--issue-42--história-0022).
 
 ## Ampliação US-21 — busca textual no body (issue #40)
 

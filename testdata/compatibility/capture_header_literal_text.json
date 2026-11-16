@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "{{missing}}"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "compartilhado: string com placeholder recebida permanece literal em header, sem interpolação recursiva",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "{{missing}}"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "{{missing}}"
+      }
+    ]
+  }
+}

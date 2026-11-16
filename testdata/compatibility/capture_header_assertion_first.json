@@ -1,0 +1,38 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "actual"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "diferença deliberada de ordem: HTTPGo assertion antes de captura ausente (1); Hurl erro de captura (3)",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

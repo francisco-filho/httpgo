@@ -1,0 +1,32 @@
+{
+  "response_json": "not JSON",
+  "classification": "status divergente com captura ausente: HTTPGo 1 e Hurl 4, ambos somente /capture; não inferir avaliação da captura pelo exit",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

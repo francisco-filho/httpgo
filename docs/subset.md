@@ -579,6 +579,46 @@ httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
 - Sem placeholders, bytes e validação permanecem os da US-02. A expectativa e a
   entrada seguinte começam em nova linha, inclusive depois de placeholder raiz.
 
+## Capturas literais de headers — US-22 (issue #42)
+
+```hurl
+GET {{base_url}}/catalog
+HTTP 200
+[Captures]
+catalog_etag: header "ETag"
+
+GET {{base_url}}/catalog
+If-None-Match: {{catalog_etag}}
+HTTP 304
+```
+
+`nome: header "nome-do-header"` consulta somente a resposta final completa,
+sem distinguir caixa do nome. Seleciona **a primeira ocorrência**, inclusive
+vazia; não junta ocorrências nem divide vírgulas. Esta política preserva a
+US-07 e é uma diferença deliberada frente a headers multivalorados do Hurl.
+O valor é sempre string literal: aspas de ETag, números, JSON e placeholders
+recebidos são preservados, sem coerção ou interpolação recursiva. Não exige
+body JSON nem retenção do body quando nenhuma outra consulta precisar dele;
+a resposta ainda é consumida e fechada integralmente antes das validações.
+
+Header ausente é erro de captura (2). Status e assertions antecedem capturas;
+lotes mistos de header/JSONPath são atômicos e mantêm as mesmas regras de nomes,
+isolamento e colisões abaixo. Sintaxe inválida tardia impede todos os envios.
+Filtros, índices, todas as ocorrências e captura por regex não são suportados.
+
+`Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` são protegidos
+sem distinguir caixa, incluindo a proveniência do nome capturado em composição
+e escapes conhecidos. Marcações explícitas de segredo acumulam; marcas dinâmicas
+não escapam da sessão. Diagnósticos não imprimem coleções de headers nem bodies.
+Valor vazio não provoca substituição global; não há detecção de codificações
+arbitrárias. Capturar `Set-Cookie` **não** cria `Cookie`, não extrai atributos e
+não ativa cookie jar; extração de valor de cookie pertence à US-25.
+Execute `httpgo test cache.hurl --var base_url=http://localhost:8080` contra API
+com cache condicional; exemplo versionado em `testdata/scenarios/scenario_capture_cache.hurl`.
+A [matriz diferencial](compatibility.md#capturas-literais-de-headers--us-22--issue-42)
+registra as diferenças observadas de repetição, interpolação JSON, ordem e colisões
+com Hurl 8.0.0; não há promessa de equivalência geral.
+
 ## Capturas tipadas — US-05/US-06
 
 ```hurl
@@ -596,7 +636,8 @@ HTTP 200
 
 `[Captures]` associa declarações à resposta anterior, após a expectativa quando
 presente; também pode existir sem `HTTP`. A seção não pode ser órfã, duplicada
-na entrada ou vazia. Cada declaração tem a forma `nome: jsonpath "consulta"`.
+na entrada ou vazia. Cada declaração JSON tem a forma `nome: jsonpath "consulta"`;
+a US-22 também aceita `nome: header "nome-do-header"`, descrita acima.
 Comentários em linha própria e LF/CRLF mantêm a associação. A próxima request-line
 encerra a seção; `[Asserts]` também pode sucedê-la na mesma entrada. Outras queries
 e filtros de captura não são aceitos nem ignorados.
@@ -610,7 +651,7 @@ descida recursiva, slices, união, propriedades entre colchetes ou índices nega
 Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
 **todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
 
-A resposta final deve conter exatamente um valor JSON válido. **Ampliação
+Para capturas JSONPath, a resposta final deve conter exatamente um valor JSON válido. **Ampliação
 intencional da US-06:** a seleção aceita string, número, booleano, `null`, array
 ou objeto, inclusive na raiz. Campo ausente/índice fora do array ou percurso
 incompatível é erro; `null`, string vazia e coleções vazias existem e são válidos.
@@ -712,8 +753,9 @@ de status; assertions e capturas continuam obrigatórias quando declaradas.
   daquela feita pelo transporte HTTP (por exemplo whitespace externo do protocolo).
 - Valores esperados são strings literais entre aspas duplas. `{{nome}}` é texto
   literal, com ou sem variável/captura definida; não passa pelo renderer.
-  `exists` não aceita valor esperado. Não há regex, filtros, captura de headers
-  ou outros operadores de header. Construções fora desse recorte falham
+  `exists` não aceita valor esperado. Não há regex, filtros
+  ou outros operadores de assertion de header. Capturas literais são suportadas
+  separadamente em `[Captures]` (US-22). Construções fora desse recorte falham
   explicitamente com posição, antes de qualquer envio do arquivo.
 - Havendo ocorrências repetidas, somente a **primeira na ordem recebida** participa
   de `==`/`contains`, inclusive se nomes chegam com caixas diferentes. Nunca há

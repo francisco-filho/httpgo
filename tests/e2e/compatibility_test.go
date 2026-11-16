@@ -44,6 +44,8 @@ type wireRequest struct {
 	ContentType          string     `json:"content_type"`
 	Probe                string     `json:"probe"`
 	Authorization        string     `json:"authorization,omitempty"`
+	ETag                 string     `json:"etag,omitempty"`
+	IfNoneMatch          string     `json:"if_none_match,omitempty"`
 }
 
 type observation struct {
@@ -156,7 +158,7 @@ func TestCompatibility(t *testing.T) {
 			var paths []string
 			var requests []wireRequest
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				request := wireRequest{Method: r.Method, ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization")}
+				request := wireRequest{Method: r.Method, ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization"), ETag: r.Header.Get("ETag"), IfNoneMatch: r.Header.Get("If-None-Match")}
 				_, params, mediaErr := mime.ParseMediaType(request.ContentType)
 				baseType, _, _ := strings.Cut(request.ContentType, ";")
 				if strings.EqualFold(strings.TrimSpace(baseType), "multipart/form-data") {
@@ -215,6 +217,12 @@ func TestCompatibility(t *testing.T) {
 				switch r.URL.Path {
 				case "/capture":
 					writeCompatibilityBody(w, expected)
+				case "/catalog":
+					if etag := w.Header().Get("ETag"); etag != "" && r.Header.Get("If-None-Match") == etag {
+						w.WriteHeader(304)
+					} else {
+						writeCompatibilityBody(w, expected)
+					}
 				case "/auth/login":
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = io.WriteString(w, `{"accessToken":"token-ficticio","items":["","array-token"]}`)

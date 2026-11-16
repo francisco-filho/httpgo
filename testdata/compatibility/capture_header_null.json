@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "null"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "diferença contextual JSON: HTTPGo envia string null; Hurl envia null neste par",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"null\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":null}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

@@ -88,6 +88,9 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
+	for _, value := range []string{`"catalog-v1"`, `session=private; Path=/; HttpOnly`, "first,whole", "", `{{missing}}`, "123", "true", "null"} {
+		f.Add(`{"full":{{captured}},"text":"prefix{{captured}}"}`, value)
+	}
 	for _, seed := range []string{`{{x}}`, `{"a":{{x}}}`, `"prefix{{x}}"`, `{"a":{}}`, `{"a":"\\{{x}}"}`, `{"{{x}}":1}`, "[\r\n{{x}}\r\n]", `"bad\{{x}}"`, "", " \t\r\n", "\"\xff\"", " \r\n{\r\n \"value\":{{x}}\r\n}\t\r\n", "{}\nHTTP 200", "{} []", "{\n \"escaped\":\"{{x}}\",\n \"next\":{{missing}}\n}"} {
 		f.Add(seed, `"\"\\\n雪{{literal}}"`)
 	}
@@ -100,6 +103,7 @@ func FuzzRenderJSON(f *testing.F) {
 			t.Fatal(err)
 		}
 		s := c.NewSession()
+		s.MarkSecret("captured")
 		captureValue := strings.ToValidUTF8(value, "\ufffd")
 		if err := s.Publish([]Capture{{"captured", captureString(captureValue)}}); err != nil {
 			t.Fatal(err)
@@ -120,7 +124,7 @@ func FuzzRenderJSON(f *testing.F) {
 		}
 		original := []byte(source)
 		saved := bytes.Clone(original)
-		got, err := c.RenderJSON(original)
+		got, err := s.RenderJSON(original)
 		if !bytes.Equal(original, saved) {
 			t.Fatal("mutated source")
 		}

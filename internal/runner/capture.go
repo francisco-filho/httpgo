@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"capimgrosso.com/httpgo/internal/parser"
+	"capimgrosso.com/httpgo/internal/query"
 	"capimgrosso.com/httpgo/internal/template"
 )
 
@@ -16,12 +17,22 @@ type CaptureError struct {
 
 func (e *CaptureError) Error() string { return fmt.Sprintf("erro de captura: %s", e.Detail) }
 
-func captureResponse(session template.Session, declarations []parser.Capture, body []byte) *CaptureError {
+func captureResponse(session template.Session, declarations []parser.Capture, response Response) *CaptureError {
 	batch := make([]template.Capture, 0, len(declarations))
 	for _, declaration := range declarations {
-		value, found, err := declaration.Path.Select(body)
-		if err != nil {
-			return &CaptureError{Position: declaration.QueryPosition, Detail: "resposta não contém JSON válido"}
+		var value any
+		var found bool
+		switch declaration.Kind {
+		case parser.JSONPathCapture:
+			var err error
+			value, found, err = declaration.Path.Select(response.Body)
+			if err != nil {
+				return &CaptureError{Position: declaration.QueryPosition, Detail: "resposta não contém JSON válido"}
+			}
+		case parser.HeaderCapture:
+			value, found = query.Header(response.Headers, declaration.Header)
+		default:
+			return &CaptureError{Position: declaration.QueryPosition, Detail: "variante de captura não suportada"}
 		}
 		if !found {
 			return &CaptureError{Position: declaration.QueryPosition, Detail: "consulta não encontrou valor"}

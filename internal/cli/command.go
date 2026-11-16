@@ -458,7 +458,8 @@ Somente primeira ocorrência; não concatena nem separa vírgulas.
 Ausente falha nos três operadores; vazio existe e satisfaz == "".
 contains "" passa para qualquer valor presente, inclusive vazio.
 Esperados são strings literais: {{nome}} não interpola, mesmo se definido.
-Sem regex, filtros, captura de headers ou outros operadores de header.
+Sem regex, filtros ou outros operadores de assertion de header.
+Capturas literais de headers são suportadas em [Captures] (exemplo abaixo).
 Ordem: resposta consumida/fechada, status, assertions na ordem escrita, capturas, resultado.
 Falha de header retorna 1, não publica capturas e impede próximo envio.
 Diagnóstico localizado distingue ausente de ""; valores de Authorization,
@@ -532,6 +533,23 @@ CLI substitui o mesmo nome YAML, preservando irmãos; objetos CLI continuam opac
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
+Capturas literais de headers — salve cache.hurl:
+  GET {{base_url}}/catalog
+  HTTP 200
+  [Captures]
+  catalog_etag: header "ETag"
+  GET {{base_url}}/catalog
+  If-None-Match: {{catalog_etag}}
+  HTTP 304
+  httpgo test cache.hurl --var base_url=http://localhost:8080
+Nome literal sem distinguir caixa; primeira ocorrência, sem juntar ou dividir vírgulas.
+Preserva string e aspas, mesmo com números/JSON/placeholders; vazio é string vazia.
+Ausente: erro de captura 2. Somente resposta final completa, após status/assertions.
+Lotes header/JSONPath são atômicos, sem sobrescrita. Header isolado não retém body.
+Authorization, Proxy-Authorization, Cookie e Set-Cookie marcam a captura como secreta
+na sessão, inclusive em composição posterior; --secret continua acumulando proteção.
+Sem filtros/seletores/regex. Não há cookie jar: capturar Set-Cookie não cria Cookie
+nem extrai atributos; essa extração pertence à US-25. Diferenças Hurl em docs/compatibility.md.
 Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo com --render-files):
   POST {{base_url}}/auth/login
   {"username":"{{username}}","password":"{{password}}"}
