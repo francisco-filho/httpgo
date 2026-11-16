@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-16 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34, #36 e #38)
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 e US-21 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34, #36, #38 e #40)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -60,8 +60,11 @@ Diagnósticos localizados identificam operador e esperado protegido, nunca body
 ou fragmentos recebidos. Captura secreta pendente oculta o esperado sem antecipar
 sua avaliação. Busca literal não detecta todas as codificações de dados sensíveis.
 Regex de body, filtros, outros predicados e interpolação de esperados não são suportados.
-A evidência diferencial e classificação de compatibilidade serão publicadas no
-fechamento da história; aceitar sintaxe não implica equivalência integral ao Hurl.
+Os 19 pares `body_*` confrontados com Hurl 8.0.0 são publicados em
+[compatibilidade](compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
+ISO-8859-1 resolve para windows-1252 (incluindo byte 0x80 → €), conforme esse
+corpus. Rótulos não confrontados não têm equivalência geral anunciada.
+Aceitar sintaxe não implica equivalência integral ao Hurl.
 
 ### Upload multipart básico — US-20 (issue #24)
 
@@ -786,6 +789,8 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
   null ou estrutura. `ausente` difere de `null` e `""`. Nunca despeja o body,
   documento inteiro não selecionado ou coleção de headers. O resultado/callback
   não guarda body, documento decodificado ou literal esperado bruto.
+  Assertions de body seguem a mesma ordem e proteção (seção US-21), com texto
+  decodificado separadamente e sob demanda; erro de charset é avaliação de body (2).
 - Segredos marcados, capturas anteriores secretas e derivados/escapes conhecidos
   são removidos de consulta, posição e operandos antes da coleção/formatação.
   Se houver **captura secreta pendente na mesma resposta**, esperado e real de
@@ -875,9 +880,9 @@ da referência. A semântica aprovada não é alterada para forçar equivalênci
   porta efetiva numérica (80 para HTTP e 443 para HTTPS, quando omitida).
   Não se usa DNS para equiparar hosts: localhost não equivale a 127.0.0.1.
   Mudar scheme/host/porta é erro de transporte, sem contato ao destino proibido.
-- Bodies intermediários e respostas sem capturas/assertions JSON são consumidos
+- Bodies intermediários e respostas sem capturas/assertions JSON ou body são consumidos
   em streaming, sem retenção. Somente o body final de entrada com capturas ou
-  assertions JSON é lido em memória, sob o mesmo prazo, e fechado antes de avaliar
+  assertions JSON/body é lido em memória, sob o mesmo prazo, e fechado antes de avaliar
   o status final. Headers isolados continuam sem retenção. Bytes e documento
   decodificado não ficam acumulados nos resultados; memória adicional acompanha
   o body final e suas estruturas.
@@ -964,8 +969,8 @@ classificação: `status validado`, `sem validação de status`, `status aceito 
 `erro de avaliação JSON` ou `erro de transporte`; uma entrada que falha antes do envio recebe
 `erro de renderização`. Em sucesso, inclusive sem expectativa, a linha começa
 diretamente com o método, sem prefixo de arquivo/linha/coluna. Apenas divergências
-e erros de transporte/renderização/captura/headers/JSON incluem esse prefixo.
-A falha de header/JSON aponta à declaração da assertion. Divergências mostram esperado e
+e erros de transporte/renderização/captura/headers/JSON/body incluem esse prefixo.
+A falha de header/JSON/body aponta à declaração da assertion. Divergências mostram esperado e
 recebido. Falha de transporte não inventa status. `erro de captura` mostra o status
 real concluído e se ele foi validado; o diagnóstico em stderr localiza a declaração/consulta.
 
@@ -1036,8 +1041,8 @@ brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 | Exit code | Significado |
 |---|---|
 | 0 | todos os arquivos concluídos sem falha/erro; inclui requisições sem expectativa |
-| 1 | pelo menos uma divergência de status ou assertion de header/JSON, sem erros de categoria 2 |
-| 2 | uso, configuração, arquivo, parsing, avaliação JSON, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
+| 1 | pelo menos uma divergência de status ou assertion de header/JSON/body, sem erros de categoria 2 |
+| 2 | uso, configuração, arquivo, parsing, avaliação JSON/body, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
 Na suíte, **2 prevalece sobre 1**. Erro ao escrever stdout/stderr também é
 categoria 2; não transforma divergência em sucesso. Falha/short write em resultado,

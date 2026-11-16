@@ -59,6 +59,10 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, expression := range []string{`contains ""`, `not contains "passwordHash"`, `contains "{{literal}}\n雪"`, `contains unquoted`, `contains "x" "extra"`, `not`, `matches "x"`, `not exists`} {
+		f.Add("GET http://example.test/first\r\nHTTP 200\r\nGET http://example.test/late\r\nHTTP *\r\n[Asserts]\r\n  body " + expression)
+	}
+	f.Add("GET http://example.test\nHTTP *\n[Asserts]\nheader \"X\" exists\nbody contains \"customer\"\njsonpath \"$.x\" == null\nbody not contains \"passwordHash\"\n[Captures]\ntoken: jsonpath \"$.token\"")
 	for _, expression := range []string{`exists`, `exists null`, `count == 0`, `count >= 1e99999999999999999999999`, `count < 999999999999999999999999999`, `count == -1`, `count == 0.5`, `count count == 1`, `> -1.2500`, `<= -0.0e999999999999999999999`, `> "1"`, `> {{expected}}`} {
 		f.Add("GET http://example.test/first\r\nGET http://example.test/late\r\nHTTP *\r\n[Asserts]\r\n  jsonpath \"$.items[0]\" " + expression)
 	}

@@ -1,4 +1,84 @@
-# Validação — US-01 a US-16 e US-20
+# Validação — US-01 a US-16, US-20 e US-21
+
+## US-21 — issue #40 / história 0021
+
+Plano/arquitetura/tasks da issue #40 executados sem planner, somente backend,
+na ordem da fila 0021: `back:1` no commit `5ebb1da` (fatia textual completa),
+`back:2` no commit `94f857a` (segurança/recursos) e `back:3` nesta alteração
+(corpus, ajuda, documentação e gates). Sem frontend/estáticos, fonte Hurl,
+mudança de transporte de produção, versão Go ou configuração de CI/lint.
+A dependência nova autorizada pelo plano é `golang.org/x/text v0.44.0`, isolada
+em `query`; `go mod tidy` executado. YAML `v3.0.6` e módulo preservados.
+SonarQube não executado: é exclusivo do QA. Evidências locais não substituem
+aprovação pelo gate de revisão.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`. Ferramentas existentes `goimports` e
+`golangci-lint` expostas por `/home/ff/go/bin` no PATH. Hurl local era 8.0.1;
+após autorização explícita do usuário, foi baixado somente o binário oficial
+**Hurl 8.0.0** (release Orange-OpenSource/hurl), extraído em
+`/tmp/httpgo-0021-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` e anteposto ao PATH
+apenas para o diferencial. SHA-256 conferido com o publicado:
+`6ab1d6703b94086ece6d2f994d73f8d215926997b292ba29b894799425afbf67`.
+Nenhuma instalação global/substituição do Hurl local; aviso de metadados libcurl
+não impediu a execução. Não foi consultado código-fonte Hurl.
+
+- Task 1: `go test ./internal/parser ./internal/query ./internal/assertion
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` passaram antes do commit.
+- Task 2: `go test ./internal/runner ./internal/cli ./internal/transport` e
+  `go test ./tests/e2e -count=1` passaram; `make fmt lint test`, `go vet ./...` e
+  `go build ./...` também passaram antes do commit. Transporte de produção intacto.
+- Task 3: novos pares executados com
+  `go test -tags compatibility ./tests/e2e -run '^TestCompatibility$/^body_' -count=1 -v`;
+  os **19 pares** passaram sem atualizar goldens. `TestCompatibilityBodyFixture`
+  também passou, comprovando bytes inválidos, vazio explícito, ausência/JSON legado
+  e preservação do Content-Type/charset configurado.
+- `make compatibility` passou com **158 pares**, Hurl **8.0.0**, sem skip e sem
+  regenerar as **139 observações anteriores**. Inclusão intencional dos 19 novos
+  pares em `testdata/compatibility/` amplia o contrato publicado.
+- A revisão local da conversão identificou uma fronteira de RN-02: reencodificar
+  todo o body para validar U+FFFD rejeitaria bytes GB18030 válidos não canônicos
+  próximos ao caractere. `query` passou a verificar somente a sequência original
+  de U+FFFD. Regressões positivas/negativas e par `body_gb18030_replacement`
+  passaram contra Hurl 8.0.0, sem afrouxar rejeição de bytes inválidos.
+- Gate integrado: `make fmt lint test`, `go vet ./...`, `go build ./...` e
+  `make e2e` passaram. Lint **0 issues**; testes com **race e cobertura**.
+  Cobertura observada: assertion **92,7%**, parser **96,2%**, query **95,6%**,
+  runner **93,2%**, CLI **97,1%**, transport **90,4%**, suite **95,4%**.
+  E2E usa build único do binário, servidor HTTP local em porta dinâmica,
+  stdout/stderr e exit codes; não depende de dummy/8080.
+- Fuzzing: seeds do parser ampliados com body válido/inválido, LF/CRLF e ordem
+  mista. Passaram os três comandos com `-fuzztime=20s -parallel=2`:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$'` (**53.590 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$'` (**71.412 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$'` (**212.495 execuções**).
+  Sem crash/corpus de falha. As contagens descrevem apenas esta execução.
+- `gofmt -l` dos arquivos Go alterados e `git diff --check` sem apontamentos.
+  Links locais novos e fixtures referenciados conferidos.
+- Não executados builds cruzados ou testes nativos macOS/Windows: opcionais nesta
+  história conforme plano v4, sem anunciar evidência inexistente.
+
+### Rastreabilidade dos cenários
+
+| GO | Evidência efetivamente executada |
+|---|---|
+| GO-226 | `TestBodyAssertionOrder`, `TestBodyCLI`, `TestBodyByBinary`, `TestBodyPublishedDemo`: demonstração, ambos os textos proibidos, códigos e próximo envio |
+| GO-227 | `TestBodyLiteralSubstring`, `TestBodyExpectedNeverRenders`, `TestBodyByBinary`, par `body_json_original`: texto não JSON, escapes/whitespace originais e placeholders literais definidos/ausentes |
+| GO-228 | Tabelas `TestBodyLiteralSubstring` e `TestBodyByBinary`; pares `body_case`, `body_spaces`, `body_newline`, `body_unicode_form` |
+| GO-229 | Mesmas tabelas e quatro pares `body_empty_*`: todas as combinações de body/esperado vazios e não vazios |
+| GO-230 | `TestBodyText`, `TestBodyByBinary`, pares UTF-8 omitido/declarado, ISO-8859-1 e UTF-16LE, incluindo U+FFFD válido |
+| GO-231 | `TestBodyText`, `TestBodyAssertionOrder`, `TestBodyCLI`, `TestBodyByBinary`: charset desconhecido e sequências inválidas/truncadas, negação/esperado vazio não aprovados |
+| GO-232 | `TestBodyAssertions`, `TestInvalidBodyAssertions`, `TestBodyInvalidLateByBinary`: literal obrigatório, operando extra, predicado fora do recorte, sem HTTP e zero contatos; LF/CRLF/indentação |
+| GO-233 | `TestBodyAssertionOrder`: status, header, body e JSON intercalados; primeiro erro/falha prevalece, HTTP *, capturas só após sucesso |
+| GO-234 | `TestBodyReportsNeverRetainOperationalData`, `TestPendingSecretConcealsAssertionsAndMetadata`, `TestBodySecretsAndPendingCapturesCLI`, `TestBodySecretExpectedByBinary`: conhecidos/derivados/pendentes, captura que falharia não antecipada, callbacks/coleção/streams sem body ou segredos |
+| GO-235 | 19 pares `body_*`, corpus legado completo, `TestBodyHelp`, `TestBodyPublishedDemo`, ajuda/README/subset/arquitetura/matriz e fuzzing |
+| GO-236 | `TestBodyFinalResponseAndConsumptionCancellation`, `TestBodyFinalResponseAndIncompleteByBinary` e retenção de headers já coberta em `TestHeaderPrecedenceAndPublication`: somente charset/texto finais, body exclusivo retido, header isolado sem retenção |
+| GO-237 | `TestBodyAssertionsRequireReadAndClose`, `TestBodyFinalResponseAndConsumptionCancellation`, `TestBodyFinalResponseAndIncompleteByBinary`, `TestBodyConsumptionRealCancellation`: leitura/fechamento, prazo, cancelamento real durante consumo, sem aprovação parcial ou próximos envios |
+| GO-238 | `TestBodyCallbackFailurePreservesResultsAndStops`, `TestBodyWriterFailureOverridesAllOutcomes`, `TestBodyRealOutputFailure`: aprovação/divergência/erro textual, callback/erro/short write, prioridade 2, sem repetir writer nem avançar |
+| GO-239 | `TestBodyReportsNeverRetainOperationalData`, `TestBodyScenarioAndSessionsAreIndependent`, `TestBodyAssertionOrder`: cenário imutável, remoção de literais/bytes operacionais antes dos relatórios, sessões novas, capturas após todas as assertions aprovadas |
+
 
 ## US-16 — issue #38 / história 0016
 

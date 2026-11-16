@@ -1,4 +1,46 @@
-# Matriz de compatibilidade — US-01 a US-16 e US-20
+# Matriz de compatibilidade — US-01 a US-16, US-20 e US-21
+
+## Ampliação US-21 — busca textual no body (issue #40)
+
+**Ampliação intencional do contrato:** `body contains "trecho"` e
+`body not contains "trecho"` deixam de ser rejeitados em `[Asserts]`, exigindo
+`HTTP` e esperado literal. Regex e outros operadores de body continuam não
+suportados. São **19 novos pares `body_*`**, total **158**; os **139 pares
+anteriores permanecem inalterados**, sem regeneração de observações.
+
+O harness ganhou `response_body` opcional (base64 JSON de bytes), distinguindo
+configuração ausente de body vazio, preservando `response_json`, `Content-Type`
+explícito e sessões/árvores de fixtures independentes entre executáveis.
+A tabela registra execução real em Linux contra **Hurl 8.0.0**; paths são os
+mesmos em ambos, salvo menção contrária. Não compara texto de mensagens ou afirma
+compatibilidade de charsets não confrontados.
+
+| Par `body_*` | HTTPGo | Hurl 8.0.0 | Classificação / observação |
+|---|---|---|---|
+| `demo` | 0; /capture → /health | 0; mesmos paths | compartilhado: presença e ausência no body final |
+| `forbidden` | 1; /capture | 4; mesmo path | condição falsa interrompe; códigos próprios |
+| `empty_contains`, `empty_absent` | 0; /capture → /health | 0; mesmos paths | vazio contém `""` e exclui texto não vazio |
+| `empty_not_contains`, `empty_missing` | 1; /capture | 4; mesmo path | vazio não exclui `""` nem contém texto não vazio |
+| `case`, `spaces`, `unicode_form` | 1; /capture | 4; mesmo path | sem normalização de caixa, espaços ou Unicode |
+| `newline` | 0; /capture → /health | 0; mesmos paths | quebra de linha literal preservada |
+| `json_original` | 0; /capture → /health | 0; mesmos paths | busca escape recebido, não JSON reserializado |
+| `utf8`, `utf8_declared` | 0; /capture → /health | 0; mesmos paths | UTF-8 omitido/declarado, incluindo U+FFFD originalmente válido |
+| `latin1` | 0; /capture → /health | 0; mesmos paths | rótulo ISO-8859-1 usa windows-1252, incluindo byte 0x80 → € |
+| `utf16le` | 0; /capture → /health | 0; mesmos paths | UTF-16LE com U+FFFD válido |
+| `gb18030_replacement` | 0; /capture → /health | 0; mesmos paths | U+FFFD válido ao lado de bytes alternativos válidos de GB18030; não exige reencodificar os demais caracteres |
+| `invalid_utf8`, `truncated_utf16`, `unknown_charset` | 2; /capture | 4; mesmo path | erro textual controlado aqui; bytes ilegíveis não provam ausência, nem em body vazio |
+
+**Diferenças e limites explícitos:** códigos 0/1/2 são do HTTPGo; falha do Hurl
+nesses pares é 4. Esperados HTTPGo nunca interpolam; não há opt-in nessa entrega.
+Status → assertions na ordem escrita → capturas continua sendo a política local,
+sem prometer a ordem de captura do Hurl. Rótulos resolvidos pelo índice web de
+`golang.org/x/text v0.44.0`, sem sniffing HTML, fallback após erro ou normalização.
+O corpus prova apenas os rótulos/conversões listados, não todos os encodings.
+Busca literal não garante detectar representações alternativas do mesmo segredo.
+Segurança de callback/coleção/streams, cancelamento, leitura/fechamento, erro de
+saída e cenário imutável têm regressões próprias `TestBody*`, sem expor payloads
+sensíveis no diferencial. YAML e renderização de arquivos continuam extensões
+HTTPGo; esta história não adiciona extensão de gramática para body.
 
 ## Contrato de suíte — US-16 (issue #38)
 

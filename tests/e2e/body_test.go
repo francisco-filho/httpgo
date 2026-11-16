@@ -60,6 +60,26 @@ func TestBodyByBinary(t *testing.T) {
 	}
 }
 
+func TestBodyPublishedDemo(t *testing.T) {
+	data, err := os.ReadFile("../../testdata/scenarios/scenario_assert_body.hurl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{"customer", "customer passwordHash", "customer trackingToken"} {
+		var hits atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); _, _ = io.WriteString(w, body) }))
+		code, out, stderr := run(t, "test", scenario(t, string(data)+"\nGET {{base_url}}/never"), "--var", "base_url="+server.URL)
+		server.Close()
+		wantCode, wantHits := 0, int32(2)
+		if body != "customer" {
+			wantCode, wantHits = 1, 1
+		}
+		if code != wantCode || hits.Load() != wantHits {
+			t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
+		}
+	}
+}
+
 func TestBodyInvalidLateByBinary(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))

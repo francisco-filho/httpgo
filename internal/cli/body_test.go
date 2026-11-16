@@ -9,6 +9,23 @@ import (
 	"capimgrosso.com/httpgo/internal/runner"
 )
 
+func TestBodyHelp(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
+		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
+			t.Fatal("help executed HTTP")
+			return runner.Response{}, nil
+		}), args...)
+		if code != 0 || stderr != "" {
+			t.Fatalf("code=%d err=%s", code, stderr)
+		}
+		for _, want := range []string{`body contains "customer"`, `body not contains "passwordHash"`, `body not contains "trackingToken"`, `not contains "" sempre falha`, "erro de avaliação de body (2)", "sem reserializar JSON", "captura secreta pendente", "nunca body ou fragmentos recebidos", "sem opt-in de interpolação"} {
+			if !strings.Contains(out, want) {
+				t.Fatalf("help lacks %q", want)
+			}
+		}
+	}
+}
+
 func TestBodyCLI(t *testing.T) {
 	for _, tc := range []struct {
 		name, expression, body, contentType, diagnostic string
