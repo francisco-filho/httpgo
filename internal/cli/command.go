@@ -455,7 +455,9 @@ Assertions de headers: salve health.hurl e execute httpgo test health.hurl
   header "X-Request-Id" == "req-123"
 [Asserts] exige HTTP numérico ou HTTP *. Nomes ignoram caixa; valores não.
 Somente primeira ocorrência; não concatena nem separa vírgulas.
-Ausente falha nos três operadores; vazio existe e satisfaz == "".
+Ausente falha em ==, contains e exists; vazio existe e satisfaz == "".
+header "Set-Cookie" not contains "Domain" aprova ausência ou primeira ocorrência sem trecho.
+Header presente com not contains "" falha, inclusive vazio.
 contains "" passa para qualquer valor presente, inclusive vazio.
 Esperados são strings literais: {{nome}} não interpola, mesmo se definido.
 Sem regex, filtros ou outros operadores de assertion de header.
@@ -493,6 +495,28 @@ Diagnóstico: consulta, arquivo/linha/coluna, esperado/real tipados e sanitizado
 Captura secreta pendente na mesma resposta oculta integralmente os dois valores
 em falhas de headers/JSON/body, sem avaliar/publicar a captura antecipadamente.
 Proteção não detecta segredos arbitrários não marcados. Sem dumps de body/documento.
+Inclusão e ausência JSON/header: salve validation.hurl e execute
+  httpgo test validation.hurl --var base_url=http://localhost:8080
+  GET {{base_url}}/validation
+  HTTP 200
+  [Asserts]
+  jsonpath "$.codes" contains "REQUIRED"
+  jsonpath "$.codes" not contains "OTHER_TENANT"
+  jsonpath "$.passwordHash" not exists
+  header "Set-Cookie" not contains "Domain"
+Resposta exemplo: {"codes":["REQUIRED","INVALID"],"name":"Pizza"}; cookie sem Domain.
+contains/not contains exigem literal escalar JSON: string, número, booleano ou null.
+String busca substring literal, distinguindo caixa, sem normalizar espaços/Unicode;
+nessa busca somente esperado string é aplicável. Array busca elemento direto tipado,
+com igualdade numérica exata, sem JSON textual, coerção ou busca recursiva.
+Array vazio não contém escalar; toda string contém "", inclusive vazia.
+Ausência aprova not exists e not contains. null, vazios, false e zero presentes existem.
+Tipo presente incompatível falha com 1 em ambos os sentidos de pertencimento.
+JSON inválido/percurso incompatível/transporte nunca vira sucesso por negação: 2.
+not exists não aceita operando. Consultas e esperados permanecem estáticos/literais.
+Sem negação genérica, header not exists, count contains, filtros ou wildcards novos.
+Falhas mostram presença/tipo e esperado protegido, nunca arrays/objetos selecionados.
+Primeira falha impede capturas/envios; sintaxe inválida tardia impede todo HTTP.
 Estrutura, quantidade e limites:
   GET {{base_url}}/products
   HTTP 200

@@ -1,0 +1,22 @@
+{
+  "response_json": "invalid",
+  "classification": "shared behavior; HTTPGo failure codes are 1/2, Hurl assertion failure is 4",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "forbidden"
+    }
+  ]
+}

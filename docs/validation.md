@@ -1,4 +1,81 @@
-# Validação — US-01 a US-16, US-20, US-21 e US-22
+# Validação — US-01 a US-16, US-20 a US-23
+
+## US-23 — issue #44 / história 0023
+
+Plano/arquitetura/tasks da issue #44 executados sem planner, somente backend,
+na ordem da fila 0023: `back:1` no commit `bbe82de` (predicados delimitados,
+proteção e testes ponta a ponta), `back:2` no commit `8df0444` (regressões de
+recursos, proteção e isolamento), `back:3` nesta alteração (corpus, ajuda,
+documentação e validação integrada). Sem frontend/estáticos, dependências novas,
+aumento de Go, alteração de CI/lint ou transporte de produção. `internal/query`
+permanece intacto. Nenhuma fonte Hurl foi consultada/copiada/adaptada.
+Os gates locais não substituem o review; SonarQube não foi executado pelo backdev.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`. Ferramentas existentes `goimports` e
+`golangci-lint` expostas por `/home/ff/go/bin` no PATH. Hurl **8.0.0** existente
+em `/tmp/httpgo-0021-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` selecionado pelo
+PATH do diferencial; Hurl padrão 8.0.1 não foi substituído. Nenhuma ferramenta
+foi instalada. Aviso local de metadados da libcurl não impediu execução.
+
+- Task 1: passaram `go test ./internal/parser ./internal/query ./internal/assertion
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test` e `go vet ./...` antes do commit.
+- Task 2: passaram `go test ./internal/runner ./internal/cli ./internal/transport`,
+  `go test ./tests/e2e -count=1`, `make fmt lint test` e `go vet ./...`
+  antes do commit. Recursos testados com fakes de leitura/close e HTTP local,
+  sincronização por canais/contextos, sem sleeps, retries ou serviço externo.
+- Task 3: **37 pares novos** `membership_*` confrontados com Hurl **8.0.0**.
+  Observações novas corrigidas pontualmente após execução real: header repetido
+  negado segue pertencimento em lista no Hurl; `numbers` usa `123.0` para isolar
+  decimais, mantendo `exponent` como divergência de gramática. O gate
+  `make compatibility` passou com **213 pares**, sem skip ou update. Nenhum dos
+  **176 pares anteriores** foi alterado/regenerado; harness não foi ampliado.
+- Gate integrado: passaram `make compatibility`, `make fmt lint test`,
+  `go vet ./...`, `go build ./...` e `make e2e`. Lint **0 issues**;
+  `make test` executa todos os pacotes com **race e cobertura**. Cobertura:
+  assertion **94,2%**, parser **96,6%**, query **95,6%**, runner **93,4%**,
+  CLI **97,5%**, transport **90,4%**, template **95,7%**, config **96,0%**,
+  suite **95,4%**. E2E reutiliza build único e `exec.CommandContext` contra
+  servidores locais, verificando stdout, stderr, exit codes e envios reais.
+- Seeds do parser ampliados para predicados novos, LF/CRLF, tipos e formas
+  inválidas/não suportadas. Passaram, sem crash:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**32.547 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**33.282 execuções**) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**26.061 execuções**). Contagens descrevem somente esta rodada, não uma meta.
+- `gofmt -l` dos arquivos Go da história e `git diff --check` sem apontamentos;
+  links locais de README/subset/architecture/compatibility/validation conferidos.
+  Exemplo publicado e ajuda root/test exercitados por binário real.
+- Cross-builds e execução nativa macOS/Windows não realizados: opcionais conforme
+  plano v4, não bloqueios desta história. Corpus sintético não é homologação da
+  suíte real nem prova de equivalência geral de segurança/gramática com Hurl.
+
+### Rastreabilidade GO-255–GO-271
+
+| GO | Evidência executada |
+|---|---|
+| GO-255 | runner `TestMembershipDemonstration`, E2E `TestMembershipDemonstrationByBinary` e `TestMembershipHelpAndPublishedExample`: demonstração/alterações 0/1, sem captura/envio posterior em falha |
+| GO-256 | assertion `TestJSONMembership`, runner `TestMembershipLiteralAndHeaderSelection`, par `literal`, E2E `TestMembershipByBinary`: caixa, espaços, escapes, Unicode e placeholders estáticos |
+| GO-257 | assertion `TestJSONMembership`, E2E `TestMembershipByBinary`, pares `typed`, `numeric_string`, `nonrecursive`: pertencimento escalar tipado, null e sem recursão |
+| GO-258 | `TestJSONMembership`, `TestMembershipByBinary`, pares `numbers`, `precision`, `exponent`: números equivalentes/distintos, zero, decimais e expoentes sem expansão |
+| GO-259 | `TestJSONNotExists`, runner `TestMembershipOrderAndPresence`, E2E `TestMembershipByBinary`, pares `missing`, `index_missing`, `null_present`, `root_present`: ausência distinta de presença |
+| GO-260 | `TestJSONMembership`, `TestMembershipOrderAndPresence`, `TestMembershipCLI`, cinco pares `incompatible_*`: incompatibilidade não invertida em aprovação |
+| GO-261 | `TestJSONMembership`, `TestMembershipByBinary`, pares `empty_array`, `empty_substring`, `empty_element`: fronteiras de vazio |
+| GO-262 | `TestHeaderNotContains`, `TestMembershipLiteralAndHeaderSelection`, pares `header_*`: nome sem caixa, primeira ocorrência, ausente/vazio/vírgula |
+| GO-263 | parser `TestMembershipInvalidLate`, CLI `TestMembershipInvalidCLINeverSends`, E2E `TestMembershipInvalidNeverSends` e `TestMembershipStructuralCorpusByBinary`, sete negativos versionados: erro tardio impede todo HTTP, inclusive LF/CRLF |
+| GO-264 | `TestMembershipOrderAndPresence`, `TestMembershipDemonstration`, pares `header_first_order`, `json_first_order`: status/assertions/capturas e primeira falha preservados, inclusive HTTP * |
+| GO-265 | `TestMembershipOrderAndPresence`, `TestMembershipCLI`, `TestMembershipByBinary`, par `traversal`: vazio/malformado/adicional/percurso incompatível são 2, nunca ausência |
+| GO-266 | `TestMembershipSafeFailures`, `TestMembershipDerivedSecretsAndPendingMetadata`, `TestMembershipSecretOperandsCLI`: arrays/objetos e headers sensíveis não vazam; operandos/metadados conhecidos/derivados e captura pendente protegidos, sem avaliar captura falha |
+| GO-267 | 37 novos pares e 213 totais em `TestCompatibility`, `TestMembershipHelpAndPublishedExample`, matriz explícita em `compatibility.md`, exemplo em README/subset e arquitetura |
+| GO-268 | transport `TestMembershipFinalResponseAndCancellation`, `TestMembershipRequiresCompleteClosedResponse`, E2E `TestMembershipFinalAndIncompleteByBinary`: somente final completa; header isolado descarta body sem exigir JSON |
+| GO-269 | mesmos testes de transporte nos modos read/close/timeout/cancel/incomplete; E2E timeout/incomplete: erro 2, zero concluídas, sem captura/envio extra/retry |
+| GO-270 | `TestMembershipCallbackFailurePreservesEarlierResults`, CLI `TestMembershipWriterFailureOverridesAllOutcomes`, E2E Linux `TestMembershipRealOutputFailure`: write/short write prioritário, sem reimpressão/envio seguinte e contagens anteriores preservadas |
+| GO-271 | `TestMembershipSessionsAndReportsStayIndependent`, `TestMembershipDerivedSecretsAndPendingMetadata`, callbacks de segurança: cenário/contexto reutilizáveis, sessão nova, sem documento/coleção/esperado bruto em relatório |
+
 
 ## US-22 — issue #42 / história 0022
 

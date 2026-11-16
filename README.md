@@ -3,6 +3,55 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Validar inclusão e ausência (US-23 / issue #44)
+
+Salve `validation.hurl` e execute
+`bin/httpgo test validation.hurl --var base_url=http://localhost:8080`:
+
+```hurl
+GET {{base_url}}/validation
+HTTP 200
+[Asserts]
+jsonpath "$.codes" contains "REQUIRED"
+jsonpath "$.codes" not contains "OTHER_TENANT"
+jsonpath "$.passwordHash" not exists
+header "Set-Cookie" not contains "Domain"
+```
+
+Com `{"codes":["REQUIRED","INVALID"],"name":"Pizza"}` e cookie sem `Domain`,
+retorna **0**. Retirar `REQUIRED`, incluir `OTHER_TENANT`, devolver `passwordHash`
+(mesmo `null`) ou incluir `Domain` na primeira ocorrência do header retorna **1**,
+sem capturas nem próximo envio. Exemplo executável versionado em
+[`scenario_assert_membership.hurl`](testdata/scenarios/scenario_assert_membership.hurl).
+`/validation` é um contrato sintético dos testes locais, não endpoint do dummy
+nem homologação de uma suíte real.
+
+- Strings buscam substring literal, com caixa/whitespace/Unicode preservados;
+  somente esperado string é aplicável. Arrays buscam um elemento **direto**, por
+  tipo e valor: número não é string numérica. Esperados são escalares JSON;
+  números usam igualdade exata, sem float64 ou expansão de expoentes.
+- Ausência aprova `not exists` e `not contains`; `null` presente não é ausência.
+  Vazios, false e zero também existem. Tipo incompatível falha com **1** nos
+  dois sentidos de pertencimento. Array vazio não contém escalar algum;
+  toda string contém `""`, logo `not contains ""` falha em string presente.
+- Headers ignoram caixa do nome e consultam apenas a primeira ocorrência,
+  sem concatenar valores. `not contains` aprova header ausente; presente vazio
+  contém `""`. `Set-Cookie` e demais headers sensíveis continuam ocultos.
+- Consultas/esperados são estáticos; `{{nome}}` em string é literal.
+  Não há negação genérica, `header not exists`, `count contains`, busca
+  recursiva, wildcards ou filtros novos. Sintaxe inválida tardia impede todos
+  os envios. JSON inválido, percurso incompatível e falha de execução são **2**,
+  nunca aprovação por negação. Ordem e publicação de capturas são preservadas.
+- Falhas localizadas mostram presença/tipo e esperado escalar protegido, não a
+  coleção selecionada. Captura secreta pendente oculta operandos sem antecipá-la;
+  segredos arbitrários não marcados não são detectados universalmente.
+
+Os **37 pares `membership_*`** foram confrontados com Hurl **8.0.0**: diferenças
+intencionais de headers repetidos (lista versus primeira ocorrência), literais,
+expoentes e percurso estão em [compatibilidade](docs/compatibility.md#inclusão-e-ausência--us-23--issue-44).
+YAML hierárquico e interpolação de arquivos externos continuam extensões HTTPGo;
+esta história não altera esses contratos.
+
 ## Detectar conteúdo proibido na resposta (US-21 / issue #40)
 
 Salve `privacy.hurl` e execute
@@ -772,13 +821,14 @@ Esta é uma **ampliação intencional**: `[Asserts]`, antes rejeitada globalment
 passou a aceitar essas três formas, com strings literais entre aspas duplas.
 A US-08 acrescenta igualdade JSON na mesma lista ordenada (abaixo).
 Nomes são case-insensitive; igualdade e substring distinguem caixa dos valores.
-`{{nome}}` no esperado permanece literal, sem interpolação. Regex, filtros e
-outros operadores de assertion de header continuam não suportados. Capturas de
+`{{nome}}` no esperado permanece literal, sem interpolação. A US-23 acrescenta
+`not contains` (acima); regex, filtros e demais operadores continuam não suportados. Capturas de
 headers são suportadas separadamente em `[Captures]` desde a US-22.
 
 Só a primeira ocorrência de cada header participa da comparação, sem concatenar
-ou separar vírgulas. Ausência faz todos os operadores falharem; presente vazio
-satisfaz `exists` e `== ""`. `contains ""` passa em qualquer valor presente.
+ou separar vírgulas. Ausência faz `==`, `contains` e `exists` falharem, mas aprova
+`not contains`; presente vazio satisfaz `exists` e `== ""`.
+`contains ""` passa em qualquer valor presente; `not contains ""` falha.
 
 `[Asserts]` exige declaração `HTTP` na entrada. `HTTP *` é aceito com ou sem
 assertions/capturas e permite qualquer status, inclusive 404/503. Sua linha mostra

@@ -1,7 +1,7 @@
-# Arquitetura implementada — US-01 a US-16, US-20 e US-21
+# Arquitetura implementada — US-01 a US-16, US-20 a US-23
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
-#40 (US-21) e plano v4 referenciado nelas.
+#40 (US-21), #42 (US-22), #44 (US-23) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
 
@@ -68,6 +68,42 @@ rótulos/conversões de charset. O restante usa biblioteca padrão; `go.mod` pre
 `runner.Request/Response`, implementando o contrato consumer-owned sem camada
 adicional nem ciclo. Testes de integração podem montar `runner.New` com o adapter.
 Somente o código de produção em `transport` importa `net/http`.
+
+## Inclusão e ausência — US-23
+
+`parser/assertion.go` amplia os operadores existentes com `JSONContains`,
+`JSONNotContains`, `JSONNotExists` e `HeaderNotContains`. Combinações de `not`
+são fechadas, sem flag de negação genérica, AST, camada ou dependência nova.
+Valida escalar JSON esperado, string em header e ausência de operando em
+`not exists` no arquivo inteiro. Rejeita combinações com count e consultas
+ampliadas; esperado e consulta não passam pelo renderer.
+
+`query` permanece intacto: `Path.SelectValue` distingue seleção, presença e erro
+de percurso; `Header` consulta a primeira ocorrência sem distinguir caixa.
+`assertion/structure.go` separa ausência, aplicabilidade e condição. Ausência
+aprova as duas negações JSON; tipo presente incompatível falha em pertencimento
+nos dois sentidos. Strings usam `strings.Contains`; arrays comparam cada elemento
+direto com `JSONEqual`, preservando números exatos, sem JSON textual, busca
+recursiva, flatten ou índice. `not exists` olha só presença, inclusive para null.
+`assertion/header.go` permite ausência somente para `HeaderNotContains`.
+
+`JSONEvaluation.Actual` é nil para os novos predicados: não leva coleção/string
+selecionada à serialização de falha. `runner/assertions.go` produz `presente`
+para `not exists` e somente `tipo <tipo JSON>` para pertencimento, com esperado
+escalar sanitizado. Reutiliza `JSONFailure`, `HeaderFailure`, `JSONError`, outcomes
+e CLI sem formato novo ou reavaliação. `pendingSecret` oculta operandos antes de
+callback/coleção; `safeEntry` remove esperado bruto e plano de consulta sem mutar
+o cenário. Documento/arrays são locais à avaliação, nunca cache entre sessões.
+
+Decode JSON continua uma vez por resposta, sob demanda. Status → assertions
+na ordem escrita → capturas → callback síncrono permanece inalterado. As novas
+assertions JSON já acionam RetainBody; header isolado continua descartando body,
+mas somente após consumo/fechamento completo. Erro de decode/percurso é `2`,
+condição falsa é `1` e erro de apresentação tem prioridade `2`. Transporte,
+contexto/prazo único, redirects finais e ausência de retry não foram alterados.
+Sem cookie jar, `header not exists`, negação de igualdade/matches/count, wildcard,
+filtros ou antecipação das US-27/28. Corpus e diferenças observadas estão em
+[compatibility.md](compatibility.md#inclusão-e-ausência--us-23--issue-44).
 
 ## Texto do body — US-21
 
