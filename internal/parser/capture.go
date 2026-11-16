@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"strconv"
 	"strings"
 
 	"capimgrosso.com/httpgo/internal/query"
@@ -29,8 +28,14 @@ func parseCapture(text string, pos Position) (Capture, error) {
 	if len(quoted) < 2 || quoted[0] != '"' {
 		return fail("captura exige consulta jsonpath entre aspas")
 	}
-	source, err := strconv.Unquote(quoted)
-	if err != nil {
+	source, tail, valid := assertionString(quoted)
+	if !valid {
+		return fail("consulta de captura entre aspas inválida")
+	}
+	if suffix := strings.Fields(tail); len(suffix) > 0 {
+		if (tail[0] == ' ' || tail[0] == '\t') && suffix[0] == "count" {
+			return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "count em captura não suportado; use count em assertion"}
+		}
 		return fail("consulta de captura entre aspas inválida")
 	}
 	queryPos := pos

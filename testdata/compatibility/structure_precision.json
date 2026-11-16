@@ -1,0 +1,18 @@
+{
+  "response_json": "9007199254740993",
+  "classification": "ordem além de float64, sem arredondamento neste par",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

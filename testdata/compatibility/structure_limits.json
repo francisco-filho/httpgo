@@ -1,0 +1,18 @@
+{
+  "response_json": "{\"n\":-1.25,\"zero\":-0.0}",
+  "classification": "quatro comparadores, negativos, decimais e zero com sinal",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

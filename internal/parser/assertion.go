@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,8 @@ type Assertion struct {
 type JSONAssertion struct {
 	Query         string
 	Path          query.Path
+	Operator      assertion.JSONOperator
+	Count         bool
 	Expected      any
 	Position      Position
 	QueryPosition Position
@@ -63,18 +66,50 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 	if tail == "" || (tail[0] != ' ' && tail[0] != '\t') {
 		return fail(pos, "sintaxe inválida", "assertion exige operador separado por espaço")
 	}
-	fields := strings.Fields(tail)
+	rest = strings.TrimSpace(tail)
+	fields := strings.Fields(rest)
 	if len(fields) == 0 {
 		return fail(pos, "sintaxe inválida", "assertion exige operador")
 	}
-	if fields[0] != "==" {
-		return fail(pos, "construção não suportada", "operador ou filtro de assertion JSON não suportado; use ==")
+	declaration := JSONAssertion{Query: source, Path: path, Position: pos, QueryPosition: queryPos}
+	if fields[0] == "count" {
+		declaration.Count = true
+		rest = strings.TrimSpace(rest[len("count"):])
+		fields = strings.Fields(rest)
+		if len(fields) == 0 {
+			return fail(pos, "sintaxe inválida", "count exige comparador e quantidade")
+		}
 	}
-	expected, err := query.Decode([]byte(strings.TrimSpace(strings.TrimLeft(tail, " \t")[2:])))
+	declaration.Operator = assertion.JSONOperator(fields[0])
+	rest = strings.TrimSpace(rest[len(fields[0]):])
+	switch declaration.Operator {
+	case assertion.JSONExists:
+		if declaration.Count {
+			return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
+		}
+		if rest != "" {
+			return fail(pos, "sintaxe inválida", "exists não aceita valor esperado")
+		}
+		return declaration, nil
+	case assertion.JSONEqualOperator:
+	case assertion.JSONGreater, assertion.JSONGreaterEqual, assertion.JSONLess, assertion.JSONLessEqual:
+	default:
+		return fail(pos, "construção não suportada", "operador ou filtro de assertion JSON não suportado")
+	}
+	expected, err := query.Decode([]byte(rest))
 	if err != nil {
 		return fail(pos, "sintaxe inválida", "assertion exige um único literal JSON esperado válido")
 	}
-	return JSONAssertion{Query: source, Path: path, Expected: expected, Position: pos, QueryPosition: queryPos}, nil
+	if declaration.Count && !assertion.ValidCount(expected) {
+		return fail(pos, "sintaxe inválida", "count exige quantidade inteira não negativa")
+	}
+	if declaration.Operator != assertion.JSONEqualOperator {
+		if _, ok := expected.(json.Number); !ok {
+			return fail(pos, "sintaxe inválida", "comparação ordenada exige número JSON esperado")
+		}
+	}
+	declaration.Expected = expected
+	return declaration, nil
 }
 
 func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {

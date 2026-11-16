@@ -17,6 +17,9 @@ type JSONFailure struct {
 	Query            string
 	Expected, Actual string
 	Present          bool
+	Operator         assertion.JSONOperator
+	Count            bool
+	Detail           string
 }
 
 // JSONError is a controlled evaluation error, never a raw decoding cause.
@@ -61,7 +64,11 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 			if err != nil {
 				return fail(err.Error())
 			}
-			if present && assertion.JSONEqual(declaration.Expected, actual) {
+			evaluation, err := assertion.EvaluateJSON(declaration.Operator, declaration.Count, declaration.Expected, actual, present)
+			if err != nil {
+				return fail(err.Error())
+			}
+			if evaluation.Matched {
 				continue
 			}
 			expectedText, actualText := "[oculto]", "[oculto]"
@@ -70,13 +77,19 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 				if err != nil {
 					return fail("não foi possível representar o esperado JSON")
 				}
-				actualJSON, err := json.Marshal(actual)
+				actualJSON, err := json.Marshal(evaluation.Actual)
 				if err != nil {
 					return fail("não foi possível representar o valor JSON selecionado")
 				}
-				expectedText, actualText = session.Sanitize(string(expectedJSON)), session.Sanitize(string(actualJSON))
+				expectedText, actualText = string(expectedJSON), string(actualJSON)
+				if declaration.Operator == assertion.JSONExists {
+					expectedText, actualText = "presente", "presente"
+				} else if evaluation.Detail != "" {
+					actualText = "tipo " + assertion.JSONType(actual)
+				}
+				expectedText, actualText = session.Sanitize(expectedText), session.Sanitize(actualText)
 			}
-			current.JSONFailure = &JSONFailure{Position: pos, Query: session.Sanitize(declaration.Query), Expected: expectedText, Actual: actualText, Present: present}
+			current.JSONFailure = &JSONFailure{Position: pos, Query: session.Sanitize(declaration.Query), Expected: expectedText, Actual: actualText, Present: present, Operator: declaration.Operator, Count: declaration.Count, Detail: session.Sanitize(evaluation.Detail)}
 			current.Outcome = JSONMismatch
 			return nil
 		default:

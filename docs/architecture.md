@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-13 e US-20
+# Arquitetura implementada — US-01 a US-14 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -515,6 +515,42 @@ de produção. `headers_query_unsupported.json` muda intencionalmente de rejeiç
 para sucesso; os outros 78 pares antigos não mudam. Vinte e um novos pares
 `assert_json_*` classificam tipos, precisão, estruturas, ausência, literais,
 precedência e restrições frente ao Hurl 8.0.0; total 100. Veja `compatibility.md`.
+
+## Estrutura, quantidade e limites — US-14
+
+`parser.JSONAssertion` acrescenta `Operator assertion.JSONOperator` e `Count bool`.
+O parser valida `exists` sem esperado, count com os cinco comparadores/quantidade
+inteira não negativa e comparação direta ordenada com esperado `json.Number`.
+Usa os mesmos `query.Parse`/`Decode`, posições e lista ordenada; nunca interpola
+operandos. Construção desconhecida continua erro explícito antes da rede.
+`query.Path.SelectValue` e a API das capturas não mudam. Não há nova interface,
+pacote, dependência, I/O, goroutine ou alteração do transporte.
+
+`assertion.EvaluateJSON` decide presença, aplicabilidade de count e comparação.
+`exists` usa o indicador de presença, não o conteúdo (null presente existe).
+Count transforma somente arrays em `json.Number` com seu tamanho; não devolve a
+coleção no `JSONEvaluation`. `ValidCount` valida valor matematicamente inteiro
+não negativo sem limite de máquina (1.0/1e3 também são inteiros). A comparação
+exata compartilhada por igualdade/ordenação normaliza dígitos e expoente `big.Int`,
+compara sinal e magnitude, depois alinha apenas os dígitos significativos. Não
+expande potências: alocação limitada ao tamanho dos operandos, mesmo para expoentes
+maiores que inteiro de máquina.
+
+`runner.checkAssertions` mantém decode sob demanda e ordem status → lista →
+capturas. Ausência, tipo selecionado incompatível e condição falsa produzem
+`JSONMismatch` (1); JSON inválido/percurso incompatível mantêm `JSONFailed` (2).
+`JSONFailure` acrescenta operador, count e detalhe de tipo controlado. Count exibe
+a quantidade; tipo incompatível exibe apenas o nome do tipo, não seu conteúdo.
+Os valores/consulta/localização são sanitizados antes do callback/coleção;
+`pendingSecret` oculta inclusive contagens sem avaliar capturas. `safeEntry`
+continua removendo `Expected` e `Path`; os novos campos são só metadados sem
+operandos brutos. A CLI apenas formata operador/causa; não reavalia. `ReportErr`
+continua prioritário e o cenário original é preservado.
+
+Vinte novos pares `structure_*` reutilizam `response_json` e o harness existente,
+sem modificar as 116 observações anteriores. Null em exists foi confirmado
+contra o binário Hurl 8.0.0 antes de classificá-lo como compartilhado. Gramática,
+pré-validação e códigos distintos constam de `compatibility.md`.
 
 ## Rede e recursos
 

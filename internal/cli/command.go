@@ -217,7 +217,15 @@ func jsonDiagnostic(failure *runner.JSONFailure) string {
 	} else if failure.Actual == "[oculto]" {
 		actual = "[oculto] (ausente)"
 	}
-	return fmt.Sprintf("assertion jsonpath %q ==: esperado %s, recebido %s", failure.Query, failure.Expected, actual)
+	operator := string(failure.Operator)
+	if failure.Count {
+		operator = "count " + operator
+	}
+	diagnostic := fmt.Sprintf("assertion jsonpath %q %s: esperado %s, recebido %s", failure.Query, operator, failure.Expected, actual)
+	if failure.Detail != "" {
+		diagnostic += "; " + failure.Detail
+	}
+	return diagnostic
 }
 
 func headerDiagnostic(failure *runner.HeaderFailure) string {
@@ -416,7 +424,21 @@ Diagnóstico: consulta, arquivo/linha/coluna, esperado/real tipados e sanitizado
 Captura secreta pendente na mesma resposta oculta integralmente os dois valores
 em falhas de headers/JSON, sem avaliar/publicar a captura antecipadamente.
 Proteção não detecta segredos arbitrários não marcados. Sem dumps de body/documento.
-Sem count, exists JSON, comparações ordenadas, regex, filtros ou JSONPath ampliado.
+Estrutura, quantidade e limites:
+  GET {{base_url}}/products
+  HTTP 200
+  [Asserts]
+  jsonpath "$.items" count == 3
+  jsonpath "$.total" >= 1
+  jsonpath "$.items[0].id" exists
+jsonpath "$.items[0].id" exists: null, vazios, false e zero presentes existem.
+jsonpath "$.items" count == 3: conta somente arrays, inclusive vazio (zero).
+count aceita ==, >, >=, < e <=; esperado inteiro não negativo, sem limite de máquina.
+Ausência ou tipo não array falha com 1; diagnóstico de count não despeja o array.
+jsonpath "$.total" >= 1: >, >=, < e <= exigem números, sem coerção de strings.
+Negativos, decimais e expoentes com precisão exata, sem arredondar.
+Ausência/tipo incompatível/condição falsa: 1; esperado não numérico: sintaxe inválida (2).
+Sem count em strings/objetos/capturas, regex, filtros ou JSONPath ampliado.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
 pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
 

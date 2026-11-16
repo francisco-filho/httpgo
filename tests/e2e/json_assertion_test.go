@@ -168,7 +168,7 @@ func TestJSONInvalidLateNeverSendsByBinary(t *testing.T) {
 			t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
 		}
 	}
-	for _, name := range []string{"invalid_assert_json_literal.hurl", "unsupported_assert_json_operator.hurl", "unsupported_assert_json_filter.hurl", "unsupported_assert_query.hurl", "unsupported_assert_json_dynamic_query.hurl"} {
+	for _, name := range []string{"invalid_assert_json_literal.hurl", "unsupported_assert_json_operator.hurl", "unsupported_assert_json_filter.hurl", "unsupported_assert_query.hurl", "unsupported_assert_json_dynamic_query.hurl", "invalid_structure_count_negative.hurl", "invalid_structure_count_fractional.hurl", "invalid_structure_exists_operand.hurl", "invalid_structure_numeric_expected.hurl", "unsupported_capture_count.hurl"} {
 		data, err := os.ReadFile("../../testdata/scenarios/" + name)
 		if err != nil {
 			t.Fatal(err)

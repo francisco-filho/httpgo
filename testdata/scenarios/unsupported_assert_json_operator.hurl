@@ -3,4 +3,4 @@ HTTP 200
 GET http://localhost:8080/late
 HTTP *
 [Asserts]
-jsonpath "$" exists
+jsonpath "$" != null
