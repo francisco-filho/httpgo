@@ -35,6 +35,43 @@ Arquivo vazio/com só comentários, URL inválida, status inválido, expectativa
 órfã/duplicada e instrução desconhecida são erros de entrada. Nada do arquivo é
 enviado nesses casos, mesmo quando o erro aparece depois de GETs válidos.
 
+### Inclusão e ausência JSON/header — US-23 (issue #44)
+
+```hurl
+GET {{base_url}}/validation
+HTTP 200
+[Asserts]
+jsonpath "$.codes" contains "REQUIRED"
+jsonpath "$.codes" not contains "OTHER_TENANT"
+jsonpath "$.passwordHash" not exists
+header "Set-Cookie" not contains "Domain"
+```
+
+JSON `contains` e `not contains` aceitam esperado escalar literal (string,
+número, booleano ou `null`). Em strings, somente esperado string é aplicável:
+busca substring literal, distinguindo caixa, sem normalização de espaços ou
+Unicode. Arrays comparam elementos diretos por tipo e valor, com igualdade
+numérica exata, sem busca recursiva nem comparação de JSON textual.
+Array vazio não contém nenhum escalar; toda string contém `""`.
+Ausência aprova `not contains` e `not exists`; `null` presente não é ausência.
+Número, booleano, objeto ou `null` selecionados, ou string com esperado não
+string, falham com `1` nos dois sentidos de pertencimento.
+`not exists` não aceita operando e falha para qualquer valor presente,
+inclusive raiz, vazio, false e zero. Índice fora do array é ausência.
+JSON inválido e percurso incompatível (inclusive através de `null`) continuam
+sendo erros `2`, nunca sucesso por negação.
+
+Header `not contains` exige string literal e aprova ausência. Consulta ignora
+caixa do nome e usa somente a primeira ocorrência, sem concatenar ou dividir
+por vírgula. Valor presente vazio contém `""`, portanto sua negação falha.
+Consultas e esperados são estáticos: placeholders dentro de strings permanecem
+literais. Não há `header not exists`, negação genérica, operadores lógicos,
+`count contains`, wildcards ou filtros novos. Erro estático tardio impede todos
+os envios. Status e assertions mantêm a ordem existente, antes das capturas;
+a primeira falha interrompe o arquivo. Diagnósticos localizados mostram somente
+presença/tipo e esperado escalar protegido, nunca a coleção selecionada.
+Headers sensíveis e captura secreta pendente permanecem ocultos.
+
 ### Busca textual no body — US-21 (issue #40)
 
 ```hurl

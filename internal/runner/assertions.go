@@ -133,7 +133,13 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 					return fail("não foi possível representar o valor JSON selecionado")
 				}
 				expectedText, actualText = string(expectedJSON), string(actualJSON)
-				if declaration.Operator == assertion.JSONExists {
+				if declaration.Operator == assertion.JSONNotExists {
+					expectedText, actualText = "ausente", "presente"
+				} else if declaration.Operator == assertion.JSONContains || declaration.Operator == assertion.JSONNotContains {
+					// Evaluation deliberately discarded the selected collection. Report
+					// only its type, never marshal the response value for membership.
+					actualText = "tipo " + assertion.JSONType(actual)
+				} else if declaration.Operator == assertion.JSONExists {
 					expectedText, actualText = "presente", "presente"
 				} else if declaration.Operator == assertion.JSONMatches {
 					patternJSON, _ := json.Marshal(declaration.Pattern)
