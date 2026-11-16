@@ -49,10 +49,58 @@ func JSONEqual(expected, actual any) bool {
 	}
 }
 
-func equalNumber(a, b json.Number) bool {
+func equalNumber(a, b json.Number) bool { return compareNumber(a, b) == 0 }
+
+// compareNumber compares normalized decimals without expanding powers of ten.
+// The exponent can exceed machine integers; padding is bounded by input digits.
+func compareNumber(a, b json.Number) int {
 	ac, ae := decimal(a.String())
 	bc, be := decimal(b.String())
-	return ac == bc && ae.Cmp(be) == 0
+	if ac == "0" || bc == "0" {
+		switch {
+		case ac == bc:
+			return 0
+		case ac == "0":
+			if strings.HasPrefix(bc, "-") {
+				return 1
+			}
+			return -1
+		case strings.HasPrefix(ac, "-"):
+			return -1
+		default:
+			return 1
+		}
+	}
+	an, bn := strings.HasPrefix(ac, "-"), strings.HasPrefix(bc, "-")
+	if an != bn {
+		if an {
+			return -1
+		}
+		return 1
+	}
+	ac, bc = strings.TrimPrefix(ac, "-"), strings.TrimPrefix(bc, "-")
+	ae.Add(ae, big.NewInt(int64(len(ac))))
+	be.Add(be, big.NewInt(int64(len(bc))))
+	order := ae.Cmp(be)
+	if order == 0 {
+		length := max(len(ac), len(bc))
+		order = strings.Compare(ac+strings.Repeat("0", length-len(ac)), bc+strings.Repeat("0", length-len(bc)))
+	}
+	if an {
+		return -order
+	}
+	return order
+}
+
+// ValidCount accepts numeric values that are integral and nonnegative, without
+// imposing an integer-machine limit (including exact decimal/exponent forms).
+func ValidCount(value any) bool {
+	number, ok := value.(json.Number)
+	if !ok {
+		return false
+	}
+	digits, power := decimal(number.String())
+	return !strings.HasPrefix(digits, "-") && power.Sign() >= 0
 }
 
 // decimal normalizes valid JSON numbers into signed significant digits and a

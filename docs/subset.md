@@ -767,7 +767,22 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
   continua identificável junto à ocultação. Essa política não reconhece segredos
   arbitrários não marcados e não substitui os limites de segurança documentados.
 
-Continuam fora do recorte: `count`, `exists` JSON, comparações ordenadas, regex,
+### Presença e quantidade — US-14
+
+`jsonpath "$.id" exists` verifica presença: `null`, vazios, false e zero
+presentes existem. Propriedade ausente ou índice fora do array falha com 1.
+`jsonpath "$.items" count == 3` conta somente elementos do array selecionado,
+inclusive elementos null; array vazio tem zero elementos. Aceita comparadores
+`==`, `>`, `>=`, `<` e `<=`. O esperado é um número JSON inteiro não negativo,
+sem limite de inteiro de máquina; representações exatas como `1.0` e `1e3`
+são aceitas. Quantidade negativa/fracionária ou operando em `exists` é sintaxe
+inválida (2) antes de qualquer envio do arquivo. Ausência ou tipo não array
+falha com 1, sem contar strings/objetos implicitamente. A divergência exibe a
+quantidade, nunca o array completo. Percurso incompatível/JSON inválido mantém
+erro de avaliação 2. Ordem, proteção de segredos e capturas seguem as regras acima;
+captura secreta pendente oculta inclusive as contagens.
+
+Continuam fora do recorte: comparações diretas ordenadas, regex,
 filtros e interpolação de consultas ou esperados. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. A semântica aprovada não é alterada para forçar equivalência.
