@@ -49,13 +49,16 @@ func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, prese
 	case JSONEqualOperator:
 		result.Matched = present && JSONEqual(expected, actual)
 	case JSONGreater, JSONGreaterEqual, JSONLess, JSONLessEqual:
-		if !count {
-			return JSONEvaluation{}, fmt.Errorf("comparador JSON direto não suportado")
+		b, ok := expected.(json.Number)
+		if !ok {
+			return JSONEvaluation{}, fmt.Errorf("comparação JSON exige esperado numérico")
 		}
-		a, aok := actual.(json.Number)
-		b, bok := expected.(json.Number)
-		if !aok || !bok {
-			return JSONEvaluation{}, fmt.Errorf("comparação count exige números")
+		if !present {
+			return JSONEvaluation{}, nil
+		}
+		a, ok := actual.(json.Number)
+		if !ok {
+			return JSONEvaluation{Detail: "comparação ordenada exige número; recebido " + JSONType(actual)}, nil
 		}
 		order := compareNumber(a, b)
 		switch operator {

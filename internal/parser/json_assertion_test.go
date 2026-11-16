@@ -47,7 +47,12 @@ func TestInvalidJSONAssertions(t *testing.T) {
 		{`jsonpath "$" count`, "sintaxe inválida"},
 		{`jsonpath "$" count exists`, "construção não suportada"},
 		{`jsonpath "$" count != 1`, "construção não suportada"},
-		{`jsonpath "$" > 1`, "construção não suportada"},
+		{`jsonpath "$" > "1"`, "sintaxe inválida"},
+		{`jsonpath "$" >= true`, "sintaxe inválida"},
+		{`jsonpath "$" < null`, "sintaxe inválida"},
+		{`jsonpath "$" <= []`, "sintaxe inválida"},
+		{`jsonpath "$" > {}`, "sintaxe inválida"},
+		{`jsonpath "$" > 1 2`, "sintaxe inválida"},
 		{`jsonpath "$"== 1`, "sintaxe inválida"},
 	} {
 		t.Run(tc.line, func(t *testing.T) {

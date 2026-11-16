@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -92,9 +93,6 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 		return declaration, nil
 	case assertion.JSONEqualOperator:
 	case assertion.JSONGreater, assertion.JSONGreaterEqual, assertion.JSONLess, assertion.JSONLessEqual:
-		if !declaration.Count {
-			return fail(pos, "construção não suportada", "comparador JSON direto não suportado")
-		}
 	default:
 		return fail(pos, "construção não suportada", "operador ou filtro de assertion JSON não suportado")
 	}
@@ -104,6 +102,11 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 	}
 	if declaration.Count && !assertion.ValidCount(expected) {
 		return fail(pos, "sintaxe inválida", "count exige quantidade inteira não negativa")
+	}
+	if declaration.Operator != assertion.JSONEqualOperator {
+		if _, ok := expected.(json.Number); !ok {
+			return fail(pos, "sintaxe inválida", "comparação ordenada exige número JSON esperado")
+		}
 	}
 	declaration.Expected = expected
 	return declaration, nil

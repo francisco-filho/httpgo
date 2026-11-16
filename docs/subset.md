@@ -782,7 +782,14 @@ quantidade, nunca o array completo. Percurso incompatível/JSON inválido manté
 erro de avaliação 2. Ordem, proteção de segredos e capturas seguem as regras acima;
 captura secreta pendente oculta inclusive as contagens.
 
-Continuam fora do recorte: comparações diretas ordenadas, regex,
+`jsonpath "$.total" >= 1` compara números com `>`, `>=`, `<` ou `<=`,
+sem coerção de strings. Negativos, decimais, alta precisão e expoentes usam a
+mesma representação exata da igualdade, sem arredondamento ou expansão de potências.
+Ausência, tipo selecionado não numérico e condição falsa falham com 1. Esperado
+não numérico é sintaxe inválida (2) antes da rede; JSON inválido e percurso
+incompatível continuam erros de avaliação (2).
+
+Continuam fora do recorte: count em strings/objetos/capturas, regex,
 filtros e interpolação de consultas ou esperados. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. A semântica aprovada não é alterada para forçar equivalência.
