@@ -64,7 +64,16 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 			if err != nil {
 				return fail(err.Error())
 			}
-			evaluation, err := assertion.EvaluateJSON(declaration.Operator, declaration.Count, declaration.Expected, actual, present)
+			var evaluation assertion.JSONEvaluation
+			if declaration.Operator == assertion.JSONMatches {
+				_, isString := actual.(string)
+				evaluation = assertion.JSONEvaluation{Actual: actual, Matched: assertion.MatchString(declaration.Compiled, actual, present)}
+				if present && !isString {
+					evaluation.Detail = "matches exige string; recebido " + assertion.JSONType(actual)
+				}
+			} else {
+				evaluation, err = assertion.EvaluateJSON(declaration.Operator, declaration.Count, declaration.Expected, actual, present)
+			}
 			if err != nil {
 				return fail(err.Error())
 			}
@@ -84,6 +93,17 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 				expectedText, actualText = string(expectedJSON), string(actualJSON)
 				if declaration.Operator == assertion.JSONExists {
 					expectedText, actualText = "presente", "presente"
+				} else if declaration.Operator == assertion.JSONMatches {
+					patternJSON, _ := json.Marshal(declaration.Pattern)
+					actualJSON, _ := json.Marshal(evaluation.Actual)
+					expectedText = string(patternJSON)
+					if !present {
+						actualText = "ausente"
+					} else if evaluation.Detail != "" {
+						actualText = "tipo " + assertion.JSONType(actual)
+					} else {
+						actualText = string(actualJSON)
+					}
 				} else if evaluation.Detail != "" {
 					actualText = "tipo " + assertion.JSONType(actual)
 				}

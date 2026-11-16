@@ -62,6 +62,44 @@ func TestJSONAssertionOrder(t *testing.T) {
 	}
 }
 
+func TestJSONMatchesStringSemantics(t *testing.T) {
+	for _, tc := range []struct {
+		name, assertion, body string
+		outcome               Outcome
+	}{
+		{"substring", `jsonpath "$.name" matches "Pizza"`, `{"name":"Mini Pizza"}`, Passed},
+		{"anchored mismatch", `jsonpath "$.name" matches "^Pizza$"`, `{"name":"Mini Pizza"}`, JSONMismatch},
+		{"case insensitive", `jsonpath "$.name" matches "(?i)^pizza"`, `{"name":"Pizza"}`, Passed},
+		{"unicode", `jsonpath "$.name" matches "雪"`, `{"name":"雪"}`, Passed},
+		{"unicode is not normalized", `jsonpath "$.name" matches "é"`, `{"name":"é"}`, JSONMismatch},
+		{"JSON regex escape", `jsonpath "$.name" matches "^Pizza\\s"`, `{"name":"Pizza Margherita"}`, Passed},
+		{"dotall option", `jsonpath "$.name" matches "(?s)^a.b$"`, `{"name":"a\nb"}`, Passed},
+		{"empty pattern", `jsonpath "$.name" matches ""`, `{"name":""}`, Passed},
+		{"empty string mismatch", `jsonpath "$.name" matches "^$"`, `{"name":"x"}`, JSONMismatch},
+		{"absent", `jsonpath "$.name" matches ""`, `{}`, JSONMismatch},
+		{"numeric", `jsonpath "$.name" matches ""`, `{"name":3}`, JSONMismatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := parseCaptureScenario(t, "GET http://example.test/first\nHTTP 200\n[Asserts]\n"+tc.assertion+"\nGET http://example.test/next")
+			calls := 0
+			result := New(executorFunc(func(context.Context, Request) (Response, error) {
+				calls++
+				return Response{Status: 200, Body: []byte(tc.body)}, nil
+			}), nil).Run(context.Background(), s)
+			wantCalls := 1
+			if tc.outcome == Passed {
+				wantCalls = 2
+			}
+			if calls != wantCalls || result.Entries[0].Outcome != tc.outcome {
+				t.Fatalf("calls=%d outcome=%v result=%+v", calls, result.Entries[0].Outcome, result)
+			}
+			if tc.name == "numeric" && result.Entries[0].JSONFailure.Actual != "tipo número" {
+				t.Fatalf("non-string diagnostic exposed value: %+v", result.Entries[0].JSONFailure)
+			}
+		})
+	}
+}
+
 func TestJSONLiteralAndCapturePublication(t *testing.T) {
 	for _, variables := range [][]string{nil, {"name=resolved"}} {
 		c, _ := template.New(variables, nil)
@@ -81,7 +119,7 @@ func TestJSONLiteralAndCapturePublication(t *testing.T) {
 }
 
 func TestPendingSecretConcealsAssertionsAndMetadata(t *testing.T) {
-	for _, line := range []string{`header "X" == "expected-private"`, `jsonpath "$.value" == "expected-private"`} {
+	for _, line := range []string{`header "X" == "expected-private"`, `jsonpath "$.value" == "expected-private"`, `jsonpath "$.value" matches "expected-private"`} {
 		for _, capturePath := range []string{"$.value", "$.missing.bad"} {
 			c, _ := template.New(nil, []string{"token"})
 			s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Captures]\ntoken: jsonpath \""+capturePath+"\"\n[Asserts]\n"+line+"\nGET http://example.test/next")
@@ -90,6 +128,9 @@ func TestPendingSecretConcealsAssertionsAndMetadata(t *testing.T) {
 				calls++
 				return Response{Status: 200, Body: []byte(`{"value":"actual-private","unrelated":"body-private"}`), Headers: []query.HeaderValue{{Name: "X", Value: "actual-private"}}}, nil
 			}), c, func(entry EntryResult) error {
+				if entry.Entry.Assertions[0].JSON != nil && (entry.Entry.Assertions[0].JSON.Pattern != "" || entry.Entry.Assertions[0].JSON.Compiled != nil) {
+					t.Fatal("operational regex leaked into report metadata")
+				}
 				raw, err := json.Marshal(entry)
 				if err != nil {
 					t.Fatal(err)

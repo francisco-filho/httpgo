@@ -11,6 +11,7 @@ type JSONOperator string
 
 const (
 	JSONEqualOperator JSONOperator = "=="
+	JSONMatches       JSONOperator = "matches"
 	JSONExists        JSONOperator = "exists"
 	JSONGreater       JSONOperator = ">"
 	JSONGreaterEqual  JSONOperator = ">="

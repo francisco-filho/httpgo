@@ -2,6 +2,7 @@ package parser
 
 import (
 	"encoding/json"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -30,6 +31,8 @@ type JSONAssertion struct {
 	Operator      assertion.JSONOperator
 	Count         bool
 	Expected      any
+	Pattern       string
+	Compiled      *regexp.Regexp
 	Position      Position
 	QueryPosition Position
 }
@@ -92,6 +95,23 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 		}
 		return declaration, nil
 	case assertion.JSONEqualOperator:
+	case assertion.JSONMatches:
+		pattern, trailing, valid := jsonString(rest)
+		if !valid || strings.TrimSpace(trailing) != "" {
+			return fail(pos, "sintaxe inválida", "matches exige somente uma string JSON entre aspas duplas")
+		}
+		compiled, err := regexp.Compile(pattern)
+		if err != nil {
+			category := "sintaxe inválida"
+			if unsupportedRegexp(pattern) {
+				category = "construção não suportada"
+			}
+			return fail(pos, category, "padrão matches inválido ou não suportado")
+		}
+		declaration.Expected = pattern
+		declaration.Pattern = pattern
+		declaration.Compiled = compiled
+		return declaration, nil
 	case assertion.JSONGreater, assertion.JSONGreaterEqual, assertion.JSONLess, assertion.JSONLessEqual:
 	default:
 		return fail(pos, "construção não suportada", "operador ou filtro de assertion JSON não suportado")
@@ -155,6 +175,41 @@ func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 		return fail("construção não suportada", "operador ou filtro de assertion não suportado")
 	}
 	return HeaderAssertion{Name: name, Operator: operator, Position: pos}, nil
+}
+
+func jsonString(text string) (string, string, bool) {
+	if len(text) < 2 || text[0] != '"' {
+		return "", "", false
+	}
+	for i := 1; i < len(text); i++ {
+		if text[i] == '\\' {
+			i++
+			continue
+		}
+		if text[i] == '"' {
+			var value string
+			if err := json.Unmarshal([]byte(text[:i+1]), &value); err != nil {
+				return "", "", false
+			}
+			return value, text[i+1:], true
+		}
+	}
+	return "", "", false
+}
+
+func unsupportedRegexp(pattern string) bool {
+	if strings.Contains(pattern, "(?=") || strings.Contains(pattern, "(?!") || strings.Contains(pattern, "(?<=") || strings.Contains(pattern, "(?<!") {
+		return true
+	}
+	for i := 0; i+1 < len(pattern); i++ {
+		if pattern[i] == '\\' && pattern[i+1] >= '1' && pattern[i+1] <= '9' {
+			return true
+		}
+		if pattern[i] == '\\' {
+			i++
+		}
+	}
+	return false
 }
 
 func assertionString(text string) (string, string, bool) {
