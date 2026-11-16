@@ -19,6 +19,8 @@ func (e *CaptureError) Error() string { return fmt.Sprintf("erro de captura: %s"
 
 func captureResponse(session template.Session, declarations []parser.Capture, response Response) *CaptureError {
 	batch := make([]template.Capture, 0, len(declarations))
+	var text string
+	textDecoded := false
 	for _, declaration := range declarations {
 		var value any
 		var found bool
@@ -31,11 +33,28 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 			}
 		case parser.HeaderCapture:
 			value, found = query.Header(response.Headers, declaration.Header)
+		case parser.RegexCapture:
+			if !textDecoded {
+				var err error
+				text, err = query.BodyText(response.Body, response.Headers)
+				if err != nil {
+					return &CaptureError{Position: declaration.QueryPosition, Detail: err.Error()}
+				}
+				textDecoded = true
+			}
+			value, found = text, true
 		default:
 			return &CaptureError{Position: declaration.QueryPosition, Detail: "variante de captura não suportada"}
 		}
 		if !found {
 			return &CaptureError{Position: declaration.QueryPosition, Detail: "consulta não encontrou valor"}
+		}
+		if declaration.Kind == parser.RegexCapture || declaration.Compiled != nil {
+			selected, err := query.Regex(declaration.Compiled, value.(string))
+			if err != nil {
+				return &CaptureError{Position: declaration.PatternPosition, Detail: err.Error()}
+			}
+			value = selected
 		}
 		raw, err := json.Marshal(value)
 		if err != nil {

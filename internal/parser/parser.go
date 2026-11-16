@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -29,15 +30,19 @@ type CaptureKind int
 const (
 	JSONPathCapture CaptureKind = iota
 	HeaderCapture
+	RegexCapture
 )
 
 type Capture struct {
-	Kind          CaptureKind
-	Header        string
-	Name          string
-	Path          query.Path
-	Position      Position
-	QueryPosition Position
+	Kind            CaptureKind
+	Header          string
+	Name            string
+	Path            query.Path
+	Position        Position
+	QueryPosition   Position
+	Pattern         string
+	Compiled        *regexp.Regexp
+	PatternPosition Position
 }
 
 // FileBody is a literal local file reference, not a template.
