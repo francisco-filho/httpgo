@@ -130,7 +130,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			}
 			prefix := "POST "
 			if tc.code != 0 {
-				prefix = fmt.Sprintf("%q:7:1: POST ", file)
+				prefix = fmt.Sprintf("%q:7:1: POST ", suiteDisplayPath(t, file))
 			}
 			if !strings.HasPrefix(remaining[0], prefix) {
 				t.Fatalf("second result = %q; want prefix %q", remaining[0], prefix)

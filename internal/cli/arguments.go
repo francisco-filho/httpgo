@@ -11,7 +11,7 @@ import (
 
 type arguments struct {
 	renderFiles        bool
-	file               string
+	files              []string
 	config             string
 	environment        string
 	variables, secrets []string
@@ -63,17 +63,17 @@ func parseArguments(args []string) (arguments, error) {
 				result.secrets = append(result.secrets, value)
 			}
 		default:
-			if strings.HasPrefix(arg, "-") || result.file != "" {
+			if strings.HasPrefix(arg, "-") || arg == "" {
 				invalid = true
 			} else {
-				result.file = arg
+				result.files = append(result.files, arg)
 			}
 		}
 	}
 	if environmentIssue != "" {
 		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
 	}
-	if invalid || result.file == "" {
+	if invalid || len(result.files) == 0 {
 		return result, fmt.Errorf("uso inválido ou flag não suportada; use httpgo test <arquivo> ou httpgo --help")
 	}
 	return result, nil

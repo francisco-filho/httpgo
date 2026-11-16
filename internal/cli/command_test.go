@@ -60,7 +60,7 @@ func TestHelpVersionAndInvalidUsage(t *testing.T) {
 		{"version", []string{"--version"}, 0, "httpgo 1.0-test commit=abc123 date=2026-11-14"},
 		{"no args", nil, 2, "uso inválido"},
 		{"no file", []string{"test"}, 2, "uso inválido"},
-		{"two files", []string{"test", "a", "b"}, 2, "uso inválido"},
+		{"missing files", []string{"test", "a", "b"}, 2, "caminho inválido"},
 		{"unknown command", []string{"check", "a"}, 2, "uso inválido"},
 		{"root flag", []string{"--token=flag-secret"}, 2, "flag não suportada"},
 		{"test flag", []string{"test", "--token=flag-secret"}, 2, "flag não suportada"},
@@ -107,7 +107,7 @@ func TestResultsAndSecretRedaction(t *testing.T) {
 				}
 				prefix := "GET "
 				if tc.code != 0 {
-					prefix = fmt.Sprintf("%q:1:1: GET ", file)
+					prefix = fmt.Sprintf("%q:1:1: GET ", shownPath(t, file))
 				}
 				if !strings.HasPrefix(line, prefix) {
 					t.Errorf("result line = %q; want prefix %q", line, prefix)

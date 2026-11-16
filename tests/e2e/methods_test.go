@@ -146,7 +146,7 @@ func TestInvalidLastOperationPreventsEverySend(t *testing.T) {
 	} {
 		file := scenario(t, "GET "+server.URL+"/first\nHTTP 200\nPOST "+server.URL+"/last\n"+suffix)
 		code, out, stderr := run(t, "test", file)
-		if code != 2 || out != "" || !strings.HasPrefix(stderr, fmt.Sprintf("%q:", file)) || hits.Load() != 0 {
+		if code != 2 || out != "" || !strings.HasPrefix(stderr, fmt.Sprintf("%q:", suiteDisplayPath(t, file))) || hits.Load() != 0 {
 			t.Fatalf("code=%d,out=%q,err=%q,hits=%d", code, out, stderr, hits.Load())
 		}
 		assertNoSecrets(t, out+stderr)

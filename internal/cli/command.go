@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"capimgrosso.com/httpgo/internal/config"
 	"capimgrosso.com/httpgo/internal/parser"
 	"capimgrosso.com/httpgo/internal/runner"
+	"capimgrosso.com/httpgo/internal/suite"
 	"capimgrosso.com/httpgo/internal/transport"
 )
 
@@ -77,31 +76,24 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail("execução cancelada antes da leitura do cenário")
 	}
 	c.timeout = settings.Timeout
-	file := args.file
-	absolute, err := filepath.Abs(file)
+	execution := suite.New(runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry))
+	files, err := execution.Discover(ctx, args.files)
 	if err != nil {
-		return c.fail("não foi possível determinar o diretório do cenário")
+		return c.fail(err.Error())
 	}
-	input, err := os.Open(absolute)
-	if err != nil {
-		return c.fail(fmt.Sprintf("%q: não foi possível abrir o arquivo; verifique o caminho e a permissão de leitura", file))
+	code := 0
+	for _, file := range files {
+		result, loadErr := execution.RunFile(ctx, file, runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout})
+		if loadErr != nil {
+			code = c.fail(loadErr.Error())
+			continue
+		}
+		code = max(code, c.renderSummary(parser.Scenario{File: file.Name}, result))
+		if result.ReportErr != nil || ctx.Err() != nil {
+			return 2
+		}
 	}
-	info, statErr := input.Stat()
-	if statErr != nil || !info.Mode().IsRegular() {
-		_ = input.Close()
-		return c.fail(fmt.Sprintf("%q: entrada deve ser um arquivo regular legível", file))
-	}
-	scenario, parseErr := parser.Parse(file, input)
-	closeErr := input.Close()
-	if parseErr != nil {
-		return c.fail(parseErr.Error())
-	}
-	if closeErr != nil {
-		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
-	}
-	scenario.OriginDir = filepath.Dir(absolute)
-	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).RunWithOptions(ctx, scenario, runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout})
-	return c.renderSummary(scenario, result)
+	return code
 }
 
 func (c *Command) renderEntry(entry runner.EntryResult) error {
