@@ -18,10 +18,18 @@ type HeaderAssertion struct {
 	Position Position
 }
 
-// Assertion is one of the concrete header/JSON variants, in source order.
+// BodyAssertion contains a literal substring, never a template expression.
+type BodyAssertion struct {
+	Operator assertion.BodyOperator
+	Expected string
+	Position Position
+}
+
+// Assertion is one of the concrete header/JSON/body variants, in source order.
 type Assertion struct {
 	Header *HeaderAssertion
 	JSON   *JSONAssertion
+	Body   *BodyAssertion
 }
 
 // JSONAssertion owns an already validated literal, never a template plan.
@@ -39,12 +47,45 @@ type JSONAssertion struct {
 
 func parseAssertion(text string, pos Position) (Assertion, error) {
 	fields := strings.Fields(text)
+	if len(fields) > 0 && fields[0] == "body" {
+		declaration, err := parseBodyAssertion(text, pos)
+		return Assertion{Body: &declaration}, err
+	}
 	if len(fields) > 0 && fields[0] == "jsonpath" {
 		declaration, err := parseJSONAssertion(text, pos)
 		return Assertion{JSON: &declaration}, err
 	}
 	declaration, err := parseHeaderAssertion(text, pos)
 	return Assertion{Header: &declaration}, err
+}
+
+func parseBodyAssertion(text string, pos Position) (BodyAssertion, error) {
+	fail := func(category, detail string) (BodyAssertion, error) {
+		return BodyAssertion{}, &Error{Position: pos, Category: category, Detail: detail}
+	}
+	rest := strings.TrimSpace(text[len("body"):])
+	fields := strings.Fields(rest)
+	if len(fields) == 0 {
+		return fail("sintaxe inválida", "assertion de body exige operador")
+	}
+	operator := fields[0]
+	rest = strings.TrimSpace(rest[len(operator):])
+	if operator == "not" {
+		fields = strings.Fields(rest)
+		if len(fields) == 0 {
+			return fail("sintaxe inválida", "not exige contains e string literal")
+		}
+		operator += " " + fields[0]
+		rest = strings.TrimSpace(rest[len(fields[0]):])
+	}
+	if operator != string(assertion.BodyContains) && operator != string(assertion.BodyNotContains) {
+		return fail("construção não suportada", "operador ou filtro de assertion de body não suportado")
+	}
+	expected, tail, ok := assertionString(rest)
+	if !ok || strings.TrimSpace(tail) != "" {
+		return fail("sintaxe inválida", "assertion de body exige somente uma string literal entre aspas duplas")
+	}
+	return BodyAssertion{Operator: assertion.BodyOperator(operator), Expected: expected, Position: pos}, nil
 }
 
 func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
@@ -144,7 +185,7 @@ func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 		rest = strings.TrimLeft(text[len(token):], " \t")
 	}
 	if token != "header" {
-		return fail("construção não suportada", "consulta de assertion não suportada; use header ou jsonpath")
+		return fail("construção não suportada", "consulta de assertion não suportada; use header, jsonpath ou body")
 	}
 	name, rest, ok := assertionString(rest)
 	if !ok || !validHeaderName(name) {

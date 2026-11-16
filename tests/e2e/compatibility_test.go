@@ -60,6 +60,7 @@ type wireHeader struct {
 type comparison struct {
 	ResponseHeaders []wireHeader `json:"response_headers,omitempty"`
 	ResponseJSON    string       `json:"response_json,omitempty"`
+	ResponseBody    *[]byte      `json:"response_body,omitempty"` // Base64 bytes; nil is absent, pointer to empty bytes is a configured empty body.
 	Variables       []string     `json:"variables,omitempty"`
 	Classification  string       `json:"classification"`
 	HTTPGo          observation  `json:"httpgo"`
@@ -79,6 +80,43 @@ func compatibilityScenario(t *testing.T, name, text string) string {
 		t.Fatal(err)
 	}
 	return file
+}
+
+func writeCompatibilityBody(w http.ResponseWriter, fixture comparison) {
+	if fixture.ResponseBody != nil {
+		_, _ = w.Write(*fixture.ResponseBody)
+		return
+	}
+	if _, present := w.Header()["Content-Type"]; !present {
+		w.Header().Set("Content-Type", "application/json")
+	}
+	_, _ = io.WriteString(w, fixture.ResponseJSON)
+}
+
+func TestCompatibilityBodyFixture(t *testing.T) {
+	for _, tc := range []struct{ name, source, want, contentType string }{
+		{"legacy JSON", `{"response_json":"null"}`, "null", "application/json"},
+		{"absent preserves JSON", `{"response_json":"legacy"}`, "legacy", "application/json"},
+		{"empty overrides JSON", `{"response_json":"legacy","response_body":""}`, "", "text/plain; charset=utf-8"},
+		{"invalid bytes", `{"response_body":"/w=="}`, "\xff", "text/plain; charset=iso-8859-1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var fixture comparison
+			if err := json.Unmarshal([]byte(tc.source), &fixture); err != nil {
+				t.Fatal(err)
+			}
+			w := httptest.NewRecorder()
+			if tc.name == "invalid bytes" {
+				w.Header().Set("Content-Type", tc.contentType)
+			}
+			writeCompatibilityBody(w, fixture)
+			response := w.Result()
+			defer func() { _ = response.Body.Close() }()
+			if w.Body.String() != tc.want || response.Header.Get("Content-Type") != tc.contentType {
+				t.Fatalf("body=%q Content-Type=%q", w.Body.String(), response.Header.Get("Content-Type"))
+			}
+		})
+	}
 }
 
 func TestCompatibility(t *testing.T) {
@@ -176,8 +214,7 @@ func TestCompatibility(t *testing.T) {
 				}
 				switch r.URL.Path {
 				case "/capture":
-					w.Header().Set("Content-Type", "application/json")
-					_, _ = io.WriteString(w, expected.ResponseJSON)
+					writeCompatibilityBody(w, expected)
 				case "/auth/login":
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = io.WriteString(w, `{"accessToken":"token-ficticio","items":["","array-token"]}`)
@@ -250,7 +287,7 @@ func TestCompatibility(t *testing.T) {
 			if expected.Hurl.Requests == nil {
 				hurlRequests = nil
 			}
-			got := comparison{ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
+			got := comparison{ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, ResponseBody: expected.ResponseBody, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {

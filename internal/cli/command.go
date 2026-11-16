@@ -110,6 +110,10 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
 	case runner.HeaderMismatch:
 		line += ": " + headerDiagnostic(entry.HeaderFailure)
+	case runner.BodyMismatch:
+		line += ": " + bodyDiagnostic(entry.BodyFailure)
+	case runner.BodyFailed:
+		line += fmt.Sprintf(": %s: %s", entry.BodyError.Operator, entry.BodyError.Detail)
 	case runner.JSONMismatch:
 		line += ": " + jsonDiagnostic(entry.JSONFailure)
 	case runner.JSONFailed:
@@ -127,7 +131,7 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
+	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
@@ -137,6 +141,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		}
 		if entry.JSONError != nil {
 			pos = entry.JSONError.Position
+		}
+		if entry.BodyFailure != nil {
+			pos = entry.BodyFailure.Position
+		}
+		if entry.BodyError != nil {
+			pos = entry.BodyError.Position
 		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
@@ -187,6 +197,10 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		if errors.As(result.Err, &jsonErr) {
 			diagnostic = jsonErr.Error()
 		}
+		var bodyErr *runner.BodyError
+		if errors.As(result.Err, &bodyErr) {
+			diagnostic = bodyErr.Error()
+		}
 		_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, diagnostic)
 		return err
 	}
@@ -204,11 +218,21 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure))
 			return err
 		}
+		if entry.BodyFailure != nil {
+			failure := entry.BodyFailure
+			pos := failure.Position
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, bodyDiagnostic(failure))
+			return err
+		}
 		pos := entry.Entry.ExpectedPosition
 		_, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status)
 		return err
 	}
 	return nil
+}
+
+func bodyDiagnostic(failure *runner.BodyFailure) string {
+	return fmt.Sprintf("assertion body %s: esperado %q; condição falsa", failure.Operator, failure.Expected)
 }
 
 func jsonDiagnostic(failure *runner.JSONFailure) string {
@@ -286,7 +310,7 @@ func (c *Command) fail(message string) int {
 }
 
 func help() string {
-	return `httpgo — executa requisições HTTP e valida status, headers e JSON
+	return `httpgo — executa requisições HTTP e valida status, headers, JSON e body
 
 Uso:
   httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--var nome=valor] [--secret nome]
@@ -392,12 +416,34 @@ Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo 
 Timeout total: default de 10 segundos por requisição, configurável em YAML.
 Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
-Códigos: 0 sucesso, 1 status ou assertion de header/JSON divergente,
-2 entrada/arquivo externo/avaliação JSON/captura/renderização/transporte/cancelamento/saída.
+Códigos: 0 sucesso, 1 status ou assertion de header/JSON/body divergente,
+2 entrada/arquivo externo/avaliação JSON ou body/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Bodies e coleções de headers não são impressos, nem em erros de entrada.
 Valores comuns sanitizados podem aparecer no diagnóstico de assertion.
+
+Assertions de body: salve privacy.hurl e execute
+  httpgo test privacy.hurl --var base_url=http://localhost:8080
+  GET {{base_url}}/export
+  HTTP 200
+  [Asserts]
+  body contains "customer"
+  body not contains "passwordHash"
+  body not contains "trackingToken"
+Busca substring no texto completo da resposta final consumida/fechada, sem reserializar JSON.
+Distingue caixa; não normaliza espaços, quebras de linha ou Unicode.
+Todo texto contém "", inclusive body vazio; not contains "" sempre falha.
+Charset do primeiro Content-Type; omitido usa UTF-8 estrito. ISO-8859-1 usa índice web.
+Charset desconhecido ou sequência inválida: erro de avaliação de body (2), inclusive na negação.
+Condição falsa retorna 1. Exige HTTP numérico ou HTTP * e uma única string literal.
+Esperado nunca interpola; sem opt-in de interpolação, regex de body ou inspeção de binários.
+Status → assertions de header/JSON/body na ordem escrita → capturas.
+Texto só decodifica na primeira assertion de body, independente do JSON e sem antecipar erros.
+Falha impede capturas e próxima requisição; sintaxe inválida tardia impede todo HTTP do arquivo.
+Diagnóstico identifica operador/arquivo/linha/coluna, nunca body ou fragmentos recebidos.
+Esperado secreto é protegido; captura secreta pendente oculta esperado sem avaliar a captura.
+Busca literal não garante detectar codificações alternativas de dados sensíveis.
 
 Assertions de headers: salve health.hurl e execute httpgo test health.hurl
 (requer resposta com Content-Type application/json e X-Request-Id req-123):
@@ -439,12 +485,12 @@ com precisão exata, também aninhada, sem float64 nem expansão de potências.
 Arrays exigem a mesma ordem; objetos ignoram a ordem das chaves.
 Ausência e índice fora do array falham com 1, distinguíveis de null presente.
 JSON inválido/vazio/adicional ou percurso incompatível gera erro de avaliação JSON (2).
-Status vem primeiro; headers e JSON seguem a ordem escrita; capturas só depois.
+Status vem primeiro; headers, JSON e body seguem a ordem escrita; capturas só depois.
 JSON é decodificado sob demanda: header anterior pode falhar antes do JSON inválido.
 Primeira falha impede capturas e próximos envios. Sintaxe inválida rejeita todo arquivo.
 Diagnóstico: consulta, arquivo/linha/coluna, esperado/real tipados e sanitizados.
 Captura secreta pendente na mesma resposta oculta integralmente os dois valores
-em falhas de headers/JSON, sem avaliar/publicar a captura antecipadamente.
+em falhas de headers/JSON/body, sem avaliar/publicar a captura antecipadamente.
 Proteção não detecta segredos arbitrários não marcados. Sem dumps de body/documento.
 Estrutura, quantidade e limites:
   GET {{base_url}}/products
@@ -517,7 +563,7 @@ Strings como "null" ou "{{literal}}" permanecem strings, sem reinterpretação.
 Array/objeto exige valor JSON completo: URL, header ou string JSON gera erro antes do envio.
 JSON inválido, campo ausente ou índice fora do array geram erro de captura;
 null é valor existente e válido. Objetos não criam variáveis para suas propriedades.
-Status ou assertion de header/JSON divergente impede capturas e próximos envios. Capturas não sobrescrevem
+Status ou assertion de header/JSON/body divergente impede capturas e próximos envios. Capturas não sobrescrevem
 variáveis iniciais nem capturas anteriores; cada execução começa sem capturas.
 --secret nome: protege variável ou captura futura, sem fornecer valor nem resolver ausência.
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas

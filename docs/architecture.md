@@ -1,7 +1,7 @@
-# Arquitetura implementada — US-01 a US-16 e US-20
+# Arquitetura implementada — US-01 a US-16, US-20 e US-21
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
-e plano v4 referenciado nelas.
+#40 (US-21) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
 
@@ -24,9 +24,10 @@ cmd/httpgo/main.go
       → internal/transport/http.go + multipart.go (via HTTPExecutor)
       → fechamento da fonte multipart antes da avaliação/apresentação
       → internal/assertion/status.go (somente expectativa numérica)
-      → internal/runner/assertions.go (headers/JSON na ordem escrita, antes de capturas)
+      → internal/runner/assertions.go (headers/JSON/body na ordem escrita, antes de capturas)
         → internal/query/header.go + internal/assertion/header.go
         → internal/query/jsonpath.go + internal/assertion/json.go (sob demanda)
+        → internal/query/body.go + internal/assertion/body.go (texto sob demanda)
       → internal/query/jsonpath.go (selecionar JSON da resposta final)
       → internal/runner/capture.go (serializar seleção JSON sem float64)
       → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
@@ -39,7 +40,8 @@ O diagrama é fluxo de execução; `runner` **não importa** o adapter HTTP.
 Não há framework de CLI, pacote genérico de tipos, domínio rico ou novos pacotes
 reservados para capacidades futuras. A US-11 acrescenta somente `internal/config`
 e a dependência YAML mantida `go.yaml.in/yaml/v3` **v3.0.6**, isolada nesse pacote.
-O restante usa biblioteca padrão; `go.mod` preserva módulo
+A US-21 acrescenta `golang.org/x/text v0.44.0`, encapsulada em `query` para
+rótulos/conversões de charset. O restante usa biblioteca padrão; `go.mod` preserva módulo
 `capimgrosso.com/httpgo` e Go `1.26.10`.
 
 | Pacote/tipos | Responsabilidade |
@@ -66,6 +68,39 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 `runner.Request/Response`, implementando o contrato consumer-owned sem camada
 adicional nem ciclo. Testes de integração podem montar `runner.New` com o adapter.
 Somente o código de produção em `transport` importa `net/http`.
+
+## Texto do body — US-21
+
+`parser.Assertion.Body` aponta para `BodyAssertion` (Operator, Expected,
+Position), validada no arquivo inteiro por `parser/assertion.go`, na mesma lista
+ordenada das variantes Header/JSON. Reutiliza strings literais sem renderer.
+`assertion.Body` compara substring com `strings.Contains` e sua negação; não
+conhece charset/HTTP ou apresentação. Vazio é texto existente, não ausência.
+
+`query.BodyText` seleciona o primeiro Content-Type, interpreta MIME e resolve o
+charset no índice web de `x/text/encoding/htmlindex`; omitido usa UTF-8 estrito.
+Valida UTF-8 e pares surrogate UTF-16; para outros decoders que podem substituir
+sequências ilegais, a presença de U+FFFD exige validar somente os bytes que
+produziram esse caractere, sem round-trip dos demais caracteres. Isso evita
+rejeitar grafias alternativas válidas de GB18030 ao lado de um U+FFFD literal.
+U+FFFD originalmente válido não é falha. Causas são categorias controladas, sem
+rótulos, bytes ou mensagens brutas da biblioteca; sem sniffing ou fallback.
+
+`runner/render.go` retém body também com assertion exclusivamente textual.
+Transporte permanece intacto: consome e fecha resposta final inteira no orçamento
+existente antes de retornar. Headers isolados continuam sem retenção.
+`checkAssertions` retorna `error` para distinguir `JSONError` de `BodyError`.
+Decodifica texto na primeira assertion de body e o reutiliza só naquela entrada,
+independentemente do JSON; uma falha anterior prevalece sobre charset inválido.
+Não cria cache global, concorrência ou nova interface de executor.
+
+`BodyFailure` contém posição, operador e esperado sanitizado; `BodyError`, posição,
+operador e causa categórica. Nunca carregam texto/body/fragmentos recebidos.
+`pendingSecret` oculta o esperado antes de callback/coleção, sem avaliar capturas.
+`safeEntry` clona a variante e remove Expected, preservando o cenário original.
+CLI só apresenta e mapeia falha para 1/erro para 2; `ReportErr` mantém prioridade 2
+e a suíte conta `BodyMismatch` como falha de assertion, não erro de transporte.
+Sem pacote `report`, nova fonte de segredos, atualização de Go ou mudança de CI.
 
 ## Configuração do projeto — US-11
 

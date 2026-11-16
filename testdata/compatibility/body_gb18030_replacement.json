@@ -1,0 +1,7 @@
+{
+  "response_headers": [{"name": "Content-Type", "value": "text/plain; charset=gb18030"}],
+  "response_body": "o6CAYYQxpDc=",
+  "classification": "shared: valid GB18030 noncanonical character bytes and literal U+FFFD are decoded without normalization or substitution",
+  "httpgo": {"exit": 0, "paths": ["/capture", "/health"]},
+  "hurl": {"exit": 0, "paths": ["/capture", "/health"]}
+}

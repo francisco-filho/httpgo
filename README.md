@@ -3,6 +3,44 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Detectar conteúdo proibido na resposta (US-21 / issue #40)
+
+Salve `privacy.hurl` e execute
+`bin/httpgo test privacy.hurl --var base_url=http://localhost:8080`:
+
+```hurl
+GET {{base_url}}/export
+HTTP 200
+[Asserts]
+body contains "customer"
+body not contains "passwordHash"
+body not contains "trackingToken"
+```
+
+A API deve devolver `customer` e nenhum dos textos proibidos. O cenário passa com
+**0**; qualquer condição falsa retorna **1** e impede capturas e a próxima
+requisição do arquivo. Exemplo versionado:
+[`scenario_assert_body.hurl`](testdata/scenarios/scenario_assert_body.hurl).
+O dummy não implementa `/export`; os testes usam um servidor HTTP local isolado.
+
+A busca usa o **texto completo recebido da resposta final**, sem reserializar
+JSON, distinguir campos ou normalizar caixa, espaços, quebras de linha e Unicode.
+O esperado é uma string literal: `{{nome}}` não interpola. Todo texto contém
+`""`, inclusive body vazio; `not contains ""` sempre falha. Charset declarado no
+primeiro `Content-Type` é respeitado (rótulos web; ISO-8859-1 → windows-1252);
+sem charset, usa UTF-8 estrito. Charset desconhecido, bytes inválidos/truncados,
+resposta incompleta e erros de consumo/fechamento retornam **2**, nunca aprovação
+de ausência. Somente após consumir e fechar a resposta: status → assertions de
+header/JSON/body na ordem escrita → capturas. Erro estático tardio impede todo
+HTTP do arquivo.
+
+Diagnóstico localizado informa operador/esperado protegido, **nunca body ou
+fragmentos recebidos**. Captura secreta pendente oculta esperado sem antecipar sua
+avaliação. Não há regex de body, inspeção de binários ou interpolação de
+assertions. Busca literal não prova ausência de todas as codificações de um dado.
+Os exemplos confrontados com Hurl **8.0.0** e as diferenças de códigos estão em
+[`docs/compatibility.md`](docs/compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
+
 ## Executar uma suíte (US-16 / issue #38)
 
 ```sh
@@ -650,13 +688,13 @@ conhecidos sem mudar os dados enviados nem criar variáveis para as propriedades
 A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
 valores finais inválidos falham imediatamente antes da requisição dependente,
 sem contá-la como iniciada e sem enviar as seguintes. As requisições são
-sequenciais e a primeira falha de status, header, JSON, captura, renderização ou transporte
+sequenciais e a primeira falha de status, header, JSON, body, captura, renderização ou transporte
 interrompe as próximas requisições do mesmo arquivo; outros arquivos seguem
 conforme `--fail-fast`. Uma falha de captura preserva a resposta concluída e o
 status aprovado nas contagens, mas impede o próximo envio. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
-- `0`: sucesso; `1`: status ou assertion de header/JSON divergente; `2`: demais erros,
+- `0`: sucesso; `1`: status ou assertion de header/JSON/body divergente; `2`: demais erros,
   inclusive avaliação de JSON inválido ou percurso incompatível.
 - Timeout total configurável em YAML, default de 10 segundos por requisição,
   incluindo redirects e leitura do body.
@@ -707,7 +745,7 @@ assertions/capturas e permite qualquer status, inclusive 404/503. Sua linha most
 Isso dispensa **só a comparação numérica**, não headers nem capturas declarados.
 
 Após consumo/fechamento da resposta final, a ordem é status numérico → assertions
-(headers/JSON na ordem escrita) → capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
+(headers/JSON/body na ordem escrita) → capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
 localiza a assertion e esperado/recebido (ausência difere de `""`), não publica
 capturas nem envia a próxima requisição. Erro estrutural tardio retorna 2 sem
 qualquer envio. Escrita, consumo incompleto, timeout e cancelamento continuam 2.
@@ -758,7 +796,7 @@ JSON vazio/inválido/adicional ou percurso por tipo incompatível retorna **2**,
 como erro de avaliação JSON, não de transporte/captura. Sintaxe ou construção
 não suportada em qualquer entrada rejeita o arquivo inteiro antes da rede.
 
-A avaliação é status numérico → headers e JSON **na ordem escrita** → capturas.
+A avaliação é status numérico → headers, JSON e body **na ordem escrita** → capturas.
 A primeira falha impede capturas e próximos envios; `HTTP *` dispensa só a
 comparação numérica. O JSON da resposta é decodificado sob demanda, portanto um
 header divergente anterior prevalece sobre JSON inválido, não o inverso.

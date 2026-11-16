@@ -32,19 +32,61 @@ func (e *JSONError) Error() string {
 	return fmt.Sprintf("erro de avaliação JSON: consulta %q: %s", e.Query, e.Detail)
 }
 
-func checkAssertions(session template.Session, entry parser.Entry, response Response, current *EntryResult) *JSONError {
+// BodyFailure contains presentation metadata only, never response text.
+type BodyFailure struct {
+	Position parser.Position
+	Operator assertion.BodyOperator
+	Expected string
+}
+
+// BodyError has a controlled categorical cause, never raw decoding input.
+type BodyError struct {
+	Position parser.Position
+	Operator assertion.BodyOperator
+	Detail   string
+}
+
+func (e *BodyError) Error() string {
+	return fmt.Sprintf("erro de avaliação de body %s: %s", e.Operator, e.Detail)
+}
+
+func checkAssertions(session template.Session, entry parser.Entry, response Response, current *EntryResult) error {
 	var document any
-	decoded := false
+	var text string
+	decoded, textDecoded := false, false
 	conceal := pendingSecret(session, entry)
 	for _, item := range entry.Assertions {
 		switch {
-		case item.Header != nil && item.JSON == nil:
+		case item.Body != nil && item.Header == nil && item.JSON == nil:
+			declaration := item.Body
+			pos := declaration.Position
+			pos.File = session.Sanitize(pos.File)
+			if !textDecoded {
+				var err error
+				text, err = query.BodyText(response.Body, response.Headers)
+				if err != nil {
+					current.Outcome = BodyFailed
+					current.BodyError = &BodyError{Position: pos, Operator: declaration.Operator, Detail: err.Error()}
+					return current.BodyError
+				}
+				textDecoded = true
+			}
+			if !assertion.Body(declaration.Operator, declaration.Expected, text) {
+				expected := "[oculto]"
+				if !conceal {
+					expected = session.Sanitize(declaration.Expected)
+				}
+				current.BodyFailure = &BodyFailure{Position: pos, Operator: declaration.Operator, Expected: expected}
+				current.Outcome = BodyMismatch
+				return nil
+			}
+		case item.Header != nil && item.JSON == nil && item.Body == nil:
 			current.HeaderFailure = checkHeader(session, *item.Header, response.Headers, conceal)
 			if current.HeaderFailure != nil {
 				current.Outcome = HeaderMismatch
 				return nil
 			}
-		case item.JSON != nil && item.Header == nil:
+		case item.JSON != nil && item.Header == nil && item.Body == nil:
 			declaration := item.JSON
 			pos := declaration.Position
 			pos.File = session.Sanitize(pos.File)
