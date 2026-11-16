@@ -579,6 +579,41 @@ httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
 - Sem placeholders, bytes e validação permanecem os da US-02. A expectativa e a
   entrada seguinte começam em nova linha, inclusive depois de placeholder raiz.
 
+## Capturas literais de headers — US-22 (issue #42)
+
+```hurl
+GET {{base_url}}/catalog
+HTTP 200
+[Captures]
+catalog_etag: header "ETag"
+
+GET {{base_url}}/catalog
+If-None-Match: {{catalog_etag}}
+HTTP 304
+```
+
+`nome: header "nome-do-header"` consulta somente a resposta final completa,
+sem distinguir caixa do nome. Seleciona **a primeira ocorrência**, inclusive
+vazia; não junta ocorrências nem divide vírgulas. Esta política preserva a
+US-07 e é uma diferença deliberada frente a headers multivalorados do Hurl.
+O valor é sempre string literal: aspas de ETag, números, JSON e placeholders
+recebidos são preservados, sem coerção ou interpolação recursiva. Não exige
+body JSON nem retenção do body quando nenhuma outra consulta precisar dele;
+a resposta ainda é consumida e fechada integralmente antes das validações.
+
+Header ausente é erro de captura (2). Status e assertions antecedem capturas;
+lotes mistos de header/JSONPath são atômicos e mantêm as mesmas regras de nomes,
+isolamento e colisões abaixo. Sintaxe inválida tardia impede todos os envios.
+Filtros, índices, todas as ocorrências e captura por regex não são suportados.
+
+`Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` são protegidos
+sem distinguir caixa, incluindo a proveniência do nome capturado em composição
+e escapes conhecidos. Marcações explícitas de segredo acumulam; marcas dinâmicas
+não escapam da sessão. Diagnósticos não imprimem coleções de headers nem bodies.
+Valor vazio não provoca substituição global; não há detecção de codificações
+arbitrárias. Capturar `Set-Cookie` **não** cria `Cookie`, não extrai atributos e
+não ativa cookie jar; extração de valor de cookie pertence à US-25.
+
 ## Capturas tipadas — US-05/US-06
 
 ```hurl

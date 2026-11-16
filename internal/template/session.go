@@ -2,6 +2,7 @@ package template
 
 import (
 	"encoding/json"
+	"maps"
 	"strings"
 )
 
@@ -12,6 +13,7 @@ type Session interface {
 	Publish([]Capture) error
 	ProtectCapture(name string, value json.RawMessage)
 	ProtectValue(string)
+	MarkSecret(string)
 	IsSecret(string) bool
 	Sanitize(string) string
 	ProtectionValues() []string // Detached known variants, never a session or variable context.
@@ -39,9 +41,9 @@ func NamesConflict(a, b string) bool {
 	return a == b || strings.HasPrefix(a, b+".") || strings.HasPrefix(b, a+".")
 }
 
-// NewSession shares immutable initial values and secret declarations only.
+// NewSession shares immutable initial values; secret declarations are session-local.
 func (c *Context) NewSession() Session {
-	return &Context{values: c.values, secrets: c.secrets, captures: make(map[string]variable), protected: append([]string(nil), c.protected...)}
+	return &Context{values: c.values, secrets: maps.Clone(c.secrets), captures: make(map[string]variable), protected: append([]string(nil), c.protected...)}
 }
 
 func (c *Context) lookup(name string) (variable, bool) {
@@ -55,6 +57,14 @@ func (c *Context) lookup(name string) (variable, bool) {
 // ProtectValue registers sensitive response metadata for this execution only.
 func (c *Context) ProtectValue(value string) {
 	c.protected = append(c.protected, SecretVariants(value)...)
+}
+
+// MarkSecret accumulates a declaration without resolving or publishing a value.
+func (c *Context) MarkSecret(name string) {
+	if c.secrets == nil {
+		c.secrets = make(map[string]bool)
+	}
+	c.secrets[name] = true
 }
 
 // IsSecret inspects only the declaration, without resolving or publishing a value.
