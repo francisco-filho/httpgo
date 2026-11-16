@@ -1,0 +1,26 @@
+{
+  "response_json": "not JSON",
+  "classification": "intentional static pattern even with variable defined; Hurl interpolates and mismatches",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "{{name}}"
+    }
+  ],
+  "variables": [
+    "name=resolved"
+  ]
+}

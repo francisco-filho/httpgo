@@ -822,8 +822,8 @@ passou a aceitar essas três formas, com strings literais entre aspas duplas.
 A US-08 acrescenta igualdade JSON na mesma lista ordenada (abaixo).
 Nomes são case-insensitive; igualdade e substring distinguem caixa dos valores.
 `{{nome}}` no esperado permanece literal, sem interpolação. A US-23 acrescenta
-`not contains` (acima); regex, filtros e demais operadores continuam não suportados. Capturas de
-headers são suportadas separadamente em `[Captures]` desde a US-22.
+`not contains` (acima); a US-24 acrescenta `matches` (abaixo). Filtros e demais
+operadores continuam não suportados. Capturas de headers são suportadas separadamente em `[Captures]` desde a US-22.
 
 Só a primeira ocorrência de cada header participa da comparação, sem concatenar
 ou separar vírgulas. Ausência faz `==`, `contains` e `exists` falharem, mas aprova
@@ -850,6 +850,55 @@ Equivalência com Hurl 8.0.0 é limitada aos pares observados: **repetidos são 
 no Hurl**, que também interpola esperados e avalia capturas antes das assertions.
 Essas divergências são deliberadas, preservando as regras da história; veja
 [matriz de compatibilidade](docs/compatibility.md).
+
+## Validar formato de headers dinâmicos (US-24 / issue #46)
+
+Salve `session.hurl` e execute
+`bin/httpgo test session.hurl --var base_url=http://localhost:8080` contra uma
+API que devolva `session=<valor variável>; Path=/; HttpOnly; Secure; SameSite=Lax`:
+
+```hurl
+GET {{base_url}}/session
+
+HTTP 200
+[Asserts]
+header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"
+```
+
+Exemplo versionado em `testdata/scenarios/scenario_assert_header_matches.hurl`,
+executado contra HTTP local nos E2E. O dummy manual não promete esse cookie.
+Remover `Secure`, alterar o formato ou omitir o header retorna **1**, sem imprimir
+cookie/padrão sensível, publicar capturas ou enviar a próxima requisição.
+
+`header "nome" matches "padrão"` exige `HTTP <status>` ou `HTTP *`. O padrão
+é **uma string JSON literal**: escapes JSON são decodificados uma vez antes da
+regex Go, como na US-15. Por exemplo, `"\s"` não é escape JSON válido;
+use `"\\s"` para a classe regex de whitespace. Operadores de header anteriores
+mantêm sua gramática de literais. Sem âncoras, basta encontrar um trecho;
+`^`/`$`, classes, grupos, alternativas, repetições, Unicode e opções internas
+`(?i)`, `(?m)`, `(?s)` seguem Go, sem normalização Unicode. Não há nova tolerância
+para controles inválidos em valores HTTP.
+
+Nomes ignoram caixa; somente a **primeira ocorrência** é comparada, mesmo vazia.
+Não concatena valores nem divide vírgulas. Ausência sempre falha, inclusive com
+padrão vazio; padrão vazio passa em qualquer valor presente e `^$` somente no
+vazio presente. Regex/escape inválido, lookaround, backreference, delimitador sem
+aspas ou operando extra retorna **2 antes de qualquer envio do arquivo**.
+
+A ordem permanece resposta final consumida/fechada → status → assertions na ordem
+escrita → capturas. Header isolado não retém body nem exige JSON. Leitura/close,
+timeout, cancelamento ou escrita de resultado continuam erros **2**, sem retry.
+Padrão e real de Authorization, Proxy-Authorization, Cookie e Set-Cookie ficam
+integralmente ocultos; headers comuns usam proteção de segredos conhecidos/derivados
+e captura secreta pendente. Nenhuma regex compilada é entregue ao relatório.
+
+Placeholders como `{{nome}}` permanecem estáticos, definidos ou não, sujeitos à
+sintaxe regex; não há interpolação nem `--render-asserts`. Regex de body/variável,
+captura por regex e seleção de todas as ocorrências continuam fora do recorte.
+Os 30 pares `header_matches_*` confrontados com Hurl **8.0.0** e as diferenças de
+gramática, primeira ocorrência/lista, interpolação, validação e códigos estão na
+[matriz diferencial](docs/compatibility.md#regex-de-headers--us-24--issue-46).
+Não se anuncia equivalência geral das engines ou homologação da suíte real.
 
 ## Validar dados JSON da resposta (US-08 / issue #20)
 
@@ -901,7 +950,7 @@ segredos arbitrários não marcados. Body, documento e coleções de headers nã
 são despejados nem acumulados no resultado.
 
 A US-14 acrescenta presença, contagem e limites (abaixo), sem ampliar JSONPath.
-A comparação por regex está restrita a strings selecionadas de JSON: consulte
+A comparação por regex em JSON restringe-se a strings selecionadas: consulte
 [Validar padrões textuais](docs/subset.md#padrões-textuais--us-15--issue-36). Não há
 interpolação de consultas nem padrões. Hurl 8.0.0 rejeita os literais esperados
 compostos e o literal com expoente testados; a gramática e os códigos próprios
@@ -962,8 +1011,8 @@ jsonpath "$.name" matches "^Pizza"
 `matches` busca trecho; âncoras controlam a string inteira e opções como `(?i)`
 são aceitas. Ausência, valor não string ou divergência retorna 1; regex ou
 escape inválido retorna 2 antes de qualquer envio. Placeholders no padrão são
-literais. `matches` não se aplica a headers/body/variáveis e não suporta
-interpolação ou captura por regex. A evidência específica frente a Hurl 8.0.0 e
+literais. A US-24 acrescenta `matches` em headers (acima); body/variáveis,
+interpolação e captura por regex continuam não suportados. A evidência específica frente a Hurl 8.0.0 e
 os códigos próprios estão na [matriz](docs/compatibility.md).
 
 ## Documentação e desenvolvimento

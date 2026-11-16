@@ -59,6 +59,11 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, pattern := range []string{`"^session=[^;]+; Secure$"`, `"^a\\s\"b\\\\c/$"`, `"(?i)\\p{L}+"`, `"{{absent}}"`, `""`, `"^$"`, `"private["`, `"(?=private)"`, `"(private)\\1"`, `"\x41private"`, `/private/`, `"private" "extra"`} {
+		for _, newline := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\nGET http://example.test/late\nHTTP *\n[Asserts]\n  header \"Set-Cookie\" matches "+pattern, "\n", newline))
+		}
+	}
 	for _, expression := range []string{`contains "{{literal}}"`, `not contains null`, `contains true`, `not contains 1e9999999999999999999999`, `not exists`, `not exists null`, `contains []`, `not contains {}`, `not`, `not == 1`, `count not contains 1`, `count not exists`} {
 		f.Add("GET http://example.test/first\r\nGET http://example.test/late\r\nHTTP *\r\n[Asserts]\r\n  jsonpath \"$.items[0]\" " + expression)
 	}
@@ -102,7 +107,7 @@ func FuzzParse(f *testing.F) {
 		"GET http://example.test\r\nHTTP *\r\n[Asserts]\r\nheader \"X\" == \"{{literal}}\"\r\nheader \"X\" contains \"\"\r\nheader \"X\" exists",
 		"GET http://example.test\nHTTP 200\n[Captures]\ntoken: jsonpath \"$\"\n[Asserts]\nheader \"Set-Cookie\" == \"private\"\nGET http://example.test/next",
 		"GET http://example.test\nHTTP 200\n[Asserts]\nheader \"X\" exists\n[Captures]\ntoken: jsonpath \"$\"",
-		"GET http://example.test\nHTTP *\n[Asserts]\nheader \"X\" matches \"x\"",
+		"GET http://example.test\nHTTP *\n[Asserts]\nheader \"X\" startsWith \"x\"",
 		"GET http://example.test\nHTTP 200\n[Asserts]\njsonpath \"$.name\" matches \"^Pizza\\\\s\"",
 		"GET http://example.test\r\nHTTP *\r\n[Asserts]\r\njsonpath \"$\" matches \"(?=x)\"",
 		"GET http://example.test\n[Asserts]",

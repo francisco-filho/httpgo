@@ -1,4 +1,78 @@
-# Validação — US-01 a US-16, US-20 a US-23
+# Validação — US-01 a US-16, US-20 a US-24
+
+## US-24 — issue #46 / história 0024
+
+Plano/arquitetura/tasks da issue #46 executados sem planner, somente backend,
+na ordem da fila 0024: `back:1` no commit `720a197` (regex de header ponta a ponta,
+pré-validação e diagnóstico protegido), `back:2` no commit `8885b74` (sigilo,
+isolamento e recursos), `back:3` nesta alteração (corpus, ajuda, documentação e
+gates integrados). Sem frontend/estáticos, mudança de Go/dependências, CI/lint,
+query ou transporte de produção. Nenhuma fonte Hurl consultada/copiada/adaptada.
+Os gates locais não substituem o review; SonarQube não foi executado pelo backdev.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`. Ferramentas existentes `goimports` e
+`golangci-lint` selecionadas por `/home/ff/go/bin` no PATH. Hurl **8.0.0** existente
+em `/tmp/httpgo-0021-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` selecionado no
+PATH do diferencial, sem substituir Hurl padrão 8.0.1 ou instalar ferramentas.
+Aviso local de metadados libcurl não impediu identificação/execução.
+
+- Task 1: passaram `go test ./internal/parser ./internal/assertion ./internal/runner
+  ./internal/cli`, `go test ./tests/e2e -count=1`, `make fmt lint test`,
+  `go vet ./...` e `make build` antes do commit.
+- Task 2: passaram `go test ./internal/runner ./internal/cli ./internal/transport`,
+  `go test ./tests/e2e -count=1`, `make fmt lint test`, `go vet ./...` e
+  `make build` antes do commit. Recursos com HTTP local e fakes de read/close,
+  canais/contextos sem sleeps/retries; resultados e callbacks inspecionados.
+- Task 3: **30 novos pares `header_matches_*`** observados contra Hurl **8.0.0**.
+  A primeira rodada explicitou diferenças de regex inválida e delimitador; somente
+  fixtures novas foram corrigidas pontualmente. Headers presentes nas fixtures de
+  regex inválida evitam confundir falha de ausência com compilação no Hurl.
+  `make compatibility` passou com **243 pares**, sem skip/`-update`; os **213
+  anteriores não foram alterados/regenerados**. Harness não precisou mudar.
+- Gate integrado: passaram `make compatibility`, `make fmt lint test`,
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e`. Lint **0 issues**;
+  `make test` usa **race e cobertura** em todos os pacotes. Coberturas:
+  assertion **94,2%**, parser **97,4%**, query **95,6%**, runner **93,5%**,
+  CLI **97,5%**, transport **90,4%**, template **95,7%**, config **96,0%**,
+  suite **95,4%**. E2E reutiliza build único e `exec.CommandContext`, verificando
+  stdout/stderr, exit code e contadores de HTTP real.
+- Seeds do parser ampliados com header matches, LF/CRLF, escapes, placeholders,
+  vazio e padrões inválidos/não suportados tardios. Passaram sem crash:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**62.484 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**17.241 execuções**) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**32.772 execuções**). Contagens descrevem apenas esta rodada.
+- Exemplo publicado e ajuda root/test exercitados pelo binário; seis negativos
+  versionados verificam rejeição antes de qualquer envio. Formatação Go, diff e
+  links locais das páginas alteradas conferidos.
+- Cross-builds e execução nativa macOS/Windows não realizados: opcionais conforme
+  plano v4, não bloqueios. Corpus sintético não é homologação da suíte real nem
+  prova de equivalência geral de engines, gramática ou políticas de segurança.
+
+### Rastreabilidade GO-272–GO-286
+
+| GO | Evidência executada |
+|---|---|
+| GO-272 | `TestHeaderMatchesSessionByBinary`, `TestHeaderMatchesHelpAndPublishedExample`, pares `session`/`session_missing_secure`: sessões distintas, formato divergente/ausência, 0/1 e interrupção sem captura/próximo envio |
+| GO-273 | `TestHeaderMatchesSemantics`, `TestHeaderMatchesSemanticsByBinary`, pares `partial`/`anchored`: busca interna versus âncoras |
+| GO-274 | `TestHeaderMatchesParsing`, `TestHeaderMatchesSemantics`, `TestHeaderMatchesSemanticsByBinary`, pares `escapes`/`slash`/`groups`: JSON uma vez e regex depois; gramática antiga preservada |
+| GO-275 | mesmos testes de semântica, pares `case`/`option`/`unicode`/`unicode_class`/`normalization`: caixa, opções Go e Unicode sem normalização; newline só no fake, sem relaxar HTTP |
+| GO-276 | runner/CLI/E2E de matches e pares `empty_*`/`missing`: ausência distinta de vazio, padrão vazio e `^$` |
+| GO-277 | `TestHeaderMatchesSemantics`, `TestHeaderMatchesCLI`, `TestHeaderMatchesSemanticsByBinary`, pares `first`/`second`/`first_empty`/`second_after_empty`/`comma`: nome sem caixa e primeira ocorrência inclusive vazia |
+| GO-278 | `TestHeaderMatchesInvalidLate`, `TestHeaderMatchesInvalidPreflightCLI`, `TestHeaderMatchesInvalidLateByBinary`, `TestHeaderMatchesStructuralCorpusByBinary`: erro tardio 2, zero envios e diagnóstico localizado/seguro LF/CRLF; negativos de nomes/seção e operadores preservados |
+| GO-279 | `TestHeaderMatchesSemantics`, `TestHeaderMatchesSemanticsByBinary`, pares `literal_missing`/`literal_defined`: padrão não resolve variável/captura ou exige definição |
+| GO-280 | `TestHeaderMatchesOrderAndCaptures`: status primeiro, JSON/header na ordem, captura depois; falhas 1/2 distintas, reutilização após aprovação e HTTP * sem comparação numérica |
+| GO-281 | `TestHeaderMatchesSensitiveFailure`, `TestPendingSecretConcealsAssertionsAndMetadata`, `TestHeaderMatchesKnownDerivedSecrets`, `TestHeaderMatchesCLI`, `TestJSONAndHeaderPendingSecretCLI`, `TestHeaderMatchesPendingSecretByBinary`: proteção antes de callbacks/coleção/streams, sem antecipar captura falha |
+| GO-282 | `TestCompatibility` (30 pares novos, 243 totais, Hurl 8.0.0), `TestHeaderMatchesHelpAndPublishedExample`: matriz, ajuda e exemplo executáveis, diferenças explícitas |
+| GO-283 | `TestHeaderMatchesCompleteFinalResponse`, `TestHeaderMatchesReadCloseAndDiscard`, `TestHeaderMatchesFinalAndIncompleteByBinary`: só resposta final completa; header isolado descarta body não JSON |
+| GO-284 | mesmos testes de transporte/E2E e `TestHeaderMatchesConsumptionRealCancellation`: read/close/timeout/cancel/incomplete são 2, zero concluídas, recursos fechados e sem aprovação/captura/retry/próximo envio |
+| GO-285 | `TestHeaderMatchesReportFailurePreservesCounts`, `TestHeaderMatchesWriterFailureOverridesAllOutcomes`, `TestHeaderMatchesRealOutputFailure`: write/short write prioritário, contagens/resultados anteriores preservados, sem envio extra ou repetição no writer falho |
+| GO-286 | `TestHeaderMatchesMetadataAndIsolation`, `TestHeaderMatchesKnownDerivedSecrets`, callbacks de segurança: regex original reutilizável, nenhuma compilada em metadados de sucesso/falha; sessões e proteção dinâmicas independentes |
+
 
 ## US-23 — issue #44 / história 0023
 

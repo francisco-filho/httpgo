@@ -9,6 +9,7 @@ const (
 	HeaderContains    HeaderOperator = "contains"
 	HeaderNotContains HeaderOperator = "not contains"
 	HeaderExists      HeaderOperator = "exists"
+	HeaderMatches     HeaderOperator = "matches"
 )
 
 // Header compares a value literally. Only not contains approves absence.

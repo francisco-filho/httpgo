@@ -1,4 +1,54 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-23
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-24
+
+## Regex de headers — US-24 / issue #46
+
+**Ampliação intencional do contrato:** `header "nome" matches "padrão"`, com
+string JSON literal estática, engine Go da US-15 e primeira ocorrência da US-07.
+São **30 novos pares `header_matches_*`**, total **243 pares**, confrontados com
+**Hurl 8.0.0** em Linux usando o harness existente e `response_headers`.
+Os **213 pares anteriores permanecem inalterados**, sem regeneração.
+Fixtures são independentes entre runners; resposta não JSON comprova que regex
+de header não exige decode de body. Códigos/paths estão versionados, sem exigir
+stdout, diagnóstico ou códigos de falha idênticos.
+
+| Par `header_matches_*` | HTTPGo | Hurl 8.0.0 | Classificação / observação |
+|---|---|---|---|
+| `session` | 0; /capture → /health | 0; mesmos paths | cookie de sessão com atributos exigidos |
+| `session_missing_secure` | 1; /capture | 4; /capture | formato divergente em ambos; códigos próprios |
+| `partial` | 0; /capture → /health | 0; mesmos paths | correspondência interna sem âncoras |
+| `anchored`, `case` | 1; /capture | 4; /capture | âncoras e distinção de caixa por padrão |
+| `option` | 0; /capture → /health | 0; mesmos paths | opção interna `(?i)` no padrão testado |
+| `unicode`, `unicode_class`, `groups` | 0; /capture → /health | 0; mesmos paths | Unicode literal/classe de letras, grupos, alternativas e repetições testados |
+| `normalization` | 1; /capture | 4; /capture | formas Unicode distintas não são normalizadas |
+| `escapes`, `slash` | 0; /capture → /health | 0; mesmos paths | JSON decodificado uma vez: whitespace regex, aspas, barra invertida e `/` literal |
+| `empty_pattern`, `empty_value`, `empty_anchor` | 0; /capture → /health | 0; mesmos paths | padrão vazio passa no presente; `^$` passa no vazio |
+| `empty_anchor_value`, `missing` | 1; /capture | 4; /capture | âncora vazia falha no não vazio; ausência falha mesmo com padrão vazio |
+| `first`, `first_empty` | 0; /capture → /health | 4; /capture | **diferença deliberada:** primeira ocorrência (inclusive vazia) aqui; Hurl recebe lista, não string escalar |
+| `second`, `second_after_empty` | 1; /capture | 4; /capture | ambos falham, mas não por equivalência: segunda ocorrência não corrige primeira aqui; Hurl recebe lista |
+| `comma` | 0; /capture → /health | 0; mesmos paths | vírgula preservada em uma ocorrência, sem divisão |
+| `literal_missing`, `literal_defined` | 0; /capture → /health | 4; /capture | **diferença:** padrão estático aqui, mesmo com variável definida; Hurl tenta interpolar (ausente ou divergente) |
+| `malformed` | 2; zero envios | 4; /health → /capture | **diferença:** regex malformada é pré-validada aqui; Hurl reporta regex inválida após enviar |
+| `lookaround`, `backreference` | 2; zero envios | 4; /health → /capture | **não suportado:** rejeição estática controlada aqui; Hurl também reportou regex inválida, mas só em avaliação |
+| `json_escape`, `extra` | 2; zero envios | 2; zero envios | escape exclusivo de Go na string JSON e operando extra rejeitados antes da rede |
+| `unquoted` | 2; zero envios | 0; /health → /capture → /health | **diferença de gramática:** HTTPGo exige string JSON; Hurl aceita delimitadores `/private/` e corresponde |
+
+A primeira rodada dos pares novos mediu diferenças de validação e delimitadores;
+as observações foram ajustadas pontualmente ao binário real, sem `-update` global.
+Nos pares de regex inválida foram fornecidos headers presentes para não confundir
+ausência com validação da expressão no Hurl. Não se anuncia equivalência geral de
+engines, escapes, opções, lista/seleção de ocorrências ou interpolação. Primeira
+ocorrência, status → assertions na ordem escrita → capturas e códigos 0/1/2 são
+contratos próprios, não modificados para imitar Hurl. Não foi usada fonte Hurl.
+
+Padrão/real sensíveis (incluindo Set-Cookie), segredos conhecidos/derivados,
+captura secreta pendente, remoção da regex compilada de resultados/callbacks,
+isolamento, consumo/fechamento/contexto e falhas de writers são cobertos pelos
+testes HTTPGo, não por comparação de diagnósticos com Hurl. Evidências em
+[validation.md](validation.md#us-24--issue-46--história-0024).
+Regex de body/variável, captura por regex e todas as ocorrências continuam fora
+do suporte; placeholders permanecem estáticos, sem `--render-asserts`.
+Corpus sintético não é homologação da suíte real. Extensões YAML hierárquico e
+interpolação de arquivos externos continuam explicitamente próprias do HTTPGo.
 
 ## Inclusão e ausência — US-23 / issue #44
 
@@ -178,7 +228,7 @@ Foram adicionados três pares `matches_*`, executados pelo harness contra **Hurl
 | `matches_substring` | 0; /capture | 0; /capture | `Pizza` sem âncoras corresponde a trecho em `Mini Pizza` |
 | `matches_anchored` | 1; /capture | 4; /capture | `^Pizza$` não corresponde a `Mini Pizza`; códigos de falha são próprios |
 
-As observações estão versionadas nos pares `.hurl`/`.json`; resposta é JSON literal fornecida pelo fixture do harness. Nenhum código-fonte Hurl foi utilizado. Construções Go fora de `regexp/syntax` (incluindo lookaround e backreferences) são rejeitadas pelo HTTPGo; os pares acima não verificam equivalência desses recursos nem de escapes. Esperados permanecem literais em ambas as ferramentas nesta evidência. A divergência de código não é corrigida para imitar Hurl. `matches` em headers/body/variáveis continua não suportado.
+As observações estão versionadas nos pares `.hurl`/`.json`; resposta é JSON literal fornecida pelo fixture do harness. Nenhum código-fonte Hurl foi utilizado. Construções Go fora de `regexp/syntax` (incluindo lookaround e backreferences) são rejeitadas pelo HTTPGo; os pares acima não verificam equivalência desses recursos nem de escapes. Esperados permanecem literais em ambas as ferramentas nesta evidência. A divergência de código não é corrigida para imitar Hurl. A US-24 acrescenta `matches` em headers (seção própria acima); body/variáveis continuam não suportados.
 
 ## Ampliação US-14 — estrutura, quantidade e limites (issue #34)
 

@@ -1,0 +1,26 @@
+{
+  "response_json": "not JSON",
+  "classification": "both fail, but HTTPGo tests only first occurrence and Hurl sees a list",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "bad"
+    },
+    {
+      "name": "x-test",
+      "value": "ok"
+    }
+  ]
+}

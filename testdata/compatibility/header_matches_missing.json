@@ -1,0 +1,16 @@
+{
+  "response_json": "not JSON",
+  "classification": "shared absence mismatch even with empty pattern; codes differ",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

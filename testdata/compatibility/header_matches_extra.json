@@ -1,0 +1,12 @@
+{
+  "response_json": "not JSON",
+  "classification": "extra operand rejected before all HTTP",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

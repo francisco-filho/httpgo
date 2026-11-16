@@ -794,11 +794,12 @@ de status; assertions e capturas continuam obrigatórias quando declaradas.
 - Valores esperados são strings literais entre aspas duplas. `{{nome}}` é texto
   literal, com ou sem variável/captura definida; não passa pelo renderer.
   `exists` não aceita valor esperado. A US-23 acrescenta `not contains` (seção acima).
-  Não há regex, filtros ou outros operadores de assertion de header. Capturas literais são suportadas
+  A US-24 acrescenta `matches` com padrão string JSON (seção abaixo).
+  Filtros e outros operadores continuam fora do recorte. Capturas literais são suportadas
   separadamente em `[Captures]` (US-22). Construções fora desse recorte falham
   explicitamente com posição, antes de qualquer envio do arquivo.
 - Havendo ocorrências repetidas, somente a **primeira na ordem recebida** participa
-  de `==`/`contains`/`not contains`, inclusive se nomes chegam com caixas diferentes. Nunca há
+  de `==`/`contains`/`not contains`/`matches`, inclusive se nomes chegam com caixas diferentes. Nunca há
   concatenação ou divisão por vírgulas: `first,second` é uma única string.
 - Ausência faz `==`, `contains` e `exists` falharem; aprova `not contains`.
   Presente vazio satisfaz `exists` e `== ""`; `contains ""` passa para qualquer
@@ -818,6 +819,68 @@ Compatibilidade comprovada é limitada aos pares `headers_*` em `compatibility.m
 **Diferenças deliberadas em relação ao Hurl 8.0.0:** primeira ocorrência em vez de
 lista em headers repetidos; esperado literal em vez de interpolado; assertions
 antes de capturas. Não se anuncia equivalência nessas combinações.
+
+## Regex de headers — US-24 / issue #46
+
+**Ampliação intencional:** `[Asserts]` aceita `header "nome" matches "padrão"`,
+com `HTTP <status>` ou `HTTP *` na mesma entrada. Exemplo `session.hurl`:
+
+```hurl
+GET {{base_url}}/session
+
+HTTP 200
+[Asserts]
+header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"
+```
+
+Execute `httpgo test session.hurl --var base_url=http://localhost:8080` contra
+uma API que devolva `session=<valor variável>; Path=/; HttpOnly; Secure; SameSite=Lax`.
+O arquivo `testdata/scenarios/scenario_assert_header_matches.hurl` é exercitado
+pelo binário nos E2E. Valores de sessão diferentes passam; ausência de `Secure`,
+formato divergente ou header ausente falham com **1**, sem captura/próximo envio.
+
+- Padrão é **uma única string JSON entre aspas duplas**, decodificada uma vez e
+  compilada durante o parse integral do arquivo, com a mesma gramática da US-15.
+  `"\\s"` entrega `\s` à regex; aspas e barras usam escapes JSON. `"\x41"` não é
+  válido na camada JSON. Não há delimitadores `/.../` nem operando adicional.
+  A gramática dos literais dos operadores anteriores de header não mudou.
+- Correspondência por trecho, distinguindo caixa por padrão. Âncoras `^`/`$`,
+  classes, grupos, alternativas, repetições, Unicode e opções internas Go como
+  `(?i)`, `(?m)`, `(?s)` seguem `regexp`, sem normalização Unicode. As opções não
+  relaxam a validação de valores HTTP. Lookaround/backreferences são não suportados.
+- Nome é estático e ignora caixa. Somente a **primeira ocorrência recebida** é
+  avaliada, inclusive vazia; nenhuma ocorrência posterior corrige ou invalida o
+  resultado. Não há concatenação ou divisão por vírgulas. Header presente vazio
+  compara como `""`. Padrão vazio passa para qualquer valor presente; `^$` passa
+  só no vazio; ausência falha mesmo com padrão vazio e é diagnosticada como ausente.
+- Regex malformada, escape inválido e construção fora do recorte retornam **2**
+  antes de qualquer HTTP, inclusive em entrada tardia; erro localizado não ecoa
+  padrão, linha original nem erro bruto de biblioteca. Sintaxe inválida é distinta
+  de construção não suportada. Negativos pequenos estão em `testdata/scenarios/`.
+- Só a resposta final completa, consumida e fechada é comparada. Ordem: status →
+  assertions na ordem escrita → capturas atômicas → apresentação. Primeira falha
+  impede capturas e próximos envios, inclusive com `HTTP *`. Header anterior a
+  JSON inválido pode falhar com 1; JSON anterior falha com 2. Header isolado não
+  retém body nem tenta decodificar JSON. Falhas de consumo/fechamento, prazo,
+  cancelamento ou escrita permanecem 2; não há retry ou aprovação parcial.
+- Padrão e real de Authorization, Proxy-Authorization, Cookie e Set-Cookie ficam
+  **integralmente ocultos**, independentemente de marca explícita. Headers comuns
+  aplicam proteção de segredos conhecidos/derivados; captura secreta pendente na
+  mesma entrada oculta os dois operandos sem antecipar avaliação/publicação.
+  Nome, operador e posição seguros permanecem; não há coleção de headers/body.
+  Clones seguros dos resultados/callbacks não conservam regex compilada, que
+  retém sua fonte, mesmo em sucesso ou erro. O cenário original não é mutado.
+- Placeholders `{{nome}}` permanecem **literais e estáticos**, definidos ou não;
+  continuam sujeitos à sintaxe regex, não são automaticamente escapados e não
+  passam pelo renderer. Não há flag `--render-asserts` nem antecipação da US-30.
+  Regex de body/variável, captura por regex, filtros e todas as ocorrências ficam
+  fora do suporte.
+
+Os **30 pares `header_matches_*`** com Hurl **8.0.0** estão classificados na
+[matriz diferencial](compatibility.md#regex-de-headers--us-24--issue-46).
+Primeira ocorrência em vez de lista, esperado estático em vez de interpolado,
+validação antecipada e códigos são contratos próprios, não equivalência geral
+de engine/gramática. Corpus sintético não é homologação da suíte real.
 
 ## Igualdade JSON — US-08 / issue #20
 
@@ -885,7 +948,7 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
 
 ### Padrões textuais — US-15 / issue #36
 
-**Ampliação intencional:** `[Asserts]` aceita `jsonpath "consulta" matches "padrão"`, somente para o valor selecionado por JSONPath. Não amplia a consulta JSONPath nem adiciona operadores a headers, body bruto ou variáveis.
+**Ampliação intencional:** `[Asserts]` aceita `jsonpath "consulta" matches "padrão"`, somente para o valor selecionado por JSONPath. Não amplia a consulta JSONPath; a US-24 reutiliza a regex para headers (seção acima), mas body bruto e variáveis continuam fora do recorte.
 
 ```hurl
 GET {{base_url}}/products/1
@@ -898,7 +961,7 @@ O padrão é um literal string JSON em aspas duplas; escapes são interpretados 
 
 String divergente, consulta ausente ou valor selecionado não string falha como assertion (**1**), sem coerção. Ausência e tipo incompatível são diagnosticados separadamente; arrays/objetos não são impressos. JSON inválido e percurso incompatível permanecem erro de avaliação (**2**). Regex inválida/não suportada ou escape JSON inválido rejeita o arquivo inteiro antes de qualquer HTTP, inclusive se a declaração for tardia. A ordem continua status → assertions na ordem escrita → capturas; a primeira falha interrompe capturas e próximos envios. Padrão e valor são sanitizados, e captura secreta pendente oculta os dois integralmente sem avaliação antecipada. Resultados não conservam padrão operacional nem regexp compilada.
 
-O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. `matches` em headers/body/variáveis, captura por regex e interpolação continuam fora do suporte.
+O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. A US-24 acrescenta `matches` em headers; body/variáveis, captura por regex e interpolação continuam fora do suporte.
 
 ### Presença, quantidade e limites — US-14 / issue #34
 
@@ -936,7 +999,7 @@ Ausência, tipo selecionado não numérico e condição falsa falham com 1. Espe
 não numérico é sintaxe inválida (2) antes da rede; JSON inválido e percurso
 incompatível continuam erros de avaliação (2).
 
-Continuam fora do recorte: count em strings/objetos/capturas, filtros e interpolação de consultas ou esperados. `matches` é restrito a strings selecionadas de JSON e tem seu próprio recorte documentado acima. A gramática de literais
+Continuam fora do recorte: count em strings/objetos/capturas, filtros e interpolação de consultas ou esperados. `matches` aceita strings selecionadas de JSON e a primeira ocorrência de header, nos recortes documentados acima. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. Os novos pares com Hurl 8.0.0 confirmam que null, vazios,
 false e zero presentes satisfazem `exists`. Count negativo/fracionário é rejeitado

@@ -460,7 +460,20 @@ header "Set-Cookie" not contains "Domain" aprova ausência ou primeira ocorrênc
 Header presente com not contains "" falha, inclusive vazio.
 contains "" passa para qualquer valor presente, inclusive vazio.
 Esperados são strings literais: {{nome}} não interpola, mesmo se definido.
-Sem regex, filtros ou outros operadores de assertion de header.
+Regex de headers: salve session.hurl e execute
+  httpgo test session.hurl --var base_url=http://localhost:8080
+(requer um cookie no formato de sessão abaixo):
+  GET {{base_url}}/session
+  HTTP 200
+  [Asserts]
+  header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"
+Padrão string JSON literal, sem interpolação; busca parcial, ^/$ ancoram.
+Opções Go (?i), (?m), (?s) e Unicode seguem a US-15, sem normalização.
+Ausente falha com 1; matches vazio passa em todo header presente, inclusive vazio.
+^$ passa somente no vazio presente. Somente primeira ocorrência, sem juntar valores.
+Regex/escape inválido, lookaround e backreferences: 2 antes de qualquer HTTP do arquivo.
+Padrão e real de Set-Cookie e demais nomes sensíveis ficam integralmente ocultos.
+Sem regex de body/variável, captura por regex, filtros ou seleção de todas as ocorrências.
 Capturas literais de headers são suportadas em [Captures] (exemplo abaixo).
 Ordem: resposta consumida/fechada, status, assertions na ordem escrita, capturas, resultado.
 Falha de header retorna 1, não publica capturas e impede próximo envio.
@@ -533,7 +546,8 @@ Negativos, decimais e expoentes com precisão exata, sem arredondar.
 jsonpath "$.name" matches "^Pizza": encontra trecho em string JSON, sem coerção;
 ^/$ ancoram, opções Go como (?i) são aceitas. Padrão JSON literal, sem interpolação.
 Ausência/tipo incompatível/condição falsa: 1; JSON inválido: 2.
-Regex Go inválida/não suportada e matches em header/body: erro 2 antes da rede.
+Regex Go inválida/não suportada e matches em body/variável: erro 2 antes da rede.
+Headers também aceitam matches, com primeira ocorrência e padrão JSON literal (acima).
 Sem count em strings/objetos/capturas, filtros ou JSONPath ampliado.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
 pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
