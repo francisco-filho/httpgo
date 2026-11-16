@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-15 e US-20
+# Arquitetura implementada — US-01 a US-16 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -11,6 +11,8 @@ copiar, adaptar ou traduzir código-fonte Hurl.
 cmd/httpgo/main.go
   → internal/cli/command.go + arguments.go (flags/contexto novo e proteção)
     → internal/config/config.go + value.go + compose.go + environment.go + reference.go (YAML, composição e resolução explícita)
+    → internal/suite/discovery.go (descoberta completa, identidade e ordenação)
+    → internal/suite/run.go (carga por arquivo, continuação, agregação compacta)
     → internal/parser/parser.go + capture.go + assertion.go + multipart.go (arquivo inteiro)
       → internal/query/jsonpath.go (validar consultas antes da rede)
     → internal/runner/runner.go + render.go (somente cenário validado)
@@ -29,7 +31,8 @@ cmd/httpgo/main.go
       → internal/runner/capture.go (serializar seleção JSON sem float64)
       → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
       → apresentação segura de cada resultado na CLI (callback síncrono)
-    → resumo final na CLI
+    → resumo por arquivo na CLI antes do próximo arquivo
+  → resumo agregado da suíte na CLI
 ```
 
 O diagrama é fluxo de execução; `runner` **não importa** o adapter HTTP.
@@ -55,7 +58,8 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 | `parser.JSONAssertion.Pattern`, `Compiled` | `matches` conserva literal de padrão e `*regexp.Regexp` validado durante parse integral; padrão não passa por renderer e é removido dos metadados pelo `safeEntry` |
 | `runner.HeaderFailure`, `JSONFailure`, `JSONError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
-| `cli.Command`, `BuildInfo` | Argumentos e streams (`SetArgs/SetIn/SetOut/SetErr`), leitura/fechamento antes da rede, saída segura, resumo e exit code; não reavalia assertion |
+| `suite.Suite`, `File`, `FileResult`, `State`, `Summary`, `Result`, `Options` | Descoberta completa, carga/fechamento por arquivo, reutilização do runner com sessão nova, estados e contagens compactos, fail-fast e interrupções globais; não importa CLI ou transporte |
+| `cli.Command`, `BuildInfo` | Argumentos/streams (`SetArgs/SetIn/SetOut/SetErr`), configuração única, montagem da suíte, saída segura e exit code; não reavalia assertion |
 | `main.run` | Monta dependências, `signal.NotifyContext`, streams do processo; seus defers terminam antes do único os.Exit de produção em main |
 
 `AGENTS.md` registra a exceção autorizada para `transport` importar **os tipos**
@@ -317,8 +321,10 @@ prefixam somente divergências e falhas. O resumo continua identificando o arqui
 Não há goroutine, fila de eventos ou espera pelo fim do arquivo para apresentar
 um resultado. Callback `nil` permite coletar resultados sem apresentação.
 
-Ao terminar ou interromper a execução, `renderSummary` escreve o resumo uma única
-vez e apresenta o diagnóstico/exit code. Resultados já emitidos não são reimpressos.
+Ao terminar ou interromper o arquivo, `renderFile` escreve o resumo uma única
+vez e `renderDiagnostic` apresenta sua causa sem decidir continuação. Classificação
+fica em `suite`, separada da apresentação: `renderSuite` escreve o agregado e a
+CLI retorna `suite.Result.Code`. Resultados já emitidos não são reimpressos.
 O resultado estruturado e suas contagens continuam disponíveis no retorno do runner.
 
 Se o callback falhar, `Result.ReportErr` preserva a causa e o runner não inicia o
@@ -414,9 +420,12 @@ próximas entradas; callback síncrono e prioridade de ReportErr permanecem.
 
 A sessão registra proteção de valores JSON secretos assim que descobertos, inclusive
 antes de uma eventual falha em outra declaração. Runner sanitiza DisplayURL antes
-do callback; os writers da CLI combinam `argumentProtection` e `Session.Sanitize`
-antes de escrever resultados/diagnósticos/resumos. `executionProtection` é local a
-ExecuteContext, sem sobreviver na instância do comando original. Variantes para
+do callback. `invocationSession` combina `Session.Sanitize` com `executionProtection`,
+que acumula variantes de redação deduplicadas em um mapa local a ExecuteContext,
+sem guardar sessões ou capturas completas e sem sobreviver na instância original
+do comando. Os writers combinam essa memória com `argumentProtection`/configuração.
+`template.Session.ProtectionValues` fornece snapshot independente das variantes,
+reutilizando `SecretVariants`/`Protector`, sem publicar valores no próximo contexto. Variantes para
 capturas partem de JSON validado: `ProtectCapture(name, json.RawMessage)` reutiliza
 `SecretVariants`/`Protector`, inclusive constituintes e escapes conhecidos de
 arrays/objetos, sem disponibilizar propriedades como variáveis. A proteção também
@@ -602,6 +611,49 @@ comuns sanitizados podem aparecer no diagnóstico de assertion. Valores de
 Authorization/Proxy-Authorization/Cookie/Set-Cookie e credenciais do JSON ficam
 fora de ambos os streams. stdout e stderr têm papéis distintos e falhas de escrita
 geram código 2.
+
+## Suítes sequenciais — US-16
+
+`cli.arguments.files` aceita caminhos múltiplos e `failFast` reconhece `--fail-fast`
+sem valor. A preparação de configuração permanece única por invocação, antes de
+qualquer HTTP. `suite.NewWithProtection` recebe o runner montado e somente a função
+de proteção da invocação; não conhece configuração ou transporte concreto.
+
+`Suite.Discover` inspeciona componentes explícitos antes de limpar `.`/`..` para
+não aceitar `link/../arquivo`. Usa `Lstat`, percurso recursivo sem seguir links,
+`ReadDir` e abertura/fechamento efetivos de arquivos regulares. Ordena candidatos
+por `filepath.Rel(cwd, absoluto)` com `/`, com fallback absoluto entre unidades;
+deduplica via `os.SameFile`, sem inferir caixa pelo SO. Cada diretório explícito
+é verificado antes da deduplicação global. Falha descarta o plano inteiro, não
+executa prefixo. Não é sandbox contra alterações concorrentes do filesystem.
+Os pontos `open`, `lstat`, `readDir` e `now` são privados e por instância, sem
+interface pública genérica nem relógio global.
+
+Na vez do arquivo, `RunFile`/`load` abrem, verificam tipo, chamam `parser.Parse`,
+fecham antes de HTTP e preservam causa de leitura/fechamento sem texto bruto.
+`Scenario.OriginDir` é absoluto e separado do nome exibível normalizado. Erro
+estrutural/carga não retorna cenário parcial; parsing não antecipa resolução de
+capturas. `Runner.RunWithOptions` recebe opções por valor e pede sessão nova à
+factory existente; variáveis iniciais permanecem imutáveis e o transporte continua
+sem cookie jar. Payloads não mudam de raiz conforme configuração ou arquivo seguinte.
+
+`Suite.Run` classifica erro, divergência e sucesso completo sem reavaliar assertions
+nem usar `Summary.Validated` como prova de sucesso. Guarda `FileResult` com nome
+protegido, estado, duração, contagens e indicador `Known`: nunca cenário, body,
+response, sessão completa ou runner.Result. O runner.Result e erro de carga são
+somente entradas transitórias do callback síncrono de apresentação. Erros expõem
+mensagem controlada/protegida e causa via Unwrap. O código agregado usa 2 > 1 > 0.
+
+Sem fail-fast, erro local continua; com a flag, posteriores têm `Skipped` e
+contagens desconhecidas, sem carga/parsing só para contar. Cancelamento global
+ou qualquer falha de apresentação interrompe sempre, mesmo sem fail-fast; timeout
+HTTP isolado continua local. Relógio por instância mede durações não negativas.
+Writers da invocação lembram a primeira falha/short write para não tentar o mesmo
+writer novamente. Callback de entrada falhou: não há callback/resumo de arquivo
+nem agregado posterior. Arquivos restantes são registrados compactamente como
+não executados sem novos envios. Proteção antecede coleção/callback, inclusive
+erros de parsing e nomes posteriores; novas variantes também protegem os nomes
+retidos até o retorno. Invocação seguinte não herda opções, variantes ou resultados.
 
 ## Testes e evidência
 

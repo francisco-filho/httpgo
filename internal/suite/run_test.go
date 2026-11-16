@@ -252,6 +252,28 @@ func TestDiscoveryCancellationAndLateLoadFailure(t *testing.T) {
 	}
 }
 
+func TestSuiteProtectedErrorCauseAndNonnegativeDuration(t *testing.T) {
+	dir := t.TempDir()
+	fixture(t, dir, "fiction-secret.hurl", "GET http://example.test")
+	cause := errors.New("private raw transport cause")
+	s := NewWithProtection(runner.New(executeFunc(func(context.Context, runner.Request) (runner.Response, error) { return runner.Response{}, cause }), nil), func(text string) string { return strings.ReplaceAll(text, "fiction-secret", "[oculto]") })
+	now := time.Unix(20, 0)
+	s.now = func() time.Time { now = now.Add(-time.Second); return now }
+	files, err := s.Discover(context.Background(), []string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := s.Run(context.Background(), files, Options{}, func(file FileResult, run runner.Result, _ error) error {
+		if strings.Contains(file.Name, "fiction-secret") || !errors.Is(run.Err, cause) || strings.Contains(run.Err.Error(), cause.Error()) {
+			t.Fatalf("file=%+v err=%v", file, run.Err)
+		}
+		return nil
+	})
+	if result.Code != 2 || result.Summary.Duration != 0 || result.Files[0].Duration != 0 {
+		t.Fatalf("result=%+v", result)
+	}
+}
+
 func TestSuiteStatusValidationDoesNotImplyRequestSuccess(t *testing.T) {
 	// Header assertion fails after numeric status passed; the aggregate must not
 	// infer request success from Summary.Validated.

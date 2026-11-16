@@ -1,4 +1,28 @@
-# Matriz de compatibilidade — US-01 a US-15 e US-20
+# Matriz de compatibilidade — US-01 a US-16 e US-20
+
+## Contrato de suíte — US-16 (issue #38)
+
+Descoberta de diretórios, normalização/deduplicação, ordenação por caminho relativo
+ao cwd com `/`, links, configuração YAML e `--fail-fast` pertencem ao contrato da
+CLI HTTPGo. Não são novas construções da linguagem `.hurl` nem promessa de
+semântica idêntica à CLI Hurl. São verificados separadamente em
+`internal/suite`, `internal/cli/suite*_test.go` e `tests/e2e/suite*_test.go`.
+Os fixtures próprios estão em `testdata/suites/basic/`, fora do corpus diferencial.
+
+Caminhos exibidos passam a relativos normalizados (fallback absoluto entre
+unidades); resumos por arquivo preservam contadores e acrescentam estado/duração,
+e `resumo suíte:` agrega inclusive arquivo único. Arquivo sem parsing completo
+não recebe contagem planejada inventada. Exit codes próprios continuam 0/1/2,
+com 2 prevalecendo sobre 1; itens não executados nunca são aprovados. Configuração
+única, sessão/capturas novas por arquivo e ausência de cookie jar continuam
+restrições explícitas. A proteção de variantes persiste entre arquivos da mesma
+invocação sem compartilhar variáveis capturadas. Não anuncia JUnit, paralelismo,
+dependências entre arquivos nem login compartilhado.
+
+Não há modificação do corpus de **139 pares** nem regeneração das observações
+anteriores nesta história. O gate permanece `make compatibility` com binário
+**Hurl 8.0.0**, sem skip; evidência efetiva em `validation.md`. A ampliação da
+CLI não amplia gramática, consultas ou predicados suportados.
 
 ## Ampliação US-15 — padrões textuais (issue #36)
 

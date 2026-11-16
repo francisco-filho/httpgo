@@ -53,18 +53,28 @@ func TestSuiteDemoAndFailurePrecedence(t *testing.T) {
 				}))
 				defer server.Close()
 				dir := t.TempDir()
-				configFile(t, dir, "01-health.hurl", "GET "+server.URL+"/health\nHTTP 200")
-				middle := "GET " + server.URL + "/products\nHTTP 200"
+				fixture := func(name string) string {
+					data, err := os.ReadFile(filepath.Join("../../testdata/suites/basic", name))
+					if err != nil {
+						t.Fatal(err)
+					}
+					return string(data)
+				}
+				configFile(t, dir, "01-health.hurl", fixture("01-health.hurl"))
+				middle := fixture("02-products.hurl")
 				if mode == "parse" {
 					middle += "\nHEAD " + server.URL + "/unsupported"
 				}
 				configFile(t, dir, "02-products.hurl", middle)
-				last := "GET " + server.URL + "/profile\nHTTP 200"
+				last := fixture("03-profile.hurl")
 				if mode == "mixed" {
 					last += "\nHEAD " + server.URL + "/unsupported"
 				}
 				configFile(t, dir, "03-profile.hurl", last)
-				args := []string{"test", dir}
+				configDir := t.TempDir()
+				base := configFile(t, configDir, "base.yaml", "version: 1")
+				environmentFile(t, configDir, "local", "variables: {base_url: "+server.URL+"}")
+				args := []string{"test", dir, "--config", base, "--env", "local"}
 				if fast {
 					args = append(args, "--fail-fast")
 				}

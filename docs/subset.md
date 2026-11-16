@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-15 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34 e #36)
+# Subconjunto suportado e extensões — US-01 a US-16 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34, #36 e #38)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -858,7 +858,9 @@ da referência. A semântica aprovada não é alterada para forçar equivalênci
 - Sem expectativa, inclusive 4xx/5xx é sucesso **sem validação de status**.
   Com expectativa numérica, compara-se igualdade com o status final recebido.
   `HTTP *` aceita esse status sem comparação numérica, mas não ignora assertions/capturas.
-- Divergência, falha de captura/renderização/transporte ou cancelamento interrompe as próximas entradas.
+- Divergência ou falha de captura/renderização/transporte interrompe as próximas
+  entradas do arquivo; outros arquivos seguem conforme `--fail-fast`. Cancelamento
+  global interrompe toda a suíte.
   Ctrl+C cancela a requisição em andamento. Evidência de sinal real: Linux;
   macOS/Windows ainda não têm aceite nativo (ver `validation.md`).
 - Não há cookie jar, proxy configurável ou leitura automática de HTTPGO_*. O transporte não lê HTTP_PROXY/HTTPS_PROXY nesta história.
@@ -866,14 +868,64 @@ da referência. A semântica aprovada não é alterada para forçar equivalênci
 ## CLI e saída
 
 ```text
-httpgo test <arquivo> [--config arquivo] [--render-files] [--var nome=valor] [--secret nome]
+httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--var nome=valor] [--secret nome]
 httpgo --help
 httpgo test --help
 httpgo --version
 ```
 
-`test` exige exatamente um arquivo regular legível. Não aceita diretórios,
-múltiplos arquivos, entrada de cenário/segredos por stdin nem outras flags.
+### Suítes — US-16 / issue #38
+
+`test` aceita um ou mais caminhos de arquivos regulares legíveis e diretórios,
+inclusive misturados. Descoberta recursiva seleciona somente extensão `.hurl`;
+arquivo explícito é validado pelo conteúdo, independentemente da extensão.
+
+- Normaliza caminhos absolutos/relativos, `.` e `..`, deduplica por identidade do
+  filesystem (incluindo hard links) e respeita sua equivalência de caixa, sem
+  transformar tudo em minúsculas. Ordena lexicograficamente pelos caminhos
+  relativos ao cwd, com `/`, independentemente da ordem dos argumentos. Externos
+  podem conter `../`; quando `filepath.Rel` não é possível (unidades distintas
+  no Windows), usa absoluto normalizado com `/` para exibição e ordenação.
+- Links descobertos são ignorados, inclusive quebrados/cíclicos. Caminho explícito
+  que atravessa link no destino ou em ancestral é rejeitado, mesmo em
+  `link/../arquivo`. Caminho inexistente/inválido/inacessível ou não regular,
+  falha de acesso durante descoberta ou cada diretório explícito sem elegíveis é
+  erro **2**, impedindo toda a rede, mesmo com outras entradas válidas. Acesso é
+  verificado efetivamente, não inferido apenas de bits de permissão. Não há
+  sandbox contra alterações concorrentes do filesystem.
+- Configuração global é carregada, resolvida e validada uma vez, antes da rede.
+  A descoberta completa termina antes do primeiro envio, mas **não** faz parsing
+  antecipado de todos os arquivos. Na vez de cada arquivo, abre, pré-valida o
+  conteúdo inteiro e fecha antes de chamar runner. Falha de carga/fechamento ou
+  estrutura inválida descarta o cenário inteiro e não executa prefixos.
+- Arquivos e requisições são sequenciais. Cada arquivo recebe variáveis e opções
+  iniciais imutáveis e sessão nova; capturas não passam ao próximo. Não há cookie
+  jar, nem cookies automáticos dentro/entre arquivos. Isolamento não desfaz efeitos
+  na API. Payloads permanecem relativos ao respectivo cenário, não à configuração.
+- Primeira falha ou erro interrompe as próximas requisições do arquivo, sem retry.
+  Sem `--fail-fast`, continua arquivos seguintes, inclusive após erro de parsing.
+  Com a flag sem valor, não inicia os posteriores e os identifica como **não
+  executados**, sem analisá-los só para contar requisições. Cancelamento do contexto
+  global e falha de apresentação sempre interrompem a suíte. Timeout HTTP continua
+  por requisição: erro local permite próximo arquivo sem fail-fast.
+- Proteção de segredos conhecidos/derivados e variantes persiste por toda a
+  invocação, inclusive em nomes de arquivos, assertions e erros tardios, sem
+  compartilhar capturas ou reter sessões anteriores. Invocação seguinte é nova.
+
+Exemplo com três arquivos (fixtures em `testdata/suites/basic/`):
+
+```sh
+httpgo test tests/ --env local
+httpgo test tests/ --env local --fail-fast
+```
+
+Se health/profile passam e products diverge, retorna 1: dois sucessos e uma falha
+sem a flag, um sucesso, uma falha e um não executado com ela. Misturar erro e
+assertion divergente retorna 2. Sem paralelismo, dependências entre arquivos,
+compartilhamento implícito de login, cenário/segredos por stdin ou outras flags.
+
+### Resultados e contagens
+
 `--output`, `--output-file`, `check` e configurações futuras
 não estão implementados ou anunciados como disponíveis.
 
@@ -895,19 +947,25 @@ GET http://localhost:8080/error: sem validação de status (recebido 500)
 "health.hurl":1:1: GET http://localhost:8080/health: status divergente (esperado 200, recebido 503)
 ```
 
-O resumo continua identificando o arquivo, sem linha/coluna.
+O resumo identifica o arquivo normalizado, sem linha/coluna. Desde a US-16,
+nomes em resumos e diagnósticos são relativos ao cwd com `/` (ou fallback absoluto
+entre unidades), mesmo quando o argumento original foi absoluto. Referências de
+payload conservam sua localização própria.
 
 A linha de cada resultado é escrita **assim que a requisição termina, antes de
 iniciar a próxima**, sem esperar o arquivo inteiro terminar. O parsing completo
-continua ocorrendo antes de qualquer rede ou resultado. Uma resposta só está
+do arquivo continua ocorrendo antes de suas requisições; uma falha de
+pré-validação gera somente resumo/diagnóstico daquele arquivo. Uma resposta só está
 concluída depois de consumir e fechar o body; receber headers não basta para
 exibir validação aprovada. As requisições continuam sequenciais, sem goroutines
 adicionais para apresentar os resultados. Os códigos de saída são preservados.
 A apresentação incremental não reimprime resultados no final.
 
-O resumo é escrito uma única vez ao final da execução, inclusive quando uma
-requisição interrompe a sequência por divergência, captura, renderização, transporte ou cancelamento.
-O resumo em stdout informa:
+O resumo de cada arquivo é escrito uma única vez antes de iniciar o seguinte,
+inclusive quando houve divergência, captura, renderização, transporte ou cancelamento.
+Uma linha `resumo suíte:` agrega a invocação, também para arquivo único. Não há
+novo formato de saída: a evolução adiciona campos ao resumo por arquivo e uma
+linha agregada. Os contadores por arquivo em stdout continuam:
 
 - `total`: entradas validadas pelo parser;
 - `iniciadas`: chamadas ao executor — **não comprova recebimento pelo servidor**;
@@ -917,20 +975,46 @@ O resumo em stdout informa:
   a linha individual distingue esses dois casos. Não significa que headers/JSON não foram avaliados;
 - `não_iniciadas`: entradas não iniciadas por interrupção.
 
-Erros de entrada anteriores ao runner não apresentam resumo de execução.
+O resumo por arquivo acrescenta `resultado` (`sucesso`, `falha de assertion`,
+`erro` ou `não executado`) e `duração` não negativa de carga/execução. `validadas`
+**não** comprova sucesso completo da requisição: uma assertion de header/JSON ou
+captura posterior pode falhar após o status passar.
+
+Erro de pré-validação tem zero `iniciadas`/`concluídas` e resultado `erro`.
+`total` e `não_iniciadas` são `desconhecido` quando não houve parsing completo,
+inclusive para arquivos não executados; não se inventa zero como quantidade de
+requisições planejadas. Uso/configuração/descoberta inválidos impedem a execução
+inteira e não apresentam resumos.
+
+O agregado informa:
+
+- `arquivos`: selecionados após deduplicação; `processados`: carga tentada;
+  `executados`: pelo menos uma requisição iniciada;
+- `sucessos`, `falhas_assertion`, `erros`, `não_executados`: estados dos arquivos,
+  não derivados do contador de status aprovados;
+- `requisições_conhecidas`: soma de `total` apenas dos arquivos com parsing completo;
+  `arquivos_contagem_desconhecida`: arquivos com erro de carga/parsing ou não executados;
+- `iniciadas`, `concluídas`, `validadas`, `sem_validação`, `não_iniciadas`: soma dos
+  contadores conhecidos do runner. `não_iniciadas` não inclui entradas desconhecidas;
+- `requisições_sucesso`: requisições concluídas sem qualquer falha, inclusive sem
+  assertion; `requisições_falha_assertion`: divergências; `requisições_erro`: entradas
+  com erro reportado, inclusive pré-envio. Erro de parsing não inventa uma entrada;
+- `duração`: carga/execução/apresentação sequencial da suíte, sem configuração ou
+  descoberta. Duração e contagens não são um timeout global.
+
 Diagnósticos ficam em stderr e incluem posição quando identificável. Erros
 brutos da rede, Location, linha de entrada e bodies nunca são impressos.
 
 | Exit code | Significado |
 |---|---|
-| 0 | todas as entradas concluídas sem divergência; inclui sem expectativa |
-| 1 | primeira divergência de status ou assertion de header/JSON |
+| 0 | todos os arquivos concluídos sem falha/erro; inclui requisições sem expectativa |
+| 1 | pelo menos uma divergência de status ou assertion de header/JSON, sem erros de categoria 2 |
 | 2 | uso, configuração, arquivo, parsing, avaliação JSON, captura, renderização, transporte, TLS, timeout, cancelamento ou escrita |
 
-Erro ao escrever stdout/stderr também é categoria 2; não transforma divergência
-em sucesso. Falha na escrita de um resultado interrompe o arquivo antes da requisição
-seguinte, preserva o que já foi escrito e não tenta emitir resumo no stdout que
-falhou. O erro é diagnosticado de forma segura em stderr, sem ecoar a causa bruta.
+Na suíte, **2 prevalece sobre 1**. Erro ao escrever stdout/stderr também é
+categoria 2; não transforma divergência em sucesso. Falha/short write em resultado,
+resumo por arquivo, diagnóstico ou agregado encerra toda a suíte antes de novos
+envios, preserva o que já foi escrito e não tenta novamente o writer que falhou. O erro é diagnosticado de forma segura em stderr, sem ecoar a causa bruta.
 A apresentação usa sempre texto simples sem cores/animações,
 independentemente de TTY e NO_COLOR: não há detecção de terminal nem formato
 alternativo dependente do ambiente. O E2E comprova pipe e PTY Linux real.

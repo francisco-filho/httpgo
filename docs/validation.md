@@ -1,4 +1,89 @@
-# Validação — US-01 a US-15 e US-20
+# Validação — US-01 a US-16 e US-20
+
+## US-16 — issue #38 / história 0016
+
+Plano/arquitetura/tasks da issue #38 executados sem planner, somente backend.
+Quatro tasks registradas e autoaprovadas na fila 0016, em ordem:
+`back:1` no commit `5207fc4` (descoberta/carga/CLI), `back:2` no commit `c085537`
+(agregação e interrupções), `back:3` no commit `98344ed` (isolamento/sigilo) e
+`back:4` nesta alteração (contrato, fixtures e regressão integrada). Sem mudanças
+de frontend/estáticos, dependências, toolchain, CI ou corpus diferencial.
+SonarQube não executado: exclusivo do QA. Evidências locais não substituem
+aprovação pelo gate automático de revisão.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, usuário não privilegiado (uid 1000), Go `go1.26.10-X:nodwarf5`, módulo
+`capimgrosso.com/httpgo`, YAML `go.yaml.in/yaml/v3 v3.0.6` mantidos. Ferramentas já
+existentes `goimports` e `golangci-lint` em `/home/ff/go/bin`, acrescentado ao PATH.
+Hurl **8.0.0** já existente em
+`/tmp/httpgo-0014-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` foi anteposto ao PATH
+somente para o diferencial; sem instalar ferramentas ou ler fontes Hurl. O aviso
+local de metadados libcurl não impediu a execução.
+
+- Task 1: `go test ./internal/suite ./internal/cli` e
+  `go test ./tests/e2e -count=1` passaram. Além das falhas injetadas por instância,
+  `TestSuiteDeniedAccessUnprivilegedProcess` comprovou permissão negada em processo
+  Linux realmente sem privilégios (arquivo/diretório), zero envios com entrada
+  válida misturada, e rejeição de FIFO sem abertura bloqueante. O teste prevê
+  redução de credenciais caso seja executado como root; nesta evidência o filho
+  herdou uid 1000. Bits chmod isolados sob root não foram tratados como evidência.
+- Task 2: `go test ./internal/suite ./internal/cli ./internal/runner` e
+  `go test ./tests/e2e -count=1` passaram, com relógio, executor e writers falsos,
+  e binário real para códigos, Ctrl+C e `/dev/full` em stdout/stderr.
+- Task 3: `go test ./internal/template ./internal/cli ./internal/runner
+  ./internal/suite` e `go test ./tests/e2e -count=1` passaram. JSON externo opt-in,
+  multipart, segredo inicial de processo, capturas e Set-Cookie foram exercitados
+  no servidor real; bytes/headers operacionais conferidos sem sanitização indevida.
+- Em cada task de código: `make fmt lint test`, `go vet ./...` e `go build ./...`
+  passaram antes do commit. Lint **0 issues**, testes com **race e cobertura**.
+  A primeira execução de lint da task 3 apontou três seletores redundantes no
+  wrapper de sessão; corrigidos sem desabilitar checks.
+- Task 4 / gate integrado: `go test ./internal/cli ./tests/e2e`,
+  `make fmt lint test`, `go vet ./...`, `go build ./...`, `make build` e `make e2e`
+  passaram. Cobertura final observada: suite **95,4%**, CLI **96,9%**, template
+  **96,1%**, runner **93,0%**. E2E usa binário compilado pelo harness, servidor
+  local em portas dinâmicas, streams e exit codes; não depende do dummy/8080.
+- O primeiro gate integrado revelou bloqueio do teste PTY antigo: ele aguardava
+  o processo antes de drenar a saída e a ajuda ampliada passou a preencher o
+  buffer. `TestPlainOutputOnRealTTY` foi corrigido para leitura concorrente com
+  término coordenado; nenhuma redução de verificação, retry ou aumento de prazo.
+  Os gates completos passaram após a correção, com e sem `NO_COLOR`.
+- `make compatibility` passou com Hurl **8.0.0**, **139 pares**, sem skip ou
+  regeneração de observações. Nenhum arquivo em `testdata/compatibility/` mudou.
+  Suíte/configuração/descoberta próprias são testadas fora desse corpus.
+- Fuzzing manteve os três comandos exigidos, todos com sucesso:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**88.791 execuções**);
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**23.249 execuções**);
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**33.389 execuções**). Sem crash ou novo corpus de falha.
+- `gofmt -l` nos arquivos Go alterados e `git diff --check` limpos.
+  Não foi executada validação nativa macOS/Windows nem fallback entre unidades
+  Windows; ficam para release, conforme plano v4, sem bloqueio desta história.
+
+### Rastreabilidade dos cenários
+
+| GO | Evidência aplicável em Linux |
+|---|---|
+| GO-210 | `TestSuiteDemoAndFailurePrecedence` usa os três fixtures `testdata/suites/basic/` e ambiente `local`; execução completa/fail-fast, paths, contagens e códigos; `TestSuitePolicyAndIncrementalPresentation` confere resumo anterior antes do próximo envio |
+| GO-211 | `TestSuiteContinuationCountsAndClock`, `TestSuitePolicyAndIncrementalPresentation`, `TestSuiteDemoAndFailurePrecedence`: assertion, transporte e pré-validação com/sem fail-fast; restantes não executados, sem contagem inventada |
+| GO-212 | `TestDiscoverNormalizedUniqueOrder`, `TestSuiteDiscoveryAndConfiguration`, `TestSuiteDiscoveryRealHTTP`: misturas, sobreposição, argumentos invertidos, absolutos/relativos, `.`/`..`, arquivo explícito sem extensão e auxiliares ignorados |
+| GO-213 | `TestDiscoverLinks` (destino, ancestral, ciclo, quebrado e `link/../arquivo`) e caso link da CLI: descobertos ignorados; explícitos rejeitados antes de HTTP |
+| GO-214 | `TestDiscoverErrorsDiscardWholePlan`, `TestSuiteDiscoveryAndConfiguration`, `TestSuiteDeniedAccessUnprivilegedProcess`: inexistência, vazios, não regular/FIFO, acesso negado e falhas injetadas; nenhum envio, sobreposição válida não vira vazio |
+| GO-215 | `TestSuiteDiscoveryAndConfiguration` cobre configuração, ambiente e referência efetiva inválidos; `TestSuiteInitialOptionsAndPayloadOriginsRemainIndependent` confere opções/timeout/variáveis iguais; regressão config/process/environment completa |
+| GO-216 | `TestSuiteErrorPrecedenceAndPerFileValidation`, `TestSuitePolicyAndIncrementalPresentation`, `TestSuiteDemoAndFailurePrecedence`: erro estrutural tardio impede prefixo do arquivo sem desfazer anteriores; continuação conforme política |
+| GO-217 | `TestSuiteRealIsolationProtectionAndPayloadOrigins`, `TestSuiteInitialOptionsAndPayloadOriginsRemainIndependent`: captura não resolve no próximo arquivo, Cookie ausente em todas as requisições, variáveis iniciais preservadas, JSON externo/multipart relativos ao cenário com configuração externa |
+| GO-218 | `TestSuiteContinuationCountsAndClock`, `TestSuiteStatusValidationDoesNotImplyRequestSuccess`, `TestSuiteErrorPrecedenceAndPerFileValidation`, `TestSuiteProtectedErrorCauseAndNonnegativeDuration`: estados/contagens, erro pré-envio, sem validação, captura após status aprovado, 2 > 1 e relógio determinístico não negativo |
+| GO-219 | `TestSuiteProtectionSurvivesSessionChangesBeforeCollection`, `TestSuiteSecretsOnStreamsAndLateErrors`, `TestSuiteRealIsolationProtectionAndPayloadOrigins`: variantes/derivados em nome, assertion, parsing e resumo depois da troca de sessão; callbacks e coleção protegidos, operação intacta |
+| GO-220 | `TestLoadFailureNeverExecutesPartialScenario` e `TestDiscoveryCancellationAndLateLoadFailure`: abrir/Stat/ler/fechar falham por instância; recurso fechado, nenhum cenário parcial, causa inspecionável sem texto bruto, anteriores preservados e próximo autorizado |
+| GO-221 | `TestDiscoveryCancellationAndLateLoadFailure`, `TestSuiteCancellationAndPresentationAreGlobal`, `TestSuiteRealCancellationStopsLaterFiles`: descoberta, request, intervalo entre arquivos e Ctrl+C real; timeout isolado permite próximo sem fail-fast |
+| GO-222 | `TestSuitePresentationFailureStopsAllFiles`, `TestSuiteLateSecretPresentationFailure`, `TestSuiteRealOutputFailureStopsNextFile`: erro e short write em entrada, resumo por arquivo, diagnóstico/parsing e agregado; não repete writer, não envia próximos, proteção e código 2 |
+| GO-223 | `TestSuiteInvocationReuseHasNoStateOrOptionLeak`, `TestProtectionValuesDetachedFromOperationalContext`: reutiliza comando após suíte, execução única com opções default, capturas/proteções/resultados novos; snapshot não publica valores e não cria alias |
+| GO-224 | `TestDiscoverEquivalenceUsesFilesystem`, `TestDiscoverNormalizedUniqueOrder`: paths externos relativos ao cwd, grafias de caixa conforme identidade real e hard links; unidades distintas/execução nativa Windows explicitamente não validadas nesta etapa |
+| GO-225 | `TestSuiteHelpAndArguments`, testes de ajuda/versão/uso, `TestPlainOutputOnRealTTY`, regressão CLI/E2E e `TestCompatibility`; ajuda/README/subset/arquitetura/matriz alinhados, sem anunciar JUnit/paralelismo/cookie jar |
+
 
 ## US-15 — issue #36 / história 0015
 

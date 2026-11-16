@@ -45,15 +45,31 @@ func TestPlainOutputOnRealTTY(t *testing.T) {
 			var stderr bytes.Buffer
 			command.Stdout = slave
 			command.Stderr = &stderr
-			if err := command.Run(); err != nil {
+			if err := command.Start(); err != nil {
 				t.Fatal(err)
 			}
-			if err := slave.Close(); err != nil {
-				t.Fatal(err)
+			// Drain while the child writes: help may exceed the PTY buffer. Waiting
+			// for process exit before reading deadlocks once that buffer fills.
+			var output []byte
+			var readErr error
+			readDone := make(chan struct{})
+			go func() { output, readErr = io.ReadAll(master); close(readDone) }()
+			waitErr := command.Wait()
+			closeErr := slave.Close()
+			select {
+			case <-readDone:
+			case <-ctx.Done():
+				_ = master.Close()
+				t.Fatal("TTY reader did not finish")
 			}
-			output, err := io.ReadAll(master)
-			if err != nil && !errors.Is(err, syscall.EIO) {
-				t.Fatal(err)
+			if waitErr != nil {
+				t.Fatal(waitErr)
+			}
+			if closeErr != nil {
+				t.Fatal(closeErr)
+			}
+			if readErr != nil && !errors.Is(readErr, syscall.EIO) {
+				t.Fatal(readErr)
 			}
 			if stderr.Len() != 0 || !strings.Contains(string(output), "httpgo test health.hurl") || bytes.Contains(output, []byte("\x1b")) {
 				t.Fatalf("stdout=%q,stderr=%q", output, stderr.String())

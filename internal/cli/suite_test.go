@@ -46,6 +46,34 @@ func shownPath(t *testing.T, path string) string {
 	return filepath.ToSlash(name)
 }
 
+func TestSuiteHelpAndArguments(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
+		code, out, stderr := execute(t, context.Background(), &fakeExecutor{}, args...)
+		if code != 0 || stderr != "" {
+			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
+		}
+		for _, fragment := range []string{"<caminho>...", "--fail-fast", "não executados", "resumo suíte", "Entre unidades", "Não há cookie jar"} {
+			if !strings.Contains(out, fragment) {
+				t.Fatalf("help missing %q", fragment)
+			}
+		}
+		if strings.Contains(out, "Exatamente um arquivo; parsing") {
+			t.Fatal("obsolete single-file restriction")
+		}
+	}
+	for _, flags := range [][]string{{"test", "a", "--fail-fast", "b", "--env=local"}, {"test", "--fail-fast", "--env", "local", "a", "b"}} {
+		args, err := parseArguments(flags)
+		if err != nil || !args.failFast || !reflect.DeepEqual(args.files, []string{"a", "b"}) || args.environment != "local" {
+			t.Fatalf("args=%+v err=%v", args, err)
+		}
+	}
+	for _, flags := range [][]string{{"test"}, {"test", "--fail-fast"}, {"test", "a", "--fail-fast=true"}, {"test", "a", "--fail-fast=false"}, {"test", "a", "--fail-fast="}, {"test", "a", "--unsupported"}} {
+		if _, err := parseArguments(flags); err == nil {
+			t.Fatalf("accepted %v", flags)
+		}
+	}
+}
+
 func TestSuitePolicyAndIncrementalPresentation(t *testing.T) {
 	for _, mode := range []string{"assertion", "transport", "parse", "success"} {
 		for _, fast := range []bool{false, true} {

@@ -86,6 +86,9 @@ func (s *Suite) checkExplicit(ctx context.Context, cwd, path string) error {
 	volume := filepath.VolumeName(path)
 	current := volume + string(filepath.Separator)
 	components := strings.FieldsFunc(strings.TrimPrefix(path, volume), func(r rune) bool { return r == '/' || r == rune(filepath.Separator) })
+	if len(path) > 0 && os.IsPathSeparator(path[len(path)-1]) {
+		components = append(components, ".")
+	}
 	for i, component := range components {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -148,6 +151,9 @@ func (s *Suite) Discover(ctx context.Context, paths []string) (plan []File, disc
 		if !duplicate {
 			unique = append(unique, file)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, &Error{Detail: "descoberta cancelada", cause: err}
 	}
 	files := make([]File, len(unique))
 	for i, file := range unique {

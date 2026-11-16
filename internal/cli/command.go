@@ -289,7 +289,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
-  httpgo test <arquivo> [--config arquivo] [--env nome] [--render-files] [--var nome=valor] [--secret nome]
+  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -363,8 +363,29 @@ do resultado, inclusive em falha/cancelamento. Não imprime arquivo ou campos br
 campos repetidos, filename customizado, headers de parte ou multipart aninhado.
 Diferenças Hurl 8.0.0 (caminhos/filename/restrições): docs/compatibility.md.
 
-Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
-status é aceito e informado como sem validação. HTTP * aceita qualquer status,
+Suítes: um ou mais arquivos/diretórios, inclusive misturados e sobrepostos.
+  httpgo test tests/ --env local
+  httpgo test tests/ --env local --fail-fast
+Diretórios descobrem .hurl recursivamente; arquivo explícito independe da extensão.
+Normaliza absolutos/relativos, . e ..; elimina duplicações pela identidade do filesystem,
+sem forçar minúsculas. Ordem lexicográfica pelo caminho relativo ao cwd, com /;
+externos podem ter ../. Entre unidades sem relativo, usa absoluto normalizado com /.
+Não segue links simbólicos: ignora descobertos e rejeita explícitos, inclusive ancestrais.
+Descoberta completa antes de HTTP; entrada inválida/inacessível, falha de acesso ou
+cada diretório explícito sem .hurl elegível retorna 2 e impede todos os envios.
+Configuração global única; parsing integral de cada arquivo antes de iniciá-lo.
+Arquivos e requisições sequenciais; primeira falha para as requisições do arquivo.
+Sem --fail-fast continua os outros, inclusive após erro de parsing/transporte;
+com --fail-fast marca os restantes não executados, sem analisá-los para contagem.
+Capturas e cookies não passam entre arquivos; variáveis/opções iniciais permanecem.
+Não há cookie jar, paralelismo, dependências entre arquivos, JUnit ou outros formatos.
+Resumo por arquivo preserva contadores e inclui resultado/duração; resumo suíte
+agrega arquivos/requisições. total e não_iniciadas desconhecidos sem parsing completo;
+zero envios não significa zero requisições planejadas. validadas conta só status,
+não sucesso completo; ausência de assertion não é validação. Código 2 prevalece sobre 1.
+Cancelamento ou falha de escrita encerra toda a suíte, sem próximos envios ou retry de saída.
+Proteção de segredos conhecidos/derivados dura toda a invocação, não só o arquivo.
+Sem HTTP, qualquer status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
 e conta em sem_validação, não em validadas. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.

@@ -40,7 +40,7 @@ func TestDiscoverNormalizedUniqueOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, paths := range [][]string{{dir, b, a, c, relative, filepath.Join(dir, "nested", "..", "01.hurl")}, {c, a, filepath.Join(dir, "nested"), dir}} {
+	for _, paths := range [][]string{{dir, b, a, c, relative, dir + string(filepath.Separator) + "nested" + string(filepath.Separator) + ".." + string(filepath.Separator) + "01.hurl"}, {c, a, filepath.Join(dir, "nested"), dir}} {
 		files, err := New(nil).Discover(context.Background(), paths)
 		if err != nil {
 			t.Fatal(err)
@@ -107,7 +107,7 @@ func TestDiscoverErrorsDiscardWholePlan(t *testing.T) {
 	good := fixture(t, dir, "good.hurl", "GET http://example.test")
 	empty := t.TempDir()
 	fixture(t, empty, "readme.txt", "ignored")
-	for _, bad := range []string{filepath.Join(dir, "missing"), empty, good + string(filepath.Separator) + "child"} {
+	for _, bad := range []string{filepath.Join(dir, "missing"), empty, good + string(filepath.Separator) + "child", good + string(filepath.Separator), good + string(filepath.Separator) + "."} {
 		files, err := New(nil).Discover(context.Background(), []string{good, bad})
 		if err == nil || files != nil {
 			t.Fatalf("bad=%s files=%v err=%v", bad, files, err)
