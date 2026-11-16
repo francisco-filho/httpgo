@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-14 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32 e #34)
+# Subconjunto suportado e extensões — US-01 a US-15 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34 e #36)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -767,6 +767,23 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
   continua identificável junto à ocultação. Essa política não reconhece segredos
   arbitrários não marcados e não substitui os limites de segurança documentados.
 
+### Padrões textuais — US-15 / issue #36
+
+**Ampliação intencional:** `[Asserts]` aceita `jsonpath "consulta" matches "padrão"`, somente para o valor selecionado por JSONPath. Não amplia a consulta JSONPath nem adiciona operadores a headers, body bruto ou variáveis.
+
+```hurl
+GET {{base_url}}/products/1
+HTTP 200
+[Asserts]
+jsonpath "$.name" matches "^Pizza"
+```
+
+O padrão é um literal string JSON em aspas duplas; escapes são interpretados segundo JSON uma vez (`\\\\` produz `\\`, `\\"` produz `"`, e `/` não exige escape). Não são aceitos delimitadores `/.../`, operandos adicionais nem escapes exclusivos de Go na camada JSON. `{{nome}}` dentro do padrão permanece literal, sem renderer. Após decodificar o literal, o padrão segue a sintaxe de `regexp` da biblioteca padrão Go: busca por trecho, classes/grupos/alternativas/repetições/âncoras e opções internas como `(?i)`, `(?m)` e `(?s)`. Lookaround e backreferences não são suportados e são rejeitados explicitamente. Comparação distingue caixa por padrão; `.` não cruza newline sem `(?s)`; Unicode não é normalizado. Padrão vazio corresponde a qualquer string.
+
+String divergente, consulta ausente ou valor selecionado não string falha como assertion (**1**), sem coerção. Ausência e tipo incompatível são diagnosticados separadamente; arrays/objetos não são impressos. JSON inválido e percurso incompatível permanecem erro de avaliação (**2**). Regex inválida/não suportada ou escape JSON inválido rejeita o arquivo inteiro antes de qualquer HTTP, inclusive se a declaração for tardia. A ordem continua status → assertions na ordem escrita → capturas; a primeira falha interrompe capturas e próximos envios. Padrão e valor são sanitizados, e captura secreta pendente oculta os dois integralmente sem avaliação antecipada. Resultados não conservam padrão operacional nem regexp compilada.
+
+O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. `matches` em headers/body/variáveis, captura por regex e interpolação continuam fora do suporte.
+
 ### Presença, quantidade e limites — US-14 / issue #34
 
 Exemplo executável: `testdata/scenarios/scenario_assert_structure.hurl`:
@@ -803,8 +820,7 @@ Ausência, tipo selecionado não numérico e condição falsa falham com 1. Espe
 não numérico é sintaxe inválida (2) antes da rede; JSON inválido e percurso
 incompatível continuam erros de avaliação (2).
 
-Continuam fora do recorte: count em strings/objetos/capturas, regex,
-filtros e interpolação de consultas ou esperados. A gramática de literais
+Continuam fora do recorte: count em strings/objetos/capturas, filtros e interpolação de consultas ou esperados. `matches` é restrito a strings selecionadas de JSON e tem seu próprio recorte documentado acima. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. Os novos pares com Hurl 8.0.0 confirmam que null, vazios,
 false e zero presentes satisfazem `exists`. Count negativo/fracionário é rejeitado

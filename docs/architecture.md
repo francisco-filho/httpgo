@@ -1,6 +1,6 @@
-# Arquitetura implementada — US-01 a US-14 e US-20
+# Arquitetura implementada — US-01 a US-15 e US-20
 
-Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14),
+Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15),
 e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
@@ -51,7 +51,8 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 | `template.Session`, `Capture`, `ConflictError`, `CaptureValueError` | Renderização e publicação atômica de JSON validado (`Capture.Value` é `json.RawMessage`); erro de payload/conflito indexa o lote sem expor conteúdo; variáveis iniciais imutáveis, cópia dos valores, capturas separadas e proteção dos valores descobertos |
 | `query.Path`, `query.Error`, `query.Decode` | Pacote folha sem interface: validar JSONPath limitado; decodificar exatamente um JSON com UseNumber; SelectValue distingue presença/ausência/percurso incompatível e Select mantém contrato de capturas |
 | `query.HeaderValue`, `query.Header` | Ocorrências nome/valor sem net/http; seleção pura da primeira, com presença distinta de vazio e nome case-insensitive |
-| `assertion.Status`, `HeaderOperator`, `assertion.Header`, `assertion.JSONEqual` | Comparação de status/headers e igualdade JSON tipada recursiva, sem coerção nem float64; não conhece runner, HTTP ou apresentação |
+| `assertion.Status`, `HeaderOperator`, `assertion.Header`, `assertion.JSONEqual`, `assertion.MatchString` | Comparação de status/headers, igualdade JSON tipada e correspondência regex de string sem coerção; não conhece runner, HTTP ou apresentação |
+| `parser.JSONAssertion.Pattern`, `Compiled` | `matches` conserva literal de padrão e `*regexp.Regexp` validado durante parse integral; padrão não passa por renderer e é removido dos metadados pelo `safeEntry` |
 | `runner.HeaderFailure`, `JSONFailure`, `JSONError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `cli.Command`, `BuildInfo` | Argumentos e streams (`SetArgs/SetIn/SetOut/SetErr`), leitura/fechamento antes da rede, saída segura, resumo e exit code; não reavalia assertion |

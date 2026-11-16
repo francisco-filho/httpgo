@@ -1,4 +1,16 @@
-# Matriz de compatibilidade — US-01 a US-14 e US-20
+# Matriz de compatibilidade — US-01 a US-15 e US-20
+
+## Ampliação US-15 — padrões textuais (issue #36)
+
+Foram adicionados três pares `matches_*`, executados pelo harness contra **Hurl 8.0.0** com `response_json` e servidor local. A evidência é limitada às strings/padrões da tabela; não afirma equivalência geral de sintaxe regex, escapes JSON ou mensagens.
+
+| Par | HTTPGo | Hurl 8.0.0 | Observação em Linux |
+|---|---|---|---|
+| `matches_prefix` | 0; /capture | 0; /capture | `^Pizza` corresponde ao início de `Pizza Margherita` |
+| `matches_substring` | 0; /capture | 0; /capture | `Pizza` sem âncoras corresponde a trecho em `Mini Pizza` |
+| `matches_anchored` | 1; /capture | 4; /capture | `^Pizza$` não corresponde a `Mini Pizza`; códigos de falha são próprios |
+
+As observações estão versionadas nos pares `.hurl`/`.json`; resposta é JSON literal fornecida pelo fixture do harness. Nenhum código-fonte Hurl foi utilizado. Construções Go fora de `regexp/syntax` (incluindo lookaround e backreferences) são rejeitadas pelo HTTPGo; os pares acima não verificam equivalência desses recursos nem de escapes. Esperados permanecem literais em ambas as ferramentas nesta evidência. A divergência de código não é corrigida para imitar Hurl. `matches` em headers/body/variáveis continua não suportado.
 
 ## Ampliação US-14 — estrutura, quantidade e limites (issue #34)
 

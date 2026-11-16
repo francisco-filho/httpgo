@@ -97,10 +97,12 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 					patternJSON, _ := json.Marshal(declaration.Pattern)
 					actualJSON, _ := json.Marshal(evaluation.Actual)
 					expectedText = string(patternJSON)
-					if present {
-						actualText = string(actualJSON)
-					} else {
+					if !present {
 						actualText = "ausente"
+					} else if evaluation.Detail != "" {
+						actualText = "tipo " + assertion.JSONType(actual)
+					} else {
+						actualText = string(actualJSON)
 					}
 				} else if evaluation.Detail != "" {
 					actualText = "tipo " + assertion.JSONType(actual)

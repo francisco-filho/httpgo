@@ -70,6 +70,10 @@ func TestJSONMatchesStringSemantics(t *testing.T) {
 		{"substring", `jsonpath "$.name" matches "Pizza"`, `{"name":"Mini Pizza"}`, Passed},
 		{"anchored mismatch", `jsonpath "$.name" matches "^Pizza$"`, `{"name":"Mini Pizza"}`, JSONMismatch},
 		{"case insensitive", `jsonpath "$.name" matches "(?i)^pizza"`, `{"name":"Pizza"}`, Passed},
+		{"unicode", `jsonpath "$.name" matches "雪"`, `{"name":"雪"}`, Passed},
+		{"unicode is not normalized", `jsonpath "$.name" matches "é"`, `{"name":"é"}`, JSONMismatch},
+		{"JSON regex escape", `jsonpath "$.name" matches "^Pizza\\s"`, `{"name":"Pizza Margherita"}`, Passed},
+		{"dotall option", `jsonpath "$.name" matches "(?s)^a.b$"`, `{"name":"a\nb"}`, Passed},
 		{"empty pattern", `jsonpath "$.name" matches ""`, `{"name":""}`, Passed},
 		{"empty string mismatch", `jsonpath "$.name" matches "^$"`, `{"name":"x"}`, JSONMismatch},
 		{"absent", `jsonpath "$.name" matches ""`, `{}`, JSONMismatch},
@@ -88,6 +92,9 @@ func TestJSONMatchesStringSemantics(t *testing.T) {
 			}
 			if calls != wantCalls || result.Entries[0].Outcome != tc.outcome {
 				t.Fatalf("calls=%d outcome=%v result=%+v", calls, result.Entries[0].Outcome, result)
+			}
+			if tc.name == "numeric" && result.Entries[0].JSONFailure.Actual != "tipo número" {
+				t.Fatalf("non-string diagnostic exposed value: %+v", result.Entries[0].JSONFailure)
 			}
 		})
 	}

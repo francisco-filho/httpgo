@@ -1,4 +1,63 @@
-# Validação — US-01 a US-14 e US-20
+# Validação — US-01 a US-15 e US-20
+
+## US-15 — issue #36 / história 0015
+
+Plano da issue #36 e arquitetura/tarefas executados sem planner, somente backend.
+Três tasks registradas/autoaprovadas e concluídas em ordem: `back:1` no commit
+`418a95d` (parser, avaliação, runner, CLI e E2E), `back:2` no commit `0d45403`
+(proteção de regex/padrão em assertions com captura secreta pendente) e `back:3`
+(documentação, ajuda, seeds de fuzz e matriz). Sem alterações de frontend/estáticos,
+dependências, toolchain, transporte ou CI. SonarQube não executado: exclusivo do QA.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports` e `golangci-lint` existentes
+em `/home/ff/go/bin` foram expostos via PATH. Hurl do PATH padrão era 8.0.1;
+foi selecionado o binário Hurl 8.0.0 já existente em
+`/tmp/httpgo-0014-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, sem substituir
+instalação nem instalar dependências. E2E usa build existente do harness, binário
+real, `httptest.Server` e portas dinâmicas.
+
+- Task 1: `go test ./internal/parser ./internal/assertion ./internal/runner
+  ./internal/cli` e `go test ./tests/e2e -run '^TestJSON' -count=1` passaram.
+- Task 2: `go test ./internal/runner ./internal/cli ./internal/transport` e
+  `go test ./tests/e2e -run '^TestJSON' -count=1` passaram.
+- Task 3 / gate final: `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build` e `make e2e` passaram. `make fmt` passou após acrescentar
+  `/home/ff/go/bin` ao PATH; a primeira tentativa sem esse PATH falhou porque
+  `goimports` não estava localizado, sem alterar código. Lint reportou **0 issues**;
+  `make test` executou `go test ./... -race -cover` sem falhas. Os testes
+  `go test ./internal/cli ./internal/parser ./tests/e2e` passaram após mudanças de
+  ajuda/seeds.
+- `make compatibility` passou com Hurl **8.0.0**, sem skip: corpus de **139 pares**,
+  incluindo três novos `matches_*`. `^Pizza` e `Pizza` sem âncoras passaram em
+  ambas ferramentas nos pares verificados; `^Pizza$` divergiu sobre `Mini Pizza`
+  em ambas, com códigos HTTPGo 1/Hurl 4. O restante do corpus anterior permaneceu
+  sem alterações.
+- Fuzzing com `-fuzztime=20s -parallel=2` passou sem crash: parser `FuzzParse`
+  (73.098 execuções), template `FuzzRender` (48.172) e `FuzzRenderJSON`
+  (10.364). Nenhum corpus de crash foi adicionado.
+- `gofmt -l` nos Go alterados e `git diff --check` limpos. macOS/Windows não
+  foram executados; são opcionais nesta etapa pelo plano v4. Não se declara
+  execução nativa nessas plataformas.
+
+### Rastreabilidade
+
+| GO | Evidência |
+|---|---|
+| GO-194, GO-202 | `TestJSONMatchesStringSemantics`, `TestJSONMatchesByBinary`: trecho, âncoras, string vazia e interrupção da próxima requisição |
+| GO-195, GO-196, GO-203, GO-204 | `TestJSONMatchesPatterns`, `TestInvalidJSONMatches`, seeds FuzzParse: literal JSON, escape e placeholder; opções e Unicode pela semântica regexp padrão |
+| GO-197 | `TestInvalidJSONMatches`, `TestJSONMatchesByBinary`: lookaround inválido tardio e zero contatos HTTP |
+| GO-198, GO-205 | casos absent/numeric em runner e validações JSON existentes; ausência/tipo resultam mismatch; decode/percurso mantêm JSONFailed |
+| GO-199 | testes de ordem/fail-fast de runner e `TestJSONMatchesByBinary` |
+| GO-200, GO-206 | extensão de `TestPendingSecretConcealsAssertionsAndMetadata` e `TestJSONSecretsByBinary`, incluindo regex/padrão nas superfícies examinadas |
+| GO-207, GO-208, GO-209 | regressões existentes de resposta final, corpo incompleto/cancelamento e prioridade de writers; `matches` usa a mesma retenção/ordem JSON |
+| GO-201 | `TestCompatibility`, três pares Hurl 8.0.0, ajuda root/test e documentação subset/README/architecture |
+
+README, ajuda, `docs/subset.md`, arquitetura, matriz e este registro descrevem somente
+padrões implementados/testados. `matches` permanece limitado a valores string de
+JSON; interpolação, headers/body bruto, captura regex e JSONPath ampliado seguem
+fora do suporte.
 
 ## US-14 — issue #34 / história 0014
 
@@ -78,8 +137,10 @@ Sem dummy/8080, sleeps, novas goroutines de produção ou credenciais reais.
 | GO-193 | `TestCompatibility`, `TestJSONAssertionHelp`, `TestJSONStructureDemonstrationByBinary` — Hurl 8.0.0, matriz/ajuda/exemplo e negativos versionados |
 
 README, ajuda root/test, subset, arquitetura e matriz descrevem o suporte real.
-Sem regex, filtros, aritmética, agregações, ampliação de JSONPath ou count em
-capturas/strings/objetos. Extensões YAML/interpolação externa permanecem separadas.
+Na entrega US-14, regex ainda estava fora do suporte; a US-15 adicionou somente
+`matches` em strings selecionadas de JSON. Filtros, aritmética, agregações,
+ampliação de JSONPath e count em capturas/strings/objetos continuam fora. Extensões
+YAML/interpolação externa permanecem separadas.
 
 ## US-13 — issue #32 / história 013
 

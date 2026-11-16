@@ -720,10 +720,12 @@ segredos arbitrários não marcados. Body, documento e coleções de headers nã
 são despejados nem acumulados no resultado.
 
 A US-14 acrescenta presença, contagem e limites (abaixo), sem ampliar JSONPath.
-Não há regex, filtros ou interpolação de consultas/esperados. Hurl 8.0.0 rejeita os literais
-esperados compostos e o literal com expoente testados; a gramática e os códigos
-próprios estão classificados em [compatibilidade](docs/compatibility.md), sem
-promessa de equivalência geral.
+A comparação por regex está restrita a strings selecionadas de JSON: consulte
+[Validar padrões textuais](docs/subset.md#padrões-textuais--us-15--issue-36). Não há
+interpolação de consultas nem padrões. Hurl 8.0.0 rejeita os literais esperados
+compostos e o literal com expoente testados; a gramática e os códigos próprios
+estão classificados em [compatibilidade](docs/compatibility.md), sem promessa de
+equivalência geral.
 
 ## Validar estrutura, quantidade e limites (US-14 / issue #34)
 
@@ -763,6 +765,25 @@ contagem e limites dos pares compartilhados. Há diferenças deliberadas de gram
 veja [matriz](docs/compatibility.md). Não há count em capturas, strings/objetos,
 novos JSONPaths, filtros, agregações, aritmética ou regex. O dummy manual não promete
 essa resposta; o exemplo é testado contra HTTP local pelos E2E.
+
+## Validar padrões textuais (US-15 / issue #36)
+
+Para verificar nomes variáveis sem exigir igualdade literal, use `matches` em
+`[Asserts]` (padrão JSON string literal, sintaxe de regex Go):
+
+```hurl
+GET {{base_url}}/products/1
+HTTP 200
+[Asserts]
+jsonpath "$.name" matches "^Pizza"
+```
+
+`matches` busca trecho; âncoras controlam a string inteira e opções como `(?i)`
+são aceitas. Ausência, valor não string ou divergência retorna 1; regex ou
+escape inválido retorna 2 antes de qualquer envio. Placeholders no padrão são
+literais. `matches` não se aplica a headers/body/variáveis e não suporta
+interpolação ou captura por regex. A evidência específica frente a Hurl 8.0.0 e
+os códigos próprios estão na [matriz](docs/compatibility.md).
 
 ## Documentação e desenvolvimento
 

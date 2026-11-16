@@ -437,8 +437,11 @@ count aceita ==, >, >=, < e <=; esperado inteiro não negativo, sem limite de m�
 Ausência ou tipo não array falha com 1; diagnóstico de count não despeja o array.
 jsonpath "$.total" >= 1: >, >=, < e <= exigem números, sem coerção de strings.
 Negativos, decimais e expoentes com precisão exata, sem arredondar.
-Ausência/tipo incompatível/condição falsa: 1; esperado não numérico: sintaxe inválida (2).
-Sem count em strings/objetos/capturas, regex, filtros ou JSONPath ampliado.
+jsonpath "$.name" matches "^Pizza": encontra trecho em string JSON, sem coerção;
+^/$ ancoram, opções Go como (?i) são aceitas. Padrão JSON literal, sem interpolação.
+Ausência/tipo incompatível/condição falsa: 1; JSON inválido: 2.
+Regex Go inválida/não suportada e matches em header/body: erro 2 antes da rede.
+Sem count em strings/objetos/capturas, filtros ou JSONPath ampliado.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
 pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
 

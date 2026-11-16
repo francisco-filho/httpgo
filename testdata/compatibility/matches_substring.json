@@ -1,0 +1,16 @@
+{
+  "response_json": "{\"name\":\"Mini Pizza\"}",
+  "classification": "equivalência observada neste par; sem promessa de equivalência geral",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture"
+    ]
+  }
+}
