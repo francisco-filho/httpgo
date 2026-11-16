@@ -15,14 +15,23 @@ import (
 )
 
 func TestBodyRealOutputFailure(t *testing.T) {
-	for _, body := range []string{"expected", "different", "\xff"} {
+	testAssertionRealOutputFailure(t, `body contains "expected"`, []string{"expected", "different", "\xff"})
+}
+
+func TestMembershipRealOutputFailure(t *testing.T) {
+	testAssertionRealOutputFailure(t, `jsonpath "$" not contains "forbidden"`, []string{`[]`, `["forbidden"]`, `invalid`})
+}
+
+func testAssertionRealOutputFailure(t *testing.T, predicate string, bodies []string) {
+	t.Helper()
+	for _, body := range bodies {
 		var hits atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			hits.Add(1)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			_, _ = io.WriteString(w, body)
 		}))
-		file := scenario(t, "GET "+server.URL+"/first\nHTTP *\n[Asserts]\nbody contains \"expected\"\nGET "+server.URL+"/never")
+		file := scenario(t, "GET "+server.URL+"/first\nHTTP *\n[Asserts]\n"+predicate+"\nGET "+server.URL+"/never")
 		full, err := os.OpenFile("/dev/full", os.O_WRONLY, 0)
 		if err != nil {
 			t.Fatal(err)
