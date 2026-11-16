@@ -49,9 +49,13 @@ const (
 	HeaderMismatch Outcome = "assertion de header divergente"
 	JSONMismatch   Outcome = "assertion JSON divergente"
 	JSONFailed     Outcome = "erro de avaliação JSON"
+	BodyMismatch   Outcome = "assertion de body divergente"
+	BodyFailed     Outcome = "erro de avaliação de body"
 )
 
 type EntryResult struct {
+	BodyFailure   *BodyFailure
+	BodyError     *BodyError
 	JSONFailure   *JSONFailure
 	JSONError     *JSONError
 	HeaderFailure *HeaderFailure
@@ -277,11 +281,20 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 		}
 		if err == nil && !result.Diverged {
 			if assertionErr := checkAssertions(session, entry, response, &current); assertionErr != nil {
-				current.JSONError = assertionErr
 				result.Err = assertionErr
-				result.ErrorPosition = assertionErr.Position
+				var jsonErr *JSONError
+				var bodyErr *BodyError
+				switch {
+				case errors.As(assertionErr, &jsonErr):
+					current.JSONError = jsonErr
+					result.ErrorPosition = jsonErr.Position
+				case errors.As(assertionErr, &bodyErr):
+					result.ErrorPosition = bodyErr.Position
+				default:
+					result.ErrorPosition = entry.Position
+				}
 			}
-			result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil
+			result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil
 		}
 		if err == nil && result.Err == nil && !result.Diverged && len(entry.Captures) > 0 {
 			if captureErr := captureResponse(session, entry.Captures, response.Body); captureErr != nil {

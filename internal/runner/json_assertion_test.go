@@ -119,7 +119,7 @@ func TestJSONLiteralAndCapturePublication(t *testing.T) {
 }
 
 func TestPendingSecretConcealsAssertionsAndMetadata(t *testing.T) {
-	for _, line := range []string{`header "X" == "expected-private"`, `jsonpath "$.value" == "expected-private"`, `jsonpath "$.value" matches "expected-private"`} {
+	for _, line := range []string{`header "X" == "expected-private"`, `jsonpath "$.value" == "expected-private"`, `jsonpath "$.value" matches "expected-private"`, `body contains "expected-private"`} {
 		for _, capturePath := range []string{"$.value", "$.missing.bad"} {
 			c, _ := template.New(nil, []string{"token"})
 			s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Captures]\ntoken: jsonpath \""+capturePath+"\"\n[Asserts]\n"+line+"\nGET http://example.test/next")

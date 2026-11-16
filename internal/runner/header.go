@@ -65,6 +65,13 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	entry.Captures = nil // Compiled queries are not report metadata.
 	entry.Assertions = slices.Clone(entry.Assertions)
 	for i := range entry.Assertions {
+		if entry.Assertions[i].Body != nil {
+			declaration := *entry.Assertions[i].Body
+			declaration.Expected = "" // Raw substring literals are not report metadata.
+			declaration.Position.File = session.Sanitize(declaration.Position.File)
+			entry.Assertions[i].Body = &declaration
+			continue
+		}
 		if entry.Assertions[i].JSON != nil {
 			declaration := *entry.Assertions[i].JSON
 			declaration.Expected = nil // Never deliver the raw literal to reports.

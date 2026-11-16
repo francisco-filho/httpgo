@@ -35,6 +35,34 @@ Arquivo vazio/com só comentários, URL inválida, status inválido, expectativa
 órfã/duplicada e instrução desconhecida são erros de entrada. Nada do arquivo é
 enviado nesses casos, mesmo quando o erro aparece depois de GETs válidos.
 
+### Busca textual no body — US-21 (issue #40)
+
+```hurl
+GET {{base_url}}/export
+HTTP 200
+[Asserts]
+body contains "customer"
+body not contains "passwordHash"
+body not contains "trackingToken"
+```
+
+`body contains "trecho"` e `body not contains "trecho"` consultam o texto
+completo da resposta final, consumida e fechada, sem reserializar JSON.
+Exigem `HTTP` na entrada e uma única string literal; placeholders não interpolam.
+A busca diferencia caixa e não normaliza espaços, quebras de linha ou Unicode.
+Todo texto contém `""`, inclusive body vazio: sua negação sempre falha.
+Charset vem do primeiro `Content-Type`; sem charset usa UTF-8 estrito.
+Rótulos reconhecidos usam o índice de encodings web (incluindo ISO-8859-1).
+Charset desconhecido ou conversão inválida gera erro `2`, também na negação.
+Status precede assertions na ordem escrita; a primeira falha impede capturas e
+próximas requisições. Condição falsa retorna `1`, sucesso `0`.
+Diagnósticos localizados identificam operador e esperado protegido, nunca body
+ou fragmentos recebidos. Captura secreta pendente oculta o esperado sem antecipar
+sua avaliação. Busca literal não detecta todas as codificações de dados sensíveis.
+Regex de body, filtros, outros predicados e interpolação de esperados não são suportados.
+A evidência diferencial e classificação de compatibilidade serão publicadas no
+fechamento da história; aceitar sintaxe não implica equivalência integral ao Hurl.
+
 ### Upload multipart básico — US-20 (issue #24)
 
 `POST`, `PUT` e `PATCH` aceitam `[MultipartFormData]` após os headers,

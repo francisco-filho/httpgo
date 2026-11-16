@@ -110,6 +110,10 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
 	case runner.HeaderMismatch:
 		line += ": " + headerDiagnostic(entry.HeaderFailure)
+	case runner.BodyMismatch:
+		line += ": " + bodyDiagnostic(entry.BodyFailure)
+	case runner.BodyFailed:
+		line += fmt.Sprintf(": %s: %s", entry.BodyError.Operator, entry.BodyError.Detail)
 	case runner.JSONMismatch:
 		line += ": " + jsonDiagnostic(entry.JSONFailure)
 	case runner.JSONFailed:
@@ -127,7 +131,7 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed {
+	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
@@ -137,6 +141,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		}
 		if entry.JSONError != nil {
 			pos = entry.JSONError.Position
+		}
+		if entry.BodyFailure != nil {
+			pos = entry.BodyFailure.Position
+		}
+		if entry.BodyError != nil {
+			pos = entry.BodyError.Position
 		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
@@ -187,6 +197,10 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		if errors.As(result.Err, &jsonErr) {
 			diagnostic = jsonErr.Error()
 		}
+		var bodyErr *runner.BodyError
+		if errors.As(result.Err, &bodyErr) {
+			diagnostic = bodyErr.Error()
+		}
 		_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, diagnostic)
 		return err
 	}
@@ -204,11 +218,21 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure))
 			return err
 		}
+		if entry.BodyFailure != nil {
+			failure := entry.BodyFailure
+			pos := failure.Position
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, bodyDiagnostic(failure))
+			return err
+		}
 		pos := entry.Entry.ExpectedPosition
 		_, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status)
 		return err
 	}
 	return nil
+}
+
+func bodyDiagnostic(failure *runner.BodyFailure) string {
+	return fmt.Sprintf("assertion body %s: esperado %q; condição falsa", failure.Operator, failure.Expected)
 }
 
 func jsonDiagnostic(failure *runner.JSONFailure) string {

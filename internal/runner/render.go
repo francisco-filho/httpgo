@@ -95,7 +95,7 @@ func render(session template.Session, entry parser.Entry) (Request, string, *Ren
 	}
 	retainBody := len(entry.Captures) > 0
 	for _, declaration := range entry.Assertions {
-		retainBody = retainBody || declaration.JSON != nil
+		retainBody = retainBody || declaration.JSON != nil || declaration.Body != nil
 	}
 	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: retainBody}, url.Display, nil
 }
