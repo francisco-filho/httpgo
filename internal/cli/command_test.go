@@ -141,7 +141,7 @@ func TestInvalidInputNeverCallsExecutor(t *testing.T) {
 			fake := &fakeExecutor{}
 			file := writeScenario(t, text)
 			code, out, err := execute(t, context.Background(), fake, "test", file)
-			if code != 2 || out != "" || !strings.Contains(err, file) || len(fake.calls) != 0 {
+			if code != 2 || !prevalidationSummary(out) || !strings.Contains(err, file) || len(fake.calls) != 0 {
 				t.Fatalf("code=%d,out=%q,err=%q,calls=%v", code, out, err, fake.calls)
 			}
 			for _, secret := range []string{"url-user", "url-password", "bad%zz", "query-secret"} {

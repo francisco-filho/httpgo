@@ -66,7 +66,7 @@ func TestProcessEnvironmentEarlyProtection(t *testing.T) {
 			}
 			fake := &fakeExecutor{}
 			code, out, stderr := execute(t, context.Background(), fake, args...)
-			if code != 2 || out != "" || stderr == "" || len(fake.calls) != 0 {
+			if code != 2 || (mode == "syntax" && !prevalidationSummary(out) || mode != "syntax" && out != "") || stderr == "" || len(fake.calls) != 0 {
 				t.Fatalf("code=%d calls=%d", code, len(fake.calls))
 			}
 			for _, value := range []string{token, "first-fiction", "second-fiction"} {

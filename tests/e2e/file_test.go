@@ -127,7 +127,7 @@ func TestMalformedExternalPreventsAllNetwork(t *testing.T) {
 	for _, suffix := range []string{"file,;", "file,a", "file,a,b;", "file,a;b;", "file,a;\nfile,b;", "{}\nfile,a;", "file,a;\n{}", "file,a;\nX-Test: value"} {
 		file := scenario(t, "GET "+server.URL+"/first\nHTTP 200\nPOST "+server.URL+"\n"+suffix)
 		code, out, stderr := run(t, "test", file)
-		if code != 2 || out != "" || !strings.Contains(stderr, fmt.Sprintf("%q:", suiteDisplayPath(t, file))) || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || !strings.Contains(stderr, fmt.Sprintf("%q:", suiteDisplayPath(t, file))) || hits.Load() != 0 {
 			t.Fatalf("suffix=%q code=%d out=%q err=%q hits=%d", suffix, code, out, stderr, hits.Load())
 		}
 	}

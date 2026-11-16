@@ -46,7 +46,7 @@ func TestNewMethodsPresentationAndSecretSafety(t *testing.T) {
 				if wantCalls > 0 && (!strings.Contains(out, method+" http://example.test/products:") || !strings.Contains(out, "resumo")) {
 					t.Fatalf("unhelpful output=%q", out)
 				}
-				if wantCalls == 0 && (out != "" || !strings.Contains(stderr, ":") || !strings.Contains(stderr, "sintaxe inválida")) {
+				if wantCalls == 0 && (!prevalidationSummary(out) || !strings.Contains(stderr, ":") || !strings.Contains(stderr, "sintaxe inválida")) {
 					t.Fatalf("out=%q,err=%q", out, stderr)
 				}
 				if mode == "unvalidated" && !strings.Contains(out, "sem validação de status (recebido 500)") {

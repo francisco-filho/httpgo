@@ -11,6 +11,7 @@ import (
 
 type arguments struct {
 	renderFiles        bool
+	failFast           bool
 	files              []string
 	config             string
 	environment        string
@@ -26,6 +27,11 @@ func parseArguments(args []string) (arguments, error) {
 		arg := args[i]
 		name, value, inline := strings.Cut(arg, "=")
 		switch name {
+		case "--fail-fast":
+			if inline {
+				invalid = true
+			}
+			result.failFast = true
 		case "--render-files":
 			if inline {
 				invalid = true
@@ -138,16 +144,23 @@ func (r sessionRenderer) NewSession() template.Session {
 type protectedWriter struct {
 	writer  io.Writer
 	protect func(string) string
+	failure *error
 }
 
 func (w protectedWriter) Write(data []byte) (int, error) {
+	if w.failure != nil && *w.failure != nil {
+		return 0, *w.failure
+	}
 	safe := w.protect(string(data))
 	n, err := io.WriteString(w.writer, safe)
-	if err != nil {
-		return 0, err
+	if err == nil && n != len(safe) {
+		err = io.ErrShortWrite
 	}
-	if n != len(safe) {
-		return 0, io.ErrShortWrite
+	if err != nil {
+		if w.failure != nil {
+			*w.failure = err
+		}
+		return 0, err
 	}
 	return len(data), nil
 }

@@ -116,7 +116,7 @@ func TestTypedJSONFailureSequenceByBinary(t *testing.T) {
 				t.Fatalf("code=%d out=%q err=%q hits=%d", code, out, stderr, hits.Load())
 			}
 			if tc.allBlocked {
-				if out != "" {
+				if !prevalidationSummary(out) {
 					t.Fatalf("partial scenario executed: %q", out)
 				}
 			} else if !strings.Contains(out, "iniciadas=1 concluídas=1 validadas=1") || !strings.Contains(out, "não_iniciadas=2") {

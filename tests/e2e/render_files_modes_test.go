@@ -186,7 +186,7 @@ func TestExternalRenderedStructuralErrorPreventsAllNetwork(t *testing.T) {
 	for _, suffix := range []string{"file,;", "file,payload;\n{}", "file,payload;\nX-Test: after body"} {
 		file := scenario(t, "GET "+server.URL+"/first\nHTTP 200\nPOST "+server.URL+"\n"+suffix)
 		code, out, stderr := run(t, "test", file, "--render-files")
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("code=%d out=%q err=%q hits=%d", code, out, stderr, hits.Load())
 		}
 	}

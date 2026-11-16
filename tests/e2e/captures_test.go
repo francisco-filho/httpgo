@@ -154,14 +154,14 @@ func TestCaptureStructuralCorpusByBinary(t *testing.T) {
 			}
 			source := "GET " + server.URL + "/first\n" + strings.ReplaceAll(string(data), "http://localhost", server.URL)
 			code, out, stderr := run(t, "test", scenario(t, source))
-			if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+			if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 				t.Fatalf("%s code=%d out=%q err=%q hits=%d", file, code, out, stderr, hits.Load())
 			}
 		}
 	}
 	for _, declaration := range []string{`bad-name: jsonpath "$"`, `token jsonpath "$"`, `token: jsonpath "$" garbage`} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/first\r\nGET "+server.URL+"/second\r\n[Captures]\r\n  "+declaration))
-		if code != 2 || out != "" || !strings.Contains(stderr, ":4:3:") || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || !strings.Contains(stderr, ":4:3:") || hits.Load() != 0 {
 			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
 		}
 	}

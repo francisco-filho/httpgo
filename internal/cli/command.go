@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"capimgrosso.com/httpgo/internal/config"
-	"capimgrosso.com/httpgo/internal/parser"
 	"capimgrosso.com/httpgo/internal/runner"
 	"capimgrosso.com/httpgo/internal/suite"
 	"capimgrosso.com/httpgo/internal/transport"
@@ -41,8 +40,9 @@ func (c *Command) SetErr(err io.Writer)  { c.err = err }
 func (c *Command) ExecuteContext(ctx context.Context) int {
 	local := *c
 	local.protection = &executionProtection{initial: argumentProtection(c.args)}
-	local.out = protectedWriter{c.out, local.protection.sanitize}
-	local.err = protectedWriter{c.err, local.protection.sanitize}
+	var outFailure, errFailure error
+	local.out = protectedWriter{writer: c.out, protect: local.protection.sanitize, failure: &outFailure}
+	local.err = protectedWriter{writer: c.err, protect: local.protection.sanitize, failure: &errFailure}
 	return local.executeContext(ctx)
 }
 
@@ -81,19 +81,20 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if err != nil {
 		return c.fail(err.Error())
 	}
-	code := 0
-	for _, file := range files {
-		result, loadErr := execution.RunFile(ctx, file, runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout})
-		if loadErr != nil {
-			code = c.fail(loadErr.Error())
-			continue
-		}
-		code = max(code, c.renderSummary(parser.Scenario{File: file.Name}, result))
-		if result.ReportErr != nil || ctx.Err() != nil {
+	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout}, FailFast: args.failFast}, c.renderFile)
+	if result.ReportErr != nil {
+		pos := result.ReportPosition
+		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
+	}
+	if result.Err != nil {
+		if _, err := io.WriteString(c.err, "execução da suíte cancelada; arquivos restantes não executados\n"); err != nil {
 			return 2
 		}
 	}
-	return code
+	if err := c.renderSuite(result.Summary); err != nil {
+		return c.fail("não foi possível escrever o resumo da suíte")
+	}
+	return result.Code
 }
 
 func (c *Command) renderEntry(entry runner.EntryResult) error {
@@ -145,15 +146,28 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	return nil
 }
 
-func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) int {
-	if result.ReportErr != nil {
-		pos := result.ErrorPosition
-		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
+func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadErr error) error {
+	s := file.Requests
+	total, notStarted := fmt.Sprint(s.Total), fmt.Sprint(s.NotStarted)
+	if !file.Known {
+		total, notStarted = "desconhecido", "desconhecido"
 	}
-	s := result.Summary
-	if c.writeText(fmt.Sprintf("resumo %q: total=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d\n", scenario.File, s.Total, s.Started, s.Completed, s.Validated, s.WithoutValidation, s.NotStarted)) != 0 {
-		return 2
+	if _, err := fmt.Fprintf(c.out, "resumo %q: total=%s iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%s resultado=%s duração=%s\n", file.Name, total, s.Started, s.Completed, s.Validated, s.WithoutValidation, notStarted, file.State, file.Duration); err != nil {
+		return err
 	}
+	if loadErr != nil {
+		_, err := fmt.Fprintln(c.err, loadErr.Error())
+		return err
+	}
+	return c.renderDiagnostic(result)
+}
+
+func (c *Command) renderSuite(s suite.Summary) error {
+	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration)
+	return err
+}
+
+func (c *Command) renderDiagnostic(result runner.Result) error {
 	if result.Err != nil {
 		pos := result.ErrorPosition
 		diagnostic := transportDiagnostic(result.Err, c.timeout)
@@ -173,33 +187,28 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 		if errors.As(result.Err, &jsonErr) {
 			diagnostic = jsonErr.Error()
 		}
-		return c.fail(fmt.Sprintf("%q:%d:%d: %s; execução interrompida", pos.File, pos.Line, pos.Column, diagnostic))
+		_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, diagnostic)
+		return err
 	}
 	if result.Diverged {
 		entry := result.Entries[len(result.Entries)-1]
 		if entry.HeaderFailure != nil {
 			failure := entry.HeaderFailure
 			pos := failure.Position
-			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure)); err != nil {
-				return 2
-			}
-			return 1
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure))
+			return err
 		}
 		if entry.JSONFailure != nil {
 			failure := entry.JSONFailure
 			pos := failure.Position
-			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure)); err != nil {
-				return 2
-			}
-			return 1
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure))
+			return err
 		}
 		pos := entry.Entry.ExpectedPosition
-		if _, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status); err != nil {
-			return 2
-		}
-		return 1
+		_, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status)
+		return err
 	}
-	return 0
+	return nil
 }
 
 func jsonDiagnostic(failure *runner.JSONFailure) string {

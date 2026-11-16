@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"capimgrosso.com/httpgo/internal/parser"
 	"capimgrosso.com/httpgo/internal/runner"
@@ -30,10 +31,11 @@ type Suite struct {
 	open    func(string) (scenarioFile, error)
 	lstat   func(string) (fs.FileInfo, error)
 	readDir func(string) ([]os.DirEntry, error)
+	now     func() time.Time
 }
 
 func New(r *runner.Runner) *Suite {
-	return &Suite{runner: r, open: func(path string) (scenarioFile, error) { return os.Open(path) }, lstat: os.Lstat, readDir: os.ReadDir}
+	return &Suite{runner: r, open: func(path string) (scenarioFile, error) { return os.Open(path) }, lstat: os.Lstat, readDir: os.ReadDir, now: time.Now}
 }
 
 // Error preserves the I/O cause without echoing operating-system error messages.

@@ -146,14 +146,14 @@ func TestInputAndUsageNeverSend(t *testing.T) {
 	defer server.Close()
 	for _, suffix := range []string{"HEAD " + server.URL, "GET http://username-secret:password-secret@bad%zz/?token=query-secret", "HTTP 999", "HTTP 200 # comment", "[Asserts]"} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"\n"+suffix))
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("code=%d,out=%q,err=%q,hits=%d", code, out, stderr, hits.Load())
 		}
 		assertNoSecrets(t, out+stderr)
 	}
 	for _, text := range []string{"", "# comments only"} {
 		code, out, stderr := run(t, "test", scenario(t, text))
-		if code != 2 || out != "" || stderr == "" {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" {
 			t.Fatalf("code=%d,out=%q,err=%q", code, out, stderr)
 		}
 	}

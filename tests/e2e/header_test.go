@@ -140,7 +140,7 @@ func TestInvalidHeaderAssertionsNeverSendByBinary(t *testing.T) {
 	for _, suffix := range []string{"[Asserts]", "HTTP *\n[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private-value", "HTTP *\n[Asserts]\njsonpath \"$.private-value\" == \"x\"", "HTTP 200\n[Asserts]\nheader \"X\" matches \"private-value\"", "HTTP *\n[Asserts]\nheader \"X\" count == 1"} {
 		source := "GET " + server.URL + "/prior\nHTTP 200\nGET " + server.URL + "/late\n" + suffix
 		code, out, stderr := run(t, "test", scenario(t, source))
-		if code != 2 || out != "" || hits.Load() != 0 || stderr == "" || strings.Contains(stderr, "private-value") {
+		if code != 2 || !prevalidationSummary(out) || hits.Load() != 0 || stderr == "" || strings.Contains(stderr, "private-value") {
 			t.Fatalf("code=%d out=%q err=%q hits=%d", code, out, stderr, hits.Load())
 		}
 	}

@@ -189,7 +189,7 @@ func TestJSONInvalidLateNeverSendsByBinary(t *testing.T) {
 	defer server.Close()
 	for _, suffix := range []string{"[Asserts]\njsonpath \"$\" == null", "HTTP *\n[Asserts]\njsonpath \"$\" == {{value}}", "HTTP *\n[Asserts]\njsonpath \"$\" == 1 2"} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/first\nHTTP 200\nGET "+server.URL+"/late\n"+suffix))
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
 		}
 	}
@@ -199,7 +199,7 @@ func TestJSONInvalidLateNeverSendsByBinary(t *testing.T) {
 			t.Fatal(err)
 		}
 		code, out, stderr := run(t, "test", scenario(t, strings.ReplaceAll(string(data), "http://localhost:8080", server.URL)))
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("%s code=%d hits=%d out=%s err=%s", name, code, hits.Load(), out, stderr)
 		}
 	}

@@ -78,7 +78,7 @@ func TestMultipartInvalidInputsByBinary(t *testing.T) {
 	} {
 		file := scenario(t, "GET "+server.URL+"/first\nPOST "+server.URL+"\n"+body)
 		code, out, stderr := run(t, "test", file)
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("body=%q code=%d hits=%d out=%q err=%q", body, code, hits.Load(), out, stderr)
 		}
 	}
