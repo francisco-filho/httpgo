@@ -52,6 +52,7 @@ type FileBody struct {
 }
 
 type Entry struct {
+	Options          EntryOptions
 	Multipart        *MultipartForm
 	ExternalBody     *FileBody
 	Assertions       []Assertion
@@ -97,6 +98,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 	scenario := Scenario{File: file}
 	captures, asserts := false, false
 	multipartActive := false
+	optionsActive, optionsSeen := false, false
+	var optionsPosition Position
+	var optionNames map[string]bool
 	capturesSeen, assertsSeen := false, false
 	var capturesPosition, assertsPosition Position
 	for offset := 0; offset < len(data); {
@@ -129,6 +133,13 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			entry = &scenario.Entries[len(scenario.Entries)-1]
 		}
 		boundary := fields[0] == "GET" || fields[0] == "POST" || fields[0] == "PUT" || fields[0] == "PATCH" || fields[0] == "DELETE" || strings.HasPrefix(fields[0], "[")
+		if boundary || fields[0] == "HTTP" {
+			if optionsActive && len(optionNames) == 0 {
+				pos = optionsPosition
+				return fail("sintaxe inválida", "seção de opções vazia")
+			}
+			optionsActive = false
+		}
 		if boundary {
 			if captures && len(entry.Captures) == 0 {
 				pos = capturesPosition
@@ -155,7 +166,27 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			offset = end + 1
 			continue
 		}
+		if optionsActive && (strings.HasPrefix(text, "file,") || isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"')) {
+			if len(optionNames) == 0 {
+				pos = optionsPosition
+				return fail("sintaxe inválida", "seção de opções vazia")
+			}
+			optionsActive = false
+		}
+		if optionsActive {
+			if err := parseOption(text, pos, &entry.Options, optionNames); err != nil {
+				return Scenario{}, err
+			}
+			offset = end + 1
+			continue
+		}
 		switch fields[0] {
+		case "[Options]":
+			if entry == nil || len(fields) != 1 || optionsSeen || entry.ExpectedStatus != nil || entry.AnyStatus || capturesSeen || assertsSeen {
+				return fail("sintaxe inválida", "seção de opções exige requisição e não pode ser duplicada ou seguir a resposta")
+			}
+			optionsActive, optionsSeen, optionsPosition = true, true, pos
+			optionNames = make(map[string]bool)
 		case "[MultipartFormData]":
 			if entry == nil || len(fields) != 1 || entry.Multipart != nil || entry.Body != nil || entry.ExternalBody != nil || entry.ExpectedStatus != nil || entry.AnyStatus || capturesSeen || assertsSeen {
 				return fail("sintaxe inválida", "seção multipart fora da requisição ou body duplicado")
@@ -176,7 +207,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			}
 			captures, capturesSeen, capturesPosition = true, true, pos
 		case "GET", "POST", "PUT", "PATCH", "DELETE":
-			capturesSeen, assertsSeen = false, false
+			capturesSeen, assertsSeen, optionsSeen = false, false, false
 			token := strings.TrimLeft(text[len(fields[0]):], " \t")
 			urlPos := pos
 			urlPos.Column += len(text) - len(token)
@@ -338,6 +369,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		}
 		offset = end + 1
 	}
+	if optionsActive && len(optionNames) == 0 {
+		return Scenario{}, &Error{Position: optionsPosition, Category: "sintaxe inválida", Detail: "seção de opções vazia"}
+	}
 	if asserts && len(scenario.Entries[len(scenario.Entries)-1].Assertions) == 0 {
 		return Scenario{}, &Error{Position: assertsPosition, Category: "sintaxe inválida", Detail: "seção de assertions vazia"}
 	}
@@ -400,7 +434,7 @@ func unsupported(token string) string {
 	switch token {
 	case "HEAD", "OPTIONS", "CONNECT", "TRACE":
 		return "método " + token
-	case "[Options]", "[QueryStringParams]", "[FormParams]", "[Cookies]", "[BasicAuth]":
+	case "[QueryStringParams]", "[FormParams]", "[Cookies]", "[BasicAuth]":
 		return "seção " + token
 	default:
 		switch {

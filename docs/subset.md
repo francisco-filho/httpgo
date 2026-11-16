@@ -1053,10 +1053,50 @@ na pré-validação aqui, mas chega à assertion no Hurl observado. Quantidade m
 que inteiro de máquina passa no par de ambos; não se deduz precisão numérica geral
 da referência. A semântica aprovada não é alterada para forçar equivalência.
 
+## Polling local por entrada — US-26 / issue #50
+
+```hurl
+GET {{base_url}}/jobs/123
+[Options]
+retry: 3
+retry-interval: 500
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "READY"
+```
+
+`retry` é a quantidade de novas tentativas após a inicial (default `0`);
+`retry-interval` é inteiro em milissegundos (default `1000`, zero sem espera
+deliberada). Opções estáticas não negativas, sem duplicação, ilimitado ou overflow;
+qualquer outra opção é rejeitada antes de todo HTTP do arquivo. A seção pertence
+à requisição e não pode seguir a resposta nem ser duplicada.
+
+Somente divergências de status/assertions (`1`) permitem repetir. Transporte,
+avaliação/decodificação, captura, preparação, cancelamento ou escrita (`2`)
+encerram imediatamente. Cada tentativa repete a requisição completa, inclusive
+POST: efeitos podem se repetir, sem garantia de idempotência. Variáveis/caminhos
+permanecem; arquivos externos e multipart são relidos/reabertos, sem snapshot dos
+bytes se outro processo alterar o arquivo. Cada tentativa começa no método/URL
+originais, não no destino de um redirect.
+
+Respostas/fontes são fechadas antes de avaliar/esperar. A ordem continua status →
+assertions → publicação atômica de capturas, somente após aprovação. Proteções de
+segredos descobertos não são descartadas. Espera é cancelável, apenas entre
+tentativas elegíveis. Cada envio tem seu timeout HTTP; não há timeout global novo,
+backoff, retry global ou reexecução do arquivo.
+
+Há uma entrada lógica e um resultado/callback terminal. `[tentativas=N]` indica
+os envios iniciados; resumos separam `tentativas_iniciadas`, `respostas_completas`
+e `status_comparados` (comparações numéricas, aprovadas ou divergentes). Contadores
+legados permanecem lógicos, cada entrada contada no máximo uma vez, pelos fatos
+da última tentativa enviada; uma preparação falha não inventa envio. Divergências
+transitórias recuperadas não contam como falha final. Esgotamento mantém o último
+diagnóstico seguro e retorna `1`; cancelamento na espera retorna `2`.
+
 ## Execução HTTP
 
-- Cada requisição é iniciada em ordem. Não há paralelismo ou retry, inclusive retry
-  implícito do transporte. HTTP/1.1 sem conexão persistente evita o replay de
+- Cada requisição é iniciada em ordem. Não há paralelismo ou retry
+  implícito do transporte; polling explícito segue a seção anterior. HTTP/1.1 sem conexão persistente evita o replay de
   requisições em conexão reutilizada. HTTP/2 não é habilitado nesta história.
 - Timeout total **configurável em YAML, default de 10 segundos** por requisição,
   contado uma vez e compartilhado por conexão/TLS, redirects e consumo de todos
@@ -1127,7 +1167,8 @@ arquivo explícito é validado pelo conteúdo, independentemente da extensão.
   iniciais imutáveis e sessão nova; capturas não passam ao próximo. Não há cookie
   jar, nem cookies automáticos dentro/entre arquivos. Isolamento não desfaz efeitos
   na API. Payloads permanecem relativos ao respectivo cenário, não à configuração.
-- Primeira falha ou erro interrompe as próximas requisições do arquivo, sem retry.
+- Primeira falha definitiva ou erro interrompe as próximas requisições do arquivo;
+  divergências transitórias só são repetidas pelo polling explicitamente configurado.
   Sem `--fail-fast`, continua arquivos seguintes, inclusive após erro de parsing.
   Com a flag sem valor, não inicia os posteriores e os identifica como **não
   executados**, sem analisá-los só para contar requisições. Cancelamento do contexto

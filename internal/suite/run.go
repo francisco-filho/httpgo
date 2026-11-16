@@ -21,6 +21,7 @@ const (
 // FileResult retains counts only: no scenarios, payloads, sessions or responses.
 // Known is false when the file was not successfully parsed, including skipped files.
 type FileResult struct {
+	Attempts                                     runner.AttemptSummary
 	Name                                         string
 	State                                        State
 	Duration                                     time.Duration
@@ -30,6 +31,7 @@ type FileResult struct {
 }
 
 type Summary struct {
+	Attempts                                                    runner.AttemptSummary
 	Files, Processed, Executed, Passed, Failed, Errors, Skipped int
 	Requests                                                    runner.Summary // Totals cover only successfully parsed files.
 	UnknownFiles                                                int
@@ -72,6 +74,7 @@ func (s *Suite) Run(ctx context.Context, files []File, options Options, report f
 			current.Duration = max(time.Duration(0), s.now().Sub(begin))
 			current.Known = loadErr == nil
 			current.Requests = execution.Summary
+			current.Attempts = execution.Attempts
 			current.State = classify(execution, loadErr)
 			for _, entry := range execution.Entries {
 				switch entry.Outcome {
@@ -162,6 +165,9 @@ func (s *Summary) add(file FileResult) {
 	if file.Requests.Started > 0 {
 		s.Executed++
 	}
+	s.Attempts.Started += file.Attempts.Started
+	s.Attempts.Completed += file.Attempts.Completed
+	s.Attempts.StatusChecks += file.Attempts.StatusChecks
 	s.Requests.Total += file.Requests.Total
 	s.Requests.Started += file.Requests.Started
 	s.Requests.Completed += file.Requests.Completed

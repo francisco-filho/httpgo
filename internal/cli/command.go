@@ -126,12 +126,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		} else {
 			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
 		}
-	case runner.Failed, runner.RenderFailed, runner.FileFailed:
+	case runner.Failed, runner.RenderFailed, runner.FileFailed, runner.Cancelled:
 		// Headers alone are not a completed response: never invent a status.
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
+	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
@@ -150,6 +150,7 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
+	line += fmt.Sprintf(" [tentativas=%d]", entry.Attempts)
 	if _, err := io.WriteString(c.out, line+"\n"); err != nil {
 		return fmt.Errorf("escrever resultado da requisição: %w", err)
 	}
@@ -162,7 +163,7 @@ func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadEr
 	if !file.Known {
 		total, notStarted = "desconhecido", "desconhecido"
 	}
-	if _, err := fmt.Fprintf(c.out, "resumo %q: total=%s iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%s resultado=%s duração=%s\n", file.Name, total, s.Started, s.Completed, s.Validated, s.WithoutValidation, notStarted, file.State, file.Duration); err != nil {
+	if _, err := fmt.Fprintf(c.out, "resumo %q: total=%s iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%s resultado=%s duração=%s tentativas_iniciadas=%d respostas_completas=%d status_comparados=%d\n", file.Name, total, s.Started, s.Completed, s.Validated, s.WithoutValidation, notStarted, file.State, file.Duration, file.Attempts.Started, file.Attempts.Completed, file.Attempts.StatusChecks); err != nil {
 		return err
 	}
 	if loadErr != nil {
@@ -173,7 +174,7 @@ func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadEr
 }
 
 func (c *Command) renderSuite(s suite.Summary) error {
-	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration)
+	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s tentativas_iniciadas=%d respostas_completas=%d status_comparados=%d\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration, s.Attempts.Started, s.Attempts.Completed, s.Attempts.StatusChecks)
 	return err
 }
 

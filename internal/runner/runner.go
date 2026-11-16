@@ -43,6 +43,7 @@ const (
 	Passed         Outcome = "status validado"
 	Mismatch       Outcome = "status divergente"
 	Failed         Outcome = "erro de transporte"
+	Cancelled      Outcome = "execução cancelada"
 	RenderFailed   Outcome = "erro de renderização"
 	FileFailed     Outcome = "erro de arquivo externo"
 	CaptureFailed  Outcome = "erro de captura"
@@ -54,6 +55,7 @@ const (
 )
 
 type EntryResult struct {
+	Attempts      int
 	BodyFailure   *BodyFailure
 	BodyError     *BodyError
 	JSONFailure   *JSONFailure
@@ -69,7 +71,14 @@ type Summary struct {
 	Total, Started, Completed, Validated, WithoutValidation, NotStarted int
 }
 
+// AttemptSummary counts executor calls, complete responses and status comparisons.
+// Redirect hops are internal to one executor call, not additional attempts.
+type AttemptSummary struct {
+	Started, Completed, StatusChecks int
+}
+
 type Result struct {
+	Attempts      AttemptSummary
 	Entries       []EntryResult
 	Summary       Summary
 	Err           error
@@ -106,6 +115,7 @@ type Runner struct {
 	renderer   Renderer
 	readFile   func(context.Context, string) ([]byte, error)
 	openUpload func(string) (uploadFile, error)
+	wait       func(context.Context, time.Duration) error
 }
 
 // New accepts an optional synchronous reporter, called before the next entry.
@@ -118,7 +128,7 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 	if renderer == nil {
 		renderer, _ = template.New(nil, nil)
 	}
-	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload}
+	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload, wait: waitInterval}
 }
 
 // Options applies to one execution only. The zero value preserves external bytes.
@@ -131,9 +141,7 @@ func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
 	return r.RunWithOptions(ctx, scenario, Options{})
 }
 
-func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, options Options) Result {
-	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
-	session := r.renderer.NewSession()
+func protectScenario(session template.Session, scenario parser.Scenario) {
 	for _, entry := range scenario.Entries {
 		for _, capture := range entry.Captures {
 			if capture.Kind == parser.HeaderCapture && sensitiveHeader(capture.Header) {
@@ -154,174 +162,155 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 			}
 		}
 	}
-	for _, entry := range scenario.Entries {
-		if err := ctx.Err(); err != nil {
-			result.Err, result.ErrorPosition = err, entry.Position
-			return result
-		}
-		request, display, renderErr := render(session, entry)
-		if renderErr != nil {
-			result.Err, result.ErrorPosition = renderErr, renderErr.Position
-			current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
-			result.Entries = append(result.Entries, current)
-			if r.report != nil {
-				if err := r.report(current); err != nil {
-					result.ReportErr = err
-				}
-			}
-			return result
-		}
-		for _, header := range request.Headers {
-			if sensitiveHeader(header.Name) {
-				session.ProtectValue(header.Value)
-			}
-		}
-		if entry.ExternalBody != nil {
-			path := entry.ExternalBody.Path
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(scenario.OriginDir, path)
-			}
-			body, err := r.readFile(ctx, path)
-			if err == nil {
-				err = ctx.Err()
-			}
-			if err != nil {
-				failure := fileFailure(entry.ExternalBody.Position, err)
-				result.Err, result.ErrorPosition = failure, failure.Position
-				current := EntryResult{Entry: safeEntry(session, entry), Outcome: FileFailed, DisplayURL: session.Sanitize(display)}
-				current.Entry.Position = failure.Position
-				current.Entry.Position.File = session.Sanitize(current.Entry.Position.File)
-				result.Entries = append(result.Entries, current)
-				if r.report != nil {
-					result.ReportErr = r.report(current)
-				}
-				return result
-			}
-			if options.RenderFiles {
-				var failure *RenderError
-				body, failure = renderExternal(session, body, *entry.ExternalBody)
-				if err := ctx.Err(); err != nil {
-					result.Err, result.ErrorPosition = err, entry.ExternalBody.Position
-					return result
-				}
-				if failure != nil {
-					result.Err, result.ErrorPosition = failure, failure.Position
-					current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
-					current.Entry.Position = failure.Position
-					result.Entries = append(result.Entries, current)
-					if r.report != nil {
-						result.ReportErr = r.report(current)
-					}
-					return result
-				}
-			}
-			request.Body = body
-		}
-		var upload io.Closer
-		if entry.Multipart != nil {
-			var err error
-			upload, err = r.prepareMultipart(ctx, session, entry, scenario.OriginDir, &request)
-			if err != nil {
-				pos, outcome := entry.Multipart.Position, FileFailed
-				var fileErr *FileError
-				var renderErr *RenderError
-				if errors.As(err, &fileErr) {
-					pos = fileErr.Position
-				}
-				if errors.As(err, &renderErr) {
-					pos, outcome = renderErr.Position, RenderFailed
-				}
-				result.Err, result.ErrorPosition = err, pos
-				current := EntryResult{Entry: safeEntry(session, entry), Outcome: outcome, DisplayURL: session.Sanitize(display)}
-				current.Entry.Position = pos
-				current.Entry.Position.File = session.Sanitize(pos.File)
-				result.Entries = append(result.Entries, current)
-				if r.report != nil {
-					result.ReportErr = r.report(current)
-				}
-				return result
-			}
-		}
-		if err := ctx.Err(); err != nil {
-			if upload != nil {
-				err = errors.Join(err, upload.Close())
-			}
-			result.Err, result.ErrorPosition = err, entry.Position
-			return result
-		}
-		request.Timeout = options.Timeout
-		result.Summary.Started++
-		result.Summary.NotStarted--
-		response, err := r.executor.Execute(ctx, request)
-		if upload != nil {
-			if closeErr := upload.Close(); closeErr != nil {
-				err = errors.Join(err, fileFailure(entry.Multipart.Position, closeErr))
-			}
-		}
-		for _, header := range response.Headers {
-			if sensitiveHeader(header.Name) {
-				session.ProtectValue(header.Value)
-			}
-		}
-		current := EntryResult{Entry: entry, Status: response.Status, DisplayURL: display}
-		if err != nil {
-			current.Outcome, current.Status = Failed, 0
-			result.Err, result.ErrorPosition = err, entry.Position
-			var fileErr *FileError
-			if errors.As(err, &fileErr) {
-				result.ErrorPosition = fileErr.Position
-			}
-		} else {
-			result.Summary.Completed++
-			if entry.ExpectedStatus == nil {
-				current.Outcome = Unvalidated
-				if entry.AnyStatus {
-					current.Outcome = Wildcard
-				}
-				result.Summary.WithoutValidation++
-			} else if assertion.Status(*entry.ExpectedStatus, response.Status) {
-				current.Outcome = Passed
-				result.Summary.Validated++
-			} else {
-				current.Outcome = Mismatch
-				result.Diverged = true
-			}
-		}
-		if err == nil && !result.Diverged {
-			if assertionErr := checkAssertions(session, entry, response, &current); assertionErr != nil {
-				result.Err = assertionErr
-				var jsonErr *JSONError
-				var bodyErr *BodyError
-				switch {
-				case errors.As(assertionErr, &jsonErr):
-					current.JSONError = jsonErr
-					result.ErrorPosition = jsonErr.Position
-				case errors.As(assertionErr, &bodyErr):
-					result.ErrorPosition = bodyErr.Position
-				default:
-					result.ErrorPosition = entry.Position
-				}
-			}
-			result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil
-		}
-		if err == nil && result.Err == nil && !result.Diverged && len(entry.Captures) > 0 {
-			if captureErr := captureResponse(session, entry.Captures, response); captureErr != nil {
-				current.Outcome = CaptureFailed
-				result.Err, result.ErrorPosition = captureErr, captureErr.Position
-			}
-		}
-		current.Entry = safeEntry(session, entry)
-		current.DisplayURL = session.Sanitize(current.DisplayURL)
+}
+
+// runAttempt executes one entry without reporting. Resources are closed before
+// evaluation or waiting; only the polling decision publishes a terminal result.
+func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.Entry, options Options, session template.Session) Result {
+	result := Result{Summary: Summary{Total: 1, NotStarted: 1}}
+	if err := ctx.Err(); err != nil {
+		result.Err, result.ErrorPosition = err, entry.Position
+		return result
+	}
+	request, display, renderErr := render(session, entry)
+	if renderErr != nil {
+		result.Err, result.ErrorPosition = renderErr, renderErr.Position
+		current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
 		result.Entries = append(result.Entries, current)
-		if r.report != nil {
-			if err := r.report(current); err != nil {
-				result.ReportErr, result.ErrorPosition = err, entry.Position
+		return result
+	}
+	for _, header := range request.Headers {
+		if sensitiveHeader(header.Name) {
+			session.ProtectValue(header.Value)
+		}
+	}
+	if entry.ExternalBody != nil {
+		path := entry.ExternalBody.Path
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(originDir, path)
+		}
+		body, err := r.readFile(ctx, path)
+		if err == nil {
+			err = ctx.Err()
+		}
+		if err != nil {
+			failure := fileFailure(entry.ExternalBody.Position, err)
+			result.Err, result.ErrorPosition = failure, failure.Position
+			current := EntryResult{Entry: safeEntry(session, entry), Outcome: FileFailed, DisplayURL: session.Sanitize(display)}
+			current.Entry.Position = failure.Position
+			current.Entry.Position.File = session.Sanitize(current.Entry.Position.File)
+			result.Entries = append(result.Entries, current)
+			return result
+		}
+		if options.RenderFiles {
+			var failure *RenderError
+			body, failure = renderExternal(session, body, *entry.ExternalBody)
+			if err := ctx.Err(); err != nil {
+				result.Err, result.ErrorPosition = err, entry.ExternalBody.Position
+				return result
+			}
+			if failure != nil {
+				result.Err, result.ErrorPosition = failure, failure.Position
+				current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
+				current.Entry.Position = failure.Position
+				result.Entries = append(result.Entries, current)
 				return result
 			}
 		}
-		if result.Err != nil || result.Diverged {
+		request.Body = body
+	}
+	var upload io.Closer
+	if entry.Multipart != nil {
+		var err error
+		upload, err = r.prepareMultipart(ctx, session, entry, originDir, &request)
+		if err != nil {
+			pos, outcome := entry.Multipart.Position, FileFailed
+			var fileErr *FileError
+			var renderErr *RenderError
+			if errors.As(err, &fileErr) {
+				pos = fileErr.Position
+			}
+			if errors.As(err, &renderErr) {
+				pos, outcome = renderErr.Position, RenderFailed
+			}
+			result.Err, result.ErrorPosition = err, pos
+			current := EntryResult{Entry: safeEntry(session, entry), Outcome: outcome, DisplayURL: session.Sanitize(display)}
+			current.Entry.Position = pos
+			current.Entry.Position.File = session.Sanitize(pos.File)
+			result.Entries = append(result.Entries, current)
 			return result
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		if upload != nil {
+			err = errors.Join(err, upload.Close())
+		}
+		result.Err, result.ErrorPosition = err, entry.Position
+		return result
+	}
+	request.Timeout = options.Timeout
+	result.Summary.Started++
+	result.Summary.NotStarted--
+	response, err := r.executor.Execute(ctx, request)
+	if upload != nil {
+		if closeErr := upload.Close(); closeErr != nil {
+			err = errors.Join(err, fileFailure(entry.Multipart.Position, closeErr))
+		}
+	}
+	for _, header := range response.Headers {
+		if sensitiveHeader(header.Name) {
+			session.ProtectValue(header.Value)
+		}
+	}
+	current := EntryResult{Entry: entry, Status: response.Status, DisplayURL: display}
+	if err != nil {
+		current.Outcome, current.Status = Failed, 0
+		result.Err, result.ErrorPosition = err, entry.Position
+		var fileErr *FileError
+		if errors.As(err, &fileErr) {
+			result.ErrorPosition = fileErr.Position
+		}
+	} else {
+		result.Summary.Completed++
+		if entry.ExpectedStatus == nil {
+			current.Outcome = Unvalidated
+			if entry.AnyStatus {
+				current.Outcome = Wildcard
+			}
+			result.Summary.WithoutValidation++
+		} else if assertion.Status(*entry.ExpectedStatus, response.Status) {
+			current.Outcome = Passed
+			result.Summary.Validated++
+		} else {
+			current.Outcome = Mismatch
+			result.Diverged = true
+		}
+	}
+	if err == nil && !result.Diverged {
+		if assertionErr := checkAssertions(session, entry, response, &current); assertionErr != nil {
+			result.Err = assertionErr
+			var jsonErr *JSONError
+			var bodyErr *BodyError
+			switch {
+			case errors.As(assertionErr, &jsonErr):
+				current.JSONError = jsonErr
+				result.ErrorPosition = jsonErr.Position
+			case errors.As(assertionErr, &bodyErr):
+				result.ErrorPosition = bodyErr.Position
+			default:
+				result.ErrorPosition = entry.Position
+			}
+		}
+		result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil
+	}
+	if err == nil && result.Err == nil && !result.Diverged && len(entry.Captures) > 0 {
+		if captureErr := captureResponse(session, entry.Captures, response); captureErr != nil {
+			current.Outcome = CaptureFailed
+			result.Err, result.ErrorPosition = captureErr, captureErr.Position
+		}
+	}
+	current.Entry = safeEntry(session, entry)
+	current.DisplayURL = session.Sanitize(current.DisplayURL)
+	result.Entries = append(result.Entries, current)
 	return result
 }
