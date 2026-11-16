@@ -719,11 +719,50 @@ callback, sem avaliar nem publicar a captura antes da hora. Isso não detecta
 segredos arbitrários não marcados. Body, documento e coleções de headers não
 são despejados nem acumulados no resultado.
 
-Não há `count`, `exists` JSON, comparações ordenadas, regex, filtros, ampliação de
-JSONPath nem interpolação de consultas/esperados. Hurl 8.0.0 rejeita os literais
+A US-14 acrescenta presença, contagem e limites (abaixo), sem ampliar JSONPath.
+Não há regex, filtros ou interpolação de consultas/esperados. Hurl 8.0.0 rejeita os literais
 esperados compostos e o literal com expoente testados; a gramática e os códigos
 próprios estão classificados em [compatibilidade](docs/compatibility.md), sem
 promessa de equivalência geral.
+
+## Validar estrutura, quantidade e limites (US-14 / issue #34)
+
+Contra uma API que devolva
+`{"items":[{"id":null},{"id":2},{"id":3}],"total":3}`, execute
+`bin/httpgo test testdata/scenarios/scenario_assert_structure.hurl --var base_url=http://localhost:8080`:
+
+```hurl
+GET {{base_url}}/products
+
+HTTP 200
+[Asserts]
+jsonpath "$.items" count == 3
+jsonpath "$.total" >= 1
+jsonpath "$.items[0].id" exists
+```
+
+| Construção | Contrato |
+|---|---|
+| `exists` | sem esperado; null, vazios, false e zero presentes existem; ausência falha |
+| `count ==`, `count >`, `count >=`, `count <`, `count <=` | tamanho do array selecionado, incluindo elementos null; vazio tem zero; esperado inteiro não negativo, sem limite de máquina |
+| `>`, `>=`, `<`, `<=` | dois números JSON, inclusive negativos/decimais; ordem exata, sem float64, coerção ou arredondamento |
+
+Contagem nunca infere tamanho de string/objeto. Representações numericamente
+inteiras como `1.0`/`1e3` são aceitas como quantidade, sem impor grafia inteira.
+Condição falsa, ausência ou tipo selecionado incompatível retorna **1**; esperado
+inválido (inclusive count negativo/fracionário) ou sintaxe inválida retorna **2**
+antes de qualquer HTTP. Resposta JSON inválida ou percurso incompatível mantém
+**2**. Ordem status → assertions escritas → capturas e fail-fast são preservados.
+Diagnósticos incluem operador/causa, consulta e localização; count mostra somente
+a quantidade, não a coleção. Segredos conhecidos/derivados continuam sanitizados;
+captura secreta pendente oculta integralmente ambos os operandos, inclusive contagens.
+
+O diferencial com **Hurl 8.0.0** confirmou presença de null, vazios, false e zero,
+contagem e limites dos pares compartilhados. Há diferenças deliberadas de gramática
+(esperados com expoente), pré-validação de count negativo/fracionário e códigos;
+veja [matriz](docs/compatibility.md). Não há count em capturas, strings/objetos,
+novos JSONPaths, filtros, agregações, aritmética ou regex. O dummy manual não promete
+essa resposta; o exemplo é testado contra HTTP local pelos E2E.
 
 ## Documentação e desenvolvimento
 

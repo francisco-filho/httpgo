@@ -48,7 +48,7 @@ func TestJSONLimitsOrderAndCaptures(t *testing.T) {
 
 func TestJSONLimitsSafeReports(t *testing.T) {
 	for _, pending := range []bool{false, true} {
-		for _, line := range []string{`jsonpath "$.known_private" > 987654321`, `jsonpath "$.items" count == 987654321`, `jsonpath "$.known_private" exists`} {
+		for _, line := range []string{`jsonpath "$.known_private" > 987654321`, `jsonpath "$.actual" > 987654321`, `jsonpath "$.items" count == 987654321`, `jsonpath "$.known_private" exists`} {
 			c, _ := template.New([]string{`secret={"name":"known_private","n":987654321}`}, []string{"secret", "token"})
 			captures := ""
 			if pending {
@@ -58,7 +58,7 @@ func TestJSONLimitsSafeReports(t *testing.T) {
 			calls := 0
 			result := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) {
 				calls++
-				return Response{Status: 200, Body: []byte(`{"items":["body-private"],"unrelated":"body-private"}`)}, nil
+				return Response{Status: 200, Body: []byte(`{"actual":987654321,"items":["body-private"],"unrelated":"body-private"}`)}, nil
 			}), c, func(entry EntryResult) error {
 				raw, _ := json.Marshal(entry)
 				for _, secret := range []string{"known_private", "987654321", "body-private"} {

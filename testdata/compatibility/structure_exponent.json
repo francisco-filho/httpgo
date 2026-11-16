@@ -1,0 +1,15 @@
+{
+  "response_json": "1e99999999999999999999999",
+  "classification": "diferença de gramática: esperado com expoente exato aqui; Hurl rejeita antes da rede",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": []
+  }
+}

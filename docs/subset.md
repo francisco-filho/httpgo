@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-13 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29 e #32)
+# Subconjunto suportado e extensões — US-01 a US-14 e US-20 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32 e #34)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -767,7 +767,21 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
   continua identificável junto à ocultação. Essa política não reconhece segredos
   arbitrários não marcados e não substitui os limites de segurança documentados.
 
-### Presença e quantidade — US-14
+### Presença, quantidade e limites — US-14 / issue #34
+
+Exemplo executável: `testdata/scenarios/scenario_assert_structure.hurl`:
+
+```hurl
+GET {{base_url}}/products
+
+HTTP 200
+[Asserts]
+jsonpath "$.items" count == 3
+jsonpath "$.total" >= 1
+jsonpath "$.items[0].id" exists
+```
+
+Resposta demonstrativa: `{"items":[{"id":null},{"id":2},{"id":3}],"total":3}`.
 
 `jsonpath "$.id" exists` verifica presença: `null`, vazios, false e zero
 presentes existem. Propriedade ausente ou índice fora do array falha com 1.
@@ -792,7 +806,11 @@ incompatível continuam erros de avaliação (2).
 Continuam fora do recorte: count em strings/objetos/capturas, regex,
 filtros e interpolação de consultas ou esperados. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
-`compatibility.md`. A semântica aprovada não é alterada para forçar equivalência.
+`compatibility.md`. Os novos pares com Hurl 8.0.0 confirmam que null, vazios,
+false e zero presentes satisfazem `exists`. Count negativo/fracionário é rejeitado
+na pré-validação aqui, mas chega à assertion no Hurl observado. Quantidade maior
+que inteiro de máquina passa no par de ambos; não se deduz precisão numérica geral
+da referência. A semântica aprovada não é alterada para forçar equivalência.
 
 ## Execução HTTP
 

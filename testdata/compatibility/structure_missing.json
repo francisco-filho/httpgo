@@ -1,0 +1,16 @@
+{
+  "response_json": "{}",
+  "classification": "ausência falha em exists; códigos próprios",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

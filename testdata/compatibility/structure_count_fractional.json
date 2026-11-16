@@ -1,0 +1,14 @@
+{
+  "response_json": "[]",
+  "classification": "HTTPGo rejeita quantidade fracionária antes de HTTP",
+  "httpgo": {
+    "exit": 2,
+    "paths": []
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

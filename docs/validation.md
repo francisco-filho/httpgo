@@ -1,4 +1,85 @@
-# Validação — US-01 a US-13 e US-20
+# Validação — US-01 a US-14 e US-20
+
+## US-14 — issue #34 / história 0014
+
+Plano da issue #34 e arquitetura/tarefas em
+`httpgo-docs/historias/US-14-validar-estrutura-e-limites.md` executados sem planner,
+somente backend. Três tasks registradas/autoaprovadas e executadas em ordem:
+`back:1` no commit `1243fd4` (presença/quantidade), `back:2` no commit `93e1081`
+(limites/falhas seguras), `back:3` nesta alteração (contrato/corpus/regressão).
+Sem frontend/estáticos, novas dependências, toolchain, transporte, CI, lint ou
+budgets alterados. SonarQube não executado: exclusivo do QA. Evidências locais
+não substituem aprovação do gate automático de revisão.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5` conforme go.mod, goimports e golangci-lint
+já disponíveis em `/home/ff/go/bin` (acrescentado ao PATH dos comandos). A instalação
+corrente de Hurl é **8.0.1**, diferente do contrato **8.0.0**. Com autorização
+explícita do usuário, foi baixado o binário oficial da release 8.0.0 para
+`/tmp/httpgo-0014-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, sem substituir a
+instalação existente nem ler fontes Hurl. SHA-256 do tarball conferido contra a
+release: `6ab1d6703b94086ece6d2f994d73f8d215926997b292ba29b894799425afbf67`.
+Esse diretório foi anteposto ao PATH somente nos comandos diferenciais; todos
+exigiram Hurl 8.0.0 real, sem skip ou alteração de gate. Aviso local de metadados
+da libcurl não impediu a execução.
+
+HTTP local com `httptest.Server`, portas dinâmicas, contatos contados, binário
+compilado uma vez por suíte e `exec.CommandContext`; fakes pequenos em runner/CLI.
+Sem dummy/8080, sleeps, novas goroutines de produção ou credenciais reais.
+
+- Task 1: `go test ./internal/parser ./internal/query ./internal/assertion
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -run 'TestJSON' -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` passaram.
+- Task 2: `go test ./internal/assertion ./internal/parser ./internal/runner
+  ./internal/cli ./internal/transport`, E2E `TestJSON`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` passaram.
+- Final: `go test ./internal/cli ./tests/e2e`, `make fmt lint test`,
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e` passaram.
+  Regressão repetida sem cache: `go test ./... -race -cover -count=1` passou.
+  Lint **0 issues**; cobertura: assertion **94,1%**, CLI **96,2%**, parser **96,2%**,
+  query **98,6%**, runner **92,7%**, transporte **90,4%**. `gofmt -l` dos Go
+  alterados e `git diff --check` limpos; links Markdown locais conferidos.
+- `make compatibility` passou duas vezes com **Hurl 8.0.0**: **136 pares**,
+  **20 novos `structure_*`**, **116 anteriores inalterados**. Nenhum `-update`
+  indiscriminado ou flag própria passada ao Hurl. A primeira rodada mostrou que
+  Hurl também aceita a quantidade enorme em `count_huge`; somente esse novo
+  esperado foi corrigido. Presença de null/vazios/false/zero foi observada antes
+  de anunciar compatibilidade. Diferenças de gramática, pré-validação de count
+  negativo/fracionário e códigos estão em `compatibility.md`.
+- Fuzzing com `-run '^$' -fuzztime=20s -parallel=2`, sem falhas:
+  - `go test ./internal/parser -fuzz '^FuzzParse$'`: **124.380** execuções na
+    última rodada; seeds ampliados com presença, count, quantidades enormes,
+    comparações e esperados inválidos. O negativo count em captura também
+    comprovou diagnóstico explícito de construção não suportada, sem execução.
+  - `go test ./internal/template -fuzz '^FuzzRender$'`: **75.156** execuções;
+  - `go test ./internal/template -fuzz '^FuzzRenderJSON$'`: **50.992** execuções.
+- macOS/Windows não executados; opcionais nesta história pelo plano v4, seção 7.
+  Não se declara execução nativa nessas plataformas.
+
+### Rastreabilidade dos cenários
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-179 | `TestJSONStructureDemonstrationByBinary` — fixture versionada, três itens/total positivo/id null; remoção de id retorna 1 e interrompe |
+| GO-180 | `TestJSONPresenceAndCount`, `TestJSONStructureByBinary` — raiz, null, vazios, false, zero, propriedade/índice ausentes |
+| GO-181 | `TestJSONPresenceAndCount`, `TestJSONStructureByBinary` — cinco comparadores, array vazio/elementos null, quantidade esperada/recebida sem coleção |
+| GO-182 | Mesmos testes — string/objeto/número/boolean/null e ausência falham com 1 sem contagem implícita |
+| GO-183 | `TestExactNumericOrder`, `TestJSONNumericBoundariesByBinary` — quatro comparadores com positivos/negativos, limites estritos/inclusivos e decimais negativos |
+| GO-184 | `TestOrderedJSONRequiresNumber`, `TestJSONNumericTypesAndEvaluationByBinary` — tipos incompatíveis e ausência, sem coerção |
+| GO-185 | `TestInvalidJSONAssertions`, `TestJSONStructureInvalidNeverSends`, `TestJSONNumericInvalidNeverSends`, `TestJSONInvalidLateNeverSendsByBinary`, testes globais de fixtures — esperados/sintaxe/queries inválidos, HTTP ausente, count em captura, zero envios |
+| GO-186 | `TestJSONStructureOrder`, `TestJSONLimitsOrderAndCaptures` — status/lista/capturas, decode tardio, primeira falha e callback antes do próximo envio; captura publicada só após sucesso |
+| GO-187 | `TestJSONLimitsSafeReports`, `TestJSONLimitsSecretsByBinary` — consulta e operandos conhecidos/derivados sanitizados antes do callback e em ambos os streams |
+| GO-188 | `TestExactNumericOrder`, `TestValidCount`, `TestJSONNumericTypesAndEvaluationByBinary` — além de float64/int, decimais próximos, zero com sinal e expoentes enormes sem expansão |
+| GO-189 | `TestJSONNumericTypesAndEvaluationByBinary`, regressões `TestJSONEqualityAndEvaluationByBinary` — resposta vazia/malformada/adicional e percurso por null/tipo incompatível são 2, não 1 |
+| GO-190 | `TestJSONStructurePendingSecret`, `TestJSONLimitsSafeReports`, `TestJSONLimitsPendingSecretsCLI`, `TestJSONLimitsSecretsByBinary` — operandos/contagem ocultos com captura secreta pendente inclusive inválida, sem antecipá-la |
+| GO-191 | `TestJSONAssertionRequiresSuccessfulReadAndClose`, `TestJSONAssertionFinalBodyDeadlineAndCancellation`, `TestJSONLimitsFinalResponseByBinary` — novas assertions somente após resposta final consumida/fechada; read/close/incompleto/timeout/cancelamento impedem próxima requisição |
+| GO-192 | `TestJSONLimitsReporterPriorityAndImmutability`, `TestJSONLimitsWriterFailures` — erro/short write em stdout/stderr, prioridade 2, cenário intacto e ausência de documento/operandos brutos no relatório |
+| GO-193 | `TestCompatibility`, `TestJSONAssertionHelp`, `TestJSONStructureDemonstrationByBinary` — Hurl 8.0.0, matriz/ajuda/exemplo e negativos versionados |
+
+README, ajuda root/test, subset, arquitetura e matriz descrevem o suporte real.
+Sem regex, filtros, aritmética, agregações, ampliação de JSONPath ou count em
+capturas/strings/objetos. Extensões YAML/interpolação externa permanecem separadas.
 
 ## US-13 — issue #32 / história 013
 

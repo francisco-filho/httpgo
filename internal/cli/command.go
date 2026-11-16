@@ -424,6 +424,13 @@ Diagnóstico: consulta, arquivo/linha/coluna, esperado/real tipados e sanitizado
 Captura secreta pendente na mesma resposta oculta integralmente os dois valores
 em falhas de headers/JSON, sem avaliar/publicar a captura antecipadamente.
 Proteção não detecta segredos arbitrários não marcados. Sem dumps de body/documento.
+Estrutura, quantidade e limites:
+  GET {{base_url}}/products
+  HTTP 200
+  [Asserts]
+  jsonpath "$.items" count == 3
+  jsonpath "$.total" >= 1
+  jsonpath "$.items[0].id" exists
 jsonpath "$.items[0].id" exists: null, vazios, false e zero presentes existem.
 jsonpath "$.items" count == 3: conta somente arrays, inclusive vazio (zero).
 count aceita ==, >, >=, < e <=; esperado inteiro não negativo, sem limite de máquina.

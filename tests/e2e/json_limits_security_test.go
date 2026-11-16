@@ -11,7 +11,7 @@ import (
 
 func TestJSONLimitsSecretsByBinary(t *testing.T) {
 	for _, pending := range []bool{false, true} {
-		for _, expression := range []string{`jsonpath "$.secret_key" > 987654321`, `jsonpath "$.items" count == 987654321`, `jsonpath "$.secret_key_missing" exists`} {
+		for _, expression := range []string{`jsonpath "$.secret_key" > 987654321`, `jsonpath "$.actual" > 987654321`, `jsonpath "$.items" count == 987654321`, `jsonpath "$.secret_key_missing" exists`} {
 			var hits atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				hits.Add(1)
@@ -19,7 +19,7 @@ func TestJSONLimitsSecretsByBinary(t *testing.T) {
 					_, _ = io.WriteString(w, `{"token":{"confidential_name":"secret_key","confidential_number":987654321}}`)
 					return
 				}
-				_, _ = io.WriteString(w, `{"secret_key":0,"items":["body-private"],"unrelated":"body-private"}`)
+				_, _ = io.WriteString(w, `{"secret_key":0,"actual":987654321,"items":["body-private"],"unrelated":"body-private"}`)
 			}))
 			source := "GET {{base}}/assert\nHTTP *\n[Asserts]\n" + expression
 			if pending {

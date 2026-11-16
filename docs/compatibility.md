@@ -1,4 +1,43 @@
-# Matriz de compatibilidade — US-01 a US-13 e US-20
+# Matriz de compatibilidade — US-01 a US-14 e US-20
+
+## Ampliação US-14 — estrutura, quantidade e limites (issue #34)
+
+**Ampliação intencional do contrato:** `exists` JSON, `count` de arrays e os
+comparadores `>`, `>=`, `<`, `<=` deixam de ser rejeitados. No corpus de cenários,
+as antigas rejeições globais de exists/count passam a `!=`/`length`, que continuam
+não suportados. Novos negativos documentam esperados inválidos e count em captura.
+São **20 novos pares `structure_*`**, total **136**; as **116 observações antigas
+permanecem inalteradas**. Sem reutilizar código-fonte Hurl, alterar o harness ou
+regenerar observações anteriores.
+
+Todos os pares abaixo foram executados contra o binário **Hurl 8.0.0**. Presença
+de **null** foi confrontada antes de ser classificada como compartilhada. Os pares
+são evidência específica, não equivalência geral de números/JSONPath ou diagnósticos.
+
+| Par `structure_*` | HTTPGo | Hurl 8.0.0 | Observação em Linux |
+|---|---|---|---|
+| `presence` | 0; /capture → /health | 0; mesmos paths | raiz, null, string/array/objeto vazios, false e zero presentes existem |
+| `missing`, `index_missing` | 1; só /capture | 4; mesmo path | ausência difere de null; interrupção compartilhada, códigos próprios |
+| `count_operators` | 0; /capture → /health | 0; mesmos paths | cinco comparadores, array vazio e elementos null |
+| `count_mismatch` | 1; só /capture | 4; mesmo path | tamanho divergente impede próximo envio |
+| `count_string`, `count_object`, `count_null` | 1; só /capture | 4; mesmo path | tipo incompatível falha; não se conta implicitamente string/objeto aqui |
+| `count_missing` | 1; só /capture | 4; mesmo path | ausência não é array vazio |
+| `limits` | 0; /capture → /health | 0; mesmos paths | quatro comparadores, negativos/decimais, limites inclusivos e zero com sinal |
+| `gt_boundary`, `ge_boundary`, `lt_boundary`, `le_boundary` | 1; só /capture | 4; mesmo path | fronteiras falsas, códigos próprios |
+| `numeric_string` | 1; só /capture | 4; mesmo path | string numérica não passa por coerção |
+| `precision` | 0; /capture → /health | 0; mesmos paths | 9007199254740993 > 9007199254740992 neste par |
+| `exponent` | 0; /capture → /health | 2; zero contatos | diferença de gramática: esperado com expoente enorme é aceito exatamente aqui |
+| `count_huge` | 0; /capture → /health | 0; mesmos paths | quantidade esperada além do inteiro de máquina é aceita neste par por ambos |
+| `count_negative`, `count_fractional` | 2; zero contatos | 4; só /capture | restrição intencional: HTTPGo pré-valida quantidade inteira não negativa; Hurl chega à assertion |
+
+A primeira rodada revelou que o Hurl aceita a quantidade enorme de `count_huge`;
+somente esse novo esperado foi corrigido conforme a observação, sem mudar a
+semântica aprovada. A proteção de valores conhecidos/derivados, ocultação integral
+de contagens com captura secreta pendente e diagnóstico sem coleção são testados
+separadamente nos testes próprios de runner/CLI/E2E. O diferencial usa só dados
+fictícios e não compara texto de mensagens. Esperados continuam literais, count
+em capturas/strings/objetos continua fora do suporte, assim como filtros, agregações,
+aritmética, regex e ampliação da linguagem de consulta.
 
 ## Extensão US-13 — referências ao ambiente do processo (issue #32)
 
