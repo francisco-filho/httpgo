@@ -14,6 +14,7 @@ type Session interface {
 	ProtectValue(string)
 	IsSecret(string) bool
 	Sanitize(string) string
+	ProtectionValues() []string // Detached known variants, never a session or variable context.
 }
 
 // Capture carries one complete JSON value, never a CLI literal with text fallback.

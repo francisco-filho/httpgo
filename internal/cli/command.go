@@ -76,7 +76,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail("execução cancelada antes da leitura do cenário")
 	}
 	c.timeout = settings.Timeout
-	execution := suite.New(runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry))
+	execution := suite.NewWithProtection(runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry), c.protection.sanitize)
 	files, err := execution.Discover(ctx, args.files)
 	if err != nil {
 		return c.fail(err.Error())

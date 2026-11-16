@@ -98,6 +98,7 @@ func (s *Suite) Run(ctx context.Context, files []File, options Options, report f
 				stopped = true
 			}
 		}
+		current.Name = s.protect(current.Name)
 		result.Files = append(result.Files, current)
 		result.Summary.add(current)
 		if execution.ReportErr != nil {
@@ -122,6 +123,11 @@ func (s *Suite) Run(ctx context.Context, files []File, options Options, report f
 		result.Err = err
 		result.Code = 2
 	}
+	// Later discoveries may protect a name seen before the value was known.
+	for i := range result.Files {
+		result.Files[i].Name = s.protect(result.Files[i].Name)
+	}
+	result.ReportPosition.File = s.protect(result.ReportPosition.File)
 	result.Summary.Duration = max(time.Duration(0), s.now().Sub(started))
 	return result
 }

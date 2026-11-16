@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -116,16 +117,37 @@ func argumentProtection(args []string) func(string) string {
 	return template.Protector(values)
 }
 
-// executionProtection is local to ExecuteContext. The runner still owns session
-// creation; its factory publishes only the sanitizer to the output boundary.
+// executionProtection lives for one invocation and retains only deduplicated
+// redaction variants, never sessions, captures or operational variable contexts.
 type executionProtection struct {
 	initial func(string) string
-	session template.Session
+	values  map[string]bool
+	protect func(string) string
+}
+
+func (p *executionProtection) remember(values []string) {
+	if p.values == nil {
+		p.values = make(map[string]bool)
+	}
+	changed := false
+	for _, value := range values {
+		if value != "" && !p.values[value] {
+			p.values[value] = true
+			changed = true
+		}
+	}
+	if changed {
+		all := make([]string, 0, len(p.values))
+		for value := range p.values {
+			all = append(all, value)
+		}
+		p.protect = template.Protector(all)
+	}
 }
 
 func (p *executionProtection) sanitize(text string) string {
-	if p.session != nil {
-		text = p.session.Sanitize(text)
+	if p.protect != nil {
+		text = p.protect(text)
 	}
 	return p.initial(text)
 }
@@ -137,8 +159,34 @@ type sessionRenderer struct {
 
 func (r sessionRenderer) NewSession() template.Session {
 	session := r.context.NewSession()
-	r.protection.session = session
-	return session
+	r.protection.remember(session.ProtectionValues())
+	return invocationSession{Session: session, protection: r.protection}
+}
+
+// The wrapper shares only protection, not resolution, with other file sessions.
+type invocationSession struct {
+	template.Session
+	protection *executionProtection
+}
+
+func (s invocationSession) Sanitize(text string) string {
+	return s.protection.sanitize(s.Session.Sanitize(text))
+}
+
+func (s invocationSession) ProtectValue(value string) {
+	s.Session.ProtectValue(value)
+	s.protection.remember(s.ProtectionValues())
+}
+
+func (s invocationSession) ProtectCapture(name string, value json.RawMessage) {
+	s.Session.ProtectCapture(name, value)
+	s.protection.remember(s.ProtectionValues())
+}
+
+func (s invocationSession) Publish(batch []template.Capture) error {
+	err := s.Session.Publish(batch)
+	s.protection.remember(s.ProtectionValues())
+	return err
 }
 
 type protectedWriter struct {

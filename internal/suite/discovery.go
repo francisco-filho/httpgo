@@ -32,10 +32,32 @@ type Suite struct {
 	lstat   func(string) (fs.FileInfo, error)
 	readDir func(string) ([]os.DirEntry, error)
 	now     func() time.Time
+	protect func(string) string
 }
 
 func New(r *runner.Runner) *Suite {
-	return &Suite{runner: r, open: func(path string) (scenarioFile, error) { return os.Open(path) }, lstat: os.Lstat, readDir: os.ReadDir, now: time.Now}
+	return NewWithProtection(r, func(text string) string { return text })
+}
+
+// NewWithProtection applies invocation-scoped protection before collection and
+// callbacks. Operational paths and request values are never rewritten.
+func NewWithProtection(r *runner.Runner, protect func(string) string) *Suite {
+	return &Suite{runner: r, open: func(path string) (scenarioFile, error) { return os.Open(path) }, lstat: os.Lstat, readDir: os.ReadDir, now: time.Now, protect: protect}
+}
+
+type protectedError struct {
+	message string
+	cause   error
+}
+
+func (e *protectedError) Error() string { return e.message }
+func (e *protectedError) Unwrap() error { return e.cause }
+
+func (s *Suite) protectError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &protectedError{message: s.protect(err.Error()), cause: err}
 }
 
 // Error preserves the I/O cause without echoing operating-system error messages.
@@ -90,7 +112,8 @@ type candidate struct {
 
 // Discover finishes all access checks before returning a plan. It never parses
 // scenarios or follows symbolic links. This is not a concurrent-filesystem sandbox.
-func (s *Suite) Discover(ctx context.Context, paths []string) ([]File, error) {
+func (s *Suite) Discover(ctx context.Context, paths []string) (plan []File, discoveryErr error) {
+	defer func() { discoveryErr = s.protectError(discoveryErr) }()
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, &Error{Detail: "não foi possível determinar o diretório corrente", cause: err}
@@ -179,9 +202,40 @@ func (s *Suite) discover(ctx context.Context, cwd, path string, explicit bool, f
 func (s *Suite) RunFile(ctx context.Context, file File, options runner.Options) (runner.Result, error) {
 	scenario, err := s.load(ctx, file)
 	if err != nil {
-		return runner.Result{}, err
+		return runner.Result{}, s.protectError(err)
 	}
-	return s.runner.RunWithOptions(ctx, scenario, options), nil
+	result := s.runner.RunWithOptions(ctx, scenario, options)
+	result.ErrorPosition.File = s.protect(result.ErrorPosition.File)
+	// Keep typed safe diagnostics/cause inspection while protecting Error() at
+	// the collection boundary, including cancellation before any callback.
+	result.Err = s.protectRunError(result.Err)
+	return result, nil
+}
+
+func (s *Suite) protectRunError(err error) error {
+	if err == nil {
+		return nil
+	}
+	detail := "falha de execução HTTP"
+	var renderErr *runner.RenderError
+	var fileErr *runner.FileError
+	var captureErr *runner.CaptureError
+	var jsonErr *runner.JSONError
+	switch {
+	case errors.As(err, &renderErr):
+		detail = renderErr.Error()
+	case errors.As(err, &fileErr):
+		detail = fileErr.Error()
+	case errors.As(err, &captureErr):
+		detail = captureErr.Error()
+	case errors.As(err, &jsonErr):
+		detail = jsonErr.Error()
+	case errors.Is(err, context.Canceled):
+		detail = "execução cancelada"
+	case errors.Is(err, context.DeadlineExceeded):
+		detail = "prazo da requisição excedido"
+	}
+	return &protectedError{message: s.protect(detail), cause: err}
 }
 
 func (s *Suite) load(ctx context.Context, file File) (parser.Scenario, error) {
@@ -197,7 +251,7 @@ func (s *Suite) load(ctx context.Context, file File) (parser.Scenario, error) {
 		closeErr := input.Close()
 		return parser.Scenario{}, &Error{File: file.Name, Detail: "cenário deve ser um arquivo regular legível", cause: errors.Join(statErr, closeErr)}
 	}
-	scenario, parseErr := parser.Parse(file.Name, input)
+	scenario, parseErr := parser.Parse(s.protect(file.Name), input)
 	closeErr := input.Close()
 	if closeErr != nil {
 		return parser.Scenario{}, errors.Join(parseErr, &Error{File: file.Name, Detail: "não foi possível fechar o cenário", cause: closeErr})

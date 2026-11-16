@@ -159,6 +159,12 @@ func (c *Context) Render(source string) (Text, error) {
 
 // Sanitize protects known representations as well as provenance-based display.
 func (c *Context) Sanitize(text string) string {
+	return Protector(c.ProtectionValues())(text)
+}
+
+// ProtectionValues returns a detached snapshot suitable for invocation-scoped
+// redaction. Importing these variants never publishes captures or variables.
+func (c *Context) ProtectionValues() []string {
 	var values []string
 	for name := range c.secrets {
 		if value, ok := c.values[name]; ok {
@@ -166,5 +172,5 @@ func (c *Context) Sanitize(text string) string {
 		}
 	}
 	values = append(values, c.protected...)
-	return Protector(values)(text)
+	return values
 }
