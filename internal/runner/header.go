@@ -30,7 +30,13 @@ func sensitiveHeader(name string) bool {
 
 func checkHeader(session template.Session, declaration parser.HeaderAssertion, headers []query.HeaderValue, conceal bool) *HeaderFailure {
 	actual, present := query.Header(headers, declaration.Name)
-	if assertion.Header(declaration.Operator, declaration.Expected, actual, present) {
+	matched := false
+	if declaration.Operator == assertion.HeaderMatches {
+		matched = assertion.MatchString(declaration.Compiled, actual, present)
+	} else {
+		matched = assertion.Header(declaration.Operator, declaration.Expected, actual, present)
+	}
+	if matched {
 		return nil
 	}
 	expected := declaration.Expected
@@ -90,6 +96,7 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 		copy := *entry.Assertions[i].Header
 		entry.Assertions[i].Header = &copy
 		declaration := &copy
+		declaration.Compiled = nil // Compiled regexps retain their source pattern.
 		if conceal || sensitiveHeader(declaration.Name) {
 			declaration.Expected = "[oculto]"
 		} else {

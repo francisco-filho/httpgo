@@ -15,6 +15,7 @@ type HeaderAssertion struct {
 	Name     string
 	Operator assertion.HeaderOperator
 	Expected string
+	Compiled *regexp.Regexp
 	Position Position
 }
 
@@ -149,17 +150,9 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 		return declaration, nil
 	case assertion.JSONEqualOperator, assertion.JSONContains, assertion.JSONNotContains:
 	case assertion.JSONMatches:
-		pattern, trailing, valid := jsonString(rest)
-		if !valid || strings.TrimSpace(trailing) != "" {
-			return fail(pos, "sintaxe inválida", "matches exige somente uma string JSON entre aspas duplas")
-		}
-		compiled, err := regexp.Compile(pattern)
+		pattern, compiled, err := parseMatches(rest, pos)
 		if err != nil {
-			category := "sintaxe inválida"
-			if unsupportedRegexp(pattern) {
-				category = "construção não suportada"
-			}
-			return fail(pos, category, "padrão matches inválido ou não suportado")
+			return JSONAssertion{}, err
 		}
 		declaration.Expected = pattern
 		declaration.Pattern = pattern
@@ -235,6 +228,12 @@ func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 		if rest != "" {
 			return fail("sintaxe inválida", "exists não aceita valor esperado")
 		}
+	case assertion.HeaderMatches:
+		pattern, compiled, err := parseMatches(rest, pos)
+		if err != nil {
+			return HeaderAssertion{}, err
+		}
+		return HeaderAssertion{Name: name, Operator: operator, Expected: pattern, Compiled: compiled, Position: pos}, nil
 	case assertion.HeaderEqual, assertion.HeaderContains, assertion.HeaderNotContains:
 		expected, tail, valid := assertionString(rest)
 		if !valid || strings.TrimSpace(tail) != "" {
@@ -245,6 +244,24 @@ func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 		return fail("construção não suportada", "operador ou filtro de assertion não suportado")
 	}
 	return HeaderAssertion{Name: name, Operator: operator, Position: pos}, nil
+}
+
+// parseMatches validates the static JSON operand without exposing its contents or
+// the regexp library's error, which can contain protected pattern fragments.
+func parseMatches(text string, pos Position) (string, *regexp.Regexp, error) {
+	pattern, trailing, valid := jsonString(text)
+	if !valid || strings.TrimSpace(trailing) != "" {
+		return "", nil, &Error{Position: pos, Category: "sintaxe inválida", Detail: "matches exige somente uma string JSON entre aspas duplas"}
+	}
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		category := "sintaxe inválida"
+		if unsupportedRegexp(pattern) {
+			category = "construção não suportada"
+		}
+		return "", nil, &Error{Position: pos, Category: category, Detail: "padrão matches inválido ou não suportado"}
+	}
+	return pattern, compiled, nil
 }
 
 func jsonString(text string) (string, string, bool) {

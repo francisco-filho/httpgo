@@ -102,7 +102,7 @@ func FuzzParse(f *testing.F) {
 		"GET http://example.test\r\nHTTP *\r\n[Asserts]\r\nheader \"X\" == \"{{literal}}\"\r\nheader \"X\" contains \"\"\r\nheader \"X\" exists",
 		"GET http://example.test\nHTTP 200\n[Captures]\ntoken: jsonpath \"$\"\n[Asserts]\nheader \"Set-Cookie\" == \"private\"\nGET http://example.test/next",
 		"GET http://example.test\nHTTP 200\n[Asserts]\nheader \"X\" exists\n[Captures]\ntoken: jsonpath \"$\"",
-		"GET http://example.test\nHTTP *\n[Asserts]\nheader \"X\" matches \"x\"",
+		"GET http://example.test\nHTTP *\n[Asserts]\nheader \"X\" startsWith \"x\"",
 		"GET http://example.test\nHTTP 200\n[Asserts]\njsonpath \"$.name\" matches \"^Pizza\\\\s\"",
 		"GET http://example.test\r\nHTTP *\r\n[Asserts]\r\njsonpath \"$\" matches \"(?=x)\"",
 		"GET http://example.test\n[Asserts]",

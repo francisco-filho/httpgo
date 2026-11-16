@@ -119,7 +119,7 @@ func TestJSONLiteralAndCapturePublication(t *testing.T) {
 }
 
 func TestPendingSecretConcealsAssertionsAndMetadata(t *testing.T) {
-	for _, line := range []string{`header "X" == "expected-private"`, `jsonpath "$.value" == "expected-private"`, `jsonpath "$.value" matches "expected-private"`, `body contains "expected-private"`} {
+	for _, line := range []string{`header "X" == "expected-private"`, `header "X" matches "expected-private"`, `jsonpath "$.value" == "expected-private"`, `jsonpath "$.value" matches "expected-private"`, `body contains "expected-private"`} {
 		for _, capturePath := range []string{"$.value", "$.missing.bad"} {
 			c, _ := template.New(nil, []string{"token"})
 			s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Captures]\ntoken: jsonpath \""+capturePath+"\"\n[Asserts]\n"+line+"\nGET http://example.test/next")
@@ -130,6 +130,9 @@ func TestPendingSecretConcealsAssertionsAndMetadata(t *testing.T) {
 			}), c, func(entry EntryResult) error {
 				if entry.Entry.Assertions[0].JSON != nil && (entry.Entry.Assertions[0].JSON.Pattern != "" || entry.Entry.Assertions[0].JSON.Compiled != nil) {
 					t.Fatal("operational regex leaked into report metadata")
+				}
+				if entry.Entry.Assertions[0].Header != nil && entry.Entry.Assertions[0].Header.Compiled != nil {
+					t.Fatal("header regex leaked into report metadata")
 				}
 				raw, err := json.Marshal(entry)
 				if err != nil {
