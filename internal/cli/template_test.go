@@ -46,7 +46,7 @@ func TestInvalidFlagsAndSyntaxPreventAllSends(t *testing.T) {
 		fake := &fakeExecutor{}
 		file := writeScenario(t, "GET http://example.test/first\n"+suffix)
 		code, out, stderr := execute(t, context.Background(), fake, "test", file, "--var", "base=http://example.test", "--var", "token=fake-token", "--secret", "token")
-		if code != 2 || out != "" || len(fake.calls) != 0 || !strings.Contains(stderr, file+"\":2:") && !strings.Contains(stderr, file+"\":3:") {
+		if code != 2 || !prevalidationSummary(out) || len(fake.calls) != 0 || !strings.Contains(stderr, file+"\":2:") && !strings.Contains(stderr, file+"\":3:") {
 			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
 		}
 	}

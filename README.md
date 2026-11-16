@@ -3,6 +3,57 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Executar uma suíte (US-16 / issue #38)
+
+```sh
+bin/httpgo test tests/ --env local
+bin/httpgo test tests/ --env local --fail-fast
+# Também aceita caminhos misturados, repetidos e arquivos sem extensão:
+bin/httpgo test tests/ tests/01-health.hurl checks/explicit --env local
+```
+
+Com `01-health.hurl` aprovado, `02-products.hurl` divergente e `03-profile.hurl`
+aprovado, a primeira chamada executa os três e retorna **1** (dois sucessos e uma
+falha de assertion). A segunda não envia o terceiro e o marca **não executado**.
+Exemplos em [`testdata/suites/basic/`](testdata/suites/basic/), usando `base_url`:
+`bin/httpgo test testdata/suites/basic/ --var base_url=http://localhost:8080`.
+A API demonstrativa deve responder 200 em `/health` e `/profile` e 503 em
+`/products`; os testes usam servidor isolado, não dependem do dummy.
+
+- Diretórios descobrem `.hurl` recursivamente; arquivos explícitos independem da
+  extensão. Normaliza absolutos/relativos, `.` e `..`, deduplica pela identidade
+  real do filesystem e respeita sua equivalência de caixa. Ordena pelo caminho
+  relativo ao cwd com `/`, independentemente dos argumentos; externos podem ter
+  `../`. Sem relativo possível entre unidades, usa absoluto normalizado com `/`.
+- Não segue links: descobertos são ignorados, explícitos com link em qualquer
+  componente são rejeitados. Descoberta inteira antes de HTTP: caminho inválido,
+  inacessível, entrada não regular, falha de acesso ou cada diretório explícito
+  sem `.hurl` elegíveis retorna **2**, sem executar nem as entradas válidas.
+  Essas verificações não são sandbox contra mudanças concorrentes do filesystem.
+- Configuração global é carregada/validada uma vez. Cada arquivo é aberto,
+  integralmente pré-validado e fechado antes de iniciar suas requisições. Um erro
+  tardio de estrutura impede todos os envios daquele arquivo, não desfaz anteriores.
+- Execução sequencial. A primeira falha para as próximas requisições do arquivo;
+  sem `--fail-fast`, segue para outros arquivos. Com a flag, os restantes não são
+  abertos/analisados para inventar contagens. Cancelamento global ou falha de
+  apresentação sempre encerra a suíte, sem reimpressão nem novos envios.
+- Cada arquivo começa sem capturas e sem cookies automáticos (não há cookie jar),
+  com as mesmas variáveis/opções iniciais. Payloads continuam relativos ao cenário,
+  não à configuração. A proteção dos segredos conhecidos/derivados persiste entre
+  arquivos, mas não entre invocações; nunca disponibiliza capturas ao próximo.
+- Linhas por requisição mantidas; resumo por arquivo acrescenta resultado/duração,
+  seguido de `resumo suíte:` com arquivos processados/executados, sucesso, falha de
+  assertion, erro, não executados, contadores de requisições e duração de execução.
+  Arquivo com erro de pré-validação tem zero envios e `total=desconhecido`;
+  `não_iniciadas` também é desconhecido sem parsing. Agregados de requisições
+  planejadas cobrem apenas arquivos analisados, com quantidade de arquivos de
+  contagem desconhecida explícita. `validadas` conta status aprovado, não sucesso
+  completo; ausência de assertion nunca é validação. **2 prevalece sobre 1**.
+
+Sem paralelismo, dependências entre arquivos, login compartilhado, JUnit,
+`--output`/`--output-file` ou novos formatos. O contrato detalhado dos contadores
+está em [`docs/subset.md`](docs/subset.md#cli-e-saída).
+
 ## Executar
 
 Com Go na versão de `go.mod`:
@@ -543,8 +594,8 @@ quando esperado, e todas as assertions de headers/JSON declaradas, para URLs, va
 headers, JSON inline e JSON externo com `--render-files` seguintes. Strings
 como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
 Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
-variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada execução
-começa sem capturas, e continua aceitando exatamente um arquivo. `--secret` pode
+variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada arquivo
+começa sem capturas, inclusive quando vários arquivos compõem uma suíte. `--secret` pode
 marcar uma captura futura sem criá-la; valores descobertos ficam ocultos nos
 streams e diagnósticos, inclusive variantes de escape conhecidas. Não há garantia
 de reconhecer segredos arbitrários antes de descobri-los ou codificações desconhecidas.
@@ -600,7 +651,8 @@ A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
 valores finais inválidos falham imediatamente antes da requisição dependente,
 sem contá-la como iniciada e sem enviar as seguintes. As requisições são
 sequenciais e a primeira falha de status, header, JSON, captura, renderização ou transporte
-interrompe a execução. Uma falha de captura preserva a resposta concluída e o
+interrompe as próximas requisições do mesmo arquivo; outros arquivos seguem
+conforme `--fail-fast`. Uma falha de captura preserva a resposta concluída e o
 status aprovado nas contagens, mas impede o próximo envio. Sem `HTTP`, qualquer status recebido é aceito,
 com indicação explícita de **sem validação de status**.
 
@@ -610,7 +662,7 @@ com indicação explícita de **sem validação de status**.
   incluindo redirects e leitura do body.
 - TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
 - Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
-  resumo ao final e diagnósticos em stderr. Sempre texto sem cores.
+  resumo por arquivo e agregado ao final, diagnósticos em stderr. Sempre texto sem cores.
 - 301/302/303 convertem POST/PUT/PATCH/DELETE em GET sem body; 307/308 preservam ambos.
 - Bodies e coleções de headers não são impressos. Apenas valores comuns sanitizados
   podem aparecer no diagnóstico de assertion; valores sensíveis nunca são expostos.

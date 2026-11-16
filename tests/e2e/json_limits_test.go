@@ -101,7 +101,7 @@ func TestJSONNumericInvalidNeverSends(t *testing.T) {
 	defer server.Close()
 	for _, expression := range []string{`jsonpath "$" > "1"`, `jsonpath "$" >= true`, `jsonpath "$" < null`, `jsonpath "$" <= []`, `jsonpath "$" > {}`, `jsonpath "$" > {{n}}`, `jsonpath "$" > 1 2`, `jsonpath "$" >`, `jsonpath "$[*]" > 0`, `jsonpath "$" != 1`} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/first\nGET "+server.URL+"/late\nHTTP *\n[Asserts]\n"+expression))
-		if code != 2 || out != "" || !strings.Contains(stderr, ":5:") || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || !strings.Contains(stderr, ":5:") || hits.Load() != 0 {
 			t.Fatalf("%s: code=%d hits=%d out=%s err=%s", expression, code, hits.Load(), out, stderr)
 		}
 	}

@@ -68,7 +68,7 @@ func TestRenderFilesPayloadDiagnostic(t *testing.T) {
 		cmd.SetOut(&out)
 		cmd.SetErr(&stderr)
 		code := cmd.ExecuteContext(context.Background())
-		if code != 2 || len(executor.bodies) != 1 || !strings.Contains(stderr.String(), `"payload.json":3:9:`) || !strings.Contains(stderr.String(), fmt.Sprintf("referência %q:4:1", file)) || !strings.Contains(stderr.String(), "variável ausente") || !strings.Contains(out.String(), "iniciadas=1 concluídas=1 validadas=1 sem_validação=0 não_iniciadas=2") || strings.Contains(out.String()+stderr.String(), "quotes") {
+		if code != 2 || len(executor.bodies) != 1 || !strings.Contains(stderr.String(), `"payload.json":3:9:`) || !strings.Contains(stderr.String(), fmt.Sprintf("referência %q:4:1", shownPath(t, file))) || !strings.Contains(stderr.String(), "variável ausente") || !strings.Contains(out.String(), "iniciadas=1 concluídas=1 validadas=1 sem_validação=0 não_iniciadas=2") || strings.Contains(out.String()+stderr.String(), "quotes") {
 			t.Fatalf("code=%d bodies=%q out=%q err=%q", code, executor.bodies, out.String(), stderr.String())
 		}
 	}

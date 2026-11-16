@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -11,7 +12,8 @@ import (
 
 type arguments struct {
 	renderFiles        bool
-	file               string
+	failFast           bool
+	files              []string
 	config             string
 	environment        string
 	variables, secrets []string
@@ -26,6 +28,11 @@ func parseArguments(args []string) (arguments, error) {
 		arg := args[i]
 		name, value, inline := strings.Cut(arg, "=")
 		switch name {
+		case "--fail-fast":
+			if inline {
+				invalid = true
+			}
+			result.failFast = true
 		case "--render-files":
 			if inline {
 				invalid = true
@@ -63,17 +70,17 @@ func parseArguments(args []string) (arguments, error) {
 				result.secrets = append(result.secrets, value)
 			}
 		default:
-			if strings.HasPrefix(arg, "-") || result.file != "" {
+			if strings.HasPrefix(arg, "-") || arg == "" {
 				invalid = true
 			} else {
-				result.file = arg
+				result.files = append(result.files, arg)
 			}
 		}
 	}
 	if environmentIssue != "" {
 		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
 	}
-	if invalid || result.file == "" {
+	if invalid || len(result.files) == 0 {
 		return result, fmt.Errorf("uso inválido ou flag não suportada; use httpgo test <arquivo> ou httpgo --help")
 	}
 	return result, nil
@@ -110,16 +117,37 @@ func argumentProtection(args []string) func(string) string {
 	return template.Protector(values)
 }
 
-// executionProtection is local to ExecuteContext. The runner still owns session
-// creation; its factory publishes only the sanitizer to the output boundary.
+// executionProtection lives for one invocation and retains only deduplicated
+// redaction variants, never sessions, captures or operational variable contexts.
 type executionProtection struct {
 	initial func(string) string
-	session template.Session
+	values  map[string]bool
+	protect func(string) string
+}
+
+func (p *executionProtection) remember(values []string) {
+	if p.values == nil {
+		p.values = make(map[string]bool)
+	}
+	changed := false
+	for _, value := range values {
+		if value != "" && !p.values[value] {
+			p.values[value] = true
+			changed = true
+		}
+	}
+	if changed {
+		all := make([]string, 0, len(p.values))
+		for value := range p.values {
+			all = append(all, value)
+		}
+		p.protect = template.Protector(all)
+	}
 }
 
 func (p *executionProtection) sanitize(text string) string {
-	if p.session != nil {
-		text = p.session.Sanitize(text)
+	if p.protect != nil {
+		text = p.protect(text)
 	}
 	return p.initial(text)
 }
@@ -131,23 +159,56 @@ type sessionRenderer struct {
 
 func (r sessionRenderer) NewSession() template.Session {
 	session := r.context.NewSession()
-	r.protection.session = session
-	return session
+	r.protection.remember(session.ProtectionValues())
+	return invocationSession{Session: session, protection: r.protection}
+}
+
+// The wrapper shares only protection, not resolution, with other file sessions.
+type invocationSession struct {
+	template.Session
+	protection *executionProtection
+}
+
+func (s invocationSession) Sanitize(text string) string {
+	return s.protection.sanitize(s.Session.Sanitize(text))
+}
+
+func (s invocationSession) ProtectValue(value string) {
+	s.Session.ProtectValue(value)
+	s.protection.remember(s.ProtectionValues())
+}
+
+func (s invocationSession) ProtectCapture(name string, value json.RawMessage) {
+	s.Session.ProtectCapture(name, value)
+	s.protection.remember(s.ProtectionValues())
+}
+
+func (s invocationSession) Publish(batch []template.Capture) error {
+	err := s.Session.Publish(batch)
+	s.protection.remember(s.ProtectionValues())
+	return err
 }
 
 type protectedWriter struct {
 	writer  io.Writer
 	protect func(string) string
+	failure *error
 }
 
 func (w protectedWriter) Write(data []byte) (int, error) {
+	if w.failure != nil && *w.failure != nil {
+		return 0, *w.failure
+	}
 	safe := w.protect(string(data))
 	n, err := io.WriteString(w.writer, safe)
-	if err != nil {
-		return 0, err
+	if err == nil && n != len(safe) {
+		err = io.ErrShortWrite
 	}
-	if n != len(safe) {
-		return 0, io.ErrShortWrite
+	if err != nil {
+		if w.failure != nil {
+			*w.failure = err
+		}
+		return 0, err
 	}
 	return len(data), nil
 }

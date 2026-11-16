@@ -86,7 +86,7 @@ func TestMultipartCLISafeDiagnostics(t *testing.T) {
 			if code == 2 && mode != "structural" && !strings.Contains(out.String(), "iniciadas=1 concluídas=1") {
 				t.Fatalf("out=%q", out.String())
 			}
-			if code != 0 && !strings.Contains(stderr.String(), fmt.Sprintf("%q:", file)) {
+			if code != 0 && !strings.Contains(stderr.String(), fmt.Sprintf("%q:", shownPath(t, file))) {
 				t.Fatalf("unlocated error=%q", stderr.String())
 			}
 		})

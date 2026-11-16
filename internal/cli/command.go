@@ -7,14 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"capimgrosso.com/httpgo/internal/config"
-	"capimgrosso.com/httpgo/internal/parser"
 	"capimgrosso.com/httpgo/internal/runner"
+	"capimgrosso.com/httpgo/internal/suite"
 	"capimgrosso.com/httpgo/internal/transport"
 )
 
@@ -42,8 +40,9 @@ func (c *Command) SetErr(err io.Writer)  { c.err = err }
 func (c *Command) ExecuteContext(ctx context.Context) int {
 	local := *c
 	local.protection = &executionProtection{initial: argumentProtection(c.args)}
-	local.out = protectedWriter{c.out, local.protection.sanitize}
-	local.err = protectedWriter{c.err, local.protection.sanitize}
+	var outFailure, errFailure error
+	local.out = protectedWriter{writer: c.out, protect: local.protection.sanitize, failure: &outFailure}
+	local.err = protectedWriter{writer: c.err, protect: local.protection.sanitize, failure: &errFailure}
 	return local.executeContext(ctx)
 }
 
@@ -77,31 +76,25 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail("execução cancelada antes da leitura do cenário")
 	}
 	c.timeout = settings.Timeout
-	file := args.file
-	absolute, err := filepath.Abs(file)
+	execution := suite.NewWithProtection(runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry), c.protection.sanitize)
+	files, err := execution.Discover(ctx, args.files)
 	if err != nil {
-		return c.fail("não foi possível determinar o diretório do cenário")
+		return c.fail(err.Error())
 	}
-	input, err := os.Open(absolute)
-	if err != nil {
-		return c.fail(fmt.Sprintf("%q: não foi possível abrir o arquivo; verifique o caminho e a permissão de leitura", file))
+	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout}, FailFast: args.failFast}, c.renderFile)
+	if result.ReportErr != nil {
+		pos := result.ReportPosition
+		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
 	}
-	info, statErr := input.Stat()
-	if statErr != nil || !info.Mode().IsRegular() {
-		_ = input.Close()
-		return c.fail(fmt.Sprintf("%q: entrada deve ser um arquivo regular legível", file))
+	if result.Err != nil {
+		if _, err := io.WriteString(c.err, "execução da suíte cancelada; arquivos restantes não executados\n"); err != nil {
+			return 2
+		}
 	}
-	scenario, parseErr := parser.Parse(file, input)
-	closeErr := input.Close()
-	if parseErr != nil {
-		return c.fail(parseErr.Error())
+	if err := c.renderSuite(result.Summary); err != nil {
+		return c.fail("não foi possível escrever o resumo da suíte")
 	}
-	if closeErr != nil {
-		return c.fail(fmt.Sprintf("%q: não foi possível fechar o arquivo", file))
-	}
-	scenario.OriginDir = filepath.Dir(absolute)
-	result := runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry).RunWithOptions(ctx, scenario, runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout})
-	return c.renderSummary(scenario, result)
+	return result.Code
 }
 
 func (c *Command) renderEntry(entry runner.EntryResult) error {
@@ -153,15 +146,28 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	return nil
 }
 
-func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) int {
-	if result.ReportErr != nil {
-		pos := result.ErrorPosition
-		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
+func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadErr error) error {
+	s := file.Requests
+	total, notStarted := fmt.Sprint(s.Total), fmt.Sprint(s.NotStarted)
+	if !file.Known {
+		total, notStarted = "desconhecido", "desconhecido"
 	}
-	s := result.Summary
-	if c.writeText(fmt.Sprintf("resumo %q: total=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d\n", scenario.File, s.Total, s.Started, s.Completed, s.Validated, s.WithoutValidation, s.NotStarted)) != 0 {
-		return 2
+	if _, err := fmt.Fprintf(c.out, "resumo %q: total=%s iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%s resultado=%s duração=%s\n", file.Name, total, s.Started, s.Completed, s.Validated, s.WithoutValidation, notStarted, file.State, file.Duration); err != nil {
+		return err
 	}
+	if loadErr != nil {
+		_, err := fmt.Fprintln(c.err, loadErr.Error())
+		return err
+	}
+	return c.renderDiagnostic(result)
+}
+
+func (c *Command) renderSuite(s suite.Summary) error {
+	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration)
+	return err
+}
+
+func (c *Command) renderDiagnostic(result runner.Result) error {
 	if result.Err != nil {
 		pos := result.ErrorPosition
 		diagnostic := transportDiagnostic(result.Err, c.timeout)
@@ -181,33 +187,28 @@ func (c *Command) renderSummary(scenario parser.Scenario, result runner.Result) 
 		if errors.As(result.Err, &jsonErr) {
 			diagnostic = jsonErr.Error()
 		}
-		return c.fail(fmt.Sprintf("%q:%d:%d: %s; execução interrompida", pos.File, pos.Line, pos.Column, diagnostic))
+		_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, diagnostic)
+		return err
 	}
 	if result.Diverged {
 		entry := result.Entries[len(result.Entries)-1]
 		if entry.HeaderFailure != nil {
 			failure := entry.HeaderFailure
 			pos := failure.Position
-			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure)); err != nil {
-				return 2
-			}
-			return 1
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, headerDiagnostic(failure))
+			return err
 		}
 		if entry.JSONFailure != nil {
 			failure := entry.JSONFailure
 			pos := failure.Position
-			if _, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure)); err != nil {
-				return 2
-			}
-			return 1
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure))
+			return err
 		}
 		pos := entry.Entry.ExpectedPosition
-		if _, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status); err != nil {
-			return 2
-		}
-		return 1
+		_, err := fmt.Fprintf(c.err, "%q:%d:%d: status divergente: esperado %d, recebido %d; execução interrompida\n", pos.File, pos.Line, pos.Column, *entry.Entry.ExpectedStatus, entry.Status)
+		return err
 	}
-	return 0
+	return nil
 }
 
 func jsonDiagnostic(failure *runner.JSONFailure) string {
@@ -288,7 +289,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers e JSON
 
 Uso:
-  httpgo test <arquivo> [--config arquivo] [--env nome] [--render-files] [--var nome=valor] [--secret nome]
+  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -362,8 +363,29 @@ do resultado, inclusive em falha/cancelamento. Não imprime arquivo ou campos br
 campos repetidos, filename customizado, headers de parte ou multipart aninhado.
 Diferenças Hurl 8.0.0 (caminhos/filename/restrições): docs/compatibility.md.
 
-Exatamente um arquivo; parsing completo antes da rede. Sem HTTP, qualquer
-status é aceito e informado como sem validação. HTTP * aceita qualquer status,
+Suítes: um ou mais arquivos/diretórios, inclusive misturados e sobrepostos.
+  httpgo test tests/ --env local
+  httpgo test tests/ --env local --fail-fast
+Diretórios descobrem .hurl recursivamente; arquivo explícito independe da extensão.
+Normaliza absolutos/relativos, . e ..; elimina duplicações pela identidade do filesystem,
+sem forçar minúsculas. Ordem lexicográfica pelo caminho relativo ao cwd, com /;
+externos podem ter ../. Entre unidades sem relativo, usa absoluto normalizado com /.
+Não segue links simbólicos: ignora descobertos e rejeita explícitos, inclusive ancestrais.
+Descoberta completa antes de HTTP; entrada inválida/inacessível, falha de acesso ou
+cada diretório explícito sem .hurl elegível retorna 2 e impede todos os envios.
+Configuração global única; parsing integral de cada arquivo antes de iniciá-lo.
+Arquivos e requisições sequenciais; primeira falha para as requisições do arquivo.
+Sem --fail-fast continua os outros, inclusive após erro de parsing/transporte;
+com --fail-fast marca os restantes não executados, sem analisá-los para contagem.
+Capturas e cookies não passam entre arquivos; variáveis/opções iniciais permanecem.
+Não há cookie jar, paralelismo, dependências entre arquivos, JUnit ou outros formatos.
+Resumo por arquivo preserva contadores e inclui resultado/duração; resumo suíte
+agrega arquivos/requisições. total e não_iniciadas desconhecidos sem parsing completo;
+zero envios não significa zero requisições planejadas. validadas conta só status,
+não sucesso completo; ausência de assertion não é validação. Código 2 prevalece sobre 1.
+Cancelamento ou falha de escrita encerra toda a suíte, sem próximos envios ou retry de saída.
+Proteção de segredos conhecidos/derivados dura toda a invocação, não só o arquivo.
+Sem HTTP, qualquer status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
 e conta em sem_validação, não em validadas. A primeira falha interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.

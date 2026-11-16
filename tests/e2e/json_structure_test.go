@@ -63,7 +63,7 @@ func TestJSONStructureInvalidNeverSends(t *testing.T) {
 	defer server.Close()
 	for _, line := range []string{`jsonpath "$" exists null`, `jsonpath "$" count`, `jsonpath "$" count == -1`, `jsonpath "$" count == 1.1`, `jsonpath "$" count == "3"`, `jsonpath "$" count == true`, `jsonpath "$" count == 1 2`, `jsonpath "$" count exists`, `jsonpath "$" count != 1`, `jsonpath "$" count count == 1`} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/first\nGET "+server.URL+"/late\nHTTP *\n[Asserts]\n"+line))
-		if code != 2 || hits.Load() != 0 || out != "" || !strings.Contains(stderr, ":5:1:") {
+		if code != 2 || hits.Load() != 0 || !prevalidationSummary(out) || !strings.Contains(stderr, ":5:1:") {
 			t.Fatalf("%s: code=%d hits=%d out=%s err=%s", line, code, hits.Load(), out, stderr)
 		}
 	}

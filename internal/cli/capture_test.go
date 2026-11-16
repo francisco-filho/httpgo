@@ -173,7 +173,7 @@ func TestCaptureStructuralErrorsAndCollisions(t *testing.T) {
 	for _, declaration := range []string{`bad-name: jsonpath "$"`, `token: jsonpath "$.*"`, `token: jsonpath "$[-1]"`, `token: jsonpath "$..x"`} {
 		fake := &fakeExecutor{}
 		code, out, stderr := execute(t, context.Background(), fake, "test", writeScenario(t, "GET http://example.test/first\nGET http://example.test/second\n[Captures]\n"+declaration))
-		if code != 2 || len(fake.calls) != 0 || out != "" || !strings.Contains(stderr, ":4:") {
+		if code != 2 || len(fake.calls) != 0 || !prevalidationSummary(out) || !strings.Contains(stderr, ":4:") {
 			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
 		}
 	}
