@@ -207,7 +207,7 @@ func TestJSONInvalidLateNeverSendsByBinary(t *testing.T) {
 
 func TestJSONSecretsByBinary(t *testing.T) {
 	for _, pending := range []bool{false, true} {
-		for _, expression := range []string{`jsonpath "$.value" == {"part":"expected-private"}`, `header "X" == "expected-private"`} {
+		for _, expression := range []string{`jsonpath "$.value" == {"part":"expected-private"}`, `jsonpath "$.value" matches "expected-private"`, `header "X" == "expected-private"`} {
 			var hits atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if hits.Add(1) == 1 && !pending {
