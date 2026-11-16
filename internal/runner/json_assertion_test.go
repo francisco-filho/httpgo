@@ -62,6 +62,37 @@ func TestJSONAssertionOrder(t *testing.T) {
 	}
 }
 
+func TestJSONMatchesStringSemantics(t *testing.T) {
+	for _, tc := range []struct {
+		name, assertion, body string
+		outcome               Outcome
+	}{
+		{"substring", `jsonpath "$.name" matches "Pizza"`, `{"name":"Mini Pizza"}`, Passed},
+		{"anchored mismatch", `jsonpath "$.name" matches "^Pizza$"`, `{"name":"Mini Pizza"}`, JSONMismatch},
+		{"case insensitive", `jsonpath "$.name" matches "(?i)^pizza"`, `{"name":"Pizza"}`, Passed},
+		{"empty pattern", `jsonpath "$.name" matches ""`, `{"name":""}`, Passed},
+		{"empty string mismatch", `jsonpath "$.name" matches "^$"`, `{"name":"x"}`, JSONMismatch},
+		{"absent", `jsonpath "$.name" matches ""`, `{}`, JSONMismatch},
+		{"numeric", `jsonpath "$.name" matches ""`, `{"name":3}`, JSONMismatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := parseCaptureScenario(t, "GET http://example.test/first\nHTTP 200\n[Asserts]\n"+tc.assertion+"\nGET http://example.test/next")
+			calls := 0
+			result := New(executorFunc(func(context.Context, Request) (Response, error) {
+				calls++
+				return Response{Status: 200, Body: []byte(tc.body)}, nil
+			}), nil).Run(context.Background(), s)
+			wantCalls := 1
+			if tc.outcome == Passed {
+				wantCalls = 2
+			}
+			if calls != wantCalls || result.Entries[0].Outcome != tc.outcome {
+				t.Fatalf("calls=%d outcome=%v result=%+v", calls, result.Entries[0].Outcome, result)
+			}
+		})
+	}
+}
+
 func TestJSONLiteralAndCapturePublication(t *testing.T) {
 	for _, variables := range [][]string{nil, {"name=resolved"}} {
 		c, _ := template.New(variables, nil)

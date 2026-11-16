@@ -38,6 +38,31 @@ func TestJSONDemonstrationByBinary(t *testing.T) {
 	}
 }
 
+func TestJSONMatchesByBinary(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, pattern string
+		code, requests      int32
+	}{
+		{"match", `{"name":"Pizza Margherita"}`, `"^Pizza"`, 0, 2},
+		{"mismatch stops", `{"name":"Calzone"}`, `"^Pizza"`, 1, 1},
+		{"late invalid zero contacts", `{"name":"Pizza"}`, `"(?=Pizza)"`, 2, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits.Add(1)
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer server.Close()
+			source := "GET {{base}}/first\nHTTP 200\n[Asserts]\njsonpath \"$.name\" matches " + tc.pattern + "\nGET {{base}}/next"
+			code, _, stderr := run(t, "test", scenario(t, source), "--var", "base="+server.URL)
+			if int32(code) != tc.code || hits.Load() != tc.requests {
+				t.Fatalf("code=%d requests=%d stderr=%s", code, hits.Load(), stderr)
+			}
+		})
+	}
+}
+
 func TestJSONAuthenticatedProductsByBinary(t *testing.T) {
 	data, err := os.ReadFile("../../testdata/scenarios/scenario_assert_json_auth_products.hurl")
 	if err != nil {
