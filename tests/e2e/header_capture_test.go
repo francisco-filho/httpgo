@@ -5,12 +5,17 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 )
 
 func TestHeaderCaptureCacheByBinary(t *testing.T) {
+	input, err := os.ReadFile("../../testdata/scenarios/scenario_capture_cache.hurl")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"ETag", "etag", "eTaG"} {
 		t.Run(name, func(t *testing.T) {
 			var hits atomic.Int32
@@ -24,8 +29,8 @@ func TestHeaderCaptureCacheByBinary(t *testing.T) {
 				_, _ = io.WriteString(w, "not JSON")
 			}))
 			defer server.Close()
-			source := "GET {{base}}/catalog\nHTTP 200\n[Captures]\ncatalog_etag: header \"" + name + "\"\nGET {{base}}/catalog\nIf-None-Match: {{catalog_etag}}\nHTTP 304"
-			code, out, stderr := run(t, "test", scenario(t, source), "--var", "base="+server.URL)
+			source := strings.ReplaceAll(string(input), `"ETag"`, `"`+name+`"`)
+			code, out, stderr := run(t, "test", scenario(t, source), "--var", "base_url="+server.URL)
 			if code != 0 || stderr != "" || hits.Load() != 2 || !strings.Contains(out, "validadas=2") {
 				t.Fatalf("code=%d hits=%d out=%q err=%q", code, hits.Load(), out, stderr)
 			}

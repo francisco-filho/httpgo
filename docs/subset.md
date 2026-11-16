@@ -613,6 +613,11 @@ não escapam da sessão. Diagnósticos não imprimem coleções de headers nem b
 Valor vazio não provoca substituição global; não há detecção de codificações
 arbitrárias. Capturar `Set-Cookie` **não** cria `Cookie`, não extrai atributos e
 não ativa cookie jar; extração de valor de cookie pertence à US-25.
+Execute `httpgo test cache.hurl --var base_url=http://localhost:8080` contra API
+com cache condicional; exemplo versionado em `testdata/scenarios/scenario_capture_cache.hurl`.
+A [matriz diferencial](compatibility.md#capturas-literais-de-headers--us-22--issue-42)
+registra as diferenças observadas de repetição, interpolação JSON, ordem e colisões
+com Hurl 8.0.0; não há promessa de equivalência geral.
 
 ## Capturas tipadas — US-05/US-06
 
@@ -631,7 +636,8 @@ HTTP 200
 
 `[Captures]` associa declarações à resposta anterior, após a expectativa quando
 presente; também pode existir sem `HTTP`. A seção não pode ser órfã, duplicada
-na entrada ou vazia. Cada declaração tem a forma `nome: jsonpath "consulta"`.
+na entrada ou vazia. Cada declaração JSON tem a forma `nome: jsonpath "consulta"`;
+a US-22 também aceita `nome: header "nome-do-header"`, descrita acima.
 Comentários em linha própria e LF/CRLF mantêm a associação. A próxima request-line
 encerra a seção; `[Asserts]` também pode sucedê-la na mesma entrada. Outras queries
 e filtros de captura não são aceitos nem ignorados.
@@ -645,7 +651,7 @@ descida recursiva, slices, união, propriedades entre colchetes ou índices nega
 Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
 **todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
 
-A resposta final deve conter exatamente um valor JSON válido. **Ampliação
+Para capturas JSONPath, a resposta final deve conter exatamente um valor JSON válido. **Ampliação
 intencional da US-06:** a seleção aceita string, número, booleano, `null`, array
 ou objeto, inclusive na raiz. Campo ausente/índice fora do array ou percurso
 incompatível é erro; `null`, string vazia e coleções vazias existem e são válidos.
@@ -747,8 +753,9 @@ de status; assertions e capturas continuam obrigatórias quando declaradas.
   daquela feita pelo transporte HTTP (por exemplo whitespace externo do protocolo).
 - Valores esperados são strings literais entre aspas duplas. `{{nome}}` é texto
   literal, com ou sem variável/captura definida; não passa pelo renderer.
-  `exists` não aceita valor esperado. Não há regex, filtros, captura de headers
-  ou outros operadores de header. Construções fora desse recorte falham
+  `exists` não aceita valor esperado. Não há regex, filtros
+  ou outros operadores de assertion de header. Capturas literais são suportadas
+  separadamente em `[Captures]` (US-22). Construções fora desse recorte falham
   explicitamente com posição, antes de qualquer envio do arquivo.
 - Havendo ocorrências repetidas, somente a **primeira na ordem recebida** participa
   de `==`/`contains`, inclusive se nomes chegam com caixas diferentes. Nunca há

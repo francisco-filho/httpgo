@@ -1,0 +1,50 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "new"
+    }
+  ],
+  "variables": [
+    "x=original"
+  ],
+  "classification": "diferença deliberada de colisão: HTTPGo proíbe sobrescrita inicial (2); Hurl sobrescreve",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "new"
+      }
+    ]
+  }
+}

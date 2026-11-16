@@ -1,0 +1,45 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "{{missing}}"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "HTTPGo preserva placeholder como string em JSON e header; Hurl termina com 3 antes do POST neste uso JSON não entre aspas",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"{{missing}}\",\"text\":\"prefix{{missing}}\"}",
+        "content_type": "application/json",
+        "probe": "{{missing}}"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

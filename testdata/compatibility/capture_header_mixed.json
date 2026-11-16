@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "123"
+    }
+  ],
+  "response_json": "{\"id\":42}",
+  "classification": "lote misto: HTTPGo envia header como string 123 e JSONPath como número 42; Hurl envia ambos como números neste JSON",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"header\":\"123\",\"id\":42}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"header\":123,\"id\":42}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

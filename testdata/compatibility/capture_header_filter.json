@@ -1,0 +1,35 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "literal"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "filtro regex de header fora do recorte HTTPGo: rejeição integral (2); Hurl suporta filtro",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "literal"
+      }
+    ]
+  }
+}

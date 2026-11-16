@@ -1,0 +1,11 @@
+{
+  "classification": "sintaxe inválida tardia impede todo o arquivo antes da rede, HTTPGo 2 e Hurl 2",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}
