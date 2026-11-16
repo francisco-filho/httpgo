@@ -16,12 +16,22 @@ import (
 )
 
 func TestBodyConsumptionRealCancellation(t *testing.T) {
+	testAssertionConsumptionCancellation(t, `body not contains "passwordHash"`)
+}
+
+func TestHeaderMatchesConsumptionRealCancellation(t *testing.T) {
+	testAssertionConsumptionCancellation(t, `header "Set-Cookie" matches "^session=private-response$"`)
+}
+
+func testAssertionConsumptionCancellation(t *testing.T, predicate string) {
+	t.Helper()
 	started := make(chan struct{})
 	closed := make(chan struct{})
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Set-Cookie", "session=private-response")
 		w.Header().Set("Content-Length", "100")
 		_, _ = w.Write([]byte("customer body-private"))
 		w.(http.Flusher).Flush()
@@ -30,7 +40,7 @@ func TestBodyConsumptionRealCancellation(t *testing.T) {
 		close(closed)
 	}))
 	defer server.Close()
-	file := scenario(t, "GET "+server.URL+"/start\nHTTP *\n[Asserts]\nbody not contains \"passwordHash\"\n[Captures]\ntoken: jsonpath \"$.missing\"\nGET "+server.URL+"/never")
+	file := scenario(t, "GET "+server.URL+"/start\nHTTP *\n[Asserts]\n"+predicate+"\n[Captures]\ntoken: jsonpath \"$.missing\"\nGET "+server.URL+"/never")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	command := exec.CommandContext(ctx, binary(t), "test", file, "--secret", "token")
@@ -54,7 +64,7 @@ func TestBodyConsumptionRealCancellation(t *testing.T) {
 	}
 	select {
 	case err := <-done:
-		if err == nil || command.ProcessState.ExitCode() != 2 || hits.Load() != 1 || !strings.Contains(stderr.String(), "cancelada") || !strings.Contains(out.String(), "concluídas=0") || !strings.Contains(out.String(), "não_iniciadas=1") || strings.Contains(out.String()+stderr.String(), "body-private") {
+		if err == nil || command.ProcessState.ExitCode() != 2 || hits.Load() != 1 || !strings.Contains(stderr.String(), "cancelada") || !strings.Contains(out.String(), "concluídas=0") || !strings.Contains(out.String(), "não_iniciadas=1") || strings.Contains(out.String()+stderr.String(), "private") {
 			t.Fatalf("err=%v hits=%d out=%s stderr=%s", err, hits.Load(), out.String(), stderr.String())
 		}
 	case <-ctx.Done():
