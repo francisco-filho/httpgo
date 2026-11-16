@@ -59,6 +59,13 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, option := range []string{"retry: 0", "retry: 3\nretry-interval: 0", "retry: 3\nretry-interval: 500", "retry: -1", "retry: 1.5", "retry: 9223372036854775807", "retry-interval: 9223372036855", "retry: 1\nretry: 2", "timeout: 1", "retry: {{dynamic}}", ""} {
+		for _, newline := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\nGET http://example.test/job\n[Options]\n  "+option+"\nHTTP 200\n", "\n", newline))
+		}
+	}
+	f.Add("POST http://example.test/job\n[Options]\nretry: 1\n[MultipartFormData]\nfile: file,upload;\nHTTP 200")
+	f.Add("POST http://example.test/job\n[Options]\nretry: 1\n{}\nHTTP 200")
 	for _, pattern := range []string{`"^session=[^;]+; Secure$"`, `"^a\\s\"b\\\\c/$"`, `"(?i)\\p{L}+"`, `"{{absent}}"`, `""`, `"^$"`, `"private["`, `"(?=private)"`, `"(private)\\1"`, `"\x41private"`, `/private/`, `"private" "extra"`} {
 		for _, newline := range []string{"\n", "\r\n"} {
 			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\nGET http://example.test/late\nHTTP *\n[Asserts]\n  header \"Set-Cookie\" matches "+pattern, "\n", newline))

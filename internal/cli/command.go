@@ -334,6 +334,29 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
   HTTP 201
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
+
+Polling por entrada: salve processing.hurl e execute httpgo test processing.hurl
+  GET http://localhost:8080/jobs/123
+  [Options]
+  retry: 3
+  retry-interval: 500
+  HTTP 200
+  [Asserts]
+  jsonpath "$.status" == "READY"
+retry: novas tentativas após a inicial (default 0); retry-interval: milissegundos
+inteiros não negativos (default 1000; zero sem espera deliberada). Sem ilimitado,
+opções duplicadas ou outras opções: erro estático 2 antes de todo HTTP do arquivo.
+Somente divergência de status/assertion (1) permite repetir; erros de avaliação,
+transporte, captura, renderização, cancelamento ou escrita (2) não são retentados.
+Repete a requisição completa, inclusive POST: pode repetir efeitos, sem idempotência.
+Variáveis/caminhos iguais; arquivos externos/multipart relidos/reabertos a cada
+tentativa, sem snapshot se o arquivo mudar. Capturas publicadas só após aprovação;
+segredos descobertos continuam protegidos. Intervalo cancelável entre tentativas;
+timeout HTTP por tentativa, sem timeout global, backoff ou retry global.
+Um resultado terminal por entrada mostra tentativas=N; contadores legados são
+lógicos, métricas tentativas_iniciadas/respostas_completas/status_comparados são reais.
+Esgotamento retorna 1 e impede a próxima entrada; cancelamento retorna 2.
+
 Headers e um body são opcionais: JSON inline, file,<caminho>; ou multipart (exclusivos).
 JSON inline estático preserva seus bytes. Sem --render-files, arquivo externo
 preserva todos os bytes, inclusive vazio, binário e {{placeholder}} literal,
@@ -399,7 +422,7 @@ Não segue links simbólicos: ignora descobertos e rejeita explícitos, inclusiv
 Descoberta completa antes de HTTP; entrada inválida/inacessível, falha de acesso ou
 cada diretório explícito sem .hurl elegível retorna 2 e impede todos os envios.
 Configuração global única; parsing integral de cada arquivo antes de iniciá-lo.
-Arquivos e requisições sequenciais; primeira falha para as requisições do arquivo.
+Arquivos e requisições sequenciais; primeira falha definitiva para as entradas do arquivo.
 Sem --fail-fast continua os outros, inclusive após erro de parsing/transporte;
 com --fail-fast marca os restantes não executados, sem analisá-los para contagem.
 Capturas e cookies não passam entre arquivos; variáveis/opções iniciais permanecem.
@@ -412,7 +435,7 @@ Cancelamento ou falha de escrita encerra toda a suíte, sem próximos envios ou 
 Proteção de segredos conhecidos/derivados dura toda a invocação, não só o arquivo.
 Sem HTTP, qualquer status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
-e conta em sem_validação, não em validadas. A primeira falha interrompe.
+e conta em sem_validação, não em validadas. A primeira falha definitiva interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
 Timeout total: default de 10 segundos por requisição, configurável em YAML.
 Até 10 redirects na mesma origem.

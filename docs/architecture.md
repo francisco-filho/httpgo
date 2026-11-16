@@ -1,9 +1,62 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-23
+# Arquitetura implementada — US-01 a US-16, US-20 a US-26
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
-#40 (US-21), #42 (US-22), #44 (US-23) e plano v4 referenciado nelas.
+#40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
+#50 (US-26) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Polling por entrada — US-26 / issue #50
+
+`internal/parser/options.go` define `EntryOptions`, armazenado em `Entry.Options`:
+`Retry` inteiro limitado para acomodar a tentativa inicial, `RetryInterval`
+ponteiro de duração (nil distingue default de zero explícito) e `Position`.
+`Interval()` aplica 1000 ms somente na ausência. `parseOption` aceita apenas
+inteiros estáticos não negativos dentro dos limites de int/duração, sem opções
+repetidas. Estados em `parser.go` associam `[Options]` à requisição, antes da
+resposta, sem confundir opções com headers, JSON, multipart ou entrada seguinte.
+Erro estático tardio descarta todo o cenário antes da rede.
+
+`Runner.RunWithOptions`, em `internal/runner/polling.go`, cria uma sessão por
+arquivo, acumula proteção com `protectScenario` e chama `pollEntry` por entrada.
+`runAttempt`, em `runner.go`, prepara a requisição completa pelos preparadores
+existentes, chama `HTTPExecutor.Execute`, fecha fontes, protege headers sensíveis,
+compara status, avalia assertions e só então publica capturas atomicamente.
+Retorna fatos privados da tentativa, sem callback ou alteração permanente do
+resultado lógico. A divergência transitória não contamina a tentativa seguinte.
+`pollEntry` só repete `Diverged` sem `Err` e com orçamento restante. Falha de
+captura/preparação/avaliação/transporte/cancelamento encerra com categoria 2.
+
+A espera privada `Runner.wait` é por instância e recebe contexto/duração;
+`waitInterval` usa timer com `Stop` garantido, seleção cancelável e checagem do
+contexto após o timer. Nova checagem antecede o envio, inclusive com intervalo
+zero ou conclusão simultânea do timer/cancelamento. Não há `time.Sleep`, relógio
+global, goroutine produtora ou novo deadline total. O executor concreto não mudou:
+cada chamada cria seu prazo HTTP, cobrindo redirects e consumo completo.
+
+Arquivos externos são relidos e multipart reaberto em cada tentativa, preservando
+caminhos, variáveis, URL, headers e campos. Não há snapshot, buffer integral de
+upload nem promessa de bytes iguais após alteração externa. A fonte multipart é
+fechada antes da avaliação/espera; cada tentativa pode gerar novo boundary.
+Redirects pertencem à tentativa atual; a seguinte começa na URL/método originais. POST opt-in pode repetir
+efeitos: sem idempotência prometida ou replay implícito no transporte.
+
+`runner.Summary` conserva sua unidade lógica. `runner.AttemptSummary` fica
+separado em `Result.Attempts`, `suite.FileResult.Attempts` e
+`suite.Summary.Attempts`, com `Started` (chamadas ao executor), `Completed`
+(respostas completas) e `StatusChecks` (comparações numéricas). `EntryResult.Attempts`
+mostra a quantidade na única entrada/callback terminal. Fatos lógicos são os da
+última tentativa enviada: preparação falha não inventa envio nem apaga o último
+fato HTTP. Cancelamento no intervalo mantém métricas e produz `Cancelled`, não
+uma divergência final 1. A suíte agrega tentativas separadamente e só classifica
+o desfecho terminal; recuperação não aciona fail-fast. CLI rotula os novos campos
+sem formato de relatório novo; falha de escrita continua prioritária (2).
+
+Respostas descartadas não ficam em coleção/histórico. Segredos conhecidos e
+variantes permanecem protegidos na mesma sessão/writers da invocação; capturas
+secretas pendentes não são antecipadas. `safeEntry` sanitiza a nova posição e
+copia o ponteiro do intervalo, sem expor fontes/bodies/coleções operacionais.
+O cenário permanece imutável; orçamento e capturas não vazam entre execuções.
 
 ## Fluxo e arquivos reais
 
@@ -13,9 +66,9 @@ cmd/httpgo/main.go
     → internal/config/config.go + value.go + compose.go + environment.go + reference.go (YAML, composição e resolução explícita)
     → internal/suite/discovery.go (descoberta completa, identidade e ordenação)
     → internal/suite/run.go (carga por arquivo, continuação, agregação compacta)
-    → internal/parser/parser.go + capture.go + assertion.go + multipart.go (arquivo inteiro)
+    → internal/parser/parser.go + capture.go + assertion.go + multipart.go + options.go (arquivo inteiro)
       → internal/query/jsonpath.go (validar consultas antes da rede)
-    → internal/runner/runner.go + render.go (somente cenário validado)
+    → internal/runner/runner.go + polling.go + render.go (somente cenário validado)
       → internal/template/template.go + json.go (valores tipados, texto/JSON contextual)
       → parser.ValidateURL/ValidateHeader e validação JSON final
       → internal/runner/file.go (leitura integral e fechamento de body externo)

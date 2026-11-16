@@ -60,14 +60,24 @@ type wireHeader struct {
 	Value string `json:"value"`
 }
 
+// pollResponse is consumed only by /poll; the last response repeats after the
+// sequence ends. Each executable starts with a fresh sequence index.
+type pollResponse struct {
+	Status  int          `json:"status"`
+	Headers []wireHeader `json:"response_headers,omitempty"`
+	JSON    string       `json:"response_json,omitempty"`
+}
+
 type comparison struct {
-	ResponseHeaders []wireHeader `json:"response_headers,omitempty"`
-	ResponseJSON    string       `json:"response_json,omitempty"`
-	ResponseBody    *[]byte      `json:"response_body,omitempty"` // Base64 bytes; nil is absent, pointer to empty bytes is a configured empty body.
-	Variables       []string     `json:"variables,omitempty"`
-	Classification  string       `json:"classification"`
-	HTTPGo          observation  `json:"httpgo"`
-	Hurl            observation  `json:"hurl"`
+	ResponseSequence []pollResponse `json:"response_sequence,omitempty"`
+	HurlRetry        *int           `json:"hurl_retry,omitempty"`
+	ResponseHeaders  []wireHeader   `json:"response_headers,omitempty"`
+	ResponseJSON     string         `json:"response_json,omitempty"`
+	ResponseBody     *[]byte        `json:"response_body,omitempty"` // Base64 bytes; nil is absent, pointer to empty bytes is a configured empty body.
+	Variables        []string       `json:"variables,omitempty"`
+	Classification   string         `json:"classification"`
+	HTTPGo           observation    `json:"httpgo"`
+	Hurl             observation    `json:"hurl"`
 }
 
 // Each executable gets an independent scenario/payload tree. References stay
@@ -158,6 +168,7 @@ func TestCompatibility(t *testing.T) {
 			var mu sync.Mutex
 			var paths []string
 			var requests []wireRequest
+			sequenceIndex := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				request := wireRequest{Method: r.Method, ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization"), ETag: r.Header.Get("ETag"), IfNoneMatch: r.Header.Get("If-None-Match"), Cookie: r.Header.Get("Cookie")}
 				_, params, mediaErr := mime.ParseMediaType(request.ContentType)
@@ -211,6 +222,18 @@ func TestCompatibility(t *testing.T) {
 					request.URI = r.RequestURI
 				}
 				requests = append(requests, request)
+				if r.URL.Path == "/poll" && len(expected.ResponseSequence) > 0 {
+					response := expected.ResponseSequence[min(sequenceIndex, len(expected.ResponseSequence)-1)]
+					sequenceIndex++
+					mu.Unlock()
+					for _, header := range response.Headers {
+						w.Header().Add(header.Name, header.Value)
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(response.Status)
+					_, _ = io.WriteString(w, response.JSON)
+					return
+				}
 				mu.Unlock()
 				for _, header := range expected.ResponseHeaders {
 					w.Header().Add(header.Name, header.Value)
@@ -266,10 +289,18 @@ func TestCompatibility(t *testing.T) {
 			httpgoPaths := slices.Clone(paths)
 			httpgoRequests := slices.Clone(requests)
 			paths, requests = nil, nil
+			sequenceIndex = 0
 			mu.Unlock()
 			hurlContext, hurlCancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer hurlCancel()
-			hurlArgs := []string{"--no-color", "--no-output", "--location", "--max-redirs", "10", "--max-time", "10", "--retry", "0", "--no-cookie-store", "--no-proxy", "*"}
+			hurlArgs := []string{"--no-color", "--no-output", "--location", "--max-redirs", "10", "--max-time", "10", "--no-cookie-store", "--no-proxy", "*"}
+			// Preserve legacy observations; polling pairs exercise local options
+			// without imposing a global override unless the pair requests it.
+			if expected.HurlRetry != nil {
+				hurlArgs = append(hurlArgs, "--retry", strconv.Itoa(*expected.HurlRetry))
+			} else if len(expected.ResponseSequence) == 0 {
+				hurlArgs = append(hurlArgs, "--retry", "0")
+			}
 			hurlArgs = append(hurlArgs, variableArgs...)
 			hurlArgs = append(hurlArgs, compatibilityScenario(t, filepath.Base(file), text))
 			command := exec.CommandContext(hurlContext, "hurl", hurlArgs...)
@@ -296,7 +327,7 @@ func TestCompatibility(t *testing.T) {
 			if expected.Hurl.Requests == nil {
 				hurlRequests = nil
 			}
-			got := comparison{ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, ResponseBody: expected.ResponseBody, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
+			got := comparison{ResponseSequence: expected.ResponseSequence, HurlRetry: expected.HurlRetry, ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, ResponseBody: expected.ResponseBody, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {

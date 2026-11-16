@@ -3,6 +3,54 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Aguardar condições assíncronas (US-26 / issue #50)
+
+```hurl
+GET {{base_url}}/jobs/123
+[Options]
+retry: 3
+retry-interval: 500
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "READY"
+```
+
+Execute o [exemplo versionado](testdata/scenarios/scenario_polling.hurl):
+
+```sh
+bin/httpgo test testdata/scenarios/scenario_polling.hurl --var base_url=http://localhost:8080
+```
+
+O endpoint é sintético dos testes, não uma rota do dummy. Com `PENDING`, `PENDING`,
+`READY`, há três envios e saída **0**. Se sempre divergir, há no máximo quatro e
+saída **1**, sem próxima entrada. `retry` conta **novas** tentativas (default `0`);
+`retry-interval` é inteiro em ms (default `1000`, zero sem espera deliberada).
+Negativos, frações, duplicações, overflow e opções fora desse recorte são erros
+estáticos **2**, impedindo todo HTTP do arquivo.
+
+- Somente divergência de status/assertion (`1`) repete; erro de transporte,
+  avaliação/decodificação, captura, preparação, cancelamento ou escrita (`2`)
+  encerra sem retry. Tipo/ausência classificados como assertion falha continuam
+  elegíveis, sem converter erros de avaliação em divergência.
+- Reenvia a requisição completa, inclusive **POST**, podendo repetir efeitos:
+  **não há garantia de idempotência**. Mantém variáveis, headers, campos e caminhos;
+  arquivos externos e multipart são relidos/reabertos em cada tentativa. Não há
+  snapshot dos bytes diante de alteração externa. Redirects recomeçam no destino
+  e método originais em cada tentativa, não na última URL redirecionada.
+- Status → assertions → capturas; tentativas divergentes não publicam capturas,
+  mas segredos descobertos permanecem protegidos. Respostas/fontes são fechadas
+  antes de avaliar/esperar; só aprovação publica o lote de capturas uma vez.
+- Espera cancelável só entre tentativas; prazo HTTP por tentativa, sem timeout
+  global novo, backoff, espera ilimitada, retry global ou repetição do arquivo.
+- Há uma entrada lógica e um resultado terminal com `[tentativas=N]`. Resumos
+  separam `tentativas_iniciadas`, `respostas_completas` e `status_comparados` dos
+  contadores lógicos anteriores. Falhas transitórias recuperadas não contam como
+  falha definitiva nem acionam fail-fast. Cancelamento na espera é **2**.
+
+[Subconjunto](docs/subset.md#polling-local-por-entrada--us-26--issue-50),
+[diferenças observadas com Hurl 8.0.0](docs/compatibility.md#polling--us-26--issue-50)
+e [validação](docs/validation.md#us-26--issue-50--história-0026).
+
 ## Validar inclusão e ausência (US-23 / issue #44)
 
 Salve `validation.hurl` e execute
@@ -834,7 +882,8 @@ com indicação explícita de **sem validação de status**.
   inclusive avaliação de JSON inválido ou percurso incompatível.
 - Timeout total configurável em YAML, default de 10 segundos por requisição,
   incluindo redirects e leitura do body.
-- TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
+- TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry implícito.
+  Polling opt-in por entrada segue a seção US-26 acima.
 - Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
   resumo por arquivo e agregado ao final, diagnósticos em stderr. Sempre texto sem cores.
 - 301/302/303 convertem POST/PUT/PATCH/DELETE em GET sem body; 307/308 preservam ambos.
