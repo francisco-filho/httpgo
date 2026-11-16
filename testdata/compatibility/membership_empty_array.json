@@ -1,0 +1,18 @@
+{
+  "response_json": "[]",
+  "classification": "shared behavior; HTTPGo failure codes are 1/2, Hurl assertion failure is 4",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

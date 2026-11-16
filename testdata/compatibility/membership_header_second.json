@@ -1,0 +1,27 @@
+{
+  "response_json": "{}",
+  "classification": "intentional difference: HTTPGo negates substring on first occurrence; Hurl negates exact element membership on the repeated-header list",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "Domain=first"
+    },
+    {
+      "name": "x",
+      "value": "safe"
+    }
+  ]
+}

@@ -1,4 +1,56 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20, US-21 e US-22
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-23
+
+## Inclusão e ausência — US-23 / issue #44
+
+**Ampliação intencional do contrato:** JSON `contains`, `not contains` e
+`not exists`; header `not contains`. Sem negação genérica ou JSONPath ampliado.
+São **37 novos pares `membership_*`**, total **213 pares**. Os **176 anteriores
+permanecem inalterados**, sem regeneração de goldens. O harness existente usa
+`response_json` e `response_headers`, com fixtures independentes. Cada esperado
+novo foi confrontado com **Hurl 8.0.0** em Linux, sem skip; códigos e paths reais
+estão nos pares. Não se exige equivalência de stdout/diagnósticos ou códigos de
+falha; 1/2 são categorias próprias HTTPGo, Hurl usa 4 nestas falhas de assertion.
+
+| Par `membership_*` | HTTPGo | Hurl 8.0.0 | Classificação / observação |
+|---|---|---|---|
+| `demo` | 0; /capture → /health | 0; mesmos paths | inclui REQUIRED, exclui OTHER_TENANT/campo proibido e Domain |
+| `substring`, `escape` | 0; /capture → /health | 0; mesmos paths | substring no JSON decodificado; newline, aspas e Unicode |
+| `case`, `unicode_form` | 1; /capture | 4; /capture | sem normalizar caixa ou Unicode |
+| `typed`, `nonrecursive` | 0; /capture → /health | 0; mesmos paths | escalares tipados, inclusive null; não busca dentro de elementos compostos |
+| `numeric_string`, `forbidden` | 1; /capture | 4; /capture | número não equivale a string; presença proibida falha |
+| `numbers`, `precision` | 0; /capture → /health | 0; mesmos paths | decimais equivalentes, zero com sinal; distingue 9007199254740993 de 9007199254740992 |
+| `exponent` | 0; /capture → /health | 2; zero envios | gramática numérica HTTPGo aceita expoente enorme, sem expansão; não equivalência geral ao Hurl |
+| `missing`, `index_missing` | 0; /capture → /health | 0; mesmos paths | ausência aprova negações; índice fora do array é ausência |
+| `null_present`, `root_present` | 1; /capture | 4; /capture | null presente existe, inclusive raiz |
+| `incompatible_null`, `incompatible_object`, `incompatible_number`, `incompatible_boolean`, `incompatible_string` | 1; /capture | 4; /capture | negação não aprova tipo incompatível, nem string com esperado numérico |
+| `empty_array`, `empty_element` | 0; /capture → /health | 0; mesmos paths | array vazio exclui escalares; string vazia corresponde como elemento direto |
+| `empty_substring` | 1; /capture | 4; /capture | string vazia não exclui substring vazia |
+| `header_missing`, `header_empty` | 0; /capture → /health | 0; mesmos paths | ausência aprova, vazio presente exclui trecho não vazio |
+| `header_empty_substring`, `header_comma` | 1; /capture | 4; /capture | vazio contém vazio; vírgula não divide valor único |
+| `header_first` | 0; /capture → /health | 0; mesmos paths | sucesso coincidente: HTTPGo ignora Domain na segunda ocorrência; Hurl compara elementos inteiros da lista |
+| `header_second` | 1; /capture | 0; /capture → /health | **diferença:** HTTPGo encontra substring Domain na primeira ocorrência; Hurl não encontra elemento inteiro igual a Domain na lista |
+| `header_list_element` | 1; /capture | 4; /capture | HTTPGo encontra substring Domain=first na primeira; Hurl encontra esse elemento exato na lista |
+| `header_first_order` | 1; /capture | 4; /capture | header divergente precede JSON inválido |
+| `json_first_order` | 2; /capture | 4; /capture | JSON inválido anterior não é aprovação por negação; categoria própria de avaliação |
+| `traversal` | 2; /capture | 0; /capture → /health | **diferença:** percurso por null é erro aqui, não ausência |
+| `literal` | 0; /capture → /health | 4; /capture | **diferença:** esperado permanece literal aqui; Hurl interpola variável definida |
+| `invalid_late` | 2; zero envios | 2; zero envios | operando em not exists rejeita todo arquivo |
+| `generic_not` | 2; zero envios | 0; /health → /capture → /health | **não suportado:** header not exists não entra no recorte HTTPGo |
+
+Primeira ocorrência de header é contrato preservado da US-07, não uma tentativa
+de imitar as listas Hurl. Não concatenar Set-Cookie nem generalizar que todos os
+predicados Hurl usam substring em headers repetidos. Números exatos, ausência e
+tipos foram confrontados somente nas fronteiras acima. Durante a primeira
+rodada, o Hurl rejeitou o esperado `1.23e2`: o par `numbers` passou a usar `123.0`
+para isolar equivalência decimal, mantendo `exponent` como diferença explícita.
+Somente novos pares foram ajustados após observar o binário; nenhuma regra de
+negócio HTTPGo foi afrouxada. Não foi copiado/adaptado código-fonte Hurl.
+
+Status → assertions na ordem escrita → capturas continua política própria;
+proteção de operandos/callbacks, recursos, writers e isolamento têm testes
+separados, rastreados em [validation.md](validation.md#us-23--issue-44--história-0023).
+O corpus sintético não homologa a suíte real. YAML hierárquico e interpolação de
+arquivos externos continuam **extensões HTTPGo**, não suporte Hurl acrescentado.
 
 ## Capturas literais de headers — US-22 / issue #42
 

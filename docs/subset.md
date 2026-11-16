@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 e US-21 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34, #36, #38 e #40)
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-23 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34, #36, #38, #40, #42 e #44)
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -34,6 +34,46 @@ O parser valida **todo** o arquivo antes de retornar um cenário executável.
 Arquivo vazio/com só comentários, URL inválida, status inválido, expectativa
 órfã/duplicada e instrução desconhecida são erros de entrada. Nada do arquivo é
 enviado nesses casos, mesmo quando o erro aparece depois de GETs válidos.
+
+### Inclusão e ausência JSON/header — US-23 (issue #44)
+
+```hurl
+GET {{base_url}}/validation
+HTTP 200
+[Asserts]
+jsonpath "$.codes" contains "REQUIRED"
+jsonpath "$.codes" not contains "OTHER_TENANT"
+jsonpath "$.passwordHash" not exists
+header "Set-Cookie" not contains "Domain"
+```
+
+JSON `contains` e `not contains` aceitam esperado escalar literal (string,
+número, booleano ou `null`). Em strings, somente esperado string é aplicável:
+busca substring literal, distinguindo caixa, sem normalização de espaços ou
+Unicode. Arrays comparam elementos diretos por tipo e valor, com igualdade
+numérica exata, sem busca recursiva nem comparação de JSON textual.
+Array vazio não contém nenhum escalar; toda string contém `""`.
+Ausência aprova `not contains` e `not exists`; `null` presente não é ausência.
+Número, booleano, objeto ou `null` selecionados, ou string com esperado não
+string, falham com `1` nos dois sentidos de pertencimento.
+`not exists` não aceita operando e falha para qualquer valor presente,
+inclusive raiz, vazio, false e zero. Índice fora do array é ausência.
+JSON inválido e percurso incompatível (inclusive através de `null`) continuam
+sendo erros `2`, nunca sucesso por negação.
+
+Header `not contains` exige string literal e aprova ausência. Consulta ignora
+caixa do nome e usa somente a primeira ocorrência, sem concatenar ou dividir
+por vírgula. Valor presente vazio contém `""`, portanto sua negação falha.
+Consultas e esperados são estáticos: placeholders dentro de strings permanecem
+literais. Não há `header not exists`, negação genérica, operadores lógicos,
+`count contains`, wildcards ou filtros novos. Erro estático tardio impede todos
+os envios. Status e assertions mantêm a ordem existente, antes das capturas;
+a primeira falha interrompe o arquivo. Diagnósticos localizados mostram somente
+presença/tipo e esperado escalar protegido, nunca a coleção selecionada.
+Headers sensíveis e captura secreta pendente permanecem ocultos.
+Exemplo versionado: `testdata/scenarios/scenario_assert_membership.hurl`.
+Os 37 pares `membership_*` e diferenças de headers repetidos, literais,
+expoentes e percurso estão em [compatibilidade](compatibility.md#inclusão-e-ausência--us-23--issue-44).
 
 ### Busca textual no body — US-21 (issue #40)
 
@@ -753,15 +793,16 @@ de status; assertions e capturas continuam obrigatórias quando declaradas.
   daquela feita pelo transporte HTTP (por exemplo whitespace externo do protocolo).
 - Valores esperados são strings literais entre aspas duplas. `{{nome}}` é texto
   literal, com ou sem variável/captura definida; não passa pelo renderer.
-  `exists` não aceita valor esperado. Não há regex, filtros
-  ou outros operadores de assertion de header. Capturas literais são suportadas
+  `exists` não aceita valor esperado. A US-23 acrescenta `not contains` (seção acima).
+  Não há regex, filtros ou outros operadores de assertion de header. Capturas literais são suportadas
   separadamente em `[Captures]` (US-22). Construções fora desse recorte falham
   explicitamente com posição, antes de qualquer envio do arquivo.
 - Havendo ocorrências repetidas, somente a **primeira na ordem recebida** participa
-  de `==`/`contains`, inclusive se nomes chegam com caixas diferentes. Nunca há
+  de `==`/`contains`/`not contains`, inclusive se nomes chegam com caixas diferentes. Nunca há
   concatenação ou divisão por vírgulas: `first,second` é uma única string.
-- Ausência faz os três operadores falharem. Presente vazio satisfaz `exists` e
-  `== ""`; `contains ""` passa para qualquer valor presente, inclusive vazio.
+- Ausência faz `==`, `contains` e `exists` falharem; aprova `not contains`.
+  Presente vazio satisfaz `exists` e `== ""`; `contains ""` passa para qualquer
+  valor presente, inclusive vazio; `not contains ""` falha.
 - A primeira falha interrompe a sequência com código 1, não avalia nem publica
   capturas dessa resposta e mantém os resultados anteriores. Um status numérico
   divergente impede ambas as etapas. Falha de transporte, consumo/fechamento do

@@ -1,0 +1,22 @@
+{
+  "response_json": "invalid",
+  "classification": "controlled JSON evaluation error 2; Hurl assertion failure 4; source order preserved",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "forbidden"
+    }
+  ]
+}

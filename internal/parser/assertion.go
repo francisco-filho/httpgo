@@ -124,18 +124,30 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 			return fail(pos, "sintaxe inválida", "count exige comparador e quantidade")
 		}
 	}
-	declaration.Operator = assertion.JSONOperator(fields[0])
-	rest = strings.TrimSpace(rest[len(fields[0]):])
+	operator := fields[0]
+	rest = strings.TrimSpace(rest[len(operator):])
+	if operator == "not" {
+		fields = strings.Fields(rest)
+		if len(fields) == 0 {
+			return fail(pos, "sintaxe inválida", "not exige contains ou exists")
+		}
+		operator += " " + fields[0]
+		rest = strings.TrimSpace(rest[len(fields[0]):])
+	}
+	declaration.Operator = assertion.JSONOperator(operator)
+	if declaration.Count && (declaration.Operator == assertion.JSONContains || declaration.Operator == assertion.JSONNotContains || declaration.Operator == assertion.JSONNotExists) {
+		return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
+	}
 	switch declaration.Operator {
-	case assertion.JSONExists:
+	case assertion.JSONExists, assertion.JSONNotExists:
 		if declaration.Count {
 			return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
 		}
 		if rest != "" {
-			return fail(pos, "sintaxe inválida", "exists não aceita valor esperado")
+			return fail(pos, "sintaxe inválida", "exists e not exists não aceitam valor esperado")
 		}
 		return declaration, nil
-	case assertion.JSONEqualOperator:
+	case assertion.JSONEqualOperator, assertion.JSONContains, assertion.JSONNotContains:
 	case assertion.JSONMatches:
 		pattern, trailing, valid := jsonString(rest)
 		if !valid || strings.TrimSpace(trailing) != "" {
@@ -164,7 +176,15 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 	if declaration.Count && !assertion.ValidCount(expected) {
 		return fail(pos, "sintaxe inválida", "count exige quantidade inteira não negativa")
 	}
-	if declaration.Operator != assertion.JSONEqualOperator {
+	switch declaration.Operator {
+	case assertion.JSONContains, assertion.JSONNotContains:
+		switch expected.(type) {
+		case nil, string, json.Number, bool:
+		default:
+			return fail(pos, "sintaxe inválida", "contains e not contains exigem literal JSON escalar")
+		}
+	case assertion.JSONEqualOperator:
+	default:
 		if _, ok := expected.(json.Number); !ok {
 			return fail(pos, "sintaxe inválida", "comparação ordenada exige número JSON esperado")
 		}
@@ -199,14 +219,23 @@ func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 	if len(fields) == 0 {
 		return fail("sintaxe inválida", "assertion exige operador")
 	}
-	operator := assertion.HeaderOperator(fields[0])
-	rest = strings.TrimSpace(rest[len(fields[0]):])
+	token = fields[0]
+	rest = strings.TrimSpace(rest[len(token):])
+	if token == "not" {
+		fields = strings.Fields(rest)
+		if len(fields) == 0 {
+			return fail("sintaxe inválida", "not exige contains e string literal")
+		}
+		token += " " + fields[0]
+		rest = strings.TrimSpace(rest[len(fields[0]):])
+	}
+	operator := assertion.HeaderOperator(token)
 	switch operator {
 	case assertion.HeaderExists:
 		if rest != "" {
 			return fail("sintaxe inválida", "exists não aceita valor esperado")
 		}
-	case assertion.HeaderEqual, assertion.HeaderContains:
+	case assertion.HeaderEqual, assertion.HeaderContains, assertion.HeaderNotContains:
 		expected, tail, valid := assertionString(rest)
 		if !valid || strings.TrimSpace(tail) != "" {
 			return fail("sintaxe inválida", "assertion exige somente uma string literal esperada entre aspas duplas")
