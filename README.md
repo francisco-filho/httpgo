@@ -940,8 +940,9 @@ integralmente ocultos; headers comuns usam proteção de segredos conhecidos/der
 e captura secreta pendente. Nenhuma regex compilada é entregue ao relatório.
 
 Placeholders como `{{nome}}` permanecem estáticos, definidos ou não, sujeitos à
-sintaxe regex; não há interpolação nem `--render-asserts`. Regex de body/variável,
-seleção de todas as ocorrências continua fora do recorte. Extração regex de body/header é a US-25.
+sintaxe regex; não há interpolação nem `--render-asserts`. Assertions regex de
+body/variável e seleção de todas as ocorrências continuam fora do recorte.
+Extração regex de body/header é a US-25.
 Os 30 pares `header_matches_*` confrontados com Hurl **8.0.0** e as diferenças de
 gramática, primeira ocorrência/lista, interpolação, validação e códigos estão na
 [matriz diferencial](docs/compatibility.md#regex-de-headers--us-24--issue-46).

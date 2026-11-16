@@ -132,6 +132,33 @@ Aviso de metadados libcurl não impediu execução.
   plano v4, não bloqueios. Corpus sintético não homologa suíte real nem prova
   equivalência geral de engines, charset, diagnóstico ou segurança com Hurl.
 
+### Revalidação após rebase sobre a US-24
+
+Por solicitação do responsável, a branch foi rebaseada sobre `develop` em
+`537ea01`, que contém a US-24 (`f7ddfe5`). Mapeamento dos commits reescritos:
+`81d4100` → `99f3f8b`, `8a429cd` → `3c278c7`, `7563cc9` → `aee9f6c`.
+Conflitos em README, documentação e seeds foram resolvidos preservando ambas
+as histórias; `header matches`, extração de capturas e seeds das duas histórias
+permanecem ativos. Sem regenerar goldens para acomodar a integração.
+
+Passaram novamente na base integrada:
+
+- `go test ./internal/parser ./internal/query ./internal/template ./internal/runner ./internal/cli`.
+- `make compatibility`: **273 pares**, Hurl **8.0.0**, sem skip ou update.
+  Dos **243 pares da base US-24**, somente `capture_header_filter.json` muda
+  intencionalmente na US-25; os outros **242** permanecem inalterados.
+- `make fmt lint test` (lint **0 issues**, race/cover), `go vet ./...`,
+  `go build ./...` e `make e2e`. Cobertura do parser integrado: **97,5%**;
+  demais percentuais iguais aos registrados na rodada inicial da US-25.
+- `TestHeaderMatchesBeforeRegexCaptureByBinary` combina US-24/25 na mesma
+  resposta: assertion sensível antes da captura mesmo com seções invertidas;
+  somente token no Cookie explícito, body indecodificável não consultado,
+  mismatch impede próxima requisição e regex inválida tardia impede todo HTTP.
+- Fuzzers repetidos com `-fuzztime=20s -parallel=2`: `FuzzParse` **27.290**,
+  `FuzzRender` **17.407**, `FuzzRenderJSON` **53.127** execuções, todos sem crash.
+- `git diff --check`, `gofmt -l` dos Go alterados e destinos dos links locais
+  conferidos. Nenhum push nem análise SonarQube realizado pelo backdev.
+
 ### Rastreabilidade GO-287–GO-303
 
 | GO | Evidência executada |
@@ -148,7 +175,7 @@ Aviso de metadados libcurl não impediu execução.
 | GO-296 | runner `TestRegexCaptureSelectionAndPrecedence`/`TestRegexCaptureProtectionAndAtomicityOnFailure`, pares `status_first`/`assertion_first`: status/assertions antes de captura |
 | GO-297 | runner `TestRegexCaptureAtomicMixedBatches`/`TestRegexCaptureProtectionAndAtomicityOnFailure`, pares `mixed`/`collision`: lote atômico, iniciais/anteriores/lote não sobrescritos |
 | GO-298 | runner de proteção com sessão observável/callbacks, CLI `TestRegexCaptureWritersAndDerivedProtection`, E2E `TestRegexCaptureFinalAndFailureByBinary`: grupo protegido imediatamente, inclusive lote falho/pending, resultado sem dados operacionais |
-| GO-299 | 30 pares novos/243 totais, `TestRegexCaptureHelpAndPublishedExamples`, matriz revisada: diferenças de tipagem/ordem/pré-validação/charset/headers explícitas |
+| GO-299 | 30 pares novos/273 totais após integração da US-24, `TestRegexCaptureHelpAndPublishedExamples`, matriz revisada: diferenças de tipagem/ordem/pré-validação/charset/headers explícitas |
 | GO-300 | transport `TestRegexCapturesRequireCompleteFinalResponse`/`TestRegexCaptureConsumesAndClosesBeforeEvaluation`, E2E final/failure: final completa, retenção só no body |
 | GO-301 | mesmos testes de transporte nos modos read/close/incomplete/timeout/cancel: 2, sem próxima requisição/retry e zero concluídas em falha de consumo |
 | GO-302 | runner de proteção modo report e CLI writers: erro/short write prevalece, preserva contagens, sem reimpressão/resumo no writer falho nem próximo envio |
