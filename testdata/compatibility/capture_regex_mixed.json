@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "v=token"
+    }
+  ],
+  "response_body": "NDI=",
+  "classification": "diferença de tipagem: lote misto HTTPGo envia regex string e JSON número; Hurl envia ambos como número 42",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"regex\":\"42\",\"json\":42,\"header\":\"token\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"regex\":42,\"json\":42,\"header\":\"token\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

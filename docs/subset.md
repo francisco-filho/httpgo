@@ -99,7 +99,7 @@ próximas requisições. Condição falsa retorna `1`, sucesso `0`.
 Diagnósticos localizados identificam operador e esperado protegido, nunca body
 ou fragmentos recebidos. Captura secreta pendente oculta o esperado sem antecipar
 sua avaliação. Busca literal não detecta todas as codificações de dados sensíveis.
-Regex de body, filtros, outros predicados e interpolação de esperados não são suportados.
+Assertions regex de body, filtros, outros predicados e interpolação de esperados não são suportados. Extração regex de body em `[Captures]` é o recorte US-25.
 Os 19 pares `body_*` confrontados com Hurl 8.0.0 são publicados em
 [compatibilidade](compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
 ISO-8859-1 resolve para windows-1252 (incluindo byte 0x80 → €), conforme esse
@@ -673,10 +673,19 @@ Content-Type: application/json
 HTTP 200
 ```
 
-Marque `otp_code` com `--secret otp_code` ou `secrets` na configuração. A forma
-`refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"` permite compor
-explicitamente `Cookie: refresh={{refresh_token}}` na próxima requisição, sem
-atributos de resposta e sem cookie jar automático.
+Marque `otp_code` com `--secret otp_code` ou `secrets` na configuração.
+Para compor cookie explicitamente, sem atributos de resposta nem cookie jar:
+
+```hurl
+GET {{base_url}}/session
+HTTP 200
+[Captures]
+refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"
+
+GET {{base_url}}/next
+Cookie: refresh={{refresh_token}}
+HTTP 200
+```
 
 O padrão é uma string JSON estática, usando a sintaxe e os limites de regex Go
 da US-15, nunca interpolada. Extrai **somente o primeiro grupo da primeira
@@ -910,8 +919,8 @@ formato divergente ou header ausente falham com **1**, sem captura/próximo envi
 - Placeholders `{{nome}}` permanecem **literais e estáticos**, definidos ou não;
   continuam sujeitos à sintaxe regex, não são automaticamente escapados e não
   passam pelo renderer. Não há flag `--render-asserts` nem antecipação da US-30.
-  Regex de body/variável, captura por regex, filtros e todas as ocorrências ficam
-  fora do suporte.
+  Assertions regex de body/variável, filtros e todas as ocorrências ficam
+  fora do suporte. Extração regex de body/header é o recorte US-25.
 
 Os **30 pares `header_matches_*`** com Hurl **8.0.0** estão classificados na
 [matriz diferencial](compatibility.md#regex-de-headers--us-24--issue-46).

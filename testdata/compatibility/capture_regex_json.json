@@ -1,0 +1,39 @@
+{
+  "response_body": "dmFsdWU9eyJhIjoxfQ==",
+  "classification": "diferença de renderização JSON: HTTPGo envia conteúdo semelhante a objeto como string; Hurl falha com 3 e não envia POST deste template",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"{\\\"a\\\":1}\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

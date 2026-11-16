@@ -1,0 +1,49 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "first,whole"
+    },
+    {
+      "name": "X-Test",
+      "value": "second"
+    }
+  ],
+  "response_body": "bm90IEpTT04=",
+  "classification": "diferença: HTTPGo seleciona primeira ocorrência preservando vírgula; Hurl trata header multivalorado",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "prefirst,wholepost"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

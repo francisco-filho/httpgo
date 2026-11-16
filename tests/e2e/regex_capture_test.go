@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -39,15 +40,19 @@ func TestRegexCaptureOTPAndCookieByBinary(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			source := "GET {{base}}/message/123\nHTTP 200\n[Captures]\notp_code: regex \"verificação é: ([0-9]{6})\"\nPOST {{base}}/verify\nContent-Type: application/json\n{\"code\":\"{{otp_code}}\"}\nHTTP 200"
+			file := "scenario_capture_otp.hurl"
 			if strings.Contains(mode, "cookie") {
-				source = "GET {{base}}/session\nHTTP 200\n[Captures]\nrefresh_token: header \"Set-Cookie\" regex \"refresh=([^;]+)\"\nGET {{base}}/next\n"
-				if mode == "cookie" {
-					source += "Cookie: refresh={{refresh_token}}\n"
-				}
-				source += "HTTP 200"
+				file = "scenario_capture_refresh.hurl"
 			}
-			code, out, stderr := run(t, "test", scenario(t, source), "--var", "base="+server.URL, "--secret", "otp_code")
+			input, err := os.ReadFile("../../testdata/scenarios/" + file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := string(input)
+			if mode == "no implicit cookie" {
+				source = strings.ReplaceAll(source, "Cookie: refresh={{refresh_token}}\n", "")
+			}
+			code, out, stderr := run(t, "test", scenario(t, source), "--var", "base_url="+server.URL, "--var", "mailbox_url="+server.URL, "--secret", "otp_code")
 			wantCode, wantHits := 0, int32(2)
 			if mode == "missing" {
 				wantCode, wantHits = 2, 1

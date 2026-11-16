@@ -46,6 +46,7 @@ type wireRequest struct {
 	Authorization        string     `json:"authorization,omitempty"`
 	ETag                 string     `json:"etag,omitempty"`
 	IfNoneMatch          string     `json:"if_none_match,omitempty"`
+	Cookie               string     `json:"cookie,omitempty"`
 }
 
 type observation struct {
@@ -158,7 +159,7 @@ func TestCompatibility(t *testing.T) {
 			var paths []string
 			var requests []wireRequest
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				request := wireRequest{Method: r.Method, ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization"), ETag: r.Header.Get("ETag"), IfNoneMatch: r.Header.Get("If-None-Match")}
+				request := wireRequest{Method: r.Method, ContentType: r.Header.Get("Content-Type"), Probe: r.Header.Get("X-Probe"), Authorization: r.Header.Get("Authorization"), ETag: r.Header.Get("ETag"), IfNoneMatch: r.Header.Get("If-None-Match"), Cookie: r.Header.Get("Cookie")}
 				_, params, mediaErr := mime.ParseMediaType(request.ContentType)
 				baseType, _, _ := strings.Cut(request.ContentType, ";")
 				if strings.EqualFold(strings.TrimSpace(baseType), "multipart/form-data") {

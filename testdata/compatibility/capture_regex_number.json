@@ -1,0 +1,46 @@
+{
+  "response_body": "dmFsdWU9MDAx",
+  "classification": "diferença de bytes JSON: HTTPGo envia string 001; Hurl envia 001 sem aspas, ambos exit 0; sucesso não prova JSON equivalente",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"001\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":001}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

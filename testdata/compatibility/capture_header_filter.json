@@ -6,10 +6,27 @@
     }
   ],
   "response_json": "not JSON",
-  "classification": "filtro regex de header fora do recorte HTTPGo: rejeição integral (2); Hurl suporta filtro",
+  "classification": "ampliação intencional US-25: filtro regex de header agora suportado; primeiro grupo string em ambos",
   "httpgo": {
-    "exit": 2,
-    "paths": null
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "literal"
+      }
+    ]
   },
   "hurl": {
     "exit": 0,

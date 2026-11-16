@@ -64,6 +64,9 @@ func FuzzParse(f *testing.F) {
 			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\nGET http://example.test/late\nHTTP *\n[Asserts]\n  header \"Set-Cookie\" matches "+pattern, "\n", newline))
 		}
 	}
+	for _, declaration := range []string{`x: regex "(\\d+)"`, `x: regex "(a)?(b)"`, `x: regex "(a*)b"`, `x: regex "no-group"`, `x: regex "({{literal}})"`, `x: regex "(?m)^é: (.+)$"`, `x: regex "\d"`, `x: regex "(?=private)"`, `x: regex "(x)\\1"`, `x: regex "private["`, `x: regex "(x)" 1`, `x: header "Set-Cookie" regex "refresh=([^;]+)"`, `x: header "X" regex "()" regex "(.*)"`, `x: header "X" regex"(x)"`} {
+		f.Add("GET http://example.test/first\r\nGET http://example.test/late\r\n[Captures]\r\n  " + declaration)
+	}
 	for _, expression := range []string{`contains "{{literal}}"`, `not contains null`, `contains true`, `not contains 1e9999999999999999999999`, `not exists`, `not exists null`, `contains []`, `not contains {}`, `not`, `not == 1`, `count not contains 1`, `count not exists`} {
 		f.Add("GET http://example.test/first\r\nGET http://example.test/late\r\nHTTP *\r\n[Asserts]\r\n  jsonpath \"$.items[0]\" " + expression)
 	}

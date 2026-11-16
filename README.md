@@ -85,7 +85,7 @@ HTTP do arquivo.
 
 Diagnóstico localizado informa operador/esperado protegido, **nunca body ou
 fragmentos recebidos**. Captura secreta pendente oculta esperado sem antecipar sua
-avaliação. Não há regex de body, inspeção de binários ou interpolação de
+avaliação. Não há assertion regex de body nem inspeção de binários ou interpolação de
 assertions. Busca literal não prova ausência de todas as codificações de um dado.
 Os exemplos confrontados com Hurl **8.0.0** e as diferenças de códigos estão em
 [`docs/compatibility.md`](docs/compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
@@ -669,7 +669,7 @@ nome capturado e seus usos compostos/escapes conhecidos, sem alterar o valor
 enviado. Marcações explícitas continuam acumulando. Não há detecção universal de
 segredos ou codificações arbitrárias. Capturar `Set-Cookie` **não** ativa cookie
 jar, não extrai atributos nem cria `Cookie`; extração de cookie é escopo da US-25.
-Filtros/seletores/regex em captura de header continuam fora do recorte.
+O único filtro de captura de header é `regex`, na US-25 abaixo; demais filtros e seletores continuam fora do recorte.
 
 Há diferenças deliberadas frente ao Hurl 8.0.0 em repetição, interpolação JSON,
 ordem de assertions e colisões: veja [a matriz diferencial](docs/compatibility.md#capturas-literais-de-headers--us-22--issue-42).
@@ -677,6 +677,53 @@ A proteção HTTPGo não é anúncio de equivalência de segurança com Hurl.
 
 Capturas de respostas estão disponíveis desde a US-05, ampliadas para qualquer
 tipo JSON na US-06.
+
+## Extração de OTP e token por regex — US-25 / issue #48
+
+```hurl
+GET {{mailbox_url}}/message/123
+HTTP 200
+[Captures]
+otp_code: regex "verificação é: ([0-9]{6})"
+
+POST {{base_url}}/verify
+Content-Type: application/json
+{"code":"{{otp_code}}"}
+HTTP 200
+```
+
+Execute `httpgo test otp.hurl --secret otp_code` com as URLs não secretas
+configuradas; `--secret` marca a futura captura, não fornece seu valor.
+Para renovação explícita de sessão:
+
+```hurl
+GET {{base_url}}/session
+HTTP 200
+[Captures]
+refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"
+
+GET {{base_url}}/next
+Cookie: refresh={{refresh_token}}
+HTTP 200
+```
+
+Extrai **somente o primeiro grupo da primeira correspondência**, como string.
+Grupo participante vazio publica string vazia; sem correspondência, sem grupo ou
+primeiro grupo não participante gera erro de captura **2**, sem próximo envio.
+Padrão é string JSON estática, usando regex Go da US-15, sem interpolação.
+Erro estático tardio rejeita todo o arquivo antes da rede. Body usa decodificação
+textual estrita da US-21; header usa a primeira ocorrência, sem decodificar body.
+Status e assertions continuam antes das capturas, com publicação atômica e sem
+sobrescrita. Grupos de headers sensíveis herdam proteção imediatamente, inclusive
+se outra captura falhar. OTP/dados do body exigem marcação explícita; não há
+detecção automática de segredos arbitrários. Não há cookie jar, escolha de grupo,
+substituições, pipelines, regex dinâmica ou assertions da captura na mesma resposta.
+
+Cenários executáveis: [`scenario_capture_otp.hurl`](testdata/scenarios/scenario_capture_otp.hurl)
+e [`scenario_capture_refresh.hurl`](testdata/scenarios/scenario_capture_refresh.hurl).
+Veja [o recorte](docs/subset.md#extração-regex-de-body-e-header--us-25-issue-48)
+e [a matriz diferencial](docs/compatibility.md#extração-regex--us-25--issue-48),
+que distingue grupos, strings JSON, charset, headers repetidos e códigos de saída.
 
 ## Autenticar e reutilizar token (US-05 / issue #14)
 
@@ -894,7 +941,7 @@ e captura secreta pendente. Nenhuma regex compilada é entregue ao relatório.
 
 Placeholders como `{{nome}}` permanecem estáticos, definidos ou não, sujeitos à
 sintaxe regex; não há interpolação nem `--render-asserts`. Regex de body/variável,
-captura por regex e seleção de todas as ocorrências continuam fora do recorte.
+seleção de todas as ocorrências continua fora do recorte. Extração regex de body/header é a US-25.
 Os 30 pares `header_matches_*` confrontados com Hurl **8.0.0** e as diferenças de
 gramática, primeira ocorrência/lista, interpolação, validação e códigos estão na
 [matriz diferencial](docs/compatibility.md#regex-de-headers--us-24--issue-46).
@@ -950,7 +997,8 @@ segredos arbitrários não marcados. Body, documento e coleções de headers nã
 são despejados nem acumulados no resultado.
 
 A US-14 acrescenta presença, contagem e limites (abaixo), sem ampliar JSONPath.
-A comparação por regex em JSON restringe-se a strings selecionadas: consulte
+A comparação por regex em JSON restringe-se a strings selecionadas (US-15);
+headers usam `matches` da US-24 e extração de body/header é o recorte US-25. Consulte
 [Validar padrões textuais](docs/subset.md#padrões-textuais--us-15--issue-36). Não há
 interpolação de consultas nem padrões. Hurl 8.0.0 rejeita os literais esperados
 compostos e o literal com expoente testados; a gramática e os códigos próprios
@@ -1011,8 +1059,9 @@ jsonpath "$.name" matches "^Pizza"
 `matches` busca trecho; âncoras controlam a string inteira e opções como `(?i)`
 são aceitas. Ausência, valor não string ou divergência retorna 1; regex ou
 escape inválido retorna 2 antes de qualquer envio. Placeholders no padrão são
-literais. A US-24 acrescenta `matches` em headers (acima); body/variáveis,
-interpolação e captura por regex continuam não suportados. A evidência específica frente a Hurl 8.0.0 e
+literais. A US-24 acrescenta `matches` em headers (acima); `matches` em body/variáveis
+e interpolação continuam não suportados. Captura por regex de body/header é o
+recorte US-25. A evidência específica frente a Hurl 8.0.0 e
 os códigos próprios estão na [matriz](docs/compatibility.md).
 
 ## Documentação e desenvolvimento
