@@ -1,0 +1,23 @@
+{
+  "response_json": "not JSON",
+  "classification": "intentional static pattern: HTTPGo never resolves placeholder; Hurl attempts interpolation",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "{{name}}"
+    }
+  ]
+}

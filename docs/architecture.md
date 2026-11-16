@@ -58,6 +58,7 @@ rótulos/conversões de charset. O restante usa biblioteca padrão; `go.mod` pre
 | `query.HeaderValue`, `query.Header` | Ocorrências nome/valor sem net/http; seleção pura da primeira, com presença distinta de vazio e nome case-insensitive |
 | `assertion.Status`, `HeaderOperator`, `assertion.Header`, `assertion.JSONEqual`, `assertion.MatchString` | Comparação de status/headers, igualdade JSON tipada e correspondência regex de string sem coerção; não conhece runner, HTTP ou apresentação |
 | `parser.JSONAssertion.Pattern`, `Compiled` | `matches` conserva literal de padrão e `*regexp.Regexp` validado durante parse integral; padrão não passa por renderer e é removido dos metadados pelo `safeEntry` |
+| `parser.HeaderAssertion.Expected`, `Compiled` | US-24: padrão decodificado em `Expected` (sem fonte duplicada) e `*regexp.Regexp` validado pelo helper privado `parseMatches`, compartilhado com JSON; `safeEntry` clona a declaração e remove `Compiled` antes de apresentar |
 | `runner.HeaderFailure`, `JSONFailure`, `JSONError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `suite.Suite`, `File`, `FileResult`, `State`, `Summary`, `Result`, `Options` | Descoberta completa, carga/fechamento por arquivo, reutilização do runner com sessão nova, estados e contagens compactos, fail-fast e interrupções globais; não importa CLI ou transporte |
@@ -532,6 +533,50 @@ e fechada antes do retorno, mesmo com `RetainBody=false`. Read/close/timeout/can
 impedem toda publicação e contagem de resposta completa. Redirects mantêm mesma
 origem, um prazo e nenhum retry. Captura de `Set-Cookie` não instala cookie jar,
 não transforma atributos nem sintetiza `Cookie` em requisições seguintes.
+
+## Regex de headers — US-24 / issue #46
+
+A fatia reutiliza US-07 e US-15, sem novos pacotes, interfaces, dependências ou
+mudança de Go. `parser.parseHeaderAssertion` reconhece `assertion.HeaderMatches`;
+`parseMatches` compartilha `jsonString`, compilação e classificação de erros com
+`jsonpath matches`. O operando é uma única string JSON, não `assertionString`
+(`strconv.Unquote`), preservando a gramática anterior dos outros operadores.
+Erro estático em qualquer entrada rejeita todo o arquivo antes da rede, localizado
+sem texto bruto de `regexp`/`regexp/syntax`. O padrão decodificado fica somente em
+`HeaderAssertion.Expected`; `Compiled` pertence ao cenário imutável. Sem cache
+ou compilação em execução, renderer ou resolução de placeholders.
+
+`runner.checkHeader` consulta `query.Header` e despacha somente `HeaderMatches`
+para `assertion.MatchString(declaration.Compiled, actual, present)`; os demais
+operadores mantêm `assertion.Header`. A query continua intacta: primeira ocorrência
+sem distinguir caixa, presença separada do texto vazio, sem juntar/dividir vírgulas.
+Engine e semântica Go da US-15: busca parcial, âncoras/opções/Unicode, sem normalização.
+Ausência sempre falha em matches, mesmo com padrão vazio. Não se serializa header
+ou body para a comparação.
+
+Fluxo inalterado: transporte retorna resposta **final consumida/fechada** → status
+→ assertions na ordem escrita → capturas → resultado/callback → próximo envio.
+`HTTP *` dispensa só comparação numérica. Header isolado não pede `RetainBody` nem
+decode JSON; resposta incompleta, read/close/timeout/cancel não chega à avaliação.
+Sem nova política de rede, prazo de regex, retenção, goroutine ou retry.
+
+A falha usa `HeaderFailure`/`HeaderMismatch`, diagnóstico existente na CLI e códigos
+0/1/2, sem reavaliação. Padrão percorre a mesma proteção do esperado literal:
+ocultação integral em nomes sensíveis e captura secreta pendente; sanitização de
+segredos conhecidos/derivados nos demais, antes de coleção/callback/streams.
+`safeEntry` clona declaração e slice, zera `Compiled` (a regex retém fonte) e
+preserva apenas esperado/metadados seguros, em sucesso e em qualquer falha.
+Cenário/renderer reutilizáveis não compartilham proteção dinâmica entre sessões.
+Falha de escrita/short write continua prioritária, sem próximo envio/reimpressão
+ou resumo no writer que falhou; contagens/resultados anteriores são preservados.
+
+Ajuda e exemplo `scenario_assert_header_matches.hurl` são exercitados pelo binário.
+O harness diferencial existente usa `response_headers`, Hurl 8.0.0 obrigatório e
+30 pares novos, sem modificar observações anteriores. Ver
+[matriz](compatibility.md#regex-de-headers--us-24--issue-46) e
+[evidência](validation.md#us-24--issue-46--história-0024).
+Repetição/lista, interpolação, gramática e códigos permanecem diferenças explícitas.
+Não há regex de body/variável/captura nem seleção de todas as ocorrências.
 
 ## Headers e expectativa curinga — US-07
 

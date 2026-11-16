@@ -1,0 +1,24 @@
+{
+  "response_json": "not JSON",
+  "classification": "JSON string escapes decoded once, then interpreted as Go regex; Hurl grammar observed separately",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "a \"b\\c/"
+    }
+  ]
+}

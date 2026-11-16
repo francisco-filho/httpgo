@@ -1,0 +1,22 @@
+{
+  "response_json": "not JSON",
+  "classification": "shared empty anchor mismatch on nonempty header; codes differ",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "value"
+    }
+  ]
+}

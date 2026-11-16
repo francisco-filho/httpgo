@@ -1,0 +1,13 @@
+{
+  "response_json": "not JSON",
+  "response_headers": [{"name":"X-Test","value":"privateprivate"}],
+  "classification": "unsupported Go backreference rejected before all HTTP; Hurl sends first then reports invalid regex (exit 4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": ["/health", "/capture"]
+  }
+}

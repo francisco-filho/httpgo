@@ -1,0 +1,26 @@
+{
+  "response_json": "not JSON",
+  "classification": "second occurrence cannot fix first empty value in HTTPGo; Hurl sees a list",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": ""
+    },
+    {
+      "name": "x-test",
+      "value": "ok"
+    }
+  ]
+}
