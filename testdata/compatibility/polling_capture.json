@@ -1,0 +1,59 @@
+{
+  "response_sequence": [
+    {
+      "status": 200
+    },
+    {
+      "status": 200,
+      "response_headers": [
+        {
+          "name": "X-Result",
+          "value": "ready"
+        }
+      ]
+    }
+  ],
+  "classification": "diferença deliberada: falha de captura é categoria 2 sem retry no HTTPGo",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/poll"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "response_sequence": [
+    {
+      "status": 503
+    },
+    {
+      "status": 200
+    }
+  ],
+  "classification": "equivalente: retry zero não reenvia, códigos de assertion 1/4",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/poll"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/poll"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

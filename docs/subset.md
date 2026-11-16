@@ -166,7 +166,8 @@ não criam campos multilinha. Todos os campos são validados antes de abrir o ar
 
 307/308 rebobinam a mesma fonte e reutilizam boundary; 301/302/303 convertem em GET
 sem body nem Content-Type multipart. Mantêm-se limite de dez redirects de mesma
-origem, TLS verificado, prazo único configurável (default de dez segundos) e nenhum retry. Resposta 413
+origem, TLS verificado e prazo único configurável por tentativa (default de dez
+segundos), sem retry implícito. Polling opt-in segue a US-26 abaixo. Resposta 413
 completa é avaliada normalmente, inclusive antecipada; erro de conexão sem resposta
 completa é transporte (2). Leituras HTTP terminam antes de rebobinar/fechar a fonte;
 falhas de leitura/fechamento não viram sucesso. I/O local bloqueado pelo SO continua
@@ -382,7 +383,8 @@ string numérica, não finitos ou arredondamento. Omissão conserva dez segundos
 O prazo é por requisição lógica, incluindo conexão, TLS, redirects e consumo/
 fechamento da resposta, sem tetos internos de dez segundos. Cada nova requisição
 recebe orçamento próprio; contexto cancelado ou prazo menor do chamador prevalece.
-Não há retry, interrupção prometida de I/O local bloqueado ou mutação do executor.
+Não há retry implícito, interrupção prometida de I/O local bloqueado ou mutação
+do executor; polling explícito por entrada segue a US-26 abaixo.
 
 `secrets` acumula com `--secret`, sem exigir variável existente. Pode proteger
 captura futura; usar valor ainda ausente continua falhando. Override nunca remove
@@ -908,7 +910,8 @@ formato divergente ou header ausente falham com **1**, sem captura/próximo envi
   impede capturas e próximos envios, inclusive com `HTTP *`. Header anterior a
   JSON inválido pode falhar com 1; JSON anterior falha com 2. Header isolado não
   retém body nem tenta decodificar JSON. Falhas de consumo/fechamento, prazo,
-  cancelamento ou escrita permanecem 2; não há retry ou aprovação parcial.
+  cancelamento ou escrita permanecem 2, sem retry desses erros ou aprovação parcial.
+  Divergência de assertion pode usar o polling explícito da US-26.
 - Padrão e real de Authorization, Proxy-Authorization, Cookie e Set-Cookie ficam
   **integralmente ocultos**, independentemente de marca explícita. Headers comuns
   aplicam proteção de segredos conhecidos/derivados; captura secreta pendente na
@@ -1053,10 +1056,50 @@ na pré-validação aqui, mas chega à assertion no Hurl observado. Quantidade m
 que inteiro de máquina passa no par de ambos; não se deduz precisão numérica geral
 da referência. A semântica aprovada não é alterada para forçar equivalência.
 
+## Polling local por entrada — US-26 / issue #50
+
+```hurl
+GET {{base_url}}/jobs/123
+[Options]
+retry: 3
+retry-interval: 500
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "READY"
+```
+
+`retry` é a quantidade de novas tentativas após a inicial (default `0`);
+`retry-interval` é inteiro em milissegundos (default `1000`, zero sem espera
+deliberada). Opções estáticas não negativas, sem duplicação, ilimitado ou overflow;
+qualquer outra opção é rejeitada antes de todo HTTP do arquivo. A seção pertence
+à requisição e não pode seguir a resposta nem ser duplicada.
+
+Somente divergências de status/assertions (`1`) permitem repetir. Transporte,
+avaliação/decodificação, captura, preparação, cancelamento ou escrita (`2`)
+encerram imediatamente. Cada tentativa repete a requisição completa, inclusive
+POST: efeitos podem se repetir, sem garantia de idempotência. Variáveis/caminhos
+permanecem; arquivos externos e multipart são relidos/reabertos, sem snapshot dos
+bytes se outro processo alterar o arquivo. Cada tentativa começa no método/URL
+originais, não no destino de um redirect.
+
+Respostas/fontes são fechadas antes de avaliar/esperar. A ordem continua status →
+assertions → publicação atômica de capturas, somente após aprovação. Proteções de
+segredos descobertos não são descartadas. Espera é cancelável, apenas entre
+tentativas elegíveis. Cada envio tem seu timeout HTTP; não há timeout global novo,
+backoff, retry global ou reexecução do arquivo.
+
+Há uma entrada lógica e um resultado/callback terminal. `[tentativas=N]` indica
+os envios iniciados; resumos separam `tentativas_iniciadas`, `respostas_completas`
+e `status_comparados` (comparações numéricas, aprovadas ou divergentes). Contadores
+legados permanecem lógicos, cada entrada contada no máximo uma vez, pelos fatos
+da última tentativa enviada; uma preparação falha não inventa envio. Divergências
+transitórias recuperadas não contam como falha final. Esgotamento mantém o último
+diagnóstico seguro e retorna `1`; cancelamento na espera retorna `2`.
+
 ## Execução HTTP
 
-- Cada requisição é iniciada em ordem. Não há paralelismo ou retry, inclusive retry
-  implícito do transporte. HTTP/1.1 sem conexão persistente evita o replay de
+- Cada requisição é iniciada em ordem. Não há paralelismo ou retry
+  implícito do transporte; polling explícito segue a seção anterior. HTTP/1.1 sem conexão persistente evita o replay de
   requisições em conexão reutilizada. HTTP/2 não é habilitado nesta história.
 - Timeout total **configurável em YAML, default de 10 segundos** por requisição,
   contado uma vez e compartilhado por conexão/TLS, redirects e consumo de todos
@@ -1127,7 +1170,8 @@ arquivo explícito é validado pelo conteúdo, independentemente da extensão.
   iniciais imutáveis e sessão nova; capturas não passam ao próximo. Não há cookie
   jar, nem cookies automáticos dentro/entre arquivos. Isolamento não desfaz efeitos
   na API. Payloads permanecem relativos ao respectivo cenário, não à configuração.
-- Primeira falha ou erro interrompe as próximas requisições do arquivo, sem retry.
+- Primeira falha definitiva ou erro interrompe as próximas requisições do arquivo;
+  divergências transitórias só são repetidas pelo polling explicitamente configurado.
   Sem `--fail-fast`, continua arquivos seguintes, inclusive após erro de parsing.
   Com a flag sem valor, não inicia os posteriores e os identifica como **não
   executados**, sem analisá-los só para contar requisições. Cancelamento do contexto
@@ -1193,13 +1237,22 @@ novo formato de saída: a evolução adiciona campos ao resumo por arquivo e uma
 linha agregada. Os contadores por arquivo em stdout continuam:
 
 - `total`: entradas validadas pelo parser;
-- `iniciadas`: chamadas ao executor — **não comprova recebimento pelo servidor**;
-- `concluídas`: respostas totalmente consumidas/fechadas, inclusive divergentes;
-- `validadas`: comparações de status aprovadas;
+- `iniciadas`: entradas com pelo menos uma chamada ao executor — **não comprova
+  recebimento pelo servidor**;
+- `concluídas`: entradas cuja última tentativa enviada teve resposta totalmente
+  consumida/fechada, inclusive divergentes;
+- `validadas`: entradas com comparação de status aprovada na última tentativa enviada;
 - `sem_validação`: respostas concluídas sem comparação numérica (sem expectativa ou `HTTP *`);
   a linha individual distingue esses dois casos. Não significa que headers/JSON não foram avaliados;
 - `não_iniciadas`: entradas não iniciadas por interrupção.
+- `tentativas_iniciadas`: total de chamadas reais ao executor;
+- `respostas_completas`: total de respostas completamente consumidas/fechadas;
+- `status_comparados`: comparações numéricas realizadas, aprovadas ou divergentes.
 
+As três métricas novas também são somadas no resumo da suíte. Redirects não são
+novas tentativas; preparação falha não soma envio. Os contadores anteriores
+continuam contando uma entrada no máximo uma vez, pelos fatos da última tentativa
+enviada; cancelamento no intervalo é erro final sem apagar esses fatos HTTP.
 O resumo por arquivo acrescenta `resultado` (`sucesso`, `falha de assertion`,
 `erro` ou `não executado`) e `duração` não negativa de carga/execução. `validadas`
 **não** comprova sucesso completo da requisição: uma assertion de header/JSON ou
@@ -1293,9 +1346,12 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
   no corpus, não uma promessa de equivalência de todos os headers implícitos.
 - Códigos de saída, resultados/resumo e mensagens pertencem ao contrato httpgo,
   não ao Hurl. Ex.: divergência é 1 aqui e 4 no Hurl 8.0.0 usado no corpus.
-- Redirects são automáticos mas limitados à mesma origem; o diferencial usa
-  `--location --max-redirs 10 --max-time 10 --retry 0` no Hurl para aproximar as
-  políticas compartilhadas. Essa aproximação não torna os motores equivalentes.
+- Redirects são automáticos mas limitados à mesma origem; o diferencial legado usa
+  `--location --max-redirs 10 --max-time 10 --retry 0` no Hurl. Pares `polling_*`
+  deixam a política na entrada, exceto `polling_cli_zero`, que comprova que a
+  opção local Hurl prevalece sobre `--retry 0`. Erro de decode/captura não repete
+  aqui, mas o Hurl 8.0.0 repetiu nos pares observados; veja `compatibility.md`.
+  A comparação aproxima as políticas compartilhadas. Essa aproximação não torna os motores equivalentes.
 - Variáveis CLI tipadas são extensão HTTPGo, sem recursão. Não presuma as mesmas
   regras na CLI Hurl: o corpus diferencia strings explicitamente delimitadas,
   estruturas e conversão textual. Interpolação escalar contextual em JSON possui

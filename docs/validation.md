@@ -1,4 +1,77 @@
-# Validação — US-01 a US-16, US-20 a US-25
+# Validação — US-01 a US-16, US-20 a US-26
+
+## US-26 — issue #50 / história 0026
+
+Plano da issue #50 executado sem planner, somente backend, na ordem da fila
+0026: `back:1` em `ed3eeab` (polling ponta a ponta, validação, resultado e métricas),
+`back:2` em `93b3376` (cancelamento, replay, sigilo, prazos e recursos), `back:3`
+nesta alteração (corpus, ajuda/documentação e validação integrada). Sem
+frontend/estáticos, alteração de dependências/toolchain, CI/lint ou transporte
+concreto de produção. Nenhuma fonte Hurl copiada/adaptada/consultada. Gates locais
+não substituem review; backdev não executou análise SonarQube.
+
+### Ambiente e execução real
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports`/`golangci-lint` existentes em
+`/home/ff/go/bin`. Hurl **8.0.0** selecionado pelo PATH em
+`/tmp/httpgo-0021-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, sem substituir
+Hurl padrão 8.0.1 nem instalar ferramentas. O aviso libcurl de metadados não
+impediu a identificação nem a execução dos pares.
+
+- Tasks 1/2: passaram os testes específicos de parser/runner/CLI/suite e
+  runner/CLI/suite/transport, respectivamente; em ambas passaram
+  `go test ./tests/e2e -count=1`, `make fmt lint test`, `go vet ./...` e `make build`
+  antes do commit. Testes usam espera privada controlada, contextos/canais,
+  fakes de executor/fontes/writers e HTTP local, sem sleeps de sincronização.
+- Task 3: `make compatibility` passou com **283 pares**, Hurl **8.0.0** obrigatório,
+  sem skip nem `-update` no gate. **10 novos pares `polling_*`** observados com
+  filtro restrito; **273 pares anteriores inalterados**, sem regeneração global.
+  Sequência é reiniciada entre executáveis. `polling_cli_zero` comprovou que
+  `retry` local prevalece sobre `--retry 0` no Hurl; `decode`/`capture` registraram
+  retry no Hurl contra encerramento 2 sem retry no HTTPGo. JSON/header/bytes,
+  ordem e métodos são observados; duração e stdout não são comparados.
+- Validação integrada passou: `make fmt lint test` (**0 issues**, race/cobertura),
+  `go vet ./...`, `go build ./...`, `make build`, `make compatibility` e `make e2e`.
+  Coberturas: assertion **94,2%**, CLI **97,5%**, config **96,0%**, parser **97,2%**,
+  query **95,8%**, runner **94,4%**, suite **95,5%**, template **95,7%**,
+  transport **90,4%**. Binário/E2E verifica stdout, stderr, exit code e HTTP real.
+- Seeds do parser ampliados para opções, limites, duplicações, negativos,
+  associação, multipart/JSON e LF/CRLF. Passaram os comandos:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**45.132 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**18.667 execuções**) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**24.056 execuções**), sem crash. Contagens são somente desta rodada.
+- `TestPollingHelpAndPublishedExample` executou ajuda root/test e o cenário
+  versionado com intervalo 500 ms e duas divergências antes de READY. Sem
+  asserção de duração/tolerância temporal; defaults/zero são verificados por
+  observação da espera injetada, não por sleeps.
+- Cross-builds e runtime macOS/Windows não executados: opcionais pelo plano v4,
+  não bloqueios. Corpus sintético não é homologação da suíte real.
+
+### Rastreabilidade GO-304–GO-323
+
+| GO | Evidência |
+|---|---|
+| 304–305 | `TestPollingClassification`, `TestPollingBudgetAndInterval`, `TestPollingByBinary`, pares `ready`/`exhausted`/`zero`/`omitted`: recuperação/esgotamento, inicial + retry, sem próxima entrada em falha |
+| 306 | `TestPollingClassification`: status, header, JSON, ausência/null elegíveis; decode/percurso são erros 2 |
+| 307 | `TestPollingPostCapturesAndLogicalSequence`, `TestPollingByBinary`, par `post`: body/header completos e mesmos valores de entrada |
+| 308–309 | `TestPollingCaptureAndPreparationErrors`, `TestPollingExternalFilesRereadAndPreparationMetrics`, fluxo POST/capturas: divergências não avaliam captura ausente, aprovação publica uma vez, erro 2 não repete |
+| 310–311 | `TestEntryOptions`, `TestInvalidEntryOptionsBeforeExecution`, `TestPollingBudgetAndInterval`, negativos CLI/binário e `invalid_late`: associação, LF/CRLF, defaults, zero, limites e arquivo inteiro |
+| 312 | tabelas de polling, `TestPollingCLIAndSuite`, `TestPollingSuiteMetricsAndFailFast`: resultado/callback único, contagens lógicas sem triplicação e tentativas reais; erro de preparo não soma envio |
+| 313 | `TestPollingDiscardedResponseProtection`, `TestPollingDiscardedSecretProtectsFollowingFile` mais regressões de proteção existentes: segredo descartado permanece protegido em resultado/callback/streams e outro arquivo |
+| 314 | fluxo POST/capturas e suíte: entrada anterior não repete, entrada posterior só começa após aprovação e callback terminal |
+| 315 | `TestPollingExternalFilesRereadAndPreparationMetrics`, `TestPollingReopensMultipartBeforeWaiting`, `TestPollingReopensPayloadByBinary`: conteúdo modificado observado, caminho relativo preservado, sem snapshot |
+| 316 | `TestPollingSuiteMetricsAndFailFast`, CLI/suíte e regressões da suíte: fail-fast só no desfecho, agregação real separada e prioridade 2 > 1 |
+| 317 | 10 pares `polling_*`, `make compatibility` com 283 pares e `TestPollingHelpAndPublishedExample`; limites/diferenças documentados |
+| 318 | `TestPollingCancellationAndTimer`: antes da inicial, durante espera e corrida timer/cancelamento, sem novo envio; timer cancelável e quantidade efetiva |
+| 319 | `TestPollingEachAttemptHasFreshDeadline`, `TestPollingIncompleteOrTimedOutResponseDoesNotRetry`, `TestPollingIncompleteBodyStopsByBinary`: prazo novo por tentativa, caller menor prevalece, leitura incompleta é 2 |
+| 320 | `TestPollingReopensMultipartBeforeWaiting`, E2E de releitura e regressões multipart existentes: fechamento antes da espera/reabertura, incrementalidade e falhas de leitura/fechamento/transporte |
+| 321 | `TestPollingReportFailureDoesNotStartNextEntry`, `TestPollingTerminalWriteFailure`: erro/short write em resultado/resumos termina 2 sem retry/reimpressão; próximas entradas bloqueadas |
+| 322 | segundo Run no mesmo runner/cenário, suíte e regressões de isolamento: orçamento/capturas não vazam, cenário não é modificado, sem respostas descartadas em resultados |
+| 323 | `TestPollingRedirectsStartAtOriginalRequest`: 302/307 reais, POST original em cada tentativa, GET/POST final conforme redirect; hops não contam como retries |
+
 
 ## US-24 — issue #46 / história 0024
 

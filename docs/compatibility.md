@@ -1,4 +1,50 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-25
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-26
+
+## Polling — US-26 / issue #50
+
+**Ampliação intencional do contrato:** `[Options]` local com `retry` e
+`retry-interval`. São **10 novos pares `polling_*`**, total **283 pares**,
+observados contra **Hurl 8.0.0** em Linux. Os **273 pares anteriores permanecem
+inalterados**, sem regeneração. Novos goldens foram observados/revisados somente
+com filtro `polling_*`; métodos, ordem, headers e bytes são comparados, não tempo,
+stdout ou códigos numéricos idênticos de falha. Nenhuma fonte Hurl foi utilizada.
+
+O harness ganhou `response_sequence`, consumida somente em `/poll`; após o fim,
+a última resposta se repete. O índice é reiniciado independentemente antes do
+segundo executável, assim como paths/requests. Fixtures estáticas antigas mantêm
+seu comportamento. Os novos pares usam intervalo zero, sem igualdade temporal.
+
+| Par `polling_*` | HTTPGo | Hurl 8.0.0 | Classificação observada |
+|---|---|---|---|
+| `ready` | 0; 3 × /poll → /health | igual | duas divergências JSON, terceira aprovação e continuação |
+| `exhausted` | 1; 4 × /poll | 4; mesmos paths | inicial + 3 retries, diagnóstico final, sem próxima entrada |
+| `status` | 0; 2 × /poll → /health | igual | 503 esperado como 200 diverge, depois aprova |
+| `post` | 0; 2 × POST /poll → GET /health | igual | mesmo JSON, Content-Type explícito e X-Probe reenviados; pode repetir efeitos |
+| `zero`, `omitted` | 1; 1 × /poll | 4; mesmo path | zero explícito e ausência de retry não repetem |
+| `cli_zero` | 0; 2 × /poll → /health | igual, mesmo com --retry 0 | **opção local retry prevalece sobre flag global Hurl** no par observado |
+| `decode` | 2; 1 × /poll | 0; 2 × /poll → /health | **diferença deliberada:** erro JSON não é condição elegível aqui; Hurl repetiu |
+| `capture` | 2; 1 × /poll | 0; 2 × /poll → /health | **diferença deliberada:** captura ausente encerra aqui; Hurl repetiu |
+| `invalid_late` | 2; zero envios | 2; zero envios | retry fracionário na entrada tardia rejeitado antes da rede |
+
+Nos pares antigos o comando conserva `--retry 0`. Nos novos, a opção global é
+omitida, exceto `cli_zero`, que usa `hurl_retry: 0` para registrar a precedência
+real: a flag **não** neutralizou a opção local no Hurl 8.0.0. HTTPGo não oferece
+retry global. A política HTTPGo é mais estreita: só divergência de status/assertion
+(1) pode repetir; transporte, avaliação, captura, preparação, cancelamento e
+escrita (2) encerram imediatamente. Não se deduz equivalência da política de
+outros erros Hurl não presentes no corpus.
+
+Default de intervalo (1000 ms), cancelamento, limites representáveis, duplicação,
+proteção de segredos descartados, releitura/reabertura de arquivos, fechamento,
+redirects, prazo HTTP por tentativa e métricas lógicas/reais são comprovados pelos
+testes HTTPGo, sem comparar duração com Hurl. Não há retry ilimitado, backoff,
+timeout global novo, idempotência de POST ou snapshot de arquivos. Capturas só
+publicam após status/assertions aprovados, diferentemente da ordem Hurl já
+documentada. Resumos novos são contrato próprio, não cópia da saída Hurl.
+
+Evidência: [validation.md](validation.md#us-26--issue-50--história-0026).
+Corpus sintético não representa homologação da suíte real nem migração sem
+adaptações. YAML hierárquico e renderização externa continuam extensões HTTPGo.
 
 ## Regex de headers — US-24 / issue #46
 
@@ -493,7 +539,9 @@ parametrizado não é editado. Os novos pares incluem `uri` (RequestURI recebido
 para provar que encoding explícito não foi duplicado.
 
 Os comandos Hurl usam `--no-color --no-output --location --max-redirs 10
---max-time 10 --retry 0 --no-cookie-store --no-proxy '*'`. Não se compara texto
+--max-time 10 --retry 0 --no-cookie-store --no-proxy '*'` nos pares legados;
+`polling_*` usa a opção local, com a exceção explícita `cli_zero` acima.
+Não se compara texto
 bruto de saída nem assume igualdade de códigos: a comparação observa aceitação,
 falha, ordem, contatos efetivos e, nos pares US-02, dados efetivamente enviados,
 conforme cada par esperado. Os testes próprios

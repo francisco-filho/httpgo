@@ -126,12 +126,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		} else {
 			line += fmt.Sprintf(" (sem validação de status, recebido %d)", entry.Status)
 		}
-	case runner.Failed, runner.RenderFailed, runner.FileFailed:
+	case runner.Failed, runner.RenderFailed, runner.FileFailed, runner.Cancelled:
 		// Headers alone are not a completed response: never invent a status.
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
+	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
@@ -150,6 +150,7 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		}
 		line = fmt.Sprintf("%q:%d:%d: %s", pos.File, pos.Line, pos.Column, line)
 	}
+	line += fmt.Sprintf(" [tentativas=%d]", entry.Attempts)
 	if _, err := io.WriteString(c.out, line+"\n"); err != nil {
 		return fmt.Errorf("escrever resultado da requisição: %w", err)
 	}
@@ -162,7 +163,7 @@ func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadEr
 	if !file.Known {
 		total, notStarted = "desconhecido", "desconhecido"
 	}
-	if _, err := fmt.Fprintf(c.out, "resumo %q: total=%s iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%s resultado=%s duração=%s\n", file.Name, total, s.Started, s.Completed, s.Validated, s.WithoutValidation, notStarted, file.State, file.Duration); err != nil {
+	if _, err := fmt.Fprintf(c.out, "resumo %q: total=%s iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%s resultado=%s duração=%s tentativas_iniciadas=%d respostas_completas=%d status_comparados=%d\n", file.Name, total, s.Started, s.Completed, s.Validated, s.WithoutValidation, notStarted, file.State, file.Duration, file.Attempts.Started, file.Attempts.Completed, file.Attempts.StatusChecks); err != nil {
 		return err
 	}
 	if loadErr != nil {
@@ -173,7 +174,7 @@ func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadEr
 }
 
 func (c *Command) renderSuite(s suite.Summary) error {
-	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration)
+	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s tentativas_iniciadas=%d respostas_completas=%d status_comparados=%d\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration, s.Attempts.Started, s.Attempts.Completed, s.Attempts.StatusChecks)
 	return err
 }
 
@@ -333,6 +334,29 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
   HTTP 201
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
+
+Polling por entrada: salve processing.hurl e execute httpgo test processing.hurl
+  GET http://localhost:8080/jobs/123
+  [Options]
+  retry: 3
+  retry-interval: 500
+  HTTP 200
+  [Asserts]
+  jsonpath "$.status" == "READY"
+retry: novas tentativas após a inicial (default 0); retry-interval: milissegundos
+inteiros não negativos (default 1000; zero sem espera deliberada). Sem ilimitado,
+opções duplicadas ou outras opções: erro estático 2 antes de todo HTTP do arquivo.
+Somente divergência de status/assertion (1) permite repetir; erros de avaliação,
+transporte, captura, renderização, cancelamento ou escrita (2) não são retentados.
+Repete a requisição completa, inclusive POST: pode repetir efeitos, sem idempotência.
+Variáveis/caminhos iguais; arquivos externos/multipart relidos/reabertos a cada
+tentativa, sem snapshot se o arquivo mudar. Capturas publicadas só após aprovação;
+segredos descobertos continuam protegidos. Intervalo cancelável entre tentativas;
+timeout HTTP por tentativa, sem timeout global, backoff ou retry global.
+Um resultado terminal por entrada mostra tentativas=N; contadores legados são
+lógicos, métricas tentativas_iniciadas/respostas_completas/status_comparados são reais.
+Esgotamento retorna 1 e impede a próxima entrada; cancelamento retorna 2.
+
 Headers e um body são opcionais: JSON inline, file,<caminho>; ou multipart (exclusivos).
 JSON inline estático preserva seus bytes. Sem --render-files, arquivo externo
 preserva todos os bytes, inclusive vazio, binário e {{placeholder}} literal,
@@ -398,7 +422,7 @@ Não segue links simbólicos: ignora descobertos e rejeita explícitos, inclusiv
 Descoberta completa antes de HTTP; entrada inválida/inacessível, falha de acesso ou
 cada diretório explícito sem .hurl elegível retorna 2 e impede todos os envios.
 Configuração global única; parsing integral de cada arquivo antes de iniciá-lo.
-Arquivos e requisições sequenciais; primeira falha para as requisições do arquivo.
+Arquivos e requisições sequenciais; primeira falha definitiva para as entradas do arquivo.
 Sem --fail-fast continua os outros, inclusive após erro de parsing/transporte;
 com --fail-fast marca os restantes não executados, sem analisá-los para contagem.
 Capturas e cookies não passam entre arquivos; variáveis/opções iniciais permanecem.
@@ -411,7 +435,7 @@ Cancelamento ou falha de escrita encerra toda a suíte, sem próximos envios ou 
 Proteção de segredos conhecidos/derivados dura toda a invocação, não só o arquivo.
 Sem HTTP, qualquer status é aceito e informado como sem validação. HTTP * aceita qualquer status,
 inclusive 404/503, sem comparação numérica; aparece como status aceito por HTTP *
-e conta em sem_validação, não em validadas. A primeira falha interrompe.
+e conta em sem_validação, não em validadas. A primeira falha definitiva interrompe.
 Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo ao final.
 Timeout total: default de 10 segundos por requisição, configurável em YAML.
 Até 10 redirects na mesma origem.

@@ -1,0 +1,55 @@
+{
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "invalid-json"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"status\":\"READY\"}"
+    }
+  ],
+  "classification": "diferença deliberada: erro de avaliação JSON é categoria 2 sem retry no HTTPGo",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/poll"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}
