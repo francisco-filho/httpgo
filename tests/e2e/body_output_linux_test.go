@@ -18,6 +18,11 @@ func TestBodyRealOutputFailure(t *testing.T) {
 	testAssertionRealOutputFailure(t, `body contains "expected"`, []string{"expected", "different", "\xff"})
 }
 
+// GO-429: success, equality failure and invalid JSON all keep writer priority.
+func TestJSONInequalityRealOutputFailure(t *testing.T) {
+	testAssertionRealOutputFailure(t, `jsonpath "$" != "old"`, []string{`"new"`, `"old"`, `invalid`})
+}
+
 func TestMembershipRealOutputFailure(t *testing.T) {
 	testAssertionRealOutputFailure(t, `jsonpath "$" not contains "forbidden"`, []string{`[]`, `["forbidden"]`, `invalid`})
 }
