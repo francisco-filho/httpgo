@@ -76,7 +76,7 @@ func TestInvalidJSONAssertions(t *testing.T) {
 		{`jsonpath "$" == "\x41"`, "sintaxe inválida"},
 		{`jsonpath "$." == 1`, "sintaxe inválida"},
 		{`jsonpath "$.{{name}}" == 1`, "construção não suportada"},
-		{`jsonpath "$[*]" == []`, "construção não suportada"},
+		{`jsonpath "$[0:1]" == []`, "construção não suportada"},
 		{`jsonpath "$[-1]" == 0`, "construção não suportada"},
 		{`jsonpath "$..name" == 0`, "construção não suportada"},
 		{`jsonpath "$" exists true`, "sintaxe inválida"},

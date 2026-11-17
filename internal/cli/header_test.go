@@ -100,7 +100,7 @@ func TestHeaderWriteFailuresTakePriority(t *testing.T) {
 }
 
 func TestHeaderInvalidLateNeverSends(t *testing.T) {
-	for _, suffix := range []string{"[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private", "HTTP *\n[Asserts]\njsonpath \"$[*]\" == \"private\""} {
+	for _, suffix := range []string{"[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private", "HTTP *\n[Asserts]\njsonpath \"$.*\" == \"private\""} {
 		fake := &fakeExecutor{}
 		code, out, stderr := execute(t, context.Background(), fake, "test", writeScenario(t, "GET http://example.test/first\nHTTP 200\nGET http://example.test/late\n"+suffix))
 		if code != 2 || !prevalidationSummary(out) || len(fake.calls) != 0 || strings.Contains(stderr, "private") || !strings.Contains(stderr, ":4:") && !strings.Contains(stderr, ":6:") {

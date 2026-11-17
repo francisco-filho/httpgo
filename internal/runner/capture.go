@@ -29,7 +29,7 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 			var err error
 			value, found, err = declaration.Path.Select(response.Body)
 			if err != nil {
-				return &CaptureError{Position: declaration.QueryPosition, Detail: "resposta não contém JSON válido"}
+				return &CaptureError{Position: declaration.QueryPosition, Detail: err.Error()}
 			}
 		case parser.HeaderCapture:
 			value, found = query.Header(response.Headers, declaration.Header)

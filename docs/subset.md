@@ -731,11 +731,37 @@ encerra a seção; `[Asserts]` também pode sucedê-la na mesma entrada. Outras 
 e filtros de captura não são aceitos nem ignorados.
 Nomes seguem a mesma regra ASCII pontuada das variáveis.
 
-O subconjunto de JSONPath aceita `$`, propriedades por ponto e índices decimais
-não negativos, combináveis: `$.accessToken`, `$.product.id`, `$.items[0].token` e
-`$[0]`. Propriedades simples usam letras ASCII, dígitos e `_`; nomes com outros
-caracteres exigiriam uma sintaxe ainda não suportada. Não há wildcard, filtros,
-descida recursiva, slices, união, propriedades entre colchetes ou índices negativos.
+O subconjunto de JSONPath aceita `$`, propriedades por ponto, índices decimais
+não negativos e wildcard de array `[*]`, combináveis: `$.items[0].token` e
+`$.categories[*].products[*].id`. Propriedades simples usam letras ASCII, dígitos
+e `_`; nomes com outros caracteres exigiriam sintaxe ainda não suportada.
+Não há wildcard de objeto (`.*`), filtros, descida recursiva, slices, união,
+propriedades entre colchetes ou índices negativos.
+
+**Ampliação intencional US-27**, compartilhada por assertions e capturas:
+`[*]` expande somente arrays em ordem de percurso. Ao terminar a consulta,
+zero resultados significa ausência; um devolve o próprio valor; vários devolvem
+um array ordenado (inclusive repetições). Atributos ausentes e índices fora do
+array eliminam somente aquele ramo; `null` selecionado permanece presente.
+Selecionar um único array preserva esse array, inclusive vazio; selecionar vários
+arrays não os achata. `count` conta o array reduzido, não correspondências internas:
+um número único ou ausência falha com 1, dois números contam 2.
+Propriedade em não objeto, índice/wildcard em não array gera erro 2 na seleção
+expansiva inteira, mesmo ao lado de ramos válidos. Captura sem resultado falha
+com 2; publicação tipada continua atômica. Diagnóstico expansivo resume presença,
+tipo e contagem, sem despejar seleção ou esperado composto; resumos protegidos
+ficam ocultos. Caminhos simples conservam seus contratos e diagnósticos.
+
+```hurl
+GET {{base_url}}/validation
+HTTP 200
+[Asserts]
+jsonpath "$.issues[*].code" contains "REQUIRED"
+jsonpath "$.issues[*].code" not contains "OTHER_TENANT"
+```
+
+Para `{"issues":[{"code":"REQUIRED"},{"code":"INVALID"}]}`, a demonstração
+passa independentemente da ordem. Sem REQUIRED ou com OTHER_TENANT, falha com 1.
 Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
 **todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
 
