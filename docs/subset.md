@@ -3,6 +3,41 @@
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
 
+## Seleção estática por igualdade — US-28 (issue #56)
+
+Assertions e capturas aceitam `[?(@.caminho == literal)]`, combinável com
+propriedades por ponto, índices não negativos e wildcards de arrays. Exemplo:
+
+```hurl
+GET {{base_url}}/products
+HTTP 200
+[Asserts]
+jsonpath "$[?(@.slug=='pizza')].active" == true
+[Captures]
+pizza_id: jsonpath "$[?(@.slug=='pizza')].id"
+
+GET {{base_url}}/products/{{pizza_id}}
+HTTP 200
+```
+
+O atributo pertence ao próprio item, sem combinar entidades. Literal escalar é
+string entre aspas simples/duplas, número JSON exato, booleano ou `null`.
+Escapes da string interna são separados dos escapes da string `.hurl` externa.
+Não há coerção; atributo ausente não corresponde nem a `null`. Propriedade em
+não objeto, índice em não array e filtro em não array geram erro `2`, inclusive
+em ramos mistos. Zero seleções é ausência, uma é o próprio valor, várias são
+array ordenado, sem achatamento. Predicados recebem somente esse valor reduzido.
+Captura ausente retorna `2`; `null` é válido. Coleções só podem ser reutilizadas
+como valor JSON completo, nunca como texto em URL/header.
+
+Consultas são estáticas: `{{texto}}` dentro de literal é dado, não template.
+Operandos dinâmicos, operadores além de `==`, existência, funções, scripts,
+regex e operadores lógicos em filtros continuam rejeitados antes de qualquer
+HTTP do arquivo. Status → assertions → capturas permanece inalterado. Falhas
+não imprimem coleções; literais dos filtros são sempre ocultados na consulta
+apresentada, inclusive escapes de segredos, e o plano não entra nos relatórios.
+Exemplo versionado: `testdata/scenarios/scenario_filter.hurl`.
+
 ## Gramática
 
 Um arquivo UTF-8 contém ao menos uma request-line

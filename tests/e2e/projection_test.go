@@ -52,7 +52,7 @@ func TestProjectionInvalidLateNeverSends(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
 	defer server.Close()
-	for _, path := range []string{"$[*", "$[**]", "$.*", "$..x", "$[0:1]", "$[0,1]", "$[?(@.x)]", "$[?(@.x == 1)]", "$.length()", "$.{{field}}", "$[{{index}}]"} {
+	for _, path := range []string{"$[*", "$[**]", "$.*", "$..x", "$[0:1]", "$[0,1]", "$[?(@.x)]", "$[?(@.x != 1)]", "$.length()", "$.{{field}}", "$[{{index}}]"} {
 		for _, nl := range []string{"\n", "\r\n"} {
 			for _, declaration := range []string{"[Asserts]\njsonpath \"" + path + "\" exists", "[Captures]\nx: jsonpath \"" + path + "\""} {
 				code, out, stderr := run(t, "test", scenario(t, strings.ReplaceAll("GET "+server.URL+"/first\nGET "+server.URL+"/late\nHTTP *\n"+declaration, "\n", nl)))

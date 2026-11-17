@@ -25,13 +25,14 @@ type step struct {
 	index    int
 	array    bool
 	wildcard bool
+	filter   *equalityFilter
 }
 type Path struct {
 	steps      []step
 	projection jp.Expr // Compiled only for expansive paths; never report metadata.
 }
 
-// Expansive reports whether the path projects array elements.
+// Expansive reports whether the path projects or filters array elements.
 func (p Path) Expansive() bool { return len(p.projection) != 0 }
 
 func Parse(source string) (Path, error) {
@@ -59,6 +60,15 @@ func Parse(source string) (Path, error) {
 			}
 			p.steps = append(p.steps, step{property: source[start:i]})
 		case '[':
+			if i+1 < len(source) && source[i+1] == '?' {
+				filter, end, err := parseEqualityFilter(source, i)
+				if err != nil {
+					return Path{}, err
+				}
+				p.steps = append(p.steps, step{array: true, filter: filter})
+				i = end
+				continue
+			}
 			i++
 			if i < len(source) && source[i] == '*' {
 				i++
@@ -93,7 +103,7 @@ func Parse(source string) (Path, error) {
 		}
 	}
 	for _, s := range p.steps {
-		if s.wildcard {
+		if s.wildcard || s.filter != nil {
 			p.compileProjection()
 			break
 		}
@@ -106,6 +116,9 @@ func (p *Path) compileProjection() {
 	p.projection = make(jp.Expr, 0, len(p.steps))
 	for _, s := range p.steps {
 		switch {
+		case s.filter != nil:
+			// Keep indices aligned; the equality operand never enters jp.
+			p.projection = append(p.projection, nil)
 		case s.wildcard:
 			p.projection = append(p.projection, jp.Wildcard('*'))
 		case s.array:
@@ -199,7 +212,15 @@ func (p Path) selectProjection(value any) (any, bool, error) {
 		}
 		var next []any
 		for _, node := range nodes {
-			next = append(next, p.projection[i:i+1].Get(node)...)
+			if s.filter != nil {
+				selected, err := s.filter.selectItems(node.([]any))
+				if err != nil {
+					return nil, false, err
+				}
+				next = append(next, selected...)
+			} else {
+				next = append(next, p.projection[i:i+1].Get(node)...)
+			}
 		}
 		nodes = next
 	}
