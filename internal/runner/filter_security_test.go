@@ -51,8 +51,8 @@ func TestFilterPlansAndLiteralsNeverReachReports(t *testing.T) {
 					if strings.Contains(text, "private-") || strings.Contains(text, "u006c") || strings.Contains(text, "[3,4]") || strings.Contains(text, "[1,2]") {
 						t.Fatalf("unsafe presentation: %s", text)
 					}
-					if pending && e.JSONFailure != nil && (e.JSONFailure.Actual != "[oculto]" || e.JSONFailure.Expected != "[oculto]") {
-						t.Fatal("pending capture did not conceal summary")
+					if e.JSONFailure != nil && (e.JSONFailure.Actual != "[oculto]" || e.JSONFailure.Expected != "[oculto]") {
+						t.Fatal("protected literal or pending capture did not conceal summary")
 					}
 					return nil
 				}

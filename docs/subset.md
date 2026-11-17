@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-23 (issues #4, #6, #11, #13, #14, #16, #18, #20, #22, #24, #25, #27, #29, #32, #34, #36, #38, #40, #42 e #44)
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-28
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo.
@@ -11,10 +11,10 @@ propriedades por ponto, índices não negativos e wildcards de arrays. Exemplo:
 ```hurl
 GET {{base_url}}/products
 HTTP 200
-[Asserts]
-jsonpath "$[?(@.slug=='pizza')].active" == true
 [Captures]
 pizza_id: jsonpath "$[?(@.slug=='pizza')].id"
+[Asserts]
+jsonpath "$[?(@.slug=='pizza')].active" == true
 
 GET {{base_url}}/products/{{pizza_id}}
 HTTP 200
@@ -23,6 +23,21 @@ HTTP 200
 O atributo pertence ao próprio item, sem combinar entidades. Literal escalar é
 string entre aspas simples/duplas, número JSON exato, booleano ou `null`.
 Escapes da string interna são separados dos escapes da string `.hurl` externa.
+Exemplos de consultas na sintaxe `.hurl`:
+
+```hurl
+GET {{base_url}}/products
+HTTP 200
+[Asserts]
+jsonpath "$[?(@.name=='it\\'s pizza')].id" exists
+jsonpath "$[?(@.name==\"a\\\"b\")].id" exists
+jsonpath "$[?(@.name=='\\uD83C\\uDF55')].id" exists
+```
+
+Dentro do literal: escapes JSON `\\`, `\/`, `\"`, `\b`, `\f`, `\n`, `\r`,
+`\t`, `\uXXXX` (inclusive pares surrogate); `\'` é aceito em aspas simples.
+A barra precisa ser duplicada novamente na string `.hurl` externa. Valores são
+comparados após decode, sem avaliar delimitadores como novos passos.
 Não há coerção; atributo ausente não corresponde nem a `null`. Propriedade em
 não objeto, índice em não array e filtro em não array geram erro `2`, inclusive
 em ramos mistos. Zero seleções é ausência, uma é o próprio valor, várias são
@@ -101,7 +116,7 @@ caixa do nome e usa somente a primeira ocorrência, sem concatenar ou dividir
 por vírgula. Valor presente vazio contém `""`, portanto sua negação falha.
 Consultas e esperados são estáticos: placeholders dentro de strings permanecem
 literais. Não há `header not exists`, negação genérica, operadores lógicos,
-`count contains` ou filtros. Projeção `[*]` de arrays é o recorte US-27 abaixo. Erro estático tardio impede todos
+`count contains` ou filtros além da igualdade estática US-28. Projeção `[*]` de arrays é o recorte US-27 abaixo. Erro estático tardio impede todos
 os envios. Status e assertions mantêm a ordem existente, antes das capturas;
 a primeira falha interrompe o arquivo. Diagnósticos localizados mostram somente
 presença/tipo e esperado escalar protegido, nunca a coleção selecionada.
@@ -770,7 +785,7 @@ O subconjunto de JSONPath aceita `$`, propriedades por ponto, índices decimais
 não negativos e wildcard de array `[*]`, combináveis: `$.items[0].token` e
 `$.categories[*].products[*].id`. Propriedades simples usam letras ASCII, dígitos
 e `_`; nomes com outros caracteres exigiriam sintaxe ainda não suportada.
-Não há wildcard de objeto (`.*`), filtros, descida recursiva, slices, união,
+Filtros estáticos por igualdade são o recorte US-28 acima. Não há wildcard de objeto (`.*`), outros filtros, descida recursiva, slices, união,
 propriedades entre colchetes ou índices negativos.
 
 **Ampliação intencional US-27**, compartilhada por assertions e capturas:
@@ -822,7 +837,7 @@ Com os IDs distintos termina em 0; substituir o segundo pelo primeiro falha em 1
 sem publicação nem POST. Use
 `httpgo test testdata/scenarios/scenario_projection_precision.hurl --var base_url=http://localhost:8080`
 contra `/products` e `/echo` do contrato sintético do exemplo. Isso não declara
-suporte a filtros/funções nem RFC integral; cardinalidade, ausência/null, erros
+suporte a filtros por consequência da biblioteca (igualdade estática é a US-28), funções nem RFC integral; cardinalidade, ausência/null, erros
 estritos, atomicidade e sigilo acima continuam inalterados. Ver
 [compatibilidade](compatibility.md#preservação-de-jsonpath--us-27b--issue-54).
 
@@ -1041,7 +1056,8 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
 
 - Consulta estática usa exatamente o subconjunto de capturas: `$`, propriedades
   por ponto, índices não negativos e `[*]` de arrays combináveis (US-27 acima).
-  Sem interpolação de consulta, wildcard de objeto, filtros ou descida recursiva.
+  Inclui filtros estáticos por igualdade US-28; sem interpolação de consulta,
+  wildcard de objeto, outros filtros ou descida recursiva.
 - Esperado é **um único literal JSON completo na mesma linha**: string, número,
   booleano, null, array ou objeto, inclusive vazios. Escapes/Unicode seguem JSON.
   Nunca passa pelo renderer: `"{{nome}}"` e placeholders aninhados em strings
@@ -1135,7 +1151,7 @@ Ausência, tipo selecionado não numérico e condição falsa falham com 1. Espe
 não numérico é sintaxe inválida (2) antes da rede; JSON inválido e percurso
 incompatível continuam erros de avaliação (2).
 
-Continuam fora do recorte: count em strings/objetos/capturas, filtros e interpolação de consultas ou esperados. `matches` aceita strings selecionadas de JSON e a primeira ocorrência de header, nos recortes documentados acima. A gramática de literais
+Continuam fora do recorte: count em strings/objetos/capturas, filtros além da igualdade estática US-28 e interpolação de consultas ou esperados. `matches` aceita strings selecionadas de JSON e a primeira ocorrência de header, nos recortes documentados acima. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. Os novos pares com Hurl 8.0.0 confirmam que null, vazios,
 false e zero presentes satisfazem `exists`. Count negativo/fracionário é rejeitado

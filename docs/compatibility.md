@@ -1,4 +1,70 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-27b
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-28
+
+## Filtros estáticos por igualdade — US-28 / issue #56
+
+**Ampliação intencional de contrato:** `[?(@.caminho == literal escalar)]` em
+assertions e capturas, combinável com navegação/wildcards. São **31 novos pares
+`filter_*`**, total **324 pares**, confrontados com **Hurl 8.0.0** em Linux.
+Os **293 pares anteriores permanecem inalterados**. Observações novas foram
+revistas e geradas somente com filtro `TestCompatibility/filter_`, seguido de
+verificação sem `-update`; não houve regeneração global ou adaptação do avaliador
+para reproduzir perda de precisão/seleção permissiva do Hurl. Fixtures usam
+`response_json`, árvores independentes e o harness existente, sem novo serviço,
+normalização dos dados ou código-fonte Hurl.
+
+| Par `filter_*` | HTTPGo | Hurl 8.0.0 | Evidência/classificação |
+|---|---|---|---|
+| `entity`, `entity_reordered` | 0; /capture → /health/p1 | igual | captura ID da pizza e consulta entidade correta, independentemente da posição |
+| `entity_inactive` | 1; /capture | 4; /capture | outro item ativo não aprova a pizza inativa; sem captura/envio seguinte |
+| `typed`, `missing_null` | 0; /capture → /health | igual | string/número/booleano/null sem coerção; ausente não corresponde a null |
+| `escape_single`, `escape_double`, `escape_unicode`, `escape_delimiters` | 0; /capture → /health | igual | apóstrofo, aspas, barras, Unicode com surrogate pair e delimitadores internos são dados |
+| `nested` | 0; /capture → /health | igual | caminho relativo por propriedade/índice, wildcard e dois filtros mantêm associação; count/contains sobre valor plural |
+| `cardinality`, `numeric_equivalent` | 0; /capture → /health | igual | ausência, valor único, null, arrays selecionados e equivalência 1e0/1.00 no recorte observado |
+| `scalar_count` | 1; /capture | 4; /capture | número único não vira array para count |
+| `precision_integer` | 0; /capture → /health | 4; /capture | **diferença:** filtro distingue 9007199254740992/9007199254740993 aqui; Hurl selecionou ambos e divergiu |
+| `precision_decimal` | 0; /capture → /health | 4; /capture | **diferença:** decimais próximos distintos aqui; Hurl selecionou ambos e divergiu |
+| `precision_large` | 0; /capture → /health | igual | literal 18446744073709551617 (além de uint64) seleciona item único; não prova precisão Hurl em geral |
+| `exponent_extreme` | 0; /capture → /health | **-1; /capture** | **diferença observada em Linux:** expoente -99999999999999999999999 é exato aqui; binário Hurl abortou por overflow ao analisar expoente (sinal, ProcessState.ExitCode=-1), não um exit code público HTTPGo |
+| `missing_capture` | 2; /capture | 3; /capture | zero resultados impede captura/avanço |
+| `null_capture` | 0; POST /health com null | igual, mas Content-Type application/json | null único é válido; HTTPGo não infere esse header no POST, como já documentado |
+| `plural_capture` | 0; POST /health com [9223372036854775809,9007199254740993] | 3; /capture | **diferença de reuso:** JSON completo tipado aqui; Hurl não renderiza composto |
+| `plural_text` | 2; /capture | 3; /capture | coleção não vira texto nem escolhe primeiro ID; nenhum segundo envio |
+| `strict_property`, `strict_index`, `strict_array` | 2; /capture | 0; /capture → /health | **diferença deliberada:** propriedade em null, índice em objeto ou filtro em não array junto de ramos válidos invalida seleção inteira aqui; Hurl descarta ramo e aprova exists |
+| `literal_placeholder`, `literal_defined` | 0; /capture → /health | 4; /capture | **diferença deliberada:** texto {{static}} dentro do literal é estático aqui; Hurl interpola (ausente ou definido como replaced) |
+| `unsupported_ordering`, `unsupported_existence` | 2; zero envios | 0; /health → /capture → /health | recursos fora do recorte rejeitados estaticamente, não habilitados pela biblioteca |
+| `unsupported_logical`, `unsupported_dynamic`, `unsupported_invalid` | 2; zero envios | 4; /health → /capture | lógica/operando dinâmico fora do recorte ou literal malformado; validação integral antecipada aqui |
+
+A implementação **não usa filtros nativos de OjG**. `jp` navega passos já
+validados; igualdade própria compara `json.Number` com primitivas compartilhadas
+por assertion, sem float64, coerção ou expansão proporcional ao expoente.
+O fato de um literal grande passar no Hurl não autoriza afirmar igualdade exata
+para outros valores; as duas diferenças numéricas acima são intencionais e
+comprovadas. O abort do binário de referência é observado/reproduzido, não
+simulado ou corrigido copiando sua implementação.
+
+Zero/um/vários resultados seguem a US-27, sem flatten nem escolha arbitrária.
+Predicados não são implicitamente aplicados por elemento. Seleção única de null
+é presente; ausência não satisfaz igualdade com null. Caminhos simples e
+projeções sem filtro conservam seus pares anteriores. Capturas compostas usam
+o reuso tipado próprio da US-06, não equivalência geral com Hurl. Falhas não
+publicam o lote nem permitem envios dependentes; status → assertions → capturas
+permanece diferente da ordem do Hurl já documentada.
+
+Os negativos históricos `unsupported_capture_filter.hurl` (existência) e demais
+operadores continuam negativos. O cenário `unsupported_projection_filter.hurl`
+e as listas de negativos de parser/E2E passaram intencionalmente de igualdade
+para `!=`, ainda fora do recorte; **nenhum par antigo de compatibility mudou**.
+Não se anuncia JSONPath completo, filtros de existência, lógica, regex, funções,
+scripts, operadores além de igualdade, operandos/propriedades/operadores dinâmicos
+ou conformidade RFC integral. Literais de filtro são sempre ocultados em
+consulta apresentada; proteção de metadados/operandos e remoção do plano são
+comprovadas em testes estruturados e streams, sem exigir diagnósticos idênticos.
+
+[Exemplo](../testdata/scenarios/scenario_filter.hurl),
+[subconjunto](subset.md#seleção-estática-por-igualdade--us-28-issue-56) e
+[validação executada](validation.md#us-28--issue-56--história-0028).
+Corpus sintético não homologa suíte real nem transforma a marca backend em
+aceite final; revisão continua sendo gate separado.
 
 ## Preservação de JSONPath — US-27b / issue #54
 
@@ -21,7 +87,7 @@ comprova o contrato HTTPGo, não igualdade numérica ou filtros de Hurl/OjG em g
 Apenas `query.Decode` usa `UseNumber`; `jp` não decodifica nem compara números.
 O [exemplo de precisão](../testdata/scenarios/scenario_projection_precision.hurl)
 é executado por binário real e HTTP local, incluindo resposta alterada com falha 1.
-Funções, filtros, interpolação estrutural e demais recursos fora do recorte
+Funções, filtros além da igualdade estática US-28, interpolação estrutural e demais recursos fora do recorte
 continuam erros estáticos 2, inclusive em entrada tardia e antes de todo HTTP.
 Evidências executadas em [validation.md](validation.md#us-27b--issue-54--história-0027b).
 Corpus sintético não homologa suíte real nem anuncia conformidade RFC integral.
@@ -101,7 +167,7 @@ preservados para rastrear a mudança, não descrevem o suporte atual de `[*]`.
 a negação não pode aprovar um percurso inválido. Ausência de atributo/índice fora
 do array, em contraste, elimina apenas o ramo. A redução final distingue número,
 null, ausência e array selecionado. Não se anuncia JSONPath completo, wildcard de
-objetos, filtros, slices, unions ou descida recursiva. Caminhos simples preservam
+objetos, filtros além da igualdade estática US-28, slices, unions ou descida recursiva. Caminhos simples preservam
 seu contrato (incluindo o adapter legado de captura), não foram normalizados para
 imitar o Hurl. Capturas compostas continuam a extensão de reuso tipado da US-06.
 

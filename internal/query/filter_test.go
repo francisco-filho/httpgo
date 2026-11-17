@@ -58,9 +58,9 @@ func TestFilterValidation(t *testing.T) {
 		{`$[?(@.x)]`, true}, {`$[?(@.x != 1)]`, true}, {`$[?(@.x > 1)]`, true},
 		{`$[?(@.x == 1 && @.y == 2)]`, true}, {`$[?(@.x == 1 || @.y == 2)]`, true},
 		{`$[?(@.x =~ 'a')]`, true}, {`$[?(@.x == [])]`, true}, {`$[?(@.x == {})]`, true},
-		{`$[?(@ == 1)]`, true}, {`$[?(@['x'] == 1)]`, true}, {`$[?(@.x[*] == 1)]`, false},
-		{`$[?(@.x[-1] == 1)]`, false}, {`$[?(@.x() == 1)]`, true},
-		{`$[?(@.x == {{value}})]`, false}, {`$[?(@.{{field}} == 1)]`, false},
+		{`$[?(@ == 1)]`, true}, {`$[?(@['x'] == 1)]`, true}, {`$[?(@.x[*] == 1)]`, true},
+		{`$[?(@.x[-1] == 1)]`, true}, {`$[?(@.x() == 1)]`, true},
+		{`$[?(@.x == {{value}})]`, true}, {`$[?(@.{{field}} == 1)]`, true},
 		{`$[?(@.x == 'unterminated)]`, false}, {`$[?(@.x == '\q')]`, false},
 		{`$[?(@.x == 1)`, false}, {`$[?(@.x == )]`, false}, {`$[?(@.x == 01)]`, false},
 	} {
@@ -71,6 +71,31 @@ func TestFilterValidation(t *testing.T) {
 				t.Fatalf("%s: %#v", tc.source, err)
 			}
 		})
+	}
+}
+
+// GO-355: redact every operand, inspect decoded values and preserve simple paths.
+func TestFilterLiteralPresentation(t *testing.T) {
+	source := `$[?(@.x=='private')].items[?(@.id==9223372036854775809)].v`
+	p, err := Parse(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := p.RedactLiterals(source); got != `$[?(@.x==[literal oculto])].items[?(@.id==[literal oculto])].v` {
+		t.Fatalf("display=%s", got)
+	}
+	if got := p.RedactLiterals(""); got != "[consulta com filtro]" {
+		t.Fatalf("mismatched source display=%s", got)
+	}
+	if !p.HasProtectedLiteral(func(value any) bool { return value == json.Number("9223372036854775809") }) {
+		t.Fatal("second decoded operand not inspected")
+	}
+	if p.HasProtectedLiteral(func(any) bool { return false }) {
+		t.Fatal("unprotected literal classified protected")
+	}
+	simple, _ := Parse("$.x")
+	if got := simple.RedactLiterals("$.x"); got != "$.x" {
+		t.Fatalf("simple display=%s", got)
 	}
 }
 

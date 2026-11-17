@@ -46,9 +46,13 @@ func parseEqualityFilter(source string, start int) (*equalityFilter, int, error)
 	if attrStart == i || source[attrStart] != '.' {
 		return nil, i, filterError(i, true)
 	}
+	if i < len(source) && strings.ContainsRune("*-'\"{:,", rune(source[i])) {
+		return nil, i, filterError(i, true)
+	}
 	attribute, err := Parse("$" + source[attrStart:i])
 	if err != nil {
-		return nil, i, filterError(i, false)
+		located, ok := err.(*Error)
+		return nil, i, filterError(i, ok && located.Unsupported)
 	}
 	i = skipFilterSpace(source, i)
 	if i == len(source) {
@@ -60,6 +64,9 @@ func parseEqualityFilter(source string, start int) (*equalityFilter, int, error)
 	i = skipFilterSpace(source, i+2)
 	if i == len(source) {
 		return nil, i, filterError(i, false)
+	}
+	if strings.HasPrefix(source[i:], "{{") || source[i] == '@' {
+		return nil, i, filterError(i, true)
 	}
 	literalStart := i
 	var literal any
@@ -134,6 +141,17 @@ func filterString(source string, start int) (string, int, error) {
 		}
 	}
 	return "", len(source), filterError(len(source), false)
+}
+
+// HasProtectedLiteral lets the presentation boundary inspect decoded operands
+// without exporting the filter plan or relying on textual matches of escapes.
+func (p Path) HasProtectedLiteral(protected func(any) bool) bool {
+	for _, s := range p.steps {
+		if s.filter != nil && protected(s.filter.literal) {
+			return true
+		}
+	}
+	return false
 }
 
 // RedactLiterals removes filter operands before a query enters diagnostics. It

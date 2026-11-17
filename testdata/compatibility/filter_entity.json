@@ -1,0 +1,46 @@
+{
+  "response_json": "[{\"slug\":\"juice\",\"id\":\"p2\",\"active\":false},{\"slug\":\"pizza\",\"id\":\"p1\",\"active\":true}]",
+  "classification": "compatível: filtra pizza, captura p1 e envia /health/p1 após assertions",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health/p1"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health/p1"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

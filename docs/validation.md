@@ -1,4 +1,88 @@
-# Validação — US-01 a US-16, US-20 a US-27b
+# Validação — US-01 a US-16, US-20 a US-28
+
+## US-28 — issue #56 / história 0028
+
+Plano da issue #56 executado sem planner, somente backend, nas quatro tasks
+aprovadas da fila 0028: `back:1` em `eef1637` (filtros estáticos com igualdade
+exata ponta a ponta), `back:2` em `5703923` (composição/cardinalidade/reuso tipado),
+`back:3` em `1fc7b28` (proteção e falhas externas), `back:4` nesta alteração
+(corpus diferencial, ajuda/documentação e gates integrados). Sem frontend,
+estáticos, alteração de Go/dependências/CI/lint ou transporte de produção.
+Nenhuma fonte Hurl consultada/copiada/adaptada; somente comportamento do binário
+8.0.0. Gates locais não substituem review; backdev não executou SonarQube.
+
+### Ambiente e execução efetiva
+
+Linux amd64 em **2026-11-17**, Go `go1.26.10-X:nodwarf5`, golangci-lint **2.15.0**
+e goimports existentes em `/home/ff/go/bin`. Hurl **8.0.0** já existente em
+`/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, escolhido via PATH,
+sem instalar ferramentas nem substituir a versão padrão 8.0.1. O aviso de
+metadados de libcurl não impediu identificação/execução dos pares.
+
+- Task 1: passaram `go test ./internal/query ./internal/parser ./internal/assertion
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `make build` antes do commit.
+- Task 2: passaram `go test ./internal/query ./internal/assertion ./internal/template
+  ./internal/runner ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test` e `go vet ./...` antes do commit.
+- Task 3: passaram `go test ./internal/runner ./internal/cli ./internal/transport
+  ./internal/suite`, `go test ./tests/e2e -count=1`, `make fmt lint test` e
+  `go vet ./...` antes do commit.
+- Task 4: passaram os testes específicos query/parser/assertion/runner/CLI e
+  `go test ./tests/e2e -run '^TestFilter' -count=1`; `make compatibility` com
+  **324 pares**, Hurl **8.0.0** obrigatório, sem skip ou `-update` no gate completo;
+  `make fmt lint test` (**0 issues**, race/cobertura), `go vet ./...`,
+  `go build ./...`, `make build` e `make e2e`.
+- **31 pares novos `filter_*`** foram observados/revistos com fixtures independentes
+  e atualização limitada a `TestCompatibility/filter_`, seguida de verificação
+  sem atualização. **Nenhum dos 293 pares anteriores foi alterado**. São mudanças
+  explícitas de linguagem os filtros de igualdade; negativos históricos de
+  existência permanecem. O cenário negativo de projeção com igualdade foi
+  substituído intencionalmente por `!=`, sem alterar seus pares de compatibility.
+- Evidência diferencial mostrou diferenças reais de precisão (inteiros acima de
+  2^53 e decimais próximos), percurso estrito, placeholders e reuso composto.
+  Expoente extremo causou abort do binário Hurl por overflow de expoente, observado
+  como exit -1/sinal em Linux; HTTPGo preserva igualdade exata. Classificação e
+  dados enviados permanecem em [compatibility.md](compatibility.md#filtros-estáticos-por-igualdade--us-28--issue-56).
+  Não se simulou equivalência nem se mudou o avaliador conforme o resultado.
+- Na integração final, ampliada a classificação de recursos relativos excluídos
+  e operandos dinâmicos como não suportados, sem confundi-los com literal
+  malformado. A inspeção de literais **decodificados** também passou a ocultar
+  resumos derivados de filtro protegido escapado, mesmo com valores selecionados
+  públicos; regressão inspeciona estruturas/callbacks além dos streams.
+- Cobertura integrada: assertion **95,3%**, CLI **97,5%**, config **96,0%**,
+  parser **97,2%**, query **88,3%**, runner **94,1%**, suite **95,5%**,
+  template **96,1%**, transport **90,4%**. Não houve meta/limite reduzido.
+- Fuzzing com seeds adicionais de filtros/escapes e comandos executados:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**104.932 execuções**), `go test ./internal/template -run '^$' -fuzz '^FuzzRender$'
+  -fuzztime=20s -parallel=2` (**35.987 execuções**) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**10.465 execuções**). Todos passaram sem crash; contagens são desta rodada.
+- Ajuda root/test, exemplo versionado e bloco de escapes documentados são
+  executados por `TestFilterHelpAndPublishedExample`, `TestFilterByBinary` e
+  `TestFilterPublishedEscapes`. Negativos são executados sem rede por
+  `TestFilterStructuralCorpusByBinary`. Links locais novos e coerência dos
+  exemplos foram conferidos; `git diff --check` e `gofmt -l` sem pendências.
+- macOS/Windows não executados: opcionais nesta história segundo plano v4.
+  Corpus sintético não homologa suíte real nem JSONPath/RFC integral.
+
+### Rastreabilidade GO-344–GO-360
+
+| GO | Evidência executada |
+|---|---|
+| 344 | `TestFilterByBinary`, `TestFilterEntityAndSafeFailures`, pares entity/reordered/inactive: ID correto independentemente da ordem e outro item ativo não aprova pizza inativa |
+| 345–346 | `TestFilterTypedEquality`, `TestFilterEqualityAndAssertionAgree`, `TestFilterDeclarations`, `TestFilterPublishedEscapes`, pares typed/precision/escape: igualdade tipada, ausência/null, precisão além de int64, expoentes e escapes em dois níveis |
+| 347–348 | `TestFilterCompositionAndCardinality`, `TestFilterNestedCaptureByBinary`, pares nested/cardinality: mesmo item, navegação/filtro alternados, ordem/repetições, zero/um/vários e arrays sem flatten |
+| 349–350 | `TestFilterCaptureTypedReuse`, `TestFilterPredicatesAndOrder`, pares null/missing/plural capture/text: null válido, ausência 2, JSON completo exato e coleção nunca vira texto/envio dependente |
+| 351 | `TestFilterPredicatesAndOrder`, pares scalar_count/numeric_equivalent: count/igualdade/presença sobre valor reduzido, sem predicado implícito por elemento |
+| 352 | `TestFilterValidation`, `TestFilterDeclarations`, `TestFilterInvalidLateNeverSends`, `TestFilterStructuralCorpusByBinary`: categorias distintas, posições originais LF/CRLF e zero envios do arquivo |
+| 353–354 | `TestFilterPredicatesAndOrder`, `TestFilterCaptureAtomicAndProtected`: status e primeira assertion prevalecem; lote não publica parcialmente nem sobrescreve, proteção descoberta persiste |
+| 355 | `TestFilterPlansAndLiteralsNeverReachReports`, `TestFilterLiteralPresentation`, `TestFilterProtectedDiagnosticsCLI`, `TestFilterFileIsolationAndSafeCallbacks`: plano/literais/documento removidos, resumos protegidos, callbacks/cenário reutilizados e sessões isoladas |
+| 356 | `TestCompatibility` (324 pares, 31 novos), `TestFilterHelpAndPublishedExample`, `TestFilterPublishedEscapes`: recorte e diferenças reais documentados; regressões GO-445–458 da US-27b preservadas |
+| 357–358 | `TestFilterStrictEvaluation`, `TestFilterEntityAndSafeFailures`, `TestFilterPredicatesAndOrder`: incompatibilidade mista e JSON vazio/malformado/adicional são erros 2, nunca ausência/parcial/negação aprovada |
+| 359 | `TestFilterFinalResponseAndCancellation`, `TestFilterReadCloseBeforeReport`, `TestFilterFinalAndIncompleteByBinary`: final de redirect, leitura/close incompleto, prazo/cancelamento e encerramento de recursos sem captura/avanço |
+| 360 | `TestFilterCallbackFailureKeepsCounts`, `TestFilterWriterFailureOverridesOutcomes`: erro/short write 2 em sucesso/divergência/erro, contagens preservadas sem reescrita nem envio seguinte |
 
 ## US-27b — issue #54 / história 0027b
 

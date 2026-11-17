@@ -128,6 +128,15 @@ func TestFilterPredicatesAndOrder(t *testing.T) {
 			}
 		})
 	}
+	// A mismatching status must win even if filter evaluation/capture would fail.
+	calls := 0
+	statusResult := New(executorFunc(func(context.Context, Request) (Response, error) {
+		calls++
+		return Response{Status: 503, Body: []byte(`invalid JSON`)}, nil
+	}), nil).Run(context.Background(), parseCaptureScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\njsonpath \"$[?(@.x==1)]\" exists\n[Captures]\nx: jsonpath \"$[?(@.x==1)]\"\nGET http://example.test/never"))
+	if calls != 1 || statusResult.Err != nil || !statusResult.Diverged || statusResult.Entries[0].Outcome != Mismatch {
+		t.Fatalf("calls=%d status result=%+v", calls, statusResult)
+	}
 	for _, body := range []string{`[]`, `[{"x":0}]`} {
 		calls := 0
 		result := New(executorFunc(func(context.Context, Request) (Response, error) {
