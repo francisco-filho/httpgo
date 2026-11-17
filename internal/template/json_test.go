@@ -88,6 +88,9 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
+	for _, value := range []string{`[[],[1],[[2]]]`, `[9007199254740993,1.2300e+99]`, `[null,"{{literal}}",{"x":[]}]`} {
+		f.Add(`{"projected":{{typed}},"value":{{x}}}`, value)
+	}
 	for _, value := range []string{`"catalog-v1"`, `session=private; Path=/; HttpOnly`, "first,whole", "", `{{missing}}`, "123", "true", "null"} {
 		f.Add(`{"full":{{captured}},"text":"prefix{{captured}}"}`, value)
 	}

@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-26
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-27
 
 ## Polling — US-26 / issue #50
 
@@ -45,6 +45,47 @@ documentada. Resumos novos são contrato próprio, não cópia da saída Hurl.
 Evidência: [validation.md](validation.md#us-26--issue-50--história-0026).
 Corpus sintético não representa homologação da suíte real nem migração sem
 adaptações. YAML hierárquico e renderização externa continuam extensões HTTPGo.
+
+## Projeção de arrays — US-27 / issue #52
+
+Referência: **Hurl 8.0.0**, somente comportamento observado, sem usar seu código.
+Após integrar o polling da US-26, o corpus passa de 283 para **293 pares**:
+dez `projection_*` novos e alteração **intencional de contrato** de dois pares
+antigos. Os outros **281** pares não
+mudam. `-update` foi limitado aos dez novos e aos dois alterados; o gate completo
+é executado sem atualização automática. Nomes históricos `*_unsupported` são
+preservados para rastrear a mudança, não descrevem o suporte atual de `[*]`.
+
+| Par | HTTPGo | Hurl 8.0.0 | Evidência/classificação |
+|---|---|---|---|
+| `captures_unsupported` | **0; /health → /auth/login → /health** | 0; mesmos paths | Antes 2/zero envios aqui; wildcard de array em captura agora aceito |
+| `assert_json_query_unsupported` | **0; /health → /capture** | 0; mesmos paths | Antes 2/zero envios aqui; wildcard singleton reduz ao número 1 |
+| `projection_cardinality` | 0; /capture → /health | 0; mesmos paths | ausência, singleton escalar/null, múltiplos números, array vazio selecionado, múltiplos arrays, ramos ausentes, projeção aninhada e índice após wildcard |
+| `projection_scalar_count` | 1; /capture | 4; /capture | singleton número não vira array para count; divergência compartilhada, códigos próprios |
+| `projection_missing_capture` | 2; /capture | 3; /capture | zero resultados não permite completar o fluxo deste par; categorias/códigos próprios |
+| `projection_nested_capture` | 0; /capture → POST /health com `[3,1,3]` | 3; /capture | HTTPGo preserva ordem/repetições sem placeholders; Hurl interrompe antes do reuso composto |
+| `projection_arrays_capture` | 0; POST com `[[],[1],[[2]]]` | 3; /capture | HTTPGo não achata valores selecionados; reuso composto difere do Hurl |
+| `projection_empty_array_capture` | 0; POST com `[]` | 3; /capture | array vazio único é capturado e reutilizado aqui; Hurl interrompe antes do reuso |
+| `projection_precision_capture` | 0; POST com `[9007199254740993,1.2300e+99]` | 3; /capture | precisão/grafia numérica preservadas aqui; sem presumir equivalência do reuso composto |
+| `projection_strict_property` | 2; /capture | 0; /capture → /health | ramo não objeto ao lado de objetos válidos invalida toda seleção aqui; Hurl descarta o ramo neste exemplo |
+| `projection_strict_index` | 2; /capture | 0; /capture → /health | índice em não array é erro aqui; Hurl descarta o ramo neste exemplo |
+| `projection_strict_wildcard` | 2; /capture | 0; /capture → /health | `[*]` em objeto vazio é erro aqui, não ausência; Hurl aprova not exists neste par |
+
+**Diferenças deliberadas:** a seleção expansiva é estrita sobre tipos incompatíveis;
+a negação não pode aprovar um percurso inválido. Ausência de atributo/índice fora
+do array, em contraste, elimina apenas o ramo. A redução final distingue número,
+null, ausência e array selecionado. Não se anuncia JSONPath completo, wildcard de
+objetos, filtros, slices, unions ou descida recursiva. Caminhos simples preservam
+seu contrato (incluindo o adapter legado de captura), não foram normalizados para
+imitar o Hurl. Capturas compostas continuam a extensão de reuso tipado da US-06.
+
+Diagnósticos expansivos são resumos de presença/tipo/contagem, sem coleção ou
+esperado composto; metadados/contagens protegidos ficam ocultos. E2E próprios
+comprovam ordem de assertions, atomicidade, segredos pendentes/descobertos,
+isolamento, resposta final consumida/fechada, leitura/close incompleto, timeout,
+cancelamento e prioridade 2 em erro/short write. Não se exige texto de diagnóstico
+idêntico nem códigos iguais aos do Hurl. O corpus é sintético e não homologa a
+suíte real de negócio.
 
 ## Regex de headers — US-24 / issue #46
 
@@ -644,7 +685,7 @@ Nove pares `captures_*` ampliam o contrato para **50 pares**. Os **41 pares
 anteriores não mudaram**. No corpus de cenários, a antiga rejeição global
 `unsupported_section_captures.hurl` virou `invalid_capture_empty.hurl`: a seção
 agora é suportada, mas vazia continua inválida. Negativos específicos mantêm
-wildcard, filtro, descida recursiva, índice negativo e outras queries rejeitados
+wildcard de objeto (array `[*]` passa a suportado na US-27), filtro, descida recursiva, índice negativo e outras queries rejeitados
 antes da rede. Esta ampliação intencional deve ser sinalizada na revisão/PR.
 
 O harness retorna JSON fictício em `/auth/login`; `response_json` parametriza a
@@ -662,7 +703,7 @@ registro de tráfego fictício.
 | `captures_collision` | 2; somente login | 0; login e /health com token novo | HTTPGo não sobrescreve variável inicial; Hurl sobrescreve |
 | `captures_missing` | 2; somente login | 3; somente login | caminho ausente interrompe; códigos próprios |
 | `captures_non_string` | **0 na US-06**; /capture e /health, X-Probe `123` | 0; mesmos requests | antiga restrição string removida intencionalmente na issue #16 |
-| `captures_unsupported` | 2; zero envios | 0; /health, login e /health | wildcard reconhecido e não suportado impede todo envio HTTPGo |
+| `captures_unsupported` | **0 na US-27**; /health, login e /health | 0; mesmos paths | restrição histórica de wildcard de array removida intencionalmente na issue #52 |
 | `captures_mismatch` | 1; somente /unavailable | 4; mesmo path | status divergente prevalece sobre captura de body não JSON |
 
 Os testes próprios httpgo cobrem também strings semelhantes a placeholders,
@@ -745,7 +786,7 @@ iguais nem generaliza equivalência entre net/http e libcurl.
 **Mudança intencional de contrato:** `headers_query_unsupported.json` passa de
 exit 2/zero envios para exit 0 com `/capture` → `/health`. O `.hurl` não muda: era
 uma igualdade JSON válida, agora implementada. A antiga rejeição global no corpus
-de cenários passa a wildcard explicitamente não suportado, acompanhada de
+de cenários passou historicamente a wildcard não suportado (agora wildcard de objeto, após US-27), acompanhada de
 negativos específicos de literal, operador, filtro e consulta dinâmica.
 **Os outros 78 pares antigos não mudam.** São **21 pares novos**, total **100**,
 reutilizando o harness `response_json` e `response_headers`, sem dependência nova
@@ -770,7 +811,7 @@ nem atualização automática indiscriminada das observações.
 | `assert_json_capture_precedence` | 1; somente /capture | 3; somente /capture | **divergência deliberada**: assertion JSON falha antes de captura ausente aqui; Hurl avalia captura primeiro |
 | `assert_json_literal` | 0; /capture → /health | 4; somente /capture | esperado `{{name}}` é literal aqui, mesmo definido; Hurl interpola |
 | `assert_json_invalid_late`, `assert_json_without_http` | 2; zero envios | 2; zero envios | literal malformado/ausência de HTTP em entrada tardia rejeita arquivo integral |
-| `assert_json_query_unsupported` | 2; zero envios | 0; /health → /capture | wildcard fora do subconjunto HTTPGo; Hurl aceita o exemplo |
+| `assert_json_query_unsupported` | **0 na US-27**; /health → /capture | 0; mesmos paths | wildcard de array passa a suportado intencionalmente na issue #52 |
 | `assert_json_operator_unsupported` | 2; zero envios | 0; /capture → /health | `!=` continua fora do recorte aqui |
 
 A primeira rodada encontrou a rejeição do esperado com expoente e a aceitação

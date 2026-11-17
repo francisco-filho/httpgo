@@ -1,6 +1,18 @@
 {
-  "response_json":"[1]",
-  "classification":"intentional JSONPath restriction here; wildcard rejected before all sends",
-  "httpgo":{"exit":2,"paths":null},
-  "hurl":{"exit":0,"paths":["/health","/capture"]}
+  "response_json": "[1]",
+  "classification": "US-27 contract change: singleton array wildcard reduces to number; both runners approve",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/capture"
+    ]
+  }
 }

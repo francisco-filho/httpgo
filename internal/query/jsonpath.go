@@ -22,14 +22,25 @@ type step struct {
 	property string
 	index    int
 	array    bool
+	wildcard bool
 }
 type Path struct{ steps []step }
+
+// Expansive reports whether the path projects array elements.
+func (p Path) Expansive() bool {
+	for _, s := range p.steps {
+		if s.wildcard {
+			return true
+		}
+	}
+	return false
+}
 
 func Parse(source string) (Path, error) {
 	fail := func(offset int, unsupported bool) (Path, error) {
 		detail := "consulta JSONPath inválida"
 		if unsupported {
-			detail = "construção JSONPath não suportada; use raiz, propriedades por ponto e índices não negativos"
+			detail = "construção JSONPath não suportada; use raiz, propriedades por ponto, índices não negativos e [*] de arrays"
 		}
 		return Path{}, &Error{offset, unsupported, detail}
 	}
@@ -51,6 +62,15 @@ func Parse(source string) (Path, error) {
 			p.steps = append(p.steps, step{property: source[start:i]})
 		case '[':
 			i++
+			if i < len(source) && source[i] == '*' {
+				i++
+				if i == len(source) || source[i] != ']' {
+					return fail(i, false)
+				}
+				p.steps = append(p.steps, step{array: true, wildcard: true})
+				i++
+				continue
+			}
 			start := i
 			for i < len(source) && source[i] >= '0' && source[i] <= '9' {
 				i++
@@ -92,42 +112,55 @@ func Decode(body []byte) (any, error) {
 	return value, nil
 }
 
-// Select preserves the capture contract: incompatible traversal counts as absence.
+// Select preserves the legacy capture contract on simple paths only:
+// incompatible traversal counts as absence. Projections propagate traversal errors.
 func (p Path) Select(body []byte) (any, bool, error) {
 	value, err := Decode(body)
 	if err != nil {
 		return nil, false, err
 	}
 	value, present, err := p.SelectValue(value)
-	if err != nil {
+	if err != nil && !p.Expansive() {
 		return nil, false, nil
 	}
-	return value, present, nil
+	return value, present, err
 }
 
 // SelectValue distinguishes absence from traversal through an incompatible type.
 // A present null is a value; traversing through it is an evaluation error.
 func (p Path) SelectValue(value any) (any, bool, error) {
+	nodes := []any{value}
 	for _, s := range p.steps {
-		if s.array {
-			array, ok := value.([]any)
-			if !ok {
-				return nil, false, fmt.Errorf("percurso JSONPath exige array")
-			}
-			if s.index >= len(array) {
-				return nil, false, nil
-			}
-			value = array[s.index]
-		} else {
-			object, ok := value.(map[string]any)
-			if !ok {
-				return nil, false, fmt.Errorf("percurso JSONPath exige objeto")
-			}
-			value, ok = object[s.property]
-			if !ok {
-				return nil, false, nil
+		var next []any
+		for _, node := range nodes {
+			if s.array {
+				array, ok := node.([]any)
+				if !ok {
+					return nil, false, fmt.Errorf("percurso JSONPath exige array")
+				}
+				if s.wildcard {
+					next = append(next, array...)
+				} else if s.index < len(array) {
+					next = append(next, array[s.index])
+				}
+			} else {
+				object, ok := node.(map[string]any)
+				if !ok {
+					return nil, false, fmt.Errorf("percurso JSONPath exige objeto")
+				}
+				if selected, ok := object[s.property]; ok {
+					next = append(next, selected)
+				}
 			}
 		}
+		nodes = next
 	}
-	return value, true, nil
+	switch len(nodes) {
+	case 0:
+		return nil, false, nil
+	case 1:
+		return nodes[0], true, nil
+	default:
+		return nodes, true, nil
+	}
 }

@@ -41,7 +41,7 @@ func TestMembershipInvalidLate(t *testing.T) {
 			{`jsonpath "$" count contains 1`, "construção não suportada"},
 			{`jsonpath "$" count not contains 1`, "construção não suportada"},
 			{`jsonpath "$" count not exists`, "construção não suportada"},
-			{`jsonpath "$[*]" contains 1`, "construção não suportada"},
+			{`jsonpath "$.*" contains 1`, "construção não suportada"},
 			{`jsonpath "$.{{name}}" not exists`, "construção não suportada"},
 			{`header "X" not exists`, "construção não suportada"},
 			{`header "X" not == "x"`, "construção não suportada"},
@@ -50,7 +50,7 @@ func TestMembershipInvalidLate(t *testing.T) {
 			s, err := Parse("late.hurl", strings.NewReader(strings.ReplaceAll(input, "\n", newline)))
 			var located *Error
 			column := 3
-			if strings.Contains(tc.line, "$[*]") || strings.Contains(tc.line, "$.{{name}}") {
+			if strings.Contains(tc.line, "$.*") || strings.Contains(tc.line, "$.{{name}}") {
 				column = 13
 			}
 			if !errors.As(err, &located) || located.Category != tc.category || located.Position.Line != 5 || located.Position.Column != column || len(s.Entries) != 0 {

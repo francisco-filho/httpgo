@@ -2,4 +2,4 @@ GET {{base_url}}/first
 GET {{base_url}}/late
 HTTP *
 [Asserts]
-jsonpath "$[*]" contains 1
+jsonpath "$.*" contains 1

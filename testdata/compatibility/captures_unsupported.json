@@ -2,10 +2,14 @@
   "variables": [
     "base=http://example.invalid"
   ],
-  "classification": "JSONPath wildcard fora do subconjunto HTTPGo: rejeição integral antes da rede",
+  "classification": "US-27 contract change: array wildcard capture now supported; both runners complete the flow",
   "httpgo": {
-    "exit": 2,
-    "paths": null
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/auth/login",
+      "/health"
+    ]
   },
   "hurl": {
     "exit": 0,

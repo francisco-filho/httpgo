@@ -18,7 +18,7 @@ func TestJSONAssertionHelp(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, want := range []string{`jsonpath "$.name" == "Pizza"`, `jsonpath "$.price" == 4500`, `jsonpath "$.active" == true`, "precisão exata", "sem float64", "ordem escrita", "erro de avaliação JSON (2)", "Captura secreta pendente", "sem avaliar/publicar", "count aceita ==, >, >=, < e <=", "não marcados", `jsonpath "$.items" count == 3`, `jsonpath "$.total" >= 1`, `jsonpath "$.items[0].id" exists`, `jsonpath "$.name" matches "^Pizza"`, "capturas, filtros ou JSONPath ampliado"} {
+		for _, want := range []string{`jsonpath "$.name" == "Pizza"`, `jsonpath "$.price" == 4500`, `jsonpath "$.active" == true`, "precisão exata", "sem float64", "ordem escrita", "erro de avaliação JSON (2)", "Captura secreta pendente", "sem avaliar/publicar", "count aceita ==, >, >=, < e <=", "não marcados", `jsonpath "$.items" count == 3`, `jsonpath "$.total" >= 1`, `jsonpath "$.items[0].id" exists`, `jsonpath "$.name" matches "^Pizza"`, "capturas, filtros ou JSONPath completo", "propriedades por ponto, índices não negativos e [*] de arrays", "Sem .*, slices, unions"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("help lacks %q", want)
 			}

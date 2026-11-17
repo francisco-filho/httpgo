@@ -1,4 +1,4 @@
-# Validação — US-01 a US-16, US-20 a US-26
+# Validação — US-01 a US-16, US-20 a US-27
 
 ## US-26 — issue #50 / história 0026
 
@@ -71,6 +71,105 @@ impediu a identificação nem a execução dos pares.
 | 321 | `TestPollingReportFailureDoesNotStartNextEntry`, `TestPollingTerminalWriteFailure`: erro/short write em resultado/resumos termina 2 sem retry/reimpressão; próximas entradas bloqueadas |
 | 322 | segundo Run no mesmo runner/cenário, suíte e regressões de isolamento: orçamento/capturas não vazam, cenário não é modificado, sem respostas descartadas em resultados |
 | 323 | `TestPollingRedirectsStartAtOriginalRequest`: 302/307 reais, POST original em cada tentativa, GET/POST final conforme redirect; hops não contam como retries |
+
+## US-27 — issue #52 / história 0027
+
+Plano da issue #52 executado sem planner e sem replanejamento, somente backend,
+na ordem das três tasks aprovadas na fila: `back:1` no commit `d883c3d`
+(projeção tipada ponta a ponta), `back:2` no commit `4696e7f` (sigilo, isolamento
+e recursos) e `back:3` nesta alteração (corpus, ajuda, documentação e validação
+integrada). Sem frontend/estáticos, dependência nova, mudança de Go, CI/lint,
+novos predicados ou alteração do transporte de produção. US-23 já presente na
+base, reutilizada sem reimplementação. Nenhum código-fonte Hurl consultado,
+copiado ou adaptado. Os gates locais não substituem o review.
+
+### Ambiente e comandos efetivamente executados
+
+Rodada final em **2026-11-17**, Linux amd64, Go `go1.26.10-X:nodwarf5`.
+`goimports` e `golangci-lint` existentes em `/home/ff/go/bin`.
+Hurl **8.0.0** inicialmente disponível em `/tmp/httpgo-0021-hurl`; após a
+interrupção da sessão e limpeza de `/tmp`, o binário público da release fixada
+foi extraído em `/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`
+e selecionado no PATH somente para o diferencial. Hurl padrão 8.0.1 não foi
+substituído. O aviso de metadados locais de libcurl não impediu identificação
+ou execução do binário 8.0.0; não houve skip ou afrouxamento da versão no harness.
+
+- Task 1: testes de `internal/parser`, `query`, `assertion`, `template`, `runner`
+  e `cli`; E2E de binário/HTTP local; `make fmt lint test`, `go vet ./...` e
+  `go build ./...` passaram antes do commit. O gate completo de testes incluiu
+  os E2E com o diagnóstico de segunda assertion corrigido para a linha original.
+- Task 2: passaram `go test ./internal/runner ./internal/cli ./internal/suite
+  ./internal/transport`, `go test ./tests/e2e -count=1`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` antes do commit. Fakes de read/close, HTTP
+  local, canais/contextos e writers, sem sleeps ou serviços externos.
+- Task 3: **dez novos pares `projection_*`**; os pares antigos
+  `captures_unsupported` e `assert_json_query_unsupported` mudam intencionalmente
+  de 2/zero envios para 0 com fluxo completo. `-update` ficou limitado a esses
+  doze pares e as observações/classificações foram revisadas: Hurl interrompe
+  reuso composto com 3; ramos incompatíveis são descartados pelo Hurl nos três
+  pares estritos, mas continuam erros 2 aqui. Os outros **271 pares** não mudam.
+  `make compatibility` passou com **283 pares** e Hurl **8.0.0**, sem `-update`.
+- Gate final: passaram `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build`, `make compatibility` e `make e2e`. Lint: **0 issues**.
+  `make test` executa `go test ./... -race -cover`. Coberturas: assertion **94,2%**,
+  CLI **97,5%**, config **96,0%**, parser **97,5%**, query **96,3%**,
+  runner **93,6%**, suite **95,4%**, template **96,1%**, transport **90,4%**.
+  O gate interrompido não foi contado como conclusão; foi repetido após a retomada.
+  A conferência final acrescentou proteção de resumo sintetizado (tipo/comprimento
+  que coincida com segredo mesmo sem folhas secretas), com regressão
+  `TestProjectionSynthesizedSummaryProtection`; os gates completos foram repetidos
+  após a correção.
+- Seeds ampliados com wildcards aninhados, índices, LF/CRLF, malformados e
+  compostos projetados. Passaram sem crash:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**30.871 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**29.800 execuções**) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**117.301 execuções**). Contagens específicas desta rodada.
+- Ajuda root/test e exemplo publicado executados pelo binário com servidor HTTP
+  local; cinco novos negativos versionados verificam rejeição antes de todos
+  os envios. Negativos antigos de wildcard foram refinados para wildcard de
+  objeto/slice, não removidos. `gofmt -l` dos arquivos Go alterados, diff e links
+  locais novos conferidos.
+- Cross-builds e testes nativos macOS/Windows não realizados (opcionais durante
+  a história, conforme plano v4). Corpus sintético não homologa a suíte real e
+  não comprova JSONPath completo nem equivalência geral com Hurl.
+
+### Validação após rebase com develop
+
+Rebase sobre `origin/develop` em `afd1063` (US-26/polling), preservando a
+documentação e os seeds de fuzzing de ambas as histórias. Os hashes de tasks
+acima refletem o histórico reescrito; os resultados anteriores registram a
+rodada antes dessa integração.
+
+Após resolver os conflitos, passaram os testes específicos de parser, query,
+assertion, template, runner, CLI, suite e transport; `make fmt lint test`
+(**0 issues**, race/cobertura), `go vet ./...`, `go build ./...` e `make e2e`.
+`make compatibility` passou sem `-update` com **293 pares** e Hurl **8.0.0**:
+os dez pares de polling da develop foram preservados, além dos dez de projeção.
+Coberturas integradas: parser **97,2%**, runner **94,1%**, suite **95,5%**;
+demais pacotes mantiveram os percentuais da rodada US-27 acima.
+`FuzzParse` foi repetido com os seeds combinados, `-fuzztime=20s -parallel=2`,
+passando com **12.167 execuções**, sem crash. Nenhum golden foi regenerado.
+
+### Rastreabilidade GO-324–GO-343
+
+| GO | Evidência executada |
+|---|---|
+| GO-324 | `TestProjectionByBinary`, `TestProjectionHelpAndPublishedExample`, `TestProjectionPredicatesAndOrder`: demo/reordenação 0, falta do requerido/proibido 1, sem captura/próximo envio |
+| GO-325–328 | `TestProjectionCardinality`, `TestProjectionReducedTypesByBinary`, par `projection_cardinality`: wildcards aninhados, índice após wildcard, redução única, ordem/repetições, ramos ausentes, null presente e arrays sem flatten |
+| GO-329–330 | `TestProjectionPredicatesAndOrder`, `TestProjectionReducedTypesByBinary`, par `projection_scalar_count`: count do valor reduzido, escalar/ausência não viram coleção; contains, igualdade, matches e limites sem aplicação implícita por nó |
+| GO-331 | `TestProjectionCaptureReuse`, pares `projection_nested_capture`, `projection_arrays_capture`, `projection_empty_array_capture`, `projection_precision_capture`: publicação/reuso tipado, precisão/grafia numérica e template literal |
+| GO-332–333 | `TestProjectionCaptureReuse`, `TestProjectionCaptureAtomic`, par `projection_missing_capture`: sem resultado, contextos textuais, conflito ancestral/descendente, proteção descoberta e ausência de publicação parcial/sobrescrita |
+| GO-334 | `TestProjectionStrictTraversal`, `TestProjectionPredicatesAndOrder`, `TestProjectionCaptureAtomic`, três pares `projection_strict_*`: nenhum resultado parcial ou aprovação por negação em percurso incompatível |
+| GO-335 | `TestProjectionMalformedPaths`, `TestProjectionDeclarations`, `TestProjectionInvalidLateNeverSends`, `TestProjectionStructuralCorpusByBinary`: LF/CRLF, posições originais e zero envios; regressão dos caminhos simples preservada |
+| GO-336–337 | `TestProjectionStrictTraversal`, `TestProjectionPredicatesAndOrder`, regressões anteriores de captura/assertions: JSON vazio/malformado/adicional, decode sob demanda, primeira falha, captura só depois de aprovação |
+| GO-338 | `TestProjectionSafeFailure`, `TestProjectionProtectedSummariesCLI`, `TestProjectionSuiteProtectionAndIsolation`, `TestProjectionReportsAndSessionsIndependent`, `TestProjectionSynthesizedSummaryProtection`: callbacks/resultados/streams sem coleção, esperado composto ou metadados/contagens protegidos, captura pendente não antecipada e proteção descoberta mantida após falha |
+| GO-339 | `TestCompatibility` (283 pares, dez novos e dois contratos alterados), ajuda root/test e `scenario_projection.hurl` executáveis; diferenças deliberadas em `compatibility.md` |
+| GO-340–341 | `TestProjectionFinalResponseAndCancellation`, `TestProjectionReadCloseBeforeReport`, `TestProjectionFinalAndIncompleteByBinary`: somente resposta final completa, read/close/timeout/cancel falham antes de seleção/captura/próximo envio; regressões de header isolado mantidas |
+| GO-342 | `TestProjectionCallbackFailurePreservesCounts`, `TestProjectionWriterFailureOverridesOutcomes`: falha/short write com 2, sem retry/envio posterior, resultados/contagens anteriores preservados |
+| GO-343 | `TestProjectionReportsAndSessionsIndependent`, `TestProjectionPublishedValuesDoNotCrossRuns`, `TestProjectionSuiteProtectionAndIsolation`: cenário/documento não mutados, planos removidos de resultados/callbacks, sessões e invocações independentes |
 
 
 ## US-24 — issue #46 / história 0024

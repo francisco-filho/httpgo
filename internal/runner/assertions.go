@@ -122,6 +122,11 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 			if evaluation.Matched {
 				continue
 			}
+			if declaration.Path.Expansive() {
+				current.JSONFailure = projectionFailure(session, *declaration, pos, actual, present, evaluation, conceal)
+				current.Outcome = JSONMismatch
+				return nil
+			}
 			expectedText, actualText := "[oculto]", "[oculto]"
 			if !conceal {
 				expectedJSON, err := json.Marshal(declaration.Expected)

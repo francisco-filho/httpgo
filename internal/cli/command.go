@@ -520,7 +520,7 @@ Assertions JSON: salve product.hurl e execute
   jsonpath "$.active" == true
 jsonpath "consulta" == <literal JSON>: string, número, booleano, null, array ou objeto,
 inclusive vazios, na mesma linha. Exige HTTP numérico ou HTTP *.
-Consultas estáticas: $, propriedades por ponto e índices não negativos combináveis.
+Consultas estáticas: $, propriedades por ponto, índices não negativos e [*] de arrays.
 Esperados nunca interpolam: "{{nome}}" é texto literal, inclusive aninhado.
 Igualdade preserva tipos: "4500" difere de 4500. 1, 1.0 e 1e0 são iguais,
 com precisão exata, também aninhada, sem float64 nem expansão de potências.
@@ -553,7 +553,7 @@ Ausência aprova not exists e not contains. null, vazios, false e zero presentes
 Tipo presente incompatível falha com 1 em ambos os sentidos de pertencimento.
 JSON inválido/percurso incompatível/transporte nunca vira sucesso por negação: 2.
 not exists não aceita operando. Consultas e esperados permanecem estáticos/literais.
-Sem negação genérica, header not exists, count contains, filtros ou wildcards novos.
+Sem negação genérica, header not exists, count contains, filtros ou wildcard de objeto.
 Falhas mostram presença/tipo e esperado protegido, nunca arrays/objetos selecionados.
 Primeira falha impede capturas/envios; sintaxe inválida tardia impede todo HTTP.
 Estrutura, quantidade e limites:
@@ -574,9 +574,30 @@ jsonpath "$.name" matches "^Pizza": encontra trecho em string JSON, sem coerçã
 Ausência/tipo incompatível/condição falsa: 1; JSON inválido: 2.
 Regex Go inválida/não suportada e matches em body/variável: erro 2 antes da rede.
 Headers também aceitam matches, com primeira ocorrência e padrão JSON literal (acima).
-Sem count em strings/objetos/capturas, filtros ou JSONPath ampliado.
+Sem count em strings/objetos/capturas, filtros ou JSONPath completo.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
 pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
+
+Projeção de coleções — US-27 (arrays, não objetos):
+  GET {{base_url}}/validation
+  HTTP 200
+  [Asserts]
+  jsonpath "$.issues[*].code" contains "REQUIRED"
+  jsonpath "$.issues[*].code" not contains "OTHER_TENANT"
+Resposta: {"issues":[{"code":"REQUIRED"},{"code":"INVALID"}]}; independe da ordem.
+Combina [*], propriedades e índices: $.categories[*].products[*].id.
+Redução somente ao final: zero resultados = ausência; um = próprio valor;
+vários = array na ordem de percurso, sem ordenar/deduplicar nem achatar arrays.
+Ramo ausente/índice fora do array não acrescenta null; null selecionado existe.
+Array vazio selecionado existe; wildcard em array vazio não encontra resultados.
+count conta o array reduzido: dois números contam 2; número único/ausência falha com 1.
+Capturas usam a mesma seleção tipada e publicação atômica; zero resultados falha com 2.
+Arrays/objetos capturados exigem valor JSON completo, sem escolher o primeiro elemento.
+Ramo incompatível invalida toda consulta expansiva com 2, mesmo com ramos válidos.
+Diagnóstico resume presença/tipo/contagem sem coleção ou esperado composto;
+resumos protegidos ficam ocultos, inclusive com captura secreta pendente.
+Sem .*, slices, unions, descida recursiva, filtros ou JSONPath completo.
+Exemplo executável com captura/reuso: testdata/scenarios/scenario_projection.hurl.
 
 Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
   httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
@@ -645,8 +666,8 @@ Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo co
   Authorization: Bearer {{accessToken}}
   HTTP 200
   httpgo test products.hurl --var base_url=http://localhost:8080 --var username=demo --var password=senha-ficticia --secret password --secret accessToken
-JSONPath limitado: raiz $, propriedades por ponto e índices não negativos,
-como $.product.id e $.items[0]. Aceita string, número, booleano, null, array ou objeto,
+JSONPath limitado: raiz $, propriedades por ponto, índices não negativos e [*]
+de arrays, como $.items[*].code. Aceita string, número, booleano, null, array ou objeto,
 inclusive raiz e vazios. Números mantêm precisão, também nas estruturas.
   POST {{base_url}}/products
   Content-Type: application/json

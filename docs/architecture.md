@@ -1,8 +1,8 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-26
+# Arquitetura implementada — US-01 a US-16, US-20 a US-27
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
 
@@ -123,6 +123,40 @@ rótulos/conversões de charset. O restante usa biblioteca padrão; `go.mod` pre
 adicional nem ciclo. Testes de integração podem montar `runner.New` com o adapter.
 Somente o código de produção em `transport` importa `net/http`.
 
+## Projeção de arrays — US-27 / issue #52
+
+`query.Parse` amplia `step` com wildcard de array e `Path.Expansive` identifica
+as novas consultas. Sem biblioteca ou engine adicional: `SelectValue` percorre
+iterativamente uma sequência interna de nós, expandindo somente arrays e
+preservando ordem/repetições. Ausências/índices fora do array eliminam ramos;
+qualquer ramo com tipo incompatível retorna erro, descartando a seleção inteira.
+A sequência é distinta de cada valor JSON e reduzida somente ao final:
+zero → ausência; um → próprio valor; vários → array. Não há flatten de valores,
+coerção numérica nem serialização intermediária do documento. `Decode` conserva
+`UseNumber`; o contrato público continua valor/presença/erro.
+
+`Path.Select` preserva o adapter legado (percurso incompatível → ausência) apenas
+para caminhos simples. Consultas expansivas propagam o erro controlado também em
+capturas; `captureResponse` não o rotula como JSON inválido. Publicação tipada e
+atômica, proteção das capturas descobertas e renderer continuam existentes.
+Predicados não recebem quantidade de nós; `count` conta só o array reduzido.
+
+Antes de serializar qualquer falha expansiva, `runner.projectionFailure` resume
+presença/tipo e comprimento de array, sem coleção nem esperado composto.
+`protectedJSON` inspeciona folhas para ocultar também resumos/contagens protegidos;
+`pendingSecret` oculta os operandos sem avaliar capturas antecipadamente.
+`JSONFailure` e a CLI mantêm seleção/predicado/posição e os códigos existentes.
+Caminhos simples conservam os diagnósticos anteriores. `safeEntry` remove planos,
+operandos, capturas e documento operacional antes de resultados/callbacks.
+
+Decode sob demanda por resposta, status → assertions na ordem → capturas →
+callback, retenção/fechamento da resposta final, prazos, isolamento e prioridade
+de falha de escrita não mudam. Não há cache global, goroutine ou pacote novo.
+Somente valores capturados/proteções sobrevivem na sessão, não o documento.
+`.*`, slices, unions, descida recursiva e filtros continuam rejeitados antes da rede.
+Comparação com Hurl 8.0.0 e divergências estritas:
+[compatibility.md](compatibility.md#projeção-de-arrays--us-27--issue-52).
+
 ## Inclusão e ausência — US-23
 
 `parser/assertion.go` amplia os operadores existentes com `JSONContains`,
@@ -155,8 +189,8 @@ assertions JSON já acionam RetainBody; header isolado continua descartando body
 mas somente após consumo/fechamento completo. Erro de decode/percurso é `2`,
 condição falsa é `1` e erro de apresentação tem prioridade `2`. Transporte,
 contexto/prazo único, redirects finais e ausência de retry não foram alterados.
-Sem cookie jar, `header not exists`, negação de igualdade/matches/count, wildcard,
-filtros ou antecipação das US-27/28. Corpus e diferenças observadas estão em
+Sem cookie jar, `header not exists`, negação de igualdade/matches/count ou filtros.
+A US-27 acrescenta somente wildcard de arrays, descrito acima; não antecipa US-28. Corpus e diferenças observadas estão em
 [compatibility.md](compatibility.md#inclusão-e-ausência--us-23--issue-44).
 
 ## Texto do body — US-21

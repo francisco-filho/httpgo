@@ -66,7 +66,7 @@ caixa do nome e usa somente a primeira ocorrência, sem concatenar ou dividir
 por vírgula. Valor presente vazio contém `""`, portanto sua negação falha.
 Consultas e esperados são estáticos: placeholders dentro de strings permanecem
 literais. Não há `header not exists`, negação genérica, operadores lógicos,
-`count contains`, wildcards ou filtros novos. Erro estático tardio impede todos
+`count contains` ou filtros. Projeção `[*]` de arrays é o recorte US-27 abaixo. Erro estático tardio impede todos
 os envios. Status e assertions mantêm a ordem existente, antes das capturas;
 a primeira falha interrompe o arquivo. Diagnósticos localizados mostram somente
 presença/tipo e esperado escalar protegido, nunca a coleção selecionada.
@@ -731,11 +731,45 @@ encerra a seção; `[Asserts]` também pode sucedê-la na mesma entrada. Outras 
 e filtros de captura não são aceitos nem ignorados.
 Nomes seguem a mesma regra ASCII pontuada das variáveis.
 
-O subconjunto de JSONPath aceita `$`, propriedades por ponto e índices decimais
-não negativos, combináveis: `$.accessToken`, `$.product.id`, `$.items[0].token` e
-`$[0]`. Propriedades simples usam letras ASCII, dígitos e `_`; nomes com outros
-caracteres exigiriam uma sintaxe ainda não suportada. Não há wildcard, filtros,
-descida recursiva, slices, união, propriedades entre colchetes ou índices negativos.
+O subconjunto de JSONPath aceita `$`, propriedades por ponto, índices decimais
+não negativos e wildcard de array `[*]`, combináveis: `$.items[0].token` e
+`$.categories[*].products[*].id`. Propriedades simples usam letras ASCII, dígitos
+e `_`; nomes com outros caracteres exigiriam sintaxe ainda não suportada.
+Não há wildcard de objeto (`.*`), filtros, descida recursiva, slices, união,
+propriedades entre colchetes ou índices negativos.
+
+**Ampliação intencional US-27**, compartilhada por assertions e capturas:
+`[*]` expande somente arrays em ordem de percurso. Ao terminar a consulta,
+zero resultados significa ausência; um devolve o próprio valor; vários devolvem
+um array ordenado (inclusive repetições). Atributos ausentes e índices fora do
+array eliminam somente aquele ramo; `null` selecionado permanece presente.
+Selecionar um único array preserva esse array, inclusive vazio; selecionar vários
+arrays não os achata. `count` conta o array reduzido, não correspondências internas:
+um número único ou ausência falha com 1, dois números contam 2.
+Propriedade em não objeto, índice/wildcard em não array gera erro 2 na seleção
+expansiva inteira, mesmo ao lado de ramos válidos. Captura sem resultado falha
+com 2; publicação tipada continua atômica. Diagnóstico expansivo resume presença,
+tipo e contagem, sem despejar seleção ou esperado composto; resumos protegidos
+ficam ocultos. Caminhos simples conservam seus contratos e diagnósticos.
+
+```hurl
+GET {{base_url}}/validation
+HTTP 200
+[Asserts]
+jsonpath "$.issues[*].code" contains "REQUIRED"
+jsonpath "$.issues[*].code" not contains "OTHER_TENANT"
+[Captures]
+codes: jsonpath "$.issues[*].code"
+POST {{base_url}}/echo
+{{codes}}
+HTTP 204
+```
+
+Para `{"issues":[{"code":"REQUIRED"},{"code":"INVALID"}]}`, a demonstração
+passa independentemente da ordem. `/echo` deve aceitar o array JSON com status 204.
+Sem REQUIRED ou com OTHER_TENANT, falha com 1, sem captura/próximo envio.
+Exemplo: `testdata/scenarios/scenario_projection.hurl`; execute com
+`httpgo test testdata/scenarios/scenario_projection.hurl --var base_url=http://localhost:8080`.
 Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
 **todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
 
@@ -953,8 +987,8 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
 `9007199254740993` em `scenario_assert_json_auth_products.hurl`, ambos nos E2E.
 
 - Consulta estática usa exatamente o subconjunto de capturas: `$`, propriedades
-  por ponto e índices não negativos combináveis (`$.items[0].name`). Sem
-  interpolação de consulta, wildcard, filtros, descida recursiva ou expansão.
+  por ponto, índices não negativos e `[*]` de arrays combináveis (US-27 acima).
+  Sem interpolação de consulta, wildcard de objeto, filtros ou descida recursiva.
 - Esperado é **um único literal JSON completo na mesma linha**: string, número,
   booleano, null, array ou objeto, inclusive vazios. Escapes/Unicode seguem JSON.
   Nunca passa pelo renderer: `"{{nome}}"` e placeholders aninhados em strings
