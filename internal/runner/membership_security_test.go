@@ -61,7 +61,7 @@ func TestMembershipDerivedSecretsAndPendingMetadata(t *testing.T) {
 		renderer, _ := template.New([]string{"token=session_private"}, []string{"token", "future"})
 		source := "GET http://example.test/login\nAuthorization: Bearer {{token}}\nGET http://example.test/second\nHTTP *\n[Asserts]\njsonpath \"$.session_private\" contains \"Bearer session_private\""
 		if pending {
-			source += "\n[Captures]\nfuture: jsonpath \"$.missing.bad\""
+			source += "\n[Captures]\nfuture: jsonpath \"$\""
 		}
 		source += "\nGET http://example.test/never"
 		s := parseCaptureScenario(t, source)

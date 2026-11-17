@@ -72,7 +72,7 @@ func TestJSONAssertionCLI(t *testing.T) {
 
 func TestJSONAndHeaderPendingSecretCLI(t *testing.T) {
 	for _, line := range []string{`header "X" == "expected-private"`, `header "X" matches "expected-private"`, `jsonpath "$.value" == "expected-private"`} {
-		file := writeScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\nGET http://example.test/next")
+		file := writeScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$\"\nGET http://example.test/next")
 		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			return runner.Response{Status: 200, Body: []byte(`{"value":"actual-private","unused":"body-private"}`), Headers: []query.HeaderValue{{Name: "X", Value: "actual-private"}}}, nil
 		}), "test", file, "--secret", "token")

@@ -19,7 +19,7 @@ func TestDynamicFilterDemonstration(t *testing.T) {
 	}{
 		{"selected", "PLACED", `{{order_number}}`, true, 0, 3},
 		{"cancelled", "CANCELLED", `{{order_number}}`, true, 1, 2},
-		{"absent", "PLACED", `12`, true, 1, 2},
+		{"absent", "PLACED", `12`, true, 2, 2},
 		{"missing", "PLACED", `{{missing}}`, true, 2, 2},
 		{"no opt-in", "PLACED", `{{order_number}}`, false, 2, 0},
 		{"quoted no opt-in", "PLACED", `'{{order_number}}'`, false, 2, 0},

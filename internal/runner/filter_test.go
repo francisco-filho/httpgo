@@ -20,8 +20,8 @@ func TestFilterEntityAndSafeFailures(t *testing.T) {
 		{`[{"slug":"juice","active":false,"id":"p2"},{"slug":"pizza","active":true,"id":"p1"}]`, Passed},
 		{`[{"slug":"pizza","active":true,"id":"p1"},{"slug":"juice","active":false,"id":"p2"}]`, Passed},
 		{`[{"slug":"pizza","active":false,"id":"p1"},{"slug":"juice","active":true,"id":"p2"}]`, JSONMismatch},
-		{`[{"slug":"pizza","active":true,"id":"p1"},null]`, JSONFailed},
-		{``, JSONFailed}, {`[] []`, JSONFailed}, {`[`, JSONFailed},
+		{`[{"slug":"pizza","active":true,"id":"p1"},null]`, CaptureFailed},
+		{``, CaptureFailed}, {`[] []`, CaptureFailed}, {`[`, CaptureFailed},
 	} {
 		t.Run(tc.body, func(t *testing.T) {
 			source := "GET http://example.test/products\nHTTP 200\n[Asserts]\njsonpath \"$[?(@.slug=='pizza')].active\" == true\n[Captures]\npizza_id: jsonpath \"$[?(@.slug=='pizza')].id\"\nGET http://example.test/products/{{pizza_id}}\nHTTP 200"

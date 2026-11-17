@@ -23,7 +23,7 @@ func TestJSONLimitsSecretsByBinary(t *testing.T) {
 			}))
 			source := "GET {{base}}/assert\nHTTP *\n[Asserts]\n" + expression
 			if pending {
-				source += "\n[Captures]\ntoken: jsonpath \"$.missing.bad\""
+				source += "\n[Captures]\ntoken: jsonpath \"$\""
 			} else {
 				source = "GET {{base}}/login\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\n" + source
 			}

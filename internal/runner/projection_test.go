@@ -137,7 +137,7 @@ func TestProjectionSafeFailure(t *testing.T) {
 			source := "GET http://example.test\nHTTP *\n[Asserts]\n" + line
 			if secret == "pending" {
 				c, _ = template.New(nil, []string{"future"})
-				source += "\n[Captures]\nfuture: jsonpath \"$.missing\""
+				source += "\n[Captures]\nfuture: jsonpath \"$\""
 			}
 			check := func(e EntryResult) error {
 				raw, _ := json.Marshal(e)

@@ -85,8 +85,8 @@ func TestHeaderMatchesOrderAndCaptures(t *testing.T) {
 		calls                               int
 	}{
 		{"status first", "HTTP 200", `header "X" matches "^ok$"`, "invalid", 503, "bad", Mismatch, 1},
-		{"header first", "HTTP 200", "header \"X\" matches \"^ok$\"\njsonpath \"$\" exists", "invalid", 200, "bad", HeaderMismatch, 1},
-		{"JSON first", "HTTP 200", "jsonpath \"$\" exists\nheader \"X\" matches \"^ok$\"", "invalid", 200, "bad", JSONFailed, 1},
+		{"header first", "HTTP 200", "header \"X\" matches \"^ok$\"\njsonpath \"$\" exists", "\"captured\"", 200, "bad", HeaderMismatch, 1},
+		{"JSON first", "HTTP 200", "jsonpath \"$\" exists\nheader \"X\" matches \"^ok$\"", "invalid", 200, "bad", CaptureFailed, 1},
 		{"later header", "HTTP 200", "header \"X\" matches \"^ok$\"\nheader \"Missing\" exists", `"captured"`, 200, "ok", HeaderMismatch, 1},
 		{"capture fails", "HTTP 200", `header "X" matches "^ok$"`, "invalid", 200, "ok", CaptureFailed, 1},
 		{"publish", "HTTP 200", "header \"X\" matches \"^ok$\"\njsonpath \"$\" == \"captured\"", `"captured"`, 200, "ok", Passed, 2},

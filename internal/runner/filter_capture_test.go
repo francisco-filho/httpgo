@@ -55,7 +55,7 @@ func TestFilterCaptureTypedReuse(t *testing.T) {
 // GO-354–355: failure in the batch never publishes or overwrites previous values,
 // but protection for discovered secret leaves survives the discarded batch.
 func TestFilterCaptureAtomicAndProtected(t *testing.T) {
-	for _, late := range []string{"missing: jsonpath \"$.missing\"", "bad: jsonpath \"$.bad[?(@.x.y==1)]\"", "ids.child: jsonpath \"$.values[0].id\"", "previous: jsonpath \"$.values[0].id\"", "previous.child: jsonpath \"$.values[0].id\""} {
+	for _, late := range []string{"missing: jsonpath \"$.missing\"", "bad: jsonpath \"$.bad[?(@.x.y==1)]\"", "ids.child: jsonpath \"$.values[0].id\"", "previous: jsonpath \"$.values[0].id\"\nprevious: jsonpath \"$.values[0].id\"", "previous.child: jsonpath \"$.values[0].id\""} {
 		t.Run(late, func(t *testing.T) {
 			c, _ := template.New(nil, []string{"ids"})
 			session := c.NewSession()
@@ -101,9 +101,9 @@ func TestFilterPredicatesAndOrder(t *testing.T) {
 		{`jsonpath "$[?(@.x==1)].v" == [1,2]`, `[{"x":1,"v":1},{"x":1,"v":2}]`, Wildcard},
 		{`jsonpath "$[?(@.x==1)].v" > 0`, `[{"x":1,"v":1},{"x":1,"v":2}]`, JSONMismatch},
 		{`jsonpath "$[?(@.x.y==1)].v" not exists`, `[{"x":{"y":1},"v":9},{"x":null}]`, JSONFailed},
-		{"header \"X\" == \"bad\"\njsonpath \"$[?(@.x==1)]\" exists", `invalid`, HeaderMismatch},
-		{"body contains \"absent\"\njsonpath \"$[?(@.x==1)]\" exists", `invalid`, BodyMismatch},
-		{"jsonpath \"$[?(@.x==1)]\" exists\nheader \"X\" == \"bad\"", `invalid`, JSONFailed},
+		{"header \"X\" == \"bad\"\njsonpath \"$[?(@.x==1)]\" exists", `invalid`, CaptureFailed},
+		{"body contains \"absent\"\njsonpath \"$[?(@.x==1)]\" exists", `invalid`, CaptureFailed},
+		{"jsonpath \"$[?(@.x==1)]\" exists\nheader \"X\" == \"bad\"", `invalid`, CaptureFailed},
 	} {
 		t.Run(tc.lines+tc.body, func(t *testing.T) {
 			calls := 0

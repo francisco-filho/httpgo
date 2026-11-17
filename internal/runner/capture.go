@@ -29,7 +29,7 @@ func captureFailure(session template.Session, declaration parser.Capture, pos pa
 	return &CaptureError{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Count: declaration.Count, Detail: session.Sanitize(detail)}
 }
 
-func captureResponse(session template.Session, declarations []parser.Capture, response Response) *CaptureError {
+func extractCaptures(session template.Session, declarations []parser.Capture, response Response) ([]template.Capture, *CaptureError) {
 	batch := make([]template.Capture, 0, len(declarations))
 	var text string
 	textDecoded := false
@@ -46,11 +46,11 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 				session.MarkSecret(declaration.Name)
 			}
 			if err != nil {
-				return fail("não foi possível resolver operando JSONPath: " + err.Error())
+				return nil, fail("não foi possível resolver operando JSONPath: " + err.Error())
 			}
 			value, found, err = bound.Select(response.Body)
 			if err != nil {
-				return fail(err.Error())
+				return nil, fail(err.Error())
 			}
 		case parser.HeaderCapture:
 			value, found = query.Header(response.Headers, declaration.Header)
@@ -59,52 +59,53 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 				var err error
 				text, err = query.BodyText(response.Body, response.Headers)
 				if err != nil {
-					return fail(err.Error())
+					return nil, fail(err.Error())
 				}
 				textDecoded = true
 			}
 			value, found = text, true
 		default:
-			return fail("variante de captura não suportada")
+			return nil, fail("variante de captura não suportada")
 		}
 		if !found {
-			return fail("consulta não encontrou valor")
+			return nil, fail("consulta não encontrou valor")
 		}
 		if declaration.Count {
 			quantity, ok := query.CountArray(value)
 			if !ok {
-				return fail("count exige array")
+				return nil, fail("count exige array")
 			}
 			value = quantity
 		}
 		if declaration.Kind == parser.RegexCapture || declaration.Compiled != nil {
 			selected, err := query.Regex(declaration.Compiled, value.(string))
 			if err != nil {
-				return captureFailure(session, declaration, declaration.PatternPosition, err.Error())
+				return nil, captureFailure(session, declaration, declaration.PatternPosition, err.Error())
 			}
 			value = selected
 		}
 		raw, err := json.Marshal(value)
 		if err != nil {
-			return fail("não foi possível serializar valor da captura")
+			return nil, fail("não foi possível serializar valor da captura")
 		}
 		session.ProtectCapture(declaration.Name, raw)
 		batch = append(batch, template.Capture{Name: declaration.Name, Value: raw})
 	}
-	if err := session.Publish(batch); err != nil {
-		declaration := declarations[0]
-		pos := declaration.Position
-		var conflict *template.ConflictError
-		if errors.As(err, &conflict) && conflict.Index >= 0 && conflict.Index < len(declarations) {
-			declaration = declarations[conflict.Index]
-			pos = declaration.Position
-		}
-		var invalid *template.CaptureValueError
-		if errors.As(err, &invalid) && invalid.Index >= 0 && invalid.Index < len(declarations) {
-			declaration = declarations[invalid.Index]
-			pos = declaration.QueryPosition
-		}
-		return captureFailure(session, declaration, pos, "não foi possível publicar captura; verifique os valores e nomes inválidos, repetidos ou em conflito ancestral/descendente")
+	return batch, nil
+}
+
+func captureBatchFailure(session template.Session, declarations []parser.Capture, err error) *CaptureError {
+	declaration := declarations[0]
+	pos := declaration.Position
+	var conflict *template.ConflictError
+	if errors.As(err, &conflict) && conflict.Index >= 0 && conflict.Index < len(declarations) {
+		declaration = declarations[conflict.Index]
+		pos = declaration.Position
 	}
-	return nil
+	var invalid *template.CaptureValueError
+	if errors.As(err, &invalid) && invalid.Index >= 0 && invalid.Index < len(declarations) {
+		declaration = declarations[invalid.Index]
+		pos = declaration.QueryPosition
+	}
+	return captureFailure(session, declaration, pos, "não foi possível publicar captura; verifique os valores e nomes inválidos, repetidos ou em conflito ancestral/descendente")
 }

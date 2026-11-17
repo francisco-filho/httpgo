@@ -19,9 +19,9 @@ func TestBodyReportsNeverRetainOperationalData(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			source := "GET http://example.test\nHTTP 200\n[Asserts]\nbody contains \"expected-private\"\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\nGET http://example.test/next"
+			source := "GET http://example.test\nHTTP 200\n[Asserts]\nbody contains \"expected-private\"\n[Captures]\ntoken: jsonpath \"$\"\nGET http://example.test/next"
 			if mode != "pending" {
-				source = strings.Replace(source, "\n[Captures]\ntoken: jsonpath \"$.missing.bad\"", "", 1)
+				source = strings.Replace(source, "\n[Captures]\ntoken: jsonpath \"$\"", "", 1)
 			}
 			if mode == "derived" {
 				source = "GET http://example.test/login\nAuthorization: Bearer {{secret}}\n" + strings.Replace(source, "expected-private", "Bearer expected-private", 1)

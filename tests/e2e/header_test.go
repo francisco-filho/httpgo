@@ -81,8 +81,8 @@ func TestHeaderCapturePrecedenceByBinary(t *testing.T) {
 		diagnostic                      string
 	}{
 		{"status first", "HTTP 200", "invalid", "bad", 503, 1, 1, "status divergente"},
-		{"header before body", "HTTP 200", "invalid", "bad", 200, 1, 1, "assertion header"},
-		{"wildcard header before body", "HTTP *", "invalid", "bad", 503, 1, 1, "assertion header"},
+		{"header before body", "HTTP 200", `{"id":9007199254740993}`, "bad", 200, 1, 1, "assertion header"},
+		{"wildcard header before body", "HTTP *", `{"id":9007199254740993}`, "bad", 503, 1, 1, "assertion header"},
 		{"capture after headers", "HTTP 200", "invalid", "ok", 200, 2, 1, "erro de captura"},
 		{"capture success", "HTTP 200", `{"id":9007199254740993}`, "ok", 200, 0, 2, ""},
 		{"wildcard capture 200", "HTTP *", `{"id":9007199254740993}`, "ok", 200, 0, 2, ""},

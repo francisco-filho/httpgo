@@ -139,7 +139,7 @@ HTTP 200
 			if reports != 1 {
 				t.Fatalf("reports=%d", reports)
 			}
-			return Response{Status: 200, Body: []byte(`{"status":"PENDING"}`)}, nil // Missing capture must not be evaluated.
+			return Response{Status: 200, Body: []byte(`{"status":"PENDING","ready":"rejected"}`)}, nil // Valid captures remain provisional.
 		case 4:
 			return Response{Status: 200, Body: []byte(`{"status":"READY","ready":"done"}`)}, nil
 		default:

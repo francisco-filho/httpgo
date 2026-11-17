@@ -76,7 +76,7 @@ func TestHeaderMatchesPendingSecretByBinary(t *testing.T) {
 		_, _ = io.WriteString(w, `{"unused":"body-private"}`)
 	}))
 	defer server.Close()
-	source := "GET {{base}}/first\nHTTP 200\n[Asserts]\nheader \"X-Test\" matches \"expected-private\"\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\nGET {{base}}/never"
+	source := "GET {{base}}/first\nHTTP 200\n[Asserts]\nheader \"X-Test\" matches \"expected-private\"\n[Captures]\ntoken: regex \"(.*)\"\nGET {{base}}/never"
 	code, out, stderr := run(t, "test", scenario(t, source), "--var", "base="+server.URL, "--secret", "token")
 	if code != 1 || hits.Load() != 1 || strings.Contains(out+stderr, "private") || strings.Contains(stderr, "erro de captura") || !strings.Contains(stderr, "[oculto]") {
 		t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)

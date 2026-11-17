@@ -177,7 +177,7 @@ func TestCaptureStructuralErrorsAndCollisions(t *testing.T) {
 			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
 		}
 	}
-	for _, assignment := range []string{"auth=null", "auth.token=[]", "auth.token.child={}"} {
+	for _, assignment := range []string{"auth=null", "auth.token.parent=[]", "auth.token.child={}"} {
 		calls := 0
 		fake := executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			calls++

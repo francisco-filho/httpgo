@@ -47,7 +47,7 @@ func TestJSONTypeOrderAndFailures(t *testing.T) {
 		{"additional JSON", `jsonpath "$" isEmpty`, `[] []`, 200, JSONFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := parseCaptureScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+tc.lines+"\n[Captures]\nx: jsonpath \"$.never\"\nGET http://example.test/never")
+			s := parseCaptureScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+tc.lines+"\n[Captures]\nx: regex \"(.*)\"\nGET http://example.test/never")
 			calls := 0
 			got := New(executorFunc(func(context.Context, Request) (Response, error) {
 				calls++

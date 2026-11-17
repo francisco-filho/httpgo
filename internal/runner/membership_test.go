@@ -42,18 +42,18 @@ func TestMembershipOrderAndPresence(t *testing.T) {
 			if tc.status != 200 {
 				expectation = "HTTP 200"
 			}
-			s := parseCaptureScenario(t, "GET http://example.test/first\n"+expectation+"\n[Asserts]\n"+tc.lines+"\n[Captures]\nx: jsonpath \"$.absent\"\nGET http://example.test/next")
-			// Successful assertions reach the deliberately failing capture, proving order.
+			s := parseCaptureScenario(t, "GET http://example.test/first\n"+expectation+"\n[Asserts]\n"+tc.lines+"\n[Captures]\nx: regex \"(.*)\"\nGET http://example.test/next")
 			want := tc.outcome
+			wantCalls := 1
 			if want == Wildcard {
-				want = CaptureFailed
+				wantCalls = 2
 			}
 			calls := 0
 			result := New(executorFunc(func(context.Context, Request) (Response, error) {
 				calls++
 				return Response{Status: tc.status, Body: []byte(tc.body), Headers: []query.HeaderValue{{Name: "X", Value: "blocked"}}}, nil
 			}), nil).Run(context.Background(), s)
-			if calls != 1 || result.Entries[0].Outcome != want {
+			if calls != wantCalls || result.Entries[0].Outcome != want {
 				t.Fatalf("calls=%d result=%+v", calls, result)
 			}
 		})
@@ -67,10 +67,10 @@ func TestMembershipDemonstration(t *testing.T) {
 		outcome      Outcome
 	}{
 		{`{"codes":["REQUIRED","INVALID"],"name":"Pizza"}`, "sid=opaque; Secure", Wildcard},
-		{`{"codes":["INVALID"]}`, "sid=opaque", JSONMismatch},
-		{`{"codes":["REQUIRED","OTHER_TENANT"]}`, "sid=opaque", JSONMismatch},
-		{`{"codes":["REQUIRED"],"passwordHash":null}`, "sid=opaque", JSONMismatch},
-		{`{"codes":["REQUIRED"]}`, "sid=opaque; Domain=example.test", HeaderMismatch},
+		{`{"name":"Pizza","codes":["INVALID"]}`, "sid=opaque", JSONMismatch},
+		{`{"name":"Pizza","codes":["REQUIRED","OTHER_TENANT"]}`, "sid=opaque", JSONMismatch},
+		{`{"name":"Pizza","codes":["REQUIRED"],"passwordHash":null}`, "sid=opaque", JSONMismatch},
+		{`{"name":"Pizza","codes":["REQUIRED"]}`, "sid=opaque; Domain=example.test", HeaderMismatch},
 	} {
 		s := parseCaptureScenario(t, "GET http://example.test/first\nHTTP *\n[Asserts]\n"+lines+"\n[Captures]\nname: jsonpath \"$.name\"\nGET http://example.test/{{name}}")
 		calls := 0
@@ -100,7 +100,7 @@ func TestMembershipSafeFailures(t *testing.T) {
 			c, _ := template.New(nil, []string{"token"})
 			captures := ""
 			if pending {
-				captures = "\n[Captures]\ntoken: jsonpath \"$.missing.bad\""
+				captures = "\n[Captures]\ntoken: jsonpath \"$\""
 			}
 			s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+line+captures+"\nGET http://example.test/next")
 			calls := 0

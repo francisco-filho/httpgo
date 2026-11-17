@@ -39,7 +39,7 @@ func TestProjectionProtectedSummariesCLI(t *testing.T) {
 	for _, pending := range []bool{false, true} {
 		source := "GET http://example.test\nHTTP *\n[Asserts]\njsonpath \"$[*]\" count == 0"
 		if pending {
-			source += "\n[Captures]\nfuture: jsonpath \"$.none.bad\""
+			source += "\n[Captures]\nfuture: jsonpath \"$\""
 		}
 		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			return runner.Response{Status: 200, Body: []byte(`["known-private","unrelated-private"]`)}, nil

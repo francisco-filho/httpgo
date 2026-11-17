@@ -31,7 +31,7 @@ func TestRegexCaptureProtectionAndAtomicityOnFailure(t *testing.T) {
 					source += "bad: regex \"(absent)\"\n"
 				}
 				if mode == "collision" {
-					source += "initial: header \"X\"\n"
+					source += "initial.child: header \"X\"\n"
 				}
 				if mode == "pending assertion" {
 					source += "[Asserts]\njsonpath \"$\" == \"pending-sensitive\"\n"
@@ -50,7 +50,7 @@ func TestRegexCaptureProtectionAndAtomicityOnFailure(t *testing.T) {
 					}
 					response := Response{Status: 200, Body: []byte("value=" + secret), Headers: []query.HeaderValue{{Name: "Set-Cookie", Value: "refresh=" + secret + "; HttpOnly"}, {Name: "X", Value: "literal"}}}
 					if mode == "pending assertion" {
-						response.Body = []byte(`"not-pending-sensitive"`)
+						response.Body = []byte(`"value=not-pending-sensitive"`)
 					}
 					if mode == "status" {
 						response.Status = 503

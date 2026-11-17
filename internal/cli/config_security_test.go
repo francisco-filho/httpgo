@@ -96,7 +96,7 @@ func TestConfigProtectionCapturesAndIsolation(t *testing.T) {
 }
 
 func TestConfigMissingAndInitialCaptureConflict(t *testing.T) {
-	for _, text := range []string{"GET http://example.test/{{future}}", "GET http://example.test/\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.value\"\nGET http://example.test/last"} {
+	for _, text := range []string{"GET http://example.test/{{future}}", "GET http://example.test/\nHTTP 200\n[Captures]\ntoken.child: jsonpath \"$.value\"\nGET http://example.test/last"} {
 		fake := executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			return runner.Response{Status: 200, Body: []byte(`{"value":"captured-fake"}`)}, nil
 		})

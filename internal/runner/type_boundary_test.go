@@ -70,7 +70,7 @@ func TestJSONTypeProtectedResultsAndReuse(t *testing.T) {
 		{"pending absence", `jsonpath "$.absent" isEmpty`, `{}`, "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			source := "GET http://example.test\nHTTP *\n[Asserts]\n" + tc.expression + "\n[Captures]\nfuture: jsonpath \"$.not_available.bad\"\nGET http://example.test/never"
+			source := "GET http://example.test\nHTTP *\n[Asserts]\n" + tc.expression + "\n[Captures]\nfuture: jsonpath \"$\"\nGET http://example.test/never"
 			s := parseCaptureScenario(t, source)
 			original := s.Entries[0].Assertions[0].JSON.Path
 			c, _ := template.New([]string{"token=" + tc.secret}, []string{"token"})

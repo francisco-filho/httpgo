@@ -40,7 +40,7 @@ func TestJSONTypeProtectedMetadataCLI(t *testing.T) {
 		for _, expression := range []string{`jsonpath "$" isString`, `jsonpath "$.absent" isInteger`} {
 			source := "GET http://example.test\nHTTP *\n[Asserts]\n" + expression
 			if pending {
-				source += "\n[Captures]\nfuture: jsonpath \"$.none.bad\""
+				source += "\n[Captures]\nfuture: jsonpath \"$\""
 			}
 			code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 				return runner.Response{Status: 200, Body: []byte(`{"v":["known-private"]}`)}, nil

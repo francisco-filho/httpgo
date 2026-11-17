@@ -22,11 +22,11 @@ func TestJSONInequalityOrderAndPublication(t *testing.T) {
 		{"equal", `jsonpath "$" != {{v}}`, `1.0`, `1`, `checked: jsonpath "$"`, "", 200, JSONMismatch},
 		{"missing", `jsonpath "$.missing" != null`, `{}`, `1`, `checked: jsonpath "$"`, "", 200, JSONMismatch},
 		{"index", `jsonpath "$[2]" != null`, `[]`, `1`, `checked: jsonpath "$"`, "", 200, JSONMismatch},
-		{"decode", `jsonpath "$" != {{v}}`, `bad`, `1`, `checked: jsonpath "$"`, "resposta não contém", 200, JSONFailed},
+		{"decode", `jsonpath "$" != {{v}}`, `bad`, `1`, `checked: jsonpath "$"`, "resposta não contém", 200, CaptureFailed},
 		{"traversal", `jsonpath "$.x.y" != {{v}}`, `{"x":1}`, `1`, `checked: jsonpath "$"`, "percurso", 200, JSONFailed},
-		{"expected before decode", `jsonpath "$" != {{missing}}`, `bad`, `1`, `checked: jsonpath "$"`, "variável ausente", 200, JSONFailed},
+		{"expected before decode", `jsonpath "$" != {{missing}}`, `bad`, `1`, `checked: regex "(.*)"`, "variável ausente", 200, JSONFailed},
 		{"expected before absence", `jsonpath "$.missing" != {{missing}}`, `{}`, `1`, `checked: jsonpath "$"`, "variável ausente", 200, JSONFailed},
-		{"own capture", `jsonpath "$" != {{checked}}`, `1`, `1`, `checked: jsonpath "$"`, "variável ausente", 200, JSONFailed},
+		{"own capture", `jsonpath "$" != {{checked}}`, `1`, `1`, `checked: jsonpath "$"`, "", 200, JSONMismatch},
 		{"future capture", `jsonpath "$" != {{future}}`, `1`, `1`, `checked: jsonpath "$"`, "variável ausente", 200, JSONFailed},
 		{"status", `jsonpath "$" != {{missing}}`, `bad`, `1`, `checked: jsonpath "$"`, "", 503, Mismatch},
 		{"first assertion", "jsonpath \"$\" != 1\njsonpath \"$\" != {{missing}}", `1`, `1`, `checked: jsonpath "$"`, "", 200, JSONMismatch},
@@ -101,7 +101,7 @@ func TestJSONInequalitySafeOperands(t *testing.T) {
 			}
 			if mode == "pending" {
 				secrets = []string{"pending"}
-				capture = "\n[Captures]\npending: jsonpath \"$.missing.bad\""
+				capture = "\n[Captures]\npending: jsonpath \"$\""
 			}
 			source := "GET http://example.test\nHTTP 200\n[Asserts]\njsonpath \"$\" != " + expected + capture + "\nGET http://example.test/never"
 			s := dynamicScenario(t, source)

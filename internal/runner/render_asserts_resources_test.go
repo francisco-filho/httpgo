@@ -25,12 +25,13 @@ func TestRenderAssertsQueryErrorPrecedence(t *testing.T) {
 		{"regex before JSON", `jsonpath "$" matches "{{v}}"`, `bad`, `"["`, "padrão matches", nil, JSONFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := dynamicScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+tc.line+"\n[Captures]\nsecret: jsonpath \"$.invalid\"\nGET http://example.test/never")
+			s := dynamicScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+tc.line+"\n[Captures]\nsecret: header \"X-Capture\"\nGET http://example.test/never")
 			c, _ := template.New([]string{"v=" + tc.value}, []string{"secret"})
 			calls := 0
 			result := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) {
 				calls++
-				return Response{Status: 200, Body: []byte(tc.body), Headers: tc.headers}, nil
+				headers := append([]query.HeaderValue{{Name: "X-Capture", Value: "capture-private"}}, tc.headers...)
+				return Response{Status: 200, Body: []byte(tc.body), Headers: headers}, nil
 			}), c, nil).Run(context.Background(), s)
 			if calls != 1 || result.Diverged || result.Err == nil || result.Entries[0].Outcome != tc.outcome || !strings.Contains(result.Err.Error(), tc.detail) {
 				t.Fatalf("calls=%d result=%+v err=%v", calls, result, result.Err)
@@ -41,7 +42,7 @@ func TestRenderAssertsQueryErrorPrecedence(t *testing.T) {
 
 // GO-390: pending secret captures do not resolve early, even for dynamic assertions.
 func TestRenderAssertsPendingSecretsAndScenarioReuse(t *testing.T) {
-	s := dynamicScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\nheader \"X\" == \"{{v}}\"\n[Captures]\nsecret: jsonpath \"$.missing.bad\"\nGET http://example.test/never")
+	s := dynamicScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\nheader \"X\" == \"{{v}}\"\n[Captures]\nsecret: header \"X\"\nGET http://example.test/never")
 	for _, expected := range []string{"first-private", "second-private"} {
 		c, _ := template.New([]string{"v=" + expected}, []string{"secret"})
 		calls := 0

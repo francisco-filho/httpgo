@@ -23,7 +23,7 @@ func TestFilterPlansAndLiteralsNeverReachReports(t *testing.T) {
 	}{
 		{`[{"key":"private-literal","v":[1,2]}]`, Passed},
 		{`[{"key":"private-literal","v":[3,4]}]`, JSONMismatch},
-		{`[{"key":"private-literal","v":[1,2]},null]`, JSONFailed},
+		{`[{"key":"private-literal","v":[1,2]},null]`, CaptureFailed},
 		{`[{"key":"private-literal","v":[1,2],"bad":true}]`, CaptureFailed},
 	} {
 		for _, pending := range []bool{false, true} {

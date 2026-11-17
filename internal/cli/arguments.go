@@ -204,6 +204,20 @@ func (s invocationSession) ProtectCapture(name string, value json.RawMessage) {
 	s.protection.remember(s.ProtectionValues())
 }
 
+func (s invocationSession) MarkSecret(name string) {
+	s.Session.MarkSecret(name)
+	s.protection.remember(s.ProtectionValues())
+}
+
+func (s invocationSession) Stage(batch []template.Capture) (template.Session, error) {
+	view, err := s.Session.Stage(batch)
+	s.protection.remember(s.ProtectionValues())
+	if err != nil {
+		return nil, err
+	}
+	return invocationSession{Session: view, protection: s.protection}, nil
+}
+
 func (s invocationSession) Publish(batch []template.Capture) error {
 	err := s.Session.Publish(batch)
 	s.protection.remember(s.ProtectionValues())

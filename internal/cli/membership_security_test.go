@@ -41,7 +41,7 @@ func TestMembershipSecretOperandsCLI(t *testing.T) {
 	for _, pending := range []bool{false, true} {
 		source := "GET http://example.test\nHTTP *\n[Asserts]\njsonpath \"$\" contains \"expected-private\""
 		if pending {
-			source += "\n[Captures]\ntoken: jsonpath \"$.missing.bad\""
+			source += "\n[Captures]\ntoken: jsonpath \"$\""
 		}
 		source += "\nGET http://example.test/never"
 		calls := 0

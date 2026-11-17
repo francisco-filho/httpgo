@@ -81,7 +81,7 @@ func TestRenderAssertsJSONOrder(t *testing.T) {
 		{"status", `jsonpath "$" == {{missing}}`, `bad`, "", 503, Mismatch, ""},
 		{"earlier assertion", "jsonpath \"$\" == 2\njsonpath \"$\" == {{missing}}", `1`, "", 200, JSONMismatch, ""},
 		{"missing before decode", `jsonpath "$" == {{missing}}`, `bad`, "", 200, JSONFailed, "variável ausente"},
-		{"own capture", `jsonpath "$" == {{own}}`, `1`, "\n[Captures]\nown: jsonpath \"$\"", 200, JSONFailed, "variável ausente"},
+		{"own capture", `jsonpath "$" == {{own}}`, `1`, "\n[Captures]\nown: jsonpath \"$\"", 200, Passed, ""},
 		{"future capture", `jsonpath "$" == {{future}}`, `1`, "", 200, JSONFailed, "variável ausente"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -91,7 +91,11 @@ func TestRenderAssertsJSONOrder(t *testing.T) {
 				calls++
 				return Response{Status: tc.status, Body: []byte(tc.body)}, nil
 			}), nil).Run(context.Background(), s)
-			if calls != 1 || result.Entries[0].Outcome != tc.outcome {
+			wantCalls := 1
+			if tc.outcome == Passed {
+				wantCalls = 2
+			}
+			if calls != wantCalls || result.Entries[0].Outcome != tc.outcome {
 				t.Fatalf("calls=%d result=%+v", calls, result)
 			}
 			if tc.detail != "" && (result.Err == nil || !strings.Contains(result.Err.Error(), tc.detail)) {
