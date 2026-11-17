@@ -1,0 +1,16 @@
+{
+  "response_json": "{\"items\":\"abc\"}",
+  "classification": "ambos rejeitam contagem de caracteres de string e impedem próximo envio; códigos próprios de captura",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

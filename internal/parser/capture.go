@@ -47,14 +47,19 @@ func parseCapture(text string, pos Position, options ParseOptions) (Capture, err
 			return parseCaptureRegex(text, rest[len("regex"):], Capture{Kind: HeaderCapture, Header: source, Name: name, Position: pos, QueryPosition: queryPos})
 		}
 	}
+	count := false
 	if suffix := strings.Fields(tail); len(suffix) > 0 {
-		if (tail[0] == ' ' || tail[0] == '\t') && suffix[0] == "count" {
-			return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "count em captura não suportado; use count em assertion"}
+		if fields[0] == "jsonpath" && (tail[0] == ' ' || tail[0] == '\t') && suffix[0] == "count" {
+			if len(suffix) != 1 {
+				return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "count em captura não aceita parâmetros, aritmética ou encadeamento"}
+			}
+			count = true
+		} else {
+			if fields[0] == "header" && (tail[0] == ' ' || tail[0] == '\t') {
+				return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "filtro ou seletor em captura de header não suportado"}
+			}
+			return fail("consulta de captura entre aspas inválida")
 		}
-		if fields[0] == "header" && (tail[0] == ' ' || tail[0] == '\t') {
-			return Capture{}, &Error{Position: pos, Category: "construção não suportada", Detail: "filtro ou seletor em captura de header não suportado"}
-		}
-		return fail("consulta de captura entre aspas inválida")
 	}
 	if fields[0] == "header" {
 		if !validHeaderName(source) {
@@ -73,7 +78,7 @@ func parseCapture(text string, pos Position, options ParseOptions) (Capture, err
 		}
 		return Capture{}, &Error{Position: queryPos, Category: category, Detail: err.Error()}
 	}
-	return Capture{Name: name, Path: path, Position: pos, QueryPosition: queryPos}, nil
+	return Capture{Name: name, Path: path, Count: count, Query: source, Position: pos, QueryPosition: queryPos}, nil
 }
 
 // parseCaptureRegex accepts exactly one static JSON string, not a pipeline or template.

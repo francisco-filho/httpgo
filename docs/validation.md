@@ -1,4 +1,89 @@
-# Validação — US-01 a US-16, US-20 a US-32
+# Validação — US-01 a US-16, US-20 a US-33
+
+## US-33 — issue #66 / história 0033
+
+Plano da issue #66 executado sem planner, somente backend, nas três tasks
+registradas e autoaprovadas da fila 0033. `back:1`: `d7db569` (captura numérica
+ponta a ponta); `back:2`: `27d0ed3` (fronteiras/segurança/isolamento); `back:3`:
+esta alteração (corpus, exemplos, ajuda/docs e validação integrada). Base
+`dc63bbc`, com US-28/30/31 disponíveis. Sem frontend/estáticos, dependências
+novas, alteração de Go, CI/lint ou transporte de produção. Nenhum código-fonte
+Hurl foi consultado, copiado ou adaptado. Gates locais não substituem review;
+backdev não executou análise SonarQube.
+
+### Ambiente e evidências executadas
+
+Linux amd64; Go `go1.26.10-X:nodwarf5`; `goimports`/`golangci-lint` existentes
+em `/home/ff/go/bin`. Hurl **8.0.0** existente em
+`/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, selecionado pelo
+PATH em vez do padrão 8.0.1, sem instalar ferramentas. Aviso de metadados libcurl
+não impediu identificação ou execução da versão obrigatória.
+
+- Task 1: passaram `go test ./internal/query ./internal/assertion`,
+  `go test ./internal/parser ./internal/template ./internal/runner ./internal/cli`,
+  `go test ./tests/e2e -count=1`, `make fmt lint test`, `go vet ./...` e
+  `go build ./...` antes do commit.
+- Task 2: passaram testes runner/CLI/suíte/transporte nos gates completos,
+  E2E focalizado `go test ./tests/e2e -run '^TestCountCapture' -count=1`,
+  `go test ./tests/e2e -count=1`, `make fmt lint test`, `go vet ./...` e
+  `go build ./...` antes do commit.
+- Task 3 integrada: `make compatibility` passou com **440 pares**, Hurl
+  **8.0.0** obrigatório, sem skip ou `-update` no gate completo. Os **16 novos**
+  pares foram observados com atualização **restrita ao prefixo `capture_count_`**,
+  revisados (inclusive wire tipado e classificações) e conferidos sem atualização.
+  Nenhum dos **424 pares históricos** foi alterado; harness não foi modificado.
+- `make fmt lint test` passou com **0 issues** e testes `-race -cover`;
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e` passaram.
+  O teste antigo de ajuda que proibia capturas foi atualizado para o recorte
+  US-33; a validação integral foi reexecutada com sucesso, sem afrouxar gates.
+- Fuzzing passou com seeds ampliadas, sem crash:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+    — 29.135 execuções;
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+    — 11.714 execuções;
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+    — 20.508 execuções.
+
+### Rastreabilidade GO-430–GO-444
+
+| GO | Evidência automatizada |
+|---|---|
+| 430 | E2E `TestCountCaptureDemonstration`: preservada 0, alterada 1, conteúdo diferente com mesma quantidade 0 e próximo envio bloqueado; pares `unchanged`/`changed` |
+| 431 | query `TestCountArray`, runner `TestCountCaptureSelectionAndTypedReuse`, E2E `TestCountCaptureNumericBodyWithoutRenderAsserts`: raiz/caminho simples, vazio 0, elementos null, wire numérico e textual |
+| 432 | runner `TestCountCaptureComparisonsAndOrder`: cinco comparadores; pares `numeric`, `unchanged`, `empty` conferem tipo enviado e limites |
+| 433 | runner `TestCountCaptureSelectionAndTypedReuse`: string/objeto/número/booleano/null/ausência são captura 2 sem publicação/avanço; CLI verifica consulta/count/causa/posição |
+| 434–435 | mesmo runner: zero, escalar único, vários, null, array único inclusive vazio e vários arrays por wildcard/filtro, sem achatamento; corpus compara contagem transformada com Hurl |
+| 436 | runner `TestCountCaptureComparisonsAndOrder`: status/primeira assertion prevalecem, captura própria indisponível e captura de entrada divergente não publicada |
+| 437 | `TestCountCaptureAtomicity`, `TestCountCaptureConflictDirections`, `TestCountCaptureBoundaryFailures`: lote misto, inicial/anterior/mesmo lote, três direções de conflito, valores preservados, nenhum próximo envio |
+| 438 | parser `TestCountCaptureSyntax`: LF/CRLF, consumo integral, consulta inválida e limites; E2E `TestCountCaptureDemonstration`/`TestCountCaptureDocumentation`: erro tardio e negativos sem HTTP |
+| 439 | CLI `TestCountCaptureCodesAndSecretComparison`, runner `TestCountCaptureSecretComparisonCallback`/`TestCountCaptureBoundaryFailures`: esperado/real ocultos mesmo diferentes, proteção em lote rejeitado, pendente não avaliado e metadados seguros |
+| 440 | E2E `TestCountCaptureNumericBodyWithoutRenderAsserts`: requisição tipada sem flag; `TestCountCaptureDemonstration` e par `no_optin`: esperado dinâmico rejeitado antes de HTTP |
+| 441 | runner `TestCountCaptureSelectionAndTypedReuse`: vazio, JSON malformado/adicional, percurso incompatível singular ou ramo plural não viram zero/contagem parcial |
+| 442 | transporte `TestCountCaptureFinalResponse`/`TestCountCaptureReadAndCloseFailure`, E2E `TestCountCaptureCompleteFinalResponse`: redirects finais, read/close, prazo/cancelamento e recursos fechados sem baseline parcial |
+| 443 | runner `TestCountCaptureBoundaryFailures`, CLI `TestCountCaptureWriterPriority`: erro/short write sobre sucesso/divergência/captura/avaliação, sem reimpressão nem próximo envio; contagens preservadas |
+| 444 | runner `TestCountCaptureRunnerIsolation`, suíte `TestCountCaptureSuiteIsolation`, E2E `TestCountCaptureSuiteNoSharedBaseline`: cenário/iniciais imutáveis, sessões/arquivos novos, resultados/callbacks sem coleção/planos de captura |
+
+### Contrato e limites da evidência
+
+A proibição antiga de `count` em captura JSONPath foi removida explicitamente;
+`unsupported_capture_count.hurl` virou positivo `capture_count.hurl`, com
+negativos específicos para pipeline/header. Não há aritmética, parâmetros,
+contagem de strings/objetos ou novos comparadores. Classificação de `count` em
+assertion continua 1 para ausência/tipo incompatível; em captura é 2.
+
+Os pares de contagem por wildcard/filtro **com transformação** concordam com
+Hurl nas quantidades observadas; isso não muda as diferenças anteriores de
+captura **sem transformação**. Códigos 2/3 em captura e 1/4 em assertion são
+próprios; colisão, captura na mesma resposta, pipelines e opt-in continuam
+explicitamente diferentes. Matriz registra somente o observado, sem inferir
+JSONPath completo ou equivalência geral de runners.
+
+Exemplos publicados são comparados byte a byte com o cenário versionado em
+`TestCountCaptureDocumentation`, que executa os dois positivos com binário/HTTP
+reais e verifica ajuda/negativos. Links locais/âncoras novos foram conferidos.
+Corpus sintético/local não equivale à homologação da suíte real. macOS/Windows
+não executados, opcionais nesta história pelo plano v4; não são gates Linux nem
+evidência de execução nativa nessas plataformas.
 
 ## US-32 — issue #64 / história 0032
 

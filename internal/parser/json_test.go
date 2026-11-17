@@ -60,6 +60,12 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	// US-33: optional count, strict suffix consumption and original positions.
+	for _, declaration := range []string{`n: jsonpath "$" count`, `n: jsonpath "$.items[*]" count`, `n: jsonpath "$[?(@.ok==true)].data" count`, `n: jsonpath "$[?(@.n=={{v}})].data" count`, `n: jsonpath "$"count`, `n: jsonpath "$" count count`, `n: jsonpath "$" count 1`, `n: jsonpath "$" count + 1`, `n: jsonpath "$" count regex "x"`, `n: header "X" count`} {
+		for _, nl := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP 200\n[Captures]\n  "+declaration, "\n", nl))
+		}
+	}
 	// US-32: direct inequality in both literal/dynamic profiles and explicit limits.
 	for _, line := range []string{`jsonpath "$" != null`, `jsonpath "$" != 1e999999999999999999`, `jsonpath "$" != {"x":[true,{{v}}]}`, `jsonpath "$" != "{{v}}"`, `jsonpath "$" != {{v}}`, `jsonpath "$" != "{{broken"`, `jsonpath "$" != 1 2`, `jsonpath "$" count != 0`, `header "X" != "x"`, `body != "x"`, `jsonpath "$" not == 1`, `jsonpath "$.items[*].id" != [1,2]`} {
 		for _, nl := range []string{"\n", "\r\n"} {

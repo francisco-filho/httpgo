@@ -1,0 +1,46 @@
+{
+  "response_json": "[null,null,1]",
+  "classification": "captura numérica e uso textual preservam tipo sem --render-asserts; null conta como elemento",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"count\":3,\"text\":\"3\"}",
+        "content_type": "application/json",
+        "probe": "3"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"count\":3,\"text\":\"3\"}",
+        "content_type": "application/json",
+        "probe": "3"
+      }
+    ]
+  }
+}

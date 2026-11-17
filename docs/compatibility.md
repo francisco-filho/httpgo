@@ -1,4 +1,55 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-32
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-33
+
+## Captura de contagem — US-33 / issue #66
+
+**Ampliação intencional da linguagem:** `nome: jsonpath "consulta" count` passa
+de não suportado para captura numérica. O antigo negativo de scenarios
+`unsupported_capture_count.hurl` foi substituído pelo positivo `capture_count.hurl`;
+negativos específicos preservam limites de pipeline/header. Nenhum dos **424
+pares históricos** em `testdata/compatibility/` foi alterado. São **16 pares
+novos `capture_count_*`**, corpus integrado **440 pares**.
+
+Harness/perfil US-30 reutilizados sem alterações: `httpgo_profile` seleciona
+`render-asserts` só no HTTPGo, nunca no Hurl. Sequência existente `/poll` representa
+antes/depois; `/health` representa operação sem alteração e avanço. Cada runner
+recebe árvore/fixture e índice de sequência independentes. Observações novas
+colhidas somente pelo prefixo novo, depois conferidas sem `-update`. Referência
+**Hurl 8.0.0**, sem skip; não foi consultado/copiado código-fonte Hurl.
+
+| Par `capture_count_…` | HTTPGo | Hurl 8.0.0 | Observação |
+|---|---|---|---|
+| `unchanged` | 0, /poll → /health → /poll → /health | 0, mesmo fluxo | itens mudam mas quantidade não; `==`, `>=`, `<=` com baseline |
+| `changed` | 1, /poll → /poll | 4, mesmo fluxo | quantidade muda, próximo envio bloqueado |
+| `numeric` | 0, /capture → POST /health | 0, mesmo fluxo | três elementos, incluindo null; body `{"count":3,"text":"3"}` e X-Probe `3` |
+| `empty` | 0, /capture → POST /health | 0, mesmo fluxo | array direto vazio publica número zero |
+| `scalar`, `null`, `missing` | 2, /capture | 3, /capture | string/null/ausência não geram baseline; nenhum próximo envio |
+| `wildcard_zero`, `wildcard_scalar` | 2, /capture | 3, /capture | zero resultados não é zero; escalar único não é array |
+| `wildcard_many` | 0, /capture → POST /health | 0, mesmo fluxo | três valores incluindo null publicam 3 |
+| `wildcard_array`, `filter_array` | 0, /capture → POST /health | 0, mesmo fluxo | único array com três elementos publica 3, não uma correspondência |
+| `collision` | 2, /capture | 0, /capture → POST /health | HTTPGo preserva inicial `baseline=7`; Hurl a substitui por captura 3 |
+| `same_response` | 2, /capture | 0, /capture → /health | HTTPGo avalia assertion antes de publicar captura; ordem deliberadamente diferente |
+| `no_optin` | 2, zero HTTP | 0, /capture → /capture → /health | esperado dinâmico não ativa `--render-asserts` implicitamente |
+| `pipeline` | 2, zero HTTP | 3, /health → /capture | HTTPGo rejeita encadeamento estaticamente; Hurl chega à transformação |
+
+Captura de `count` nos pares de wildcard/filtro acima concorda na quantidade
+observada; isso não elimina diferenças já documentadas das **capturas sem
+transformação**. HTTPGo conta o array final reduzido; não se infere suporte a
+toda gramática/seleção Hurl a partir destes exemplos. Os códigos de captura
+2/3 e de assertion 1/4 são próprios, não requisitos de igualdade entre runners.
+
+Testes HTTPGo adicionais cobrem objetos/números/booleanos, vários arrays sem
+achatamento, consulta inválida/percurso incompatível, colisões hierárquicas,
+segredo descoberto em lote rejeitado, comparação secreta com real diferente,
+pendente sem avaliação antecipada, read/close/prazo/cancelamento, writers e
+isolamento. Captura não precisa de opt-in; esperado dinâmico precisa. Extensões
+YAML e renderização externa continuam explicitamente HTTPGo. Corpus sintético
+local não equivale à homologação da suíte real.
+
+[Subconjunto](subset.md#captura-de-contagem--us-33--issue-66),
+[arquitetura](architecture.md#captura-de-contagem--us-33--issue-66),
+[validação](validation.md#us-33--issue-66--história-0033).
+Reprodução: Hurl 8.0.0 no PATH e `make compatibility`, ou apenas os novos pares
+com `go test -tags compatibility ./tests/e2e -run '^TestCompatibility/capture_count_' -count=1 -v`.
 
 ## Desigualdade JSON — US-32 / issue #64
 
@@ -648,7 +699,7 @@ As observações estão versionadas nos pares `.hurl`/`.json`; resposta é JSON 
 **Ampliação intencional do contrato:** `exists` JSON, `count` de arrays e os
 comparadores `>`, `>=`, `<`, `<=` deixam de ser rejeitados. No corpus de cenários,
 as antigas rejeições globais de exists/count passaram a `!=`/`length`, que naquela entrega continuavam
-não suportados. Novos negativos documentam esperados inválidos e count em captura.
+não suportados. Naquela entrega, novos negativos documentavam esperados inválidos e count em captura; a proibição de captura JSONPath foi substituída pela US-33 acima.
 São **20 novos pares `structure_*`**, total **136**; as **116 observações antigas
 permanecem inalteradas**. Sem reutilizar código-fonte Hurl, alterar o harness ou
 regenerar observações anteriores.

@@ -1,10 +1,47 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-32
+# Arquitetura implementada — US-01 a US-16, US-20 a US-33
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Captura de contagem — US-33 / issue #66
+
+`parser.Capture` acrescenta `Count` e `Query` (fonte para diagnóstico), preservando
+`Kind`, `Path`, `Position` e `QueryPosition`. `parseCapture` aceita exatamente o
+sufixo opcional `count` separado por espaço em JSONPath; consome a declaração
+inteira e valida a consulta com o perfil existente. Header, parâmetros,
+aritmética e pipelines são rejeitados antes da rede. Não há nova flag, pacote,
+interface, dependência ou alteração de Go/toolchain.
+
+`query.CountArray(value) (json.Number, bool)` é a operação pura compartilhada:
+conta apenas `[]any` e produz inteiro não negativo com `strconv.Itoa`, sem
+float64. Não seleciona nem decide sucesso. `assertion.EvaluateJSON` a reutiliza,
+preservando ausência/tipo incompatível como divergência **1**. Já
+`runner.captureResponse` usa `Path.Select` e transforma o valor final selecionado;
+ausência/tipo não array são erro de captura **2**, não baseline zero.
+Cardinalidade US-27/28 é preservada: zero ausente, um conserva tipo, vários
+formam array; não há achatamento nem contagem das correspondências intermediárias.
+
+O lote serializa o `json.Number` via `json.Marshal` e reutiliza `ProtectCapture`
+antes de passar à próxima declaração. `Session.Publish` mantém validação/colisão
+exata e hierárquica e publicação atômica; seu contrato não muda. Ordem continua
+status → assertions → capturas → callback → próximo envio. Esperado US-30 usa
+somente iniciais/capturas anteriores e mantém o opt-in `--render-asserts`.
+
+`CaptureError` acrescenta `Query` e `Count`; `captureFailure` sanitiza consulta
+(com literais de filtro redigidos), detalhe e arquivo antes do resultado. A CLI
+reutiliza a apresentação do erro controlado: localização, consulta, transformação
+e causa, nunca coleção ou quantidade protegida. Proveniência do esperado secreto
+oculta esperado e real posteriores, mesmo diferentes; `pendingSecret` não
+antecipa seleção. `safeEntry` remove capturas/planos/corpos antes de callbacks.
+
+`RetainBody` já cobre captura JSONPath. Transporte não muda: só resposta final
+consumida e fechada é avaliada; read/close/prazo/cancelamento não publicam valores.
+Falha/short write impede próximo envio e mantém prioridade **2**. Nova execução
+cria sessão independente; a proteção acumulada da invocação não resolve valores
+em outros arquivos. Resultados não retêm documento, coleção ou plano operacional.
 
 ## Desigualdade JSON — US-32 / issue #64
 
@@ -321,7 +358,7 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 | `template.SecretVariants`, `Protector` | Proteção de valores brutos, decodificados e escapes conhecidos, inclusive antes de validar contexto; sem substituição de texto vazio |
 | `runner.Renderer`, `RenderError`, `CaptureError` | Factory consumer-owned `NewSession() template.Session` por Run; erros pré-envio e de captura com categorias/origens distintas; clones preservam cenário |
 | `template.Session`, `Capture`, `ConflictError`, `CaptureValueError` | Renderização e publicação atômica de JSON validado (`Capture.Value` é `json.RawMessage`); erro de payload/conflito indexa o lote sem expor conteúdo; variáveis iniciais imutáveis, cópia dos valores, capturas separadas e proteção dos valores descobertos |
-| `query.Path`, `query.Error`, `query.Decode` | Pacote folha sem interface: validar JSONPath limitado; decodificar exatamente um JSON com UseNumber; SelectValue distingue presença/ausência/percurso incompatível e Select mantém contrato de capturas |
+| `query.Path`, `query.Error`, `query.Decode`, `query.CountArray` | Pacote folha sem interface: validar JSONPath limitado; decodificar exatamente um JSON com UseNumber; SelectValue distingue presença/ausência/percurso incompatível e Select mantém contrato de capturas |
 | `query.HeaderValue`, `query.Header` | Ocorrências nome/valor sem net/http; seleção pura da primeira, com presença distinta de vazio e nome case-insensitive |
 | `assertion.Status`, `HeaderOperator`, `assertion.Header`, `assertion.JSONEqual`, `assertion.MatchString` | Comparação de status/headers, igualdade JSON tipada e correspondência regex de string sem coerção; não conhece runner, HTTP ou apresentação |
 | `parser.JSONAssertion.Pattern`, `Compiled` | `matches` conserva literal e regex estática, ou `ExpectedTemplate` no opt-in US-30; cópia local resolve/compila na avaliação; `safeEntry` remove ambos |

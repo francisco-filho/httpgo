@@ -1,0 +1,45 @@
+{
+  "response_json": "[1,2,3]",
+  "variables": [
+    "baseline=7"
+  ],
+  "classification": "HTTPGo não sobrescreve variável inicial; Hurl permite substituição pela captura",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"count\":3}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

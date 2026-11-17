@@ -1,0 +1,32 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"items\":[null,1,2]}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"items\":[3,4,5]}"
+    }
+  ],
+  "classification": "quantidade preservada apesar de itens diferentes; HTTPGo exige opt-in para esperado dinâmico",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/health",
+      "/poll",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/health",
+      "/poll",
+      "/health"
+    ]
+  }
+}

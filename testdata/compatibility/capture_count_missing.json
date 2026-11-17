@@ -1,0 +1,16 @@
+{
+  "response_json": "{}",
+  "classification": "seleção ausente não produz baseline zero; códigos próprios de captura",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}
