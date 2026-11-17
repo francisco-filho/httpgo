@@ -17,6 +17,7 @@ type arguments struct {
 	files              []string
 	config             string
 	environment        string
+	output, outputFile string
 	variables, secrets []string
 }
 
@@ -24,6 +25,7 @@ func parseArguments(args []string) (arguments, error) {
 	var result arguments
 	invalid := len(args) == 0 || args[0] != "test"
 	environmentSeen := false
+	outputSeen, outputFileSeen := false, false
 	environmentIssue := ""
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
@@ -44,7 +46,7 @@ func parseArguments(args []string) (arguments, error) {
 				invalid = true
 			}
 			result.renderFiles = true
-		case "--config", "--env", "--var", "--secret":
+		case "--config", "--env", "--var", "--secret", "--output", "--output-file":
 			if !inline {
 				if i+1 == len(args) {
 					invalid = true
@@ -57,6 +59,16 @@ func parseArguments(args []string) (arguments, error) {
 				value = args[i]
 			}
 			switch name {
+			case "--output":
+				if outputSeen || value != "junit" {
+					invalid = true
+				}
+				outputSeen, result.output = true, value
+			case "--output-file":
+				if outputFileSeen || value == "" {
+					invalid = true
+				}
+				outputFileSeen, result.outputFile = true, value
 			case "--config":
 				if value == "" || result.config != "" {
 					invalid = true
@@ -85,6 +97,9 @@ func parseArguments(args []string) (arguments, error) {
 	}
 	if environmentIssue != "" {
 		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
+	}
+	if outputSeen != outputFileSeen {
+		return result, fmt.Errorf("JUnit exige --output junit e --output-file <caminho>; use httpgo --help")
 	}
 	if invalid || len(result.files) == 0 {
 		return result, fmt.Errorf("uso inválido ou flag não suportada; use httpgo test <arquivo> ou httpgo --help")

@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-33
+# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-33
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo. As descrições de esperados
@@ -6,6 +6,52 @@ literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
 [US-30](#esperados-dinâmicos--us-30--issue-60) define sua evolução opt-in com
 `--render-asserts`. A US-31 também permite operandos dinâmicos nos filtros por
 igualdade de assertions e capturas, sem ampliar operadores ou passos.
+
+## Relatório JUnit — US-17 / issue #68
+
+```bash
+httpgo test tests/ --output junit --output-file target/test-results.xml
+```
+
+- `--output` aceita somente `junit`; sem a flag, preserva o texto existente em
+  stdout. JUnit exige `--output-file` não vazio. Ambas aceitam `--flag=valor` ou
+  `--flag valor`, em qualquer ordem após `test`, uma ocorrência de cada.
+  Formato desconhecido, repetição ou destino sem formato retornam **2** antes
+  de qualquer HTTP. `--output text/json`, JUnit em stdout e destino do modo texto
+  não são suportados. Nenhuma flag nova altera a linguagem `.hurl`.
+- stdout fica vazio em JUnit; stderr mantém os mesmos diagnósticos seguros do
+  modo texto. Abre/cria/trunca o destino somente após obter resultados da suíte,
+  cria diretórios pais quando possível. Falha global de configuração, composição,
+  cancelamento prévio ou descoberta não cria nem altera o destino anterior.
+- Raiz `testsuite` com `name="httpgo"`, atributos `tests`, `failures`, `errors`,
+  `skipped` e `time` em segundos decimais. Um `testcase` por arquivo descoberto,
+  na ordem da suíte, com `classname="httpgo"`, `name` igual ao caminho normalizado
+  da descoberta (relativo ao cwd, fallback absoluto entre unidades) e `time` de
+  execução do arquivo. Identidade estável enquanto caminhos e cwd não mudam,
+  sujeita à sanitização de segredos. Não conta requests/tentativas como testcases.
+- Resultado completo aprovado não recebe filho de falha. Divergência final de
+  status/header/JSON/body recebe `failure`; entrada/captura/renderização/avaliação/
+  transporte recebe `error`. Não executados por fail-fast, cancelamento ou erro
+  global de apresentação recebem `skipped` com tempo zero, nunca sucesso.
+  Diagnósticos identificam arquivo/linha/coluna da requisição/assertion quando
+  disponíveis. `message` é a categoria; texto do elemento contém o diagnóstico.
+- Contagens são de arquivos; duração da suíte inclui carga/execução/apresentação,
+  não a escrita posterior do XML. Um arquivo com múltiplas requisições ou polling
+  gera um único testcase, com o desfecho definitivo já decidido pela suíte.
+- XML usa escaping da biblioteca padrão e substitui caracteres inválidos em XML
+  por U+FFFD. Nomes/diagnósticos são sanitizados **antes** da serialização e mais
+  uma vez ao fim da invocação, inclusive por segredos descobertos em outro arquivo.
+  Não há `system-out`, bodies, coleções de headers ou erros brutos de I/O.
+  stderr incremental não pode ocultar retroativamente um valor ainda desconhecido
+  como segredo; use as marcações/referências explícitas existentes.
+- Artefato é produzido também com falhas: **0** sucesso, **1** assertion,
+  **2** outros erros. Falha de criação/escrita curta/escrita/fechamento prevalece
+  com **2**, sem anúncio de publicação. Pode deixar um arquivo parcial: geração
+  não é transacional. Use um destino de relatório separado dos arquivos de entrada.
+- Não reenvia requests, não reavalia assertions nem muda sessões/polling.
+  [Exemplo mínimo](../testdata/scenarios/scenario_junit.hurl) e
+  [consumidor de referência/CI](junit.md). Sem dashboard, histórico persistente,
+  formatos adicionais ou envio para serviços externos.
 
 ## Captura de contagem — US-33 / issue #66
 
@@ -732,7 +778,7 @@ parsing antes da primeira sessão. A comparação não muda; operandos de assert
 resultados/callbacks, stdout/stderr são sanitizados, inclusive diante de eco em
 header comum/JSON. Sessão continua protegendo capturas e derivados em URL, headers,
 JSON inline/externo opt-in e campos multipart, sem alterar bytes de arquivo.
-Mesma política para um futuro relatório JUnit, não implementado aqui.
+A US-17 reutiliza a mesma política no relatório JUnit.
 
 Cada invocação lê seu próprio ambiente, sem cache global, dotenv ou herança de
 valores/marcas/capturas da execução anterior. Cancelamento é verificado na preparação
@@ -1579,8 +1625,9 @@ compartilhamento implícito de login, cenário/segredos por stdin ou outras flag
 
 ### Resultados e contagens
 
-`--output`, `--output-file`, `check` e configurações futuras
-não estão implementados ou anunciados como disponíveis.
+`--output junit --output-file <caminho>` seleciona o relatório US-17 descrito
+acima. `check` e configurações futuras não estão implementados ou anunciados.
+As linhas e contagens a seguir descrevem o **modo texto padrão**.
 
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
 resultado com o método declarado, URL segura e uma

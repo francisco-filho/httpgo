@@ -20,6 +20,7 @@ type BuildInfo struct{ Version, Commit, Date string }
 
 type Command struct {
 	executor   runner.HTTPExecutor
+	openReport func(string) (io.WriteCloser, error)
 	build      BuildInfo
 	args       []string
 	in         io.Reader
@@ -76,12 +77,32 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return c.fail("execução cancelada antes da leitura do cenário")
 	}
 	c.timeout = settings.Timeout
-	execution := suite.NewWithProtection(runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, c.renderEntry), c.protection.sanitize)
+	entryReporter := c.renderEntry
+	fileReporter := c.renderFile
+	var diagnostics []string
+	if args.output == "junit" {
+		entryReporter = nil
+		fileReporter = func(_ suite.FileResult, run runner.Result, loadErr error) error {
+			text := c.junitDiagnostic(run, loadErr)
+			diagnostics = append(diagnostics, text)
+			if text == "" {
+				return nil
+			}
+			_, err := io.WriteString(c.err, text)
+			return err
+		}
+	}
+	execution := suite.NewWithProtection(runner.NewWithRenderer(c.executor, sessionRenderer{renderer, c.protection}, entryReporter), c.protection.sanitize)
 	files, err := execution.Discover(ctx, args.files)
 	if err != nil {
 		return c.fail(err.Error())
 	}
-	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}, c.renderFile)
+	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}, fileReporter)
+	if args.output == "junit" {
+		if err := c.writeJUnit(args.outputFile, result, diagnostics); err != nil {
+			return c.fail(fmt.Sprintf("não foi possível gravar relatório JUnit em %q; verifique o destino e as permissões de escrita", args.outputFile))
+		}
+	}
 	if result.ReportErr != nil {
 		pos := result.ReportPosition
 		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
@@ -90,6 +111,9 @@ func (c *Command) executeContext(ctx context.Context) int {
 		if _, err := io.WriteString(c.err, "execução da suíte cancelada; arquivos restantes não executados\n"); err != nil {
 			return 2
 		}
+	}
+	if args.output == "junit" {
+		return result.Code
 	}
 	if err := c.renderSuite(result.Summary); err != nil {
 		return c.fail("não foi possível escrever o resumo da suíte")
@@ -326,7 +350,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers, JSON e body
 
 Uso:
-  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--render-asserts] [--var nome=valor] [--secret nome]
+  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--output junit --output-file caminho] [--render-files] [--render-asserts] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -438,7 +462,16 @@ Arquivos e requisições sequenciais; primeira falha definitiva para as entradas
 Sem --fail-fast continua os outros, inclusive após erro de parsing/transporte;
 com --fail-fast marca os restantes não executados, sem analisá-los para contagem.
 Capturas e cookies não passam entre arquivos; variáveis/opções iniciais permanecem.
-Não há cookie jar, paralelismo, dependências entre arquivos, JUnit ou outros formatos.
+Não há cookie jar, paralelismo ou dependências entre arquivos.
+JUnit: httpgo test tests/ --output junit --output-file target/test-results.xml
+--output junit exige --output-file; cria diretório pai quando possível.
+Um testcase por arquivo; assertion divergente=failure, demais erros=error,
+não executados=skipped. Nomes seguem os caminhos normalizados da descoberta.
+Tempos em segundos por arquivo; nenhum reenvio para gerar o XML.
+Resultado vai somente ao arquivo, stdout vazio; diagnósticos seguros em stderr.
+Artefato também em falha de assertion (1) ou execução (2); erro de escrita/fechamento
+retorna 2, sem anunciar publicação. Configuração/descoberta inválida não cria relatório.
+Sem bodies/headers integrais, outros formatos ou envio para serviços externos.
 Resumo por arquivo preserva contadores e inclui resultado/duração; resumo suíte
 agrega arquivos/requisições. total e não_iniciadas desconhecidos sem parsing completo;
 zero envios não significa zero requisições planejadas. validadas conta só status,
@@ -935,7 +968,7 @@ Destino ganha proteção automática antes dos overrides e acumula secrets/--sec
 --var pode substituir por valor fictício, conservando precedência e proteção;
 credenciais reais em argumentos continuam proibidas. Valores conhecidos, derivados
 e esperado/recebido ecoados são sanitizados antes de resultados/callbacks/streams.
-Não importa variáveis sem referência nem oferece dotenv, stdin, listas ou JUnit.
+Não importa variáveis sem referência nem oferece dotenv, stdin ou listas.
 Não detecta segredos desconhecidos ou transformações arbitrárias.
 Templates externos exigem --render-files.
 Proteção cobre valores brutos/decodificados e escapes conhecidos, não codificações arbitrárias.

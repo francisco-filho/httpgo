@@ -1,10 +1,42 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-33
+# Arquitetura implementada — US-01 a US-17, US-20 a US-33
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33), #68 (US-17) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Serialização JUnit — US-17 / issue #68
+
+`internal/report/junit.go` define `WriteJUnit(io.Writer, suite.Result, []string)`.
+Consome estados, nomes e durações já agregados, mais diagnósticos de apresentação
+protegidos na ordem dos arquivos. A CLI coleta somente esses textos pelo callback
+síncrono da suíte, reutilizando `renderDiagnostic`; não retém cenário/resposta/
+sessão entre arquivos. `report` usa `encoding/xml`, não abre/fecha arquivos, não
+conhece a CLI/transporte e não reavalia assertions. `suite` não importa `report`.
+Nenhuma dependência ou versão do Go mudou.
+
+A CLI valida o par de flags, desabilita as linhas/resumos de texto no modo JUnit
+e mantém stderr para diagnósticos seguros. Depois de `Suite.Run`, `cli/junit.go`
+cria o pai (`0700`) e abre o arquivo (`0600` na criação), sanitiza nomes/textos com
+`executionProtection` ao fim da invocação, chama o renderer e fecha mesmo em erro.
+O seam privado `Command.openReport` permite testar falhas de open/write/close sem
+interface de filesystem nova. `errors.Join` conserva falhas de escrita e close;
+a borda só apresenta diagnóstico seguro de destino/permissões e código 2.
+O writer do renderer converte escrita curta sem erro em `io.ErrShortWrite`.
+
+O formato possui raiz `testsuite`, contagens por arquivo, `classname="httpgo"`
+e identidade pelo nome normalizado da descoberta. Só converte `State` em
+`failure`/`error`/`skipped`; não altera classificação/exit code. Writer recebe
+texto protegido antes do escaping XML, nunca redigido por chunks de XML.
+Erro global anterior a `Run` não abre o destino. Após iniciar a suíte, conserva
+o artefato mesmo em falha de assertion, transporte, cancelamento ou apresentação,
+sem novos envios. Sem escrita atômica prometida ou confirmação falsa de publicação.
+
+A dependência nova é unidirecional: `cli → report → suite`; contratos runner,
+transporte, configuração, parser e formato texto permanecem. O consumidor de CI
+`dorny/test-reporter` v2.6.0 está fixado pelo commit no workflow e nos testes de
+seu parser original, sem dependência de runtime do HTTPGo. [Contrato](junit.md).
 
 ## Captura de contagem — US-33 / issue #66
 
@@ -335,7 +367,8 @@ cmd/httpgo/main.go
       → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
       → apresentação segura de cada resultado na CLI (callback síncrono)
     → resumo por arquivo na CLI antes do próximo arquivo
-  → resumo agregado da suíte na CLI
+  → resumo agregado da suíte na CLI (texto padrão)
+  → cli/junit.go → internal/report/junit.go (JUnit opt-in, após execução)
 ```
 
 O diagrama é fluxo de execução; `runner` **não importa** o adapter HTTP.
@@ -366,6 +399,7 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 | `runner.HeaderFailure`, `JSONFailure`, `JSONError`, `HeaderError`, `BodyError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `suite.Suite`, `File`, `FileResult`, `State`, `Summary`, `Result`, `Options` | Descoberta completa, carga/fechamento por arquivo, reutilização do runner com sessão nova, estados e contagens compactos, fail-fast e interrupções globais; não importa CLI ou transporte |
+| `report.WriteJUnit` | Serializa resultados por arquivo e diagnósticos protegidos em um writer; não executa nem decide sucesso |
 | `cli.Command`, `BuildInfo` | Argumentos/streams (`SetArgs/SetIn/SetOut/SetErr`), configuração única, montagem da suíte, saída segura e exit code; não reavalia assertion |
 | `main.run` | Monta dependências, `signal.NotifyContext`, streams do processo; seus defers terminam antes do único os.Exit de produção em main |
 

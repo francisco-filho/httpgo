@@ -12,7 +12,7 @@ func TestProcessEnvironmentHelp(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%q", code, stderr)
 		}
-		for _, text := range []string{"extensão HTTPGo (US-13)", "${OWNER_TOKEN}", "[A-Za-z_][A-Za-z0-9_]*", "valor string completo", "base < ambiente < CLI", "só referências efetivas", "mesmo não usadas", "vazia é string vazia", "proteção automática antes dos overrides", "credenciais reais em argumentos continuam proibidas", "Não importa variáveis sem referência", "nem oferece dotenv, stdin, listas ou JUnit"} {
+		for _, text := range []string{"extensão HTTPGo (US-13)", "${OWNER_TOKEN}", "[A-Za-z_][A-Za-z0-9_]*", "valor string completo", "base < ambiente < CLI", "só referências efetivas", "mesmo não usadas", "vazia é string vazia", "proteção automática antes dos overrides", "credenciais reais em argumentos continuam proibidas", "Não importa variáveis sem referência", "nem oferece dotenv, stdin ou listas"} {
 			if !strings.Contains(out, text) {
 				t.Errorf("help missing %q", text)
 			}
