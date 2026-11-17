@@ -1,0 +1,16 @@
+{
+  "response_json": "{\"items\":null}",
+  "classification": "null presente não é array vazio; códigos próprios de captura",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

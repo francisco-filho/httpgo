@@ -3,6 +3,66 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Comparar a quantidade antes e depois (US-33 / issue #66)
+
+```hurl
+GET {{base_url}}/orders
+
+HTTP 200
+[Captures]
+orders_before: jsonpath "$.items" count
+
+POST {{base_url}}/orders/preview
+Content-Type: application/json
+{"productId":"p1"}
+
+HTTP 200
+
+GET {{base_url}}/orders
+
+HTTP 200
+[Asserts]
+jsonpath "$.items" count == {{orders_before}}
+```
+
+Salve como `unchanged.hurl` ou use o
+[cenário versionado](testdata/scenarios/scenario_count_unchanged.hurl):
+
+```bash
+httpgo test unchanged.hurl --render-asserts --var base_url=http://localhost:8080
+```
+
+A API retorna `{"items":[...]}` em `/orders`; `/orders/preview` não deve alterar
+sua quantidade. Três itens antes e três depois passam com **0**, mesmo com
+conteúdo diferente; quatro depois falham com **1**, sem imprimir os pedidos.
+
+- `nome: jsonpath "consulta" count` publica **número JSON inteiro não negativo**,
+  não string. Conta somente elementos do array final selecionado, incluindo
+  `null`; array vazio publica zero. O número pode ser reutilizado em URL,
+  header, string JSON ou valor JSON completo (mantendo tipo numérico).
+- Capturar não exige `--render-asserts`; usar o baseline como esperado dinâmico
+  exige esse opt-in HTTPGo. Os comparadores continuam `==`, `>`, `>=`, `<`, `<=`.
+  Não há aritmética, `count !=`, contagem de strings/objetos, parâmetros,
+  pipelines ou `count` em captura de header.
+- Ausência, `null`, escalar/objeto, JSON inválido ou percurso incompatível são
+  **erro de captura 2**, nunca baseline zero fictício. Em assertion, ausência ou
+  tipo não array continuam divergência **1**. Wildcard/filtro respeitam a
+  redução US-27/28: zero resultados é ausência; um resultado conserva seu tipo;
+  vários formam array sem achatamento. Um único array conserva seu conteúdo.
+- Ordem: status → assertions → capturas atômicas → apresentação → próximo envio.
+  Colisões exatas/hierárquicas com iniciais, capturas anteriores ou mesmo lote
+  rejeitam todo o lote sem sobrescrever. Captura própria não está disponível
+  para assertions da mesma resposta. Erro estático tardio impede todo HTTP.
+- `--secret orders_before` protege a quantidade e seus usos; comparação posterior
+  oculta esperado **e** real, mesmo diferentes. Diagnóstico de captura informa
+  consulta, `count`, causa e localização, sem despejar a coleção. Falhas de
+  transporte/escrita impedem avanço; sessões não compartilham baselines.
+
+[Subconjunto](docs/subset.md#captura-de-contagem--us-33--issue-66),
+[diferenças Hurl 8.0.0](docs/compatibility.md#captura-de-contagem--us-33--issue-66)
+e [evidência Linux](docs/validation.md#us-33--issue-66--história-0033).
+Corpus sintético não equivale à homologação de uma suíte real.
+
 ## Verificar mudança de valor JSON (US-32 / issue #64)
 
 ```hurl
@@ -1428,7 +1488,7 @@ captura secreta pendente oculta integralmente ambos os operandos, inclusive cont
 O diferencial com **Hurl 8.0.0** confirmou presença de null, vazios, false e zero,
 contagem e limites dos pares compartilhados. Há diferenças deliberadas de gramática
 (esperados com expoente), pré-validação de count negativo/fracionário e códigos;
-veja [matriz](docs/compatibility.md). Não há count em capturas, strings/objetos,
+veja [matriz](docs/compatibility.md). Count em captura JSONPath está disponível na US-33 acima; não há count em strings/objetos,
 novos JSONPaths, filtros, agregações, aritmética ou regex. O dummy manual não promete
 essa resposta; o exemplo é testado contra HTTP local pelos E2E.
 

@@ -1,0 +1,17 @@
+{
+  "httpgo_profile": "literal",
+  "response_json": "[1,2,3]",
+  "classification": "captura count não ativa interpolação de assertions; esperado dinâmico exige opt-in HTTPGo",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ]
+  }
+}

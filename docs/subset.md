@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-32
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-33
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo. As descrições de esperados
@@ -6,6 +6,78 @@ literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
 [US-30](#esperados-dinâmicos--us-30--issue-60) define sua evolução opt-in com
 `--render-asserts`. A US-31 também permite operandos dinâmicos nos filtros por
 igualdade de assertions e capturas, sem ampliar operadores ou passos.
+
+## Captura de contagem — US-33 / issue #66
+
+Em `[Captures]`, `nome: jsonpath "consulta" count` é a única transformação de
+contagem suportada. Sem transformação, a captura JSONPath não muda. Exemplo
+[versionado](../testdata/scenarios/scenario_count_unchanged.hurl):
+
+```hurl
+GET {{base_url}}/orders
+
+HTTP 200
+[Captures]
+orders_before: jsonpath "$.items" count
+
+POST {{base_url}}/orders/preview
+Content-Type: application/json
+{"productId":"p1"}
+
+HTTP 200
+
+GET {{base_url}}/orders
+
+HTTP 200
+[Asserts]
+jsonpath "$.items" count == {{orders_before}}
+```
+
+Execute `httpgo test unchanged.hurl --render-asserts --var base_url=http://localhost:8080`.
+Quantidade preservada passa com **0**, alterada falha com **1**; mudar os itens
+sem mudar a quantidade continua passando. Nenhuma coleção é impressa.
+
+Contrato:
+
+- A consulta seleciona primeiro, só depois `count` conta elementos do **array
+  final**. Inclui elementos `null`; array vazio publica `0`. O valor publicado
+  é número JSON inteiro não negativo, nunca string nem float64. Reutilização
+  em JSON completo mantém número; em URL/header/string JSON usa forma textual.
+- Ausência não é array vazio. `null`, string, número, booleano e objeto não são
+  arrays. Esses casos, JSON inválido/adicional e percurso não avaliável falham
+  com **erro de captura 2**, sem publicar qualquer parte do lote ou avançar.
+  A classificação de `count` em assertion não muda: ausência/tipo não array
+  falham com **1**, erro de decode/percurso com **2**.
+- Cardinalidade US-27/28: zero resultados é ausência; um escalar conserva tipo e
+  falha; vários valores formam array e contam seus elementos. Um array único,
+  inclusive vazio, conserva seu conteúdo; vários arrays contam como elementos,
+  sem achatamento, deduplicação ou contagem das correspondências internas.
+- Captura/reutilização em requisições não exige opt-in. Esperado dinâmico
+  `count == {{orders_before}}` exige **`--render-asserts`**, extensão explícita
+  HTTPGo da US-30, também para `>`, `>=`, `<`, `<=`. Sem flag, esperado bare
+  dinâmico é rejeitado antes de qualquer HTTP. A captura não ativa a flag.
+- Status → assertions na ordem escrita → seleção/transformação de capturas →
+  publicação atômica → apresentação. Nenhuma captura provisória fica acessível
+  no mesmo lote ou nas assertions da mesma resposta. Iniciais/valores anteriores
+  são imutáveis; colisões exatas/hierárquicas com eles ou no lote rejeitam tudo.
+- `--secret orders_before` apenas marca o nome. Quantidade descoberta é protegida
+  antes de outra captura falhar; comparação posterior oculta esperado e real,
+  inclusive diferentes. Captura secreta pendente oculta sem avaliação antecipada.
+  Diagnóstico identifica consulta/`count`/causa/localização, não a coleção nem
+  quantidade protegida. Marque segredos explicitamente: não há detecção universal.
+- Só resposta final completa/fechada pode gerar baseline; leitura, fechamento,
+  timeout/cancelamento e falha/short write interrompem. Escrita tem prioridade
+  **2**. Sessões/arquivos independentes não compartilham valores resolvíveis;
+  proteção acumulada na mesma invocação não compartilha capturas.
+
+Não há parâmetros em `count`, pipelines, aritmética, soma/média, comparador novo
+ou contagem em strings/objetos/header. Declaração inteira e arquivo inteiro são
+validados antes da rede, inclusive erro tardio em LF/CRLF. Esta ampliação remove
+somente a antiga proibição de `count` em captura JSONPath.
+
+[Diferencial Hurl 8.0.0](compatibility.md#captura-de-contagem--us-33--issue-66)
+separa códigos de captura, opt-in, colisões e ordem; não afirma equivalência de
+toda seleção ou de toda a linguagem. [Validação](validation.md#us-33--issue-66--história-0033).
 
 ## Desigualdade JSON — US-32 / issue #64
 
@@ -1323,7 +1395,7 @@ Ausência, tipo selecionado não numérico e condição falsa falham com 1. Espe
 não numérico é sintaxe inválida (2) antes da rede; JSON inválido e percurso
 incompatível continuam erros de avaliação (2).
 
-Continuam fora do recorte: count em strings/objetos/capturas, filtros além da igualdade estática US-28 e interpolação de consultas.
+Continuam fora do recorte: count em strings/objetos, filtros além da igualdade estática US-28 e interpolação estrutural de consultas. Count em captura JSONPath é suportado na US-33 acima.
 Esperados dinâmicos exigem `--render-asserts` (US-30). `matches` aceita strings selecionadas de JSON e a primeira ocorrência de header, nos recortes documentados acima. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. Os novos pares com Hurl 8.0.0 confirmam que null, vazios,

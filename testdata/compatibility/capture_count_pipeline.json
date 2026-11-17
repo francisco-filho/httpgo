@@ -1,0 +1,15 @@
+{
+  "response_json": "[[1,2,3],[]]",
+  "classification": "pipelines fora do recorte HTTPGo são rejeitados antes de todo HTTP",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/health",
+      "/capture"
+    ]
+  }
+}

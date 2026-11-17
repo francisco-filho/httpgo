@@ -512,6 +512,32 @@ Diferença não garante revogação do token antigo, validade do novo ou outros 
 verifique essas propriedades com requisições independentes. Exemplo completo:
 testdata/scenarios/scenario_json_inequality_rotation.hurl (inclui uso de new_token).
 
+Captura de contagem — US-33:
+  httpgo test unchanged.hurl --render-asserts --var base_url=http://localhost:8080
+  GET {{base_url}}/orders
+  HTTP 200
+  [Captures]
+  orders_before: jsonpath "$.items" count
+  POST {{base_url}}/orders/preview
+  Content-Type: application/json
+  {"productId":"p1"}
+  HTTP 200
+  GET {{base_url}}/orders
+  HTTP 200
+  [Asserts]
+  jsonpath "$.items" count == {{orders_before}}
+Quantidade preservada passa com 0; alterada falha com 1, sem imprimir pedidos.
+count em captura JSONPath publica número JSON inteiro não negativo, nunca string.
+Conta só array final, incluindo null; vazio publica zero. Não conta strings/objetos.
+Ausência, null ou tipo não array em captura: erro 2, sem baseline zero fictício.
+Wildcard/filtro: zero ausente; um conserva tipo; vários formam array, sem achatamento.
+Captura e reutilização em requisição não exigem --render-asserts; esperado dinâmico exige.
+Comparadores: ==, >, >=, <, <=. Sem parâmetros, pipelines, aritmética ou count em header.
+Ordem status → assertions → capturas atômicas; sem sobrescrita nem captura própria.
+--secret orders_before protege quantidade e ambos os operandos na comparação posterior.
+Diagnóstico mostra consulta/count/causa/localização, não coleção ou quantidade protegida.
+Exemplos: testdata/scenarios/scenario_count_unchanged.hurl e capture_count.hurl.
+
 Assertions de body: salve privacy.hurl e execute
   httpgo test privacy.hurl --var base_url=http://localhost:8080
   GET {{base_url}}/export
@@ -663,7 +689,7 @@ jsonpath "$.name" matches "^Pizza": encontra trecho em string JSON, sem coerçã
 Ausência/tipo incompatível/condição falsa: 1; JSON inválido: 2.
 Regex Go inválida/não suportada e matches em body/variável: erro 2 antes da rede.
 Headers também aceitam matches, com primeira ocorrência e padrão JSON literal (acima).
-Sem count em strings/objetos/capturas ou JSONPath completo.
+Sem count em strings/objetos ou JSONPath completo. Captura JSONPath count: US-33 acima.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
 pelo Hurl; esperado literal aqui no perfil padrão, sem interpolação. Veja docs/compatibility.md.
 

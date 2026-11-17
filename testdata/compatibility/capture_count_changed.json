@@ -1,0 +1,28 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"items\":[null,1,2]}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"items\":[3,4,5,6]}"
+    }
+  ],
+  "classification": "quantidade alterada falha; códigos próprios de assertion",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/poll",
+      "/poll"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/poll",
+      "/poll"
+    ]
+  }
+}

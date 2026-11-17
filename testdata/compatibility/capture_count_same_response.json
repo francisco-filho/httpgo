@@ -1,0 +1,18 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[1,2,3]",
+  "classification": "HTTPGo mantém assertions antes da publicação; captura da mesma resposta não é esperado disponível",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}
