@@ -1,0 +1,78 @@
+{
+  "response_sequence": [
+    {
+      "status": 503,
+      "response_json": "invalid"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"accepted\"}"
+    }
+  ],
+  "variables": [
+    "id=old"
+  ],
+  "classification": "US-34: ambos retentam 503 antes de captura inválida e confirmam id accepted somente na resposta 200",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  }
+}

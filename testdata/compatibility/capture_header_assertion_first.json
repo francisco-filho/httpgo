@@ -6,9 +6,9 @@
     }
   ],
   "response_json": "not JSON",
-  "classification": "diferença deliberada de ordem: HTTPGo assertion antes de captura ausente (1); Hurl erro de captura (3)",
+  "classification": "US-34: ambos avaliam captura ausente antes da assertion; códigos HTTPGo 2 e Hurl 3",
   "httpgo": {
-    "exit": 1,
+    "exit": 2,
     "paths": [
       "/capture"
     ],

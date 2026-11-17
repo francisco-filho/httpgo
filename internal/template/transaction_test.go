@@ -1,6 +1,7 @@
 package template
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 )
@@ -44,6 +45,35 @@ func TestStagedCaptureReplacement(t *testing.T) {
 				t.Fatal("replacement lost protection")
 			}
 		})
+	}
+}
+
+// Both fuzz targets exercise typed overlays and discard, not only publication.
+func fuzzCaptureOverlay(t *testing.T, s Session, value string) {
+	t.Helper()
+	before, err := s.RenderJSON([]byte(`{{x}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := json.RawMessage(value)
+	if !json.Valid(raw) {
+		raw = captureString(value)
+	}
+	view, err := s.Stage([]Capture{{"x", raw}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := view.RenderJSON([]byte(`{{x}}`))
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, raw); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil || !bytes.Equal(got, compact.Bytes()) {
+		t.Fatal("overlay changed JSON value", err)
+	}
+	after, err := s.RenderJSON([]byte(`{{x}}`))
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatal("discard changed confirmed value", err)
 	}
 }
 

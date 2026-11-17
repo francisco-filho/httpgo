@@ -3,11 +3,12 @@
   "variables": [
     "x=original"
   ],
-  "classification": "diferença: HTTPGo não sobrescreve variável inicial; Hurl sobrescreve",
+  "classification": "US-34: ambos renovam variável inicial por regex, sem expansão recursiva",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/capture"
+      "/capture",
+      "/health"
     ],
     "requests": [
       {
@@ -16,6 +17,13 @@
         "body": "",
         "content_type": "",
         "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "prenewpost"
       }
     ]
   },

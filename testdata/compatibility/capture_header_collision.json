@@ -8,11 +8,12 @@
   "variables": [
     "x=original"
   ],
-  "classification": "diferença deliberada de colisão: HTTPGo proíbe sobrescrita inicial (2); Hurl sobrescreve",
+  "classification": "US-34: ambos substituem variável inicial pela string do header, enviando X-Probe new",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/capture"
+      "/capture",
+      "/health"
     ],
     "requests": [
       {
@@ -21,6 +22,13 @@
         "body": "",
         "content_type": "",
         "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "new"
       }
     ]
   },

@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{`"replacement"`, `"{{literal}}"`, `null`, `9007199254740993`, `{"child":[]}`} {
+		f.Add("renewed={{x}}/previous={{captured}}", value)
+	}
 	for _, value := range []string{`"x')].id[?(@.n=='other"`, `"a\"\\[]雪"`, `"{{missing}}"`, `1e99999999999999999999`, `1.00000000000000000000002`, `null`, `[]`, `{}`} {
 		f.Add("Order {{x}}", value)
 	}
@@ -99,6 +102,7 @@ func FuzzRender(f *testing.F) {
 				t.Fatal("invalid typed capture", err)
 			}
 		}
+		fuzzCaptureOverlay(t, s, value)
 		_, err = s.Render(source)
 		if err != nil && strings.Contains(err.Error(), "notRecursive") {
 			t.Fatal("unsafe error")

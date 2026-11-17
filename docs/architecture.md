@@ -1,10 +1,62 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-33
+# Arquitetura implementada — US-01 a US-17, US-20 a US-34
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33), #68 (US-17) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33), #68 (US-17), #70 (US-34) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Renovação transacional de capturas — US-34 / issue #70
+
+Esta seção substitui explicitamente a ordem e a rejeição de colisão **exata**
+registradas nas seções históricas abaixo. Não muda parser/query/predicados,
+`HTTPExecutor`, preparadores de payload/multipart, transporte, orçamento/regras
+de retry ou a configuração original. Go/dependências preservados, sem nova flag,
+pacote, goroutine, persistência ou engine.
+
+`template.Session.Stage([]Capture) (Session, error)` valida todo o lote sem
+publicá-lo. `captureValues` mantém duplicações no lote e conflitos hierárquicos,
+mas permite substituição exata de inicial/confirmado. `lookup` prioriza capturas
+sobre iniciais. A implementação concreta privada `provisional` resolve sobre
+cópia dos mapas de capturas confirmadas mais o lote, compartilhando iniciais
+imutáveis e declarações de segredo. Não usa `NewSession` como snapshot: ela deve
+continuar iniciando sem capturas para cada execução de arquivo.
+
+A visão implementa `Render`/`RenderJSON` no overlay e encaminha proteção para a
+sessão confirmada; `MarkSecret` também registra o valor anterior e o provisório.
+`Publish` é confirmação atômica explícita, revalidando o lote inteiro. Descarte
+é simplesmente deixar a visão sair de escopo; nunca publica para depois desfazer.
+Valores JSON permanecem tipados, números sem float64, objetos opacos.
+
+`runner.extractCaptures` em `capture.go` extrai/transforma usando somente a sessão
+confirmada; protege cada valor descoberto antes da próxima extração. Não publica.
+`captureBatchFailure` associa erro de validação à declaração/posição correta.
+`runAttempt` coordena resposta completa → status → extração/Stage →
+`checkAssertions(view)` na ordem escrita → `ctx.Err()` → `Publish(batch)`.
+Qualquer saída anterior descarta valores; captura inválida precede preparo dos
+esperados. Sem capturas, usa a sessão confirmada; sem assertions, confirma após
+status aceito e contexto ativo. As seções podem estar em qualquer ordem.
+
+`pollEntry` continua recebendo uma sessão confirmada por arquivo. Cada reenvio
+prepara requisição/capturas com os valores confirmados antes da entrada. Só
+sucesso altera o estado; divergência 1 permite retry, qualquer erro 2 encerra.
+Métricas e callback terminal único não mudam, nem consumo/fechamento de recursos.
+Cancelamento antes de confirmar preserva o contexto anterior, sem rollback da API.
+
+`invocationSession.Stage` envolve também a visão provisória no wrapper da CLI;
+`MarkSecret`, `ProtectCapture`, `ProtectValue` e `Publish` acumulam snapshots de
+proteção na invocação. Essa proteção é monotônica mesmo após descarte/troca de
+arquivo, mas não compartilha valores resolvíveis nem marcas locais entre arquivos.
+`safeEntry`, `pendingSecret`, resultados e callbacks conservam só apresentação
+segura; lotes, planos resolvidos, resposta e sessão nunca entram no resultado.
+Texto/JUnit apenas consomem esses resultados, sem reavaliar/reexecutar. Falha de
+escrita tem prioridade 2 e interrompe próximo envio, sem repetir no writer falho.
+
+[Contrato](subset.md#renovação-transacional-de-capturas--us-34--issue-70),
+[diferencial executado](compatibility.md#renovação-transacional-de-capturas--us-34--issue-70)
+e [validação](validation.md#us-34--issue-70--história-0034).
+As seções por história seguintes são registros de evolução: regras antigas de
+ordem e de colisão exata não são mais o contrato atual.
 
 ## Serialização JUnit — US-17 / issue #68
 

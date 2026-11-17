@@ -1,0 +1,62 @@
+{
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"status\":\"PENDING\"}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"accepted\",\"status\":\"READY\"}"
+    }
+  ],
+  "variables": [
+    "id=old"
+  ],
+  "classification": "US-34: captura ausente encerra HTTPGo 2 sem retry; Hurl retenta e aprova com id accepted",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/poll"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  }
+}

@@ -1,8 +1,8 @@
 {
   "response_body": "Y29kZQ==",
-  "classification": "diferença de ordem: HTTPGo assertion antes da captura falha; Hurl captura antes da assertion",
+  "classification": "US-34: extração regex falha antes da assertion em ambos; códigos HTTPGo 2 e Hurl 3",
   "httpgo": {
-    "exit": 1,
+    "exit": 2,
     "paths": [
       "/capture"
     ],

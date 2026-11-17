@@ -16,7 +16,7 @@ func TestRenderAssertsHelpAndPublishedExample(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
 		}
-		for _, term := range []string{"--render-asserts", "evolução explícita HTTPGo", "sem valor", "antes dos operandos da consulta", "sem escape automático", "nunca é recursiva", "captura própria/futura", `jsonpath "$.number" == {{order_number}}`, `jsonpath "$.name" == "{{order_name}}"`} {
+		for _, term := range []string{"--render-asserts", "evolução explícita HTTPGo", "sem valor", "antes dos operandos da consulta", "sem escape automático", "nunca é recursiva", "Captura própria válida fica disponível", `jsonpath "$.number" == {{order_number}}`, `jsonpath "$.name" == "{{order_name}}"`} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}

@@ -1,0 +1,79 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"rejected\",\"status\":\"PENDING\"}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"accepted\",\"status\":\"READY\"}"
+    }
+  ],
+  "variables": [
+    "id=old"
+  ],
+  "classification": "US-34: HTTPGo reenvia id old e somente aprovação confirma accepted; Hurl reenvia id rejected da tentativa reprovada",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"rejected\"}",
+        "content_type": "application/json",
+        "probe": "rejected"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  }
+}

@@ -3,11 +3,12 @@
     "base=http://example.invalid",
     "token=initial"
   ],
-  "classification": "colisão: HTTPGo não sobrescreve variável inicial; comportamento Hurl observado",
+  "classification": "US-34: substituição exata inicial por captura JSON aceita em ambos, com X-Probe token-ficticio",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/auth/login"
+      "/auth/login",
+      "/health"
     ],
     "requests": [
       {
@@ -16,6 +17,13 @@
         "body": "",
         "content_type": "",
         "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "token-ficticio"
       }
     ]
   },

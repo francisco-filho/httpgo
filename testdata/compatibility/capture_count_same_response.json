@@ -1,11 +1,12 @@
 {
   "httpgo_profile": "render-asserts",
   "response_json": "[1,2,3]",
-  "classification": "HTTPGo mantém assertions antes da publicação; captura da mesma resposta não é esperado disponível",
+  "classification": "US-34: captura da própria resposta disponível à assertion; confirmação HTTPGo somente após aprovação",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/capture"
+      "/capture",
+      "/health"
     ]
   },
   "hurl": {

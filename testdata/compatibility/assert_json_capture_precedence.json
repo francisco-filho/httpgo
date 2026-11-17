@@ -1,6 +1,6 @@
 {
   "response_json":"{\"value\":1}",
-  "classification":"intentional precedence: JSON assertion mismatch before missing capture here; Hurl evaluates capture first",
-  "httpgo":{"exit":1,"paths":["/capture"]},
+  "classification":"US-34: ambos avaliam captura antes da assertion; erro de captura HTTPGo 2, Hurl 3",
+  "httpgo":{"exit":2,"paths":["/capture"]},
   "hurl":{"exit":3,"paths":["/capture"]}
 }

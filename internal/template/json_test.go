@@ -88,6 +88,9 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
+	for _, value := range []string{`"replacement"`, `"{{literal}}"`, `null`, `9007199254740993`, `{"child":[]}`} {
+		f.Add(`{"renewed":{{x}},"previous":{{captured}}}`, value)
+	}
 	// US-32: expected operands reuse this renderer, including exact extremes.
 	for _, value := range []string{`-0e999999999999999999`, `1e-999999999999999999`, `{"old":[9007199254740993,"{{not_recursive}}"]}`, `"rotation\"\\\n雪"`} {
 		f.Add(`{{x}}`, value)
@@ -141,6 +144,7 @@ func FuzzRenderJSON(f *testing.F) {
 				t.Fatal("invalid typed capture", err)
 			}
 		}
+		fuzzCaptureOverlay(t, s, value)
 		original := []byte(source)
 		saved := bytes.Clone(original)
 		got, err := s.RenderJSON(original)
