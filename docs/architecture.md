@@ -1,10 +1,49 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-28
+# Arquitetura implementada — US-01 a US-16, US-20 a US-29
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Tipos e vazio — US-29 / issue #58
+
+Ampliação concreta, sem nova engine/interface/pacote/dependência:
+
+1. `internal/parser/assertion.go` reconhece `JSONIsString`, `JSONIsInteger`,
+   `JSONIsBoolean` e `JSONIsEmpty` do `JSONOperator` existente. Os unários não
+   têm `Expected`. Operando extra é sintaxe inválida; `count` com unário,
+   negação genérica e outros tipos são não suportados. O parser descarta o
+   cenário inteiro antes da rede, com posições originais inclusive CRLF.
+2. `internal/query` não muda: decode sob demanda com `UseNumber`, seleção simples
+   e expansiva já disponível, redução única zero/um/vários e percurso estrito.
+3. `internal/assertion/structure.go` avalia tipos/tamanho uma vez sobre o valor
+   reduzido. A grafia de `json.Number` validada como JSON é examinada por presença
+   de ponto/expoente para `isInteger`, sem float64, inteiro de máquina,
+   normalização ou arredondamento. Não reutiliza `ValidCount`: quantidade integral
+   e igualdade exata continuam aceitando representações matematicamente iguais.
+   `isEmpty` só mede string/array/objeto, sem coerção, recursão ou serialização.
+4. `JSONEvaluation` dos novos predicados retém somente aprovação/detalhe
+   categórico, nunca `Actual`. O runner usa `typeFailure` antes da representação
+   de operandos ou projeções; `JSONFailure.Expected` fica vazio e `Actual` é
+   presença/tipo, sem valor nem contagem da coleção. A CLI não inventa esperado
+   null para os unários. Consulta/predicado/localização e causa continuam visíveis.
+5. `Session.Sanitize`, `pendingSecret` e inspeção protegida existente ocultam
+   também categorias derivadas e literais de filtro protegidos, antes de resultados
+   e callbacks; indicação de ausência permanece via `Present`. `safeEntry` remove
+   planos/operandos/capturas operacionais. Não antecipa capturas nem muda o cenário.
+
+Preservados status → assertions na ordem escrita → capturas atômicas, primeira
+falha e interrupção do arquivo, inclusive sob `HTTP *` (dispensa só status).
+Ausência/tipo/condição falsa é divergência 1; JSON inválido/percurso incompatível
+é avaliação 2. Transporte/sessão/renderização não ganham capacidades: somente
+resposta final consumida/fechada pode aprovar; cancelamento, prazo, leitura/close
+e escrita continuam erros 2, sem novo envio ou reimpressão no writer falho.
+
+Regressões por executor falso, callbacks e HTTP/binário reais estão em
+`type*_test.go`, `json_type*_test.go` nos pacotes existentes e `tests/e2e`.
+Diferenças estritas e evidência numérica observada com Hurl 8.0.0 estão em
+[compatibility.md](compatibility.md#tipos-e-vazio--us-29--issue-58).
 
 ## Seleção estática por igualdade — US-28 / issue #56
 

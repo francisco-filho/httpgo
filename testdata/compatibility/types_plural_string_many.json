@@ -1,0 +1,32 @@
+{
+  "response_json": "[\"a\",\"b\"]",
+  "classification": "compartilhado: várias strings formam array e não satisfazem isString por item; divergência HTTPGo 1, Hurl 4",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

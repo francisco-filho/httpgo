@@ -1,4 +1,47 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-28
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-29
+
+## Tipos e vazio — US-29 / issue #58
+
+**Mudança intencional de linguagem:** quatro predicados JSONPath unários em
+`[Asserts]`, sem esperado: `isString`, `isInteger`, `isBoolean`, `isEmpty`.
+Os **43 pares novos `types_*`** usam fixtures independentes e o harness existente
+(`response_json`, build único, `exec.CommandContext`). Foram observados com
+Hurl **8.0.0**, sem consultar/copiar/adaptar seu código-fonte. Nenhum dos 324
+pares anteriores foi modificado; o corpus integrado contém **367 pares**.
+
+| Pares | Observação HTTPGo / Hurl 8.0.0 |
+|---|---|
+| `types_demo`, `types_string_empty`, `types_boolean_true/false` | 0/0: string inclusive vazia, inteiro lexical e false booleano aprovam |
+| `types_integer_negative/signed_zero/precision/huge` | 0/0: negativos, -0, acima de 2^53 e além de inteiro de máquina passam neste predicado |
+| `types_integer_decimal/exponent/fraction/string` | 1/4: 3.0, 3e0, fração e string numérica reprovam, sem coerção |
+| `types_equality_notation` | 0/0: igualdade mantém 3 == 3.0 == 3e0; count aceita esperado 1.0 |
+| `types_empty_string/array/object` | 0/0: os três tipos vazios, inclusive raiz |
+| `types_empty_whitespace/null_element/null_property/null/number/boolean` | 1/4: whitespace é conteúdo, presença de null em coleção não a torna vazia; null/número/bool são inaplicáveis |
+| `types_*_missing`, `types_string_number`, `types_boolean_number` | 1/4: ausência ou tipo incompatível, sem confundir zero/false/string ou índice ausente |
+| `types_plural_absent`, `types_plural_*_one/many` | redução zero/um/vários igual: ausência falha 1/4, escalar/array vazio único conserva tipo (0/0); vários são array não vazio (1/4), nunca aplicação por item |
+| `types_strict_property/wildcard` | **diferença deliberada:** ramo null incompatível invalida toda seleção aqui (2); Hurl descarta o ramo e aprova o array vazio único (0) |
+| `types_strict_index` | **diferença deliberada:** índice em objeto é erro de percurso aqui (2); Hurl reduz a ausência e falha na assertion (4) |
+| `types_late_operand` | 2/2, zero envios: operando extra em declaração tardia rejeita todo arquivo |
+| `types_late_count` | **diferença deliberada:** `count isInteger` é não suportado antes da rede aqui (2); Hurl executa entradas e falha na assertion (4) |
+| `types_late_negation` | **fora do recorte:** `not isString` é rejeitado antes da rede aqui (2); Hurl aceita a forma e a assertion falha (4) |
+
+Inteiros grandes aprovados por **tipo** não comprovam que o Hurl preserva seu
+valor exato. Diferenças de precisão já classificadas nas US-27b/28 continuam
+válidas; HTTPGo mantém a grafia `json.Number` e não impõe limite de máquina para
+imitar uma referência. Notação inteira não é igualdade matemática nem quantidade
+integral. Resultados divergentes compartilham aprovação/reprovação/fluxo, não
+códigos numéricos idênticos (HTTPGo 1, Hurl 4).
+
+Diagnóstico dos novos predicados é categórico e não imprime valores/estruturas,
+mesmo escalares; metadados protegidos ficam ocultos. `isString` e vazio de
+string/array são atalhos para `matches ""`, `== ""`/`count == 0`. Não há schema,
+novos tipos, negação genérica ou aplicação por item. Consultas/filtros disponíveis
+continuam estáticos. O corpus é sintético e não homologa a suíte real.
+
+Reprodução: com Hurl 8.0.0 no PATH, `make compatibility` (sem `-update`), ou
+`go test -tags compatibility ./tests/e2e -run '^TestCompatibility/types_' -count=1 -v`.
+Veja [subconjunto](subset.md#tipos-e-valores-vazios-json--us-29--issue-58) e
+[validação executada](validation.md#us-29--issue-58--história-0029).
 
 ## Filtros estáticos por igualdade — US-28 / issue #56
 

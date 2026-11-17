@@ -1,0 +1,29 @@
+{
+  "response_json": "null",
+  "classification": "diferença deliberada: count isInteger rejeitado antes de toda rede aqui (2); Hurl executa entradas e falha no predicado (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/health",
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}
