@@ -8,7 +8,7 @@ import (
 	"capimgrosso.com/httpgo/internal/template"
 )
 
-func parseCapture(text string, pos Position) (Capture, error) {
+func parseCapture(text string, pos Position, options ParseOptions) (Capture, error) {
 	fail := func(detail string) (Capture, error) {
 		return Capture{}, &Error{Position: pos, Category: "sintaxe inválida", Detail: detail}
 	}
@@ -62,7 +62,7 @@ func parseCapture(text string, pos Position) (Capture, error) {
 		}
 		return Capture{Kind: HeaderCapture, Header: source, Name: name, Position: pos, QueryPosition: queryPos}, nil
 	}
-	path, err := query.Parse(source)
+	path, err := query.ParseWithOptions(source, options.RenderAsserts)
 	if err != nil {
 		category := "sintaxe inválida"
 		if located, ok := err.(*query.Error); ok {

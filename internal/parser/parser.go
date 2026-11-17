@@ -290,7 +290,7 @@ func ParseWithOptions(file string, input io.Reader, options ParseOptions) (Scena
 				break
 			}
 			if captures {
-				capture, err := parseCapture(text, pos)
+				capture, err := parseCapture(text, pos, options)
 				if err != nil {
 					return Scenario{}, err
 				}

@@ -3,6 +3,8 @@ package query
 import (
 	"encoding/json"
 	"strings"
+
+	"capimgrosso.com/httpgo/internal/template"
 )
 
 // equalityFilter is operational state, never presentation metadata. Its operand
@@ -10,6 +12,7 @@ import (
 type equalityFilter struct {
 	attribute                Path
 	literal                  any
+	operand                  *filterOperand
 	literalStart, literalEnd int
 }
 
@@ -28,7 +31,7 @@ func skipFilterSpace(source string, i int) int {
 	return i
 }
 
-func parseEqualityFilter(source string, start int) (*equalityFilter, int, error) {
+func parseEqualityFilter(source string, start int, renderAsserts bool) (*equalityFilter, int, error) {
 	i := start + 2 // [?
 	if i == len(source) || source[i] != '(' {
 		return nil, i, filterError(i, false)
@@ -65,15 +68,42 @@ func parseEqualityFilter(source string, start int) (*equalityFilter, int, error)
 	if i == len(source) {
 		return nil, i, filterError(i, false)
 	}
-	if strings.HasPrefix(source[i:], "{{") || source[i] == '@' {
+	if source[i] == '@' {
 		return nil, i, filterError(i, true)
 	}
 	literalStart := i
 	var literal any
-	if source[i] == '\'' || source[i] == '"' {
+	var operand *filterOperand
+	if strings.HasPrefix(source[i:], "{{") {
+		if !renderAsserts {
+			return nil, i, filterError(i, true)
+		}
+		end := strings.Index(source[i+2:], "}}")
+		if end < 0 {
+			return nil, i, filterError(i, false)
+		}
+		end += i + 4
+		refs, parseErr := template.Parse(source[i:end])
+		if parseErr != nil || len(refs) != 1 {
+			return nil, i, filterError(i, false)
+		}
+		operand = &filterOperand{source: source[i:end], complete: true}
+		i = end
+	} else if source[i] == '\'' || source[i] == '"' {
 		literal, i, err = filterString(source, i)
 		if err != nil {
 			return nil, i, err
+		}
+		if renderAsserts {
+			text := literal.(string)
+			refs, parseErr := template.Parse(text)
+			if parseErr != nil {
+				return nil, literalStart, filterError(literalStart, false)
+			}
+			if len(refs) > 0 {
+				operand = &filterOperand{source: text}
+				literal = nil
+			}
 		}
 	} else {
 		begin := i
@@ -103,7 +133,7 @@ func parseEqualityFilter(source string, start int) (*equalityFilter, int, error)
 		return nil, i, filterError(i, false)
 	}
 	attribute.compileProjection()
-	return &equalityFilter{attribute: attribute, literal: literal, literalStart: literalStart, literalEnd: literalEnd}, i + 1, nil
+	return &equalityFilter{attribute: attribute, literal: literal, operand: operand, literalStart: literalStart, literalEnd: literalEnd}, i + 1, nil
 }
 
 // filterString handles the inner query literal, after the outer .hurl string

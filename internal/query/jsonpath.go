@@ -36,6 +36,11 @@ type Path struct {
 func (p Path) Expansive() bool { return len(p.projection) != 0 }
 
 func Parse(source string) (Path, error) {
+	return ParseWithOptions(source, false)
+}
+
+// ParseWithOptions admits templates only in equality operands when opted in.
+func ParseWithOptions(source string, renderAsserts bool) (Path, error) {
 	fail := func(offset int, unsupported bool) (Path, error) {
 		detail := "consulta JSONPath inválida"
 		if unsupported {
@@ -45,6 +50,9 @@ func Parse(source string) (Path, error) {
 	}
 	if len(source) == 0 || source[0] != '$' {
 		return fail(0, false)
+	}
+	if !renderAsserts && (bytes.Contains([]byte(source), []byte("{{")) || bytes.Contains([]byte(source), []byte("}}"))) {
+		return fail(0, true)
 	}
 	var p Path
 	for i := 1; i < len(source); {
@@ -61,7 +69,7 @@ func Parse(source string) (Path, error) {
 			p.steps = append(p.steps, step{property: source[start:i]})
 		case '[':
 			if i+1 < len(source) && source[i+1] == '?' {
-				filter, end, err := parseEqualityFilter(source, i)
+				filter, end, err := parseEqualityFilter(source, i, renderAsserts)
 				if err != nil {
 					return Path{}, err
 				}
@@ -161,6 +169,11 @@ func (p Path) Select(body []byte) (any, bool, error) {
 // SelectValue distinguishes absence from traversal through an incompatible type.
 // A present null is a value; traversing through it is an evaluation error.
 func (p Path) SelectValue(value any) (any, bool, error) {
+	for _, s := range p.steps {
+		if s.filter != nil && s.filter.operand != nil {
+			return nil, false, fmt.Errorf("operandos JSONPath ainda não vinculados")
+		}
+	}
 	if p.Expansive() {
 		return p.selectProjection(value)
 	}

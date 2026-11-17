@@ -26,8 +26,14 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 		var found bool
 		switch declaration.Kind {
 		case parser.JSONPathCapture:
-			var err error
-			value, found, err = declaration.Path.Select(response.Body)
+			bound, secret, err := bindQuery(session, declaration.Path)
+			if secret {
+				session.MarkSecret(declaration.Name)
+			}
+			if err != nil {
+				return &CaptureError{Position: declaration.QueryPosition, Detail: "não foi possível resolver operando JSONPath: " + err.Error()}
+			}
+			value, found, err = bound.Select(response.Body)
 			if err != nil {
 				return &CaptureError{Position: declaration.QueryPosition, Detail: err.Error()}
 			}

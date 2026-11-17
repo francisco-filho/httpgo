@@ -1,10 +1,11 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-30
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-31
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo. As descrições de esperados
 literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
 [US-30](#esperados-dinâmicos--us-30--issue-60) define sua evolução opt-in com
-`--render-asserts`, sem mudar consultas, operadores ou capturas.
+`--render-asserts`. A US-31 também permite operandos dinâmicos nos filtros por
+igualdade de assertions e capturas, sem ampliar operadores ou passos.
 
 ## Seleção estática por igualdade — US-28 (issue #56)
 
@@ -48,10 +49,18 @@ array ordenado, sem achatamento. Predicados recebem somente esse valor reduzido.
 Captura ausente retorna `2`; `null` é válido. Coleções só podem ser reutilizadas
 como valor JSON completo, nunca como texto em URL/header.
 
-Consultas são estáticas: `{{texto}}` dentro de literal é dado, não template.
-Operandos dinâmicos, operadores além de `==`, existência, funções, scripts,
-regex e operadores lógicos em filtros continuam rejeitados antes de qualquer
-HTTP do arquivo. Status → assertions → capturas permanece inalterado. Falhas
+**Evolução explícita US-31 (issue #62):** placeholders em consultas, inclusive
+em literais, exigem `--render-asserts`; sem a flag são rejeitados antes da rede.
+Com a flag, somente operandos de igualdade admitem `{{nome}}` como valor escalar
+tipado ou composição textual como `'Order {{suffix}}'`. Arrays/objetos não são
+convertidos em texto nem admitidos como operando completo. O plano estrutural é
+validado antes do HTTP; operandos são vinculados na avaliação, nunca concatenados
+ou reinterpretados como expressão. Aspas e texto de filtro inseridos são dados,
+e não há expansão recursiva. Exemplo executável:
+`testdata/scenarios/dynamic_filter.hurl` (usar `--render-asserts`).
+Consultas inteiras, propriedades, índices e operadores dinâmicos continuam
+rejeitados, assim como operadores além de `==`, existência, funções, scripts,
+regex e operadores lógicos em filtros, antes de qualquer HTTP do arquivo. Status → assertions → capturas permanece inalterado. Falhas
 não imprimem coleções; literais dos filtros são sempre ocultados na consulta
 apresentada, inclusive escapes de segredos, e o plano não entra nos relatórios.
 Exemplo versionado: `testdata/scenarios/scenario_filter.hurl`.
