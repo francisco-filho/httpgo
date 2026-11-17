@@ -24,6 +24,13 @@ func projectionFailure(session template.Session, declaration parser.JSONAssertio
 		failure.Actual = "tipo " + assertion.JSONType(actual)
 		if array, ok := actual.([]any); ok {
 			failure.Actual += fmt.Sprintf("; contagem=%d", len(array))
+		} else if declaration.Operator == assertion.JSONNotEqualOperator && !declaration.Path.Expansive() {
+			switch actual.(type) {
+			case map[string]any:
+			default:
+				encoded, _ := json.Marshal(actual)
+				failure.Actual = session.Sanitize(string(encoded))
+			}
 		}
 	}
 	switch declaration.Operator {

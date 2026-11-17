@@ -66,7 +66,7 @@ func TestJSONEvaluationUnsupported(t *testing.T) {
 		op    JSONOperator
 		count bool
 	}{
-		{"!=", false}, {JSONExists, true},
+		{"not ==", false}, {JSONNotEqualOperator, true}, {JSONExists, true},
 	} {
 		if _, err := EvaluateJSON(tc.op, tc.count, nil, []any{}, true); err == nil {
 			t.Fatalf("accepted %s count=%v", tc.op, tc.count)

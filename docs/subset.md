@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-31
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-32
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo. As descrições de esperados
@@ -6,6 +6,28 @@ literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
 [US-30](#esperados-dinâmicos--us-30--issue-60) define sua evolução opt-in com
 `--render-asserts`. A US-31 também permite operandos dinâmicos nos filtros por
 igualdade de assertions e capturas, sem ampliar operadores ou passos.
+
+## Desigualdade JSON — US-32 / issue #64
+
+`jsonpath "consulta" != <literal JSON>` compara um valor **presente**, usando a
+mesma igualdade tipada e exata de `==`. Tipos diferentes diferem; `1`, `1.0` e
+`1e0` não diferem. Ordem de chaves não altera objetos; ordem de arrays participa.
+Ausência falha com **1**, inclusive contra `null`; `null` presente é valor.
+JSON inválido/percurso incompatível retorna **2**, nunca sucesso por negação.
+
+Esperados seguem US-30: sem flag, placeholders em strings são literais; com
+`--render-asserts`, valores iniciais ou capturas anteriores são resolvidos somente
+na assertion alcançada, antes da consulta/decode. Status → assertions → capturas
+continua obrigatório; erro estático em qualquer entrada impede todo envio.
+`count !=`, desigualdade de header/body e negação genérica não são suportados.
+
+[Rotação completa](../testdata/scenarios/scenario_json_inequality_rotation.hurl):
+execute com `--render-asserts --secret old_token --secret new_token` e
+`--var base_url=http://localhost:8080`. As flags `--secret` marcam nomes, nunca
+fornecem credenciais. Diagnósticos ocultam operandos secretos/derivados e capturas
+secretas pendentes; coleções são resumos de tipo, não seu conteúdo.
+**Diferença de valor não garante revogação do token antigo, validade do novo nem
+ausência de outros efeitos**: verifique essas propriedades com outras requisições.
 
 ## Operandos dinâmicos — US-31 / issue #62
 
