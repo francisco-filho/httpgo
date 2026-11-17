@@ -88,8 +88,8 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 			declaration.Expected = nil // Never deliver the raw literal to reports.
 			declaration.Pattern = ""
 			declaration.Compiled = nil // Compiled regexps retain their source pattern.
+			declaration.Query = session.Sanitize(declaration.Path.RedactLiterals(declaration.Query))
 			declaration.Path = query.Path{}
-			declaration.Query = session.Sanitize(declaration.Query)
 			declaration.Position.File = session.Sanitize(declaration.Position.File)
 			declaration.QueryPosition.File = session.Sanitize(declaration.QueryPosition.File)
 			entry.Assertions[i].JSON = &declaration

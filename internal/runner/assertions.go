@@ -92,7 +92,7 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 			pos.File = session.Sanitize(pos.File)
 			fail := func(detail string) *JSONError {
 				current.Outcome = JSONFailed
-				return &JSONError{Position: pos, Query: session.Sanitize(declaration.Query), Detail: detail}
+				return &JSONError{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Detail: detail}
 			}
 			if !decoded {
 				var err error

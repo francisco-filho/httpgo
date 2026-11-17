@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -59,6 +60,11 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, path := range []string{`$[?(@.slug=='pizza')].id`, `$.groups[*].items[?(@.meta.keys[0]=="a\"b")].id`, `$[?(@.x==9223372036854775809)]`, `$[?(@.x==1e-99999999999999999999999)]`, `$[?(@.x=='\uD83C\uDF55')].id`, `$[?(@.x=='{{literal}}')]`, `$[?(@.x==null)]`, `$[?(@.x==true)]`, `$[?(@.x!='unsupported')]`, `$[?(@.x=='unterminated)]`, `$[?(@.x=={{dynamic}})]`, `$[?(@.x==[]) ]`} {
+		for _, newline := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP *\n[Asserts]\njsonpath "+strconv.Quote(path)+" exists\n[Captures]\nx: jsonpath "+strconv.Quote(path), "\n", newline))
+		}
+	}
 	for _, option := range []string{"retry: 0", "retry: 3\nretry-interval: 0", "retry: 3\nretry-interval: 500", "retry: -1", "retry: 1.5", "retry: 9223372036854775807", "retry-interval: 9223372036855", "retry: 1\nretry: 2", "timeout: 1", "retry: {{dynamic}}", ""} {
 		for _, newline := range []string{"\n", "\r\n"} {
 			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\nGET http://example.test/job\n[Options]\n  "+option+"\nHTTP 200\n", "\n", newline))

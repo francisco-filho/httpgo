@@ -1,0 +1,39 @@
+{
+  "response_json": "[{\"v\":1e-99999999999999999999999,\"id\":\"tiny\"}]",
+  "classification": "diferença: igualdade exata sem expansão aqui; Hurl 8.0.0 abortou (exit -1 por sinal no Linux) ao analisar expoente fora de int64",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": -1,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

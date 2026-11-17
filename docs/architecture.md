@@ -1,10 +1,57 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-27b
+# Arquitetura implementada — US-01 a US-16, US-20 a US-28
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Seleção estática por igualdade — US-28 / issue #56
+
+`internal/query/filter.go` acrescenta `equalityFilter` privado aos `step` de
+`Path`. `Parse` reconhece somente `[?(@.caminho == literal escalar)]`, valida o
+caminho relativo por propriedades/índices e decodifica o literal separadamente.
+`filterString` separa aspas simples/duplas e escapes internos dos escapes da
+string `.hurl`, já decodificada no parser. Números entram via `Decode`/`UseNumber`;
+nem a consulta completa filtrada nem seu literal passam por `jp.ParseString`.
+Não há `oj.Parse`, avaliação de código, interpolação ou coerção para float/string.
+
+`Path.Expansive` inclui filtros, mesmo sem wildcard. Caminhos simples continuam
+nativos; projeções e filtros são planos estáticos executados por
+`selectProjection`, sem seleção por conteúdo, fallback, dupla execução ou flag.
+`compileProjection` mantém um slot por passo: navegação usa `jp.Child`, `jp.Nth`
+ou `jp.Wildcard`; filtro tem slot nil, avaliado por `equalityFilter.selectItems`.
+O atributo é navegado pelo mesmo adapter com verificação estrita e igualdade
+própria no item atual. O item inteiro corresponde à origem dos passos seguintes.
+Só ao final a sequência vira ausência, valor único ou array ordenado; não há
+flatten, deduplicação, ordenação nem redução ao alternar navegação/filtro.
+Ausência exclui item; incompatibilidade em qualquer ramo invalida toda seleção.
+
+As primitivas puras `JSONEqual`, `CompareNumber`, `ValidCount` e a normalização
+numérica agora residem em `internal/query/json.go`. As APIs públicas de assertion
+mantêm delegação para elas; a dependência é **assertion → query**, nunca inversa.
+A comparação normaliza coeficientes e expoentes `big.Int` sem expandir potências.
+Query compara o atributo do filtro, mas a decisão de aprovação do predicado
+continua em assertion, aplicada ao valor reduzido e nunca por correspondência.
+
+Runner/sessão/transporte conservam status → assertions na ordem → capturas
+atômicas, precisão, contexto, retenção e recursos da resposta final. Filtro em
+não array ou percurso incompatível no atributo é erro `2` também em captura;
+JSON inválido não vira ausência. Coleções mantêm a restrição de uso em JSON
+completo, sem escolher primeiro ID nem convertê-las em texto. Não há novo I/O,
+cache global, goroutine, interface, pacote, dependência, toolchain ou política de retry.
+
+`Path.RedactLiterals` remove operandos dos filtros da consulta de apresentação
+**antes** de `Session.Sanitize`, incluindo escapes que um sanitizador textual
+não reconheceria. Mantém caminho/predicado/localização úteis. `safeEntry` faz
+isso antes de zerar todo Path e remover capturas/literais operacionais;
+`projectionFailure` resume seleção/esperado composto antes de serializar e
+oculta resumos protegidos/pendingSecret. `HasProtectedLiteral` permite inspecionar
+os operandos decodificados na borda sem exportar o plano: até literal secreto
+escapado que seleciona apenas valores públicos protege metadados derivados. `JSONError` usa a mesma consulta segura.
+Resultados/callbacks não retêm plano, operandos ou documento operacional; o
+cenário original permanece reutilizável. Não se anuncia JSONPath completo nem
+operandos dinâmicos, filtros de existência/lógica/regex/funções/outros operadores.
 
 ## Polling por entrada — US-26 / issue #50
 
@@ -151,10 +198,11 @@ coerção numérica nem serialização intermediária do documento. `Decode` con
 O decode continua exclusivamente em `encoding/json`, rejeitando valores adicionais.
 Não se usa `oj.Parse`, conversão para números OjG ou avaliação numérica por `jp`.
 A biblioteca navega sobre `json.Number`; igualdade/comparação decimal exata
-continua em `internal/assertion/json.go`, sem expansão proporcional ao expoente.
+reside em `internal/query/json.go` desde a US-28, por delegação de assertion,
+sem expansão proporcional ao expoente.
 Capturas usam `encoding/json` e conservam a grafia numérica, inclusive além de
 `int64`, decimais próximos e expoentes extremos. Não há fallback numérico nem
-promessa de precisão para filtros futuros (US-28), que exigem decisão própria.
+avaliação numérica por filtros nativos da biblioteca: a US-28 usa igualdade própria exata.
 `safeEntry` zera **todo** `query.Path`, removendo também `projection`, em qualquer
 desfecho antes dos resultados/callbacks. Nenhuma mensagem da biblioteca ou
 documento operacional é encaminhada à apresentação.
@@ -177,7 +225,7 @@ Decode sob demanda por resposta, status → assertions na ordem → capturas →
 callback, retenção/fechamento da resposta final, prazos, isolamento e prioridade
 de falha de escrita não mudam. Não há cache global, goroutine ou pacote novo.
 Somente valores capturados/proteções sobrevivem na sessão, não o documento.
-`.*`, slices, unions, descida recursiva e filtros continuam rejeitados antes da rede.
+`.*`, slices, unions, descida recursiva e filtros além da igualdade estática US-28 continuam rejeitados antes da rede.
 Comparação com Hurl 8.0.0 e divergências estritas:
 [compatibility.md](compatibility.md#projeção-de-arrays--us-27--issue-52).
 

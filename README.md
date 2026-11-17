@@ -3,6 +3,55 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Selecionar a entidade correta pelo conteúdo (US-28 / issue #56)
+
+```hurl
+GET {{base_url}}/products
+HTTP 200
+[Captures]
+pizza_id: jsonpath "$[?(@.slug=='pizza')].id"
+[Asserts]
+jsonpath "$[?(@.slug=='pizza')].active" == true
+
+GET {{base_url}}/products/{{pizza_id}}
+HTTP 200
+```
+
+Execute o [exemplo versionado](testdata/scenarios/scenario_filter.hurl) com
+`httpgo test testdata/scenarios/scenario_filter.hurl --var base_url=http://localhost:8080`.
+A API sintética dos testes devolve `[{"slug":"pizza","id":"p1","active":true},
+{"slug":"juice","id":"p2","active":false}]`. Mesmo invertendo a ordem, a
+consulta seguinte envia `/products/p1`. Pizza inativa falha com **1**, sem captura
+nem próxima requisição, mesmo se o outro produto estiver ativo. Não é uma rota
+prometida pelo dummy nem homologação de uma API real.
+
+- Filtro estático `[?(@.caminho == literal escalar)]` em assertions/capturas:
+  caminho relativo com propriedades por ponto e índices não negativos; literal
+  string entre aspas simples/duplas, número JSON exato, booleano ou `null`.
+  Há dois níveis de escape: string `.hurl` externa e literal da consulta interna.
+- Igualdade tipada sem coerção, inclusive além de `int64`, decimais próximos e
+  expoentes extremos. Ausente não corresponde nem a `null`; os passos seguintes
+  partem da **mesma entidade**, inclusive com filtros aninhados e wildcards.
+- A cardinalidade da US-27 permanece: zero = ausência, um = próprio valor,
+  vários = array ordenado, sem achatamento/reordenação/deduplicação. `count` e
+  demais predicados recebem esse valor reduzido, não cada correspondência.
+- Captura ausente é **2**; `null` único é válido. Coleções mantêm tipos e precisão
+  em JSON completo, nunca viram texto em URL/header nem escolhem o primeiro ID.
+  Publicação atômica e status → assertions → capturas permanecem.
+- Filtro em não array ou percurso incompatível no atributo invalida **toda** a
+  seleção com **2**, inclusive em ramos mistos; ausência só elimina o item.
+  JSON inválido continua erro de avaliação, não ausência ou aprovação por negação.
+- Operadores além de `==`, existência/lógica/regex/funções/scripts em filtro e
+  operandos dinâmicos continuam fora. `{{texto}}` dentro de literal é dado estático.
+  Erro estático tardio impede todos os envios; diagnósticos localizados não
+  despejam coleção e sempre ocultam literais de filtro/plano operacional.
+
+O adapter OjG navega; **a igualdade de filtros é própria e exata**, não a avaliação
+numérica nativa da biblioteca. [Subconjunto](docs/subset.md#seleção-estática-por-igualdade--us-28-issue-56),
+[arquitetura](docs/architecture.md#seleção-estática-por-igualdade--us-28--issue-56),
+[diferenças Hurl 8.0.0](docs/compatibility.md#filtros-estáticos-por-igualdade--us-28--issue-56)
+e [validação](docs/validation.md#us-28--issue-56--história-0028).
+
 ## Aguardar condições assíncronas (US-26 / issue #50)
 
 ```hurl
@@ -93,7 +142,7 @@ não representa homologação de uma API real.
 - Falhas expansivas mostram consulta/predicado/localização e presença/tipo/contagem,
   sem despejar seleção ou esperado composto. Resumos protegidos ficam ocultos.
   Caminhos simples mantêm seus contratos anteriores.
-- Continuam fora: `.*`, slices, unions, descida recursiva e filtros. Validação
+- Continuam fora: `.*`, slices, unions, descida recursiva e filtros além da igualdade estática da US-28. Validação
   estática integral impede todos os envios do arquivo em caso de consulta inválida.
   Diferenças deliberadas frente ao Hurl 8.0.0 estão em [docs/compatibility.md](docs/compatibility.md#projeção-de-arrays--us-27--issue-52).
 
@@ -129,7 +178,7 @@ Números selecionados, comparados e capturados mantêm tipos e precisão além d
 infinito ou zero por perda de representação. Grafias capturadas são preservadas;
 igualdade numérica existente continua aceitando formas equivalentes (`1.00`, `1e0`).
 Projeções usam OjG `jp` somente para navegação, caminhos simples permanecem nativos.
-Isso **não** habilita filtros, funções ou conformidade JSONPath/RFC integral nem
+A adoção US-27b, por si só, **não** habilita filtros (igualdade estática é a US-28), funções ou conformidade JSONPath/RFC integral nem
 altera cardinalidade, erros, sigilo ou restrições de uso textual de coleções.
 Veja [arquitetura](docs/architecture.md#projeção-de-arrays--us-27--issue-52) e
 [compatibilidade preservada](docs/compatibility.md#preservação-de-jsonpath--us-27b--issue-54).
@@ -170,7 +219,7 @@ nem homologação de uma suíte real.
   contém `""`. `Set-Cookie` e demais headers sensíveis continuam ocultos.
 - Consultas/esperados são estáticos; `{{nome}}` em string é literal.
   Não há negação genérica, `header not exists`, `count contains`, busca
-  recursiva ou filtros; projeção de arrays `[*]` é o recorte US-27 acima. Sintaxe inválida tardia impede todos
+  recursiva ou filtros além da igualdade estática US-28; projeção de arrays `[*]` é o recorte US-27 acima. Sintaxe inválida tardia impede todos
   os envios. JSON inválido, percurso incompatível e falha de execução são **2**,
   nunca aprovação por negação. Ordem e publicação de capturas são preservadas.
 - Falhas localizadas mostram presença/tipo e esperado escalar protegido, não a
@@ -889,7 +938,7 @@ proibidas.
 
 `[Captures]` associa-se à resposta anterior, depois de `HTTP` quando declarado.
 JSONPath aceita raiz `$`, propriedades por ponto (`$.product.id`), índices de
-array não negativos (`$.items[0]`) e `[*]` de arrays (US-27 acima). Desde a US-06, o resultado aceita
+array não negativos (`$.items[0]`), `[*]` de arrays (US-27) e igualdade estática (US-28). Desde a US-06, o resultado aceita
 qualquer tipo JSON, inclusive raiz, `null`, string vazia, arrays/objetos vazios.
 JSON inválido, caminho ausente ou índice fora do array é erro de captura (código 2).
 Consultas não suportadas em qualquer entrada impedem todos os envios.
@@ -1103,7 +1152,7 @@ contra HTTP real pelos E2E. O dummy manual não promete esse contrato JSON.
 
 **Ampliação intencional:** `jsonpath "consulta" == <literal JSON>` aceita string,
 número, booleano, null, array ou objeto, inclusive vazios. JSONPath combina
-raiz `$`, propriedades por ponto, índices não negativos e `[*]` de arrays. Consultas
+raiz `$`, propriedades por ponto, índices não negativos, `[*]` de arrays e filtros estáticos por igualdade (US-28). Consultas
 são estáticas; os esperados são literais JSON completos na mesma linha, nunca
 templates: `"{{nome}}"` permanece texto mesmo com a variável definida.
 

@@ -1,0 +1,32 @@
+{
+  "response_json": "[{\"x\":1,\"id\":\"a\"},{\"x\":1,\"id\":\"b\"}]",
+  "classification": "reutilização textual plural rejeitada antes do segundo envio por ambos, códigos 2/3",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

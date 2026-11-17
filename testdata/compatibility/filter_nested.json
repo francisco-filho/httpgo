@@ -1,0 +1,46 @@
+{
+  "response_json": "{\"groups\":[{\"items\":[{\"meta\":{\"keys\":[\"pizza\"]},\"variants\":[{\"code\":\"x\",\"id\":3},{\"code\":\"y\",\"id\":8}]}]},{\"items\":[{\"meta\":{\"keys\":[\"pizza\"]},\"variants\":[{\"code\":\"x\",\"id\":1},{\"code\":\"x\",\"id\":3}]}]},{}]}",
+  "classification": "compatível no recorte observado; códigos de falha próprios",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "response_json": "{\"none\":[],\"one\":[{\"x\":1,\"v\":7}],\"null\":[{\"x\":1,\"v\":null}],\"arrays\":[{\"x\":1,\"v\":[]},{\"x\":1,\"v\":[2]}],\"single_array\":[{\"x\":1,\"v\":[1,2]}]}",
+  "classification": "compatível no recorte observado; códigos de falha próprios",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

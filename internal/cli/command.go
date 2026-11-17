@@ -553,7 +553,8 @@ Ausência aprova not exists e not contains. null, vazios, false e zero presentes
 Tipo presente incompatível falha com 1 em ambos os sentidos de pertencimento.
 JSON inválido/percurso incompatível/transporte nunca vira sucesso por negação: 2.
 not exists não aceita operando. Consultas e esperados permanecem estáticos/literais.
-Sem negação genérica, header not exists, count contains, filtros ou wildcard de objeto.
+Sem negação genérica, header not exists, count contains ou wildcard de objeto.
+Filtros JSONPath estáticos por igualdade são o recorte US-28 abaixo.
 Falhas mostram presença/tipo e esperado protegido, nunca arrays/objetos selecionados.
 Primeira falha impede capturas/envios; sintaxe inválida tardia impede todo HTTP.
 Estrutura, quantidade e limites:
@@ -574,7 +575,7 @@ jsonpath "$.name" matches "^Pizza": encontra trecho em string JSON, sem coerçã
 Ausência/tipo incompatível/condição falsa: 1; JSON inválido: 2.
 Regex Go inválida/não suportada e matches em body/variável: erro 2 antes da rede.
 Headers também aceitam matches, com primeira ocorrência e padrão JSON literal (acima).
-Sem count em strings/objetos/capturas, filtros ou JSONPath completo.
+Sem count em strings/objetos/capturas ou JSONPath completo.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
 pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
 
@@ -594,12 +595,36 @@ count conta o array reduzido: dois números contam 2; número único/ausência f
 Capturas usam a mesma seleção tipada e publicação atômica; zero resultados falha com 2.
 Arrays/objetos capturados exigem valor JSON completo, sem escolher o primeiro elemento.
 Precisão preservada além de int64, decimais próximos e expoentes extremos, sem coerção.
-Sem nova sintaxe ou opção de avaliador; exemplo: testdata/scenarios/scenario_projection_precision.hurl.
+US-27b: Sem nova sintaxe ou opção de avaliador na adoção do adapter;
+exemplo: testdata/scenarios/scenario_projection_precision.hurl. Filtros são a US-28 abaixo.
 Ramo incompatível invalida toda consulta expansiva com 2, mesmo com ramos válidos.
 Diagnóstico resume presença/tipo/contagem sem coleção ou esperado composto;
 resumos protegidos ficam ocultos, inclusive com captura secreta pendente.
-Sem .*, slices, unions, descida recursiva, filtros ou JSONPath completo.
+Sem .*, slices, unions, descida recursiva ou JSONPath completo.
 Exemplo executável com captura/reuso: testdata/scenarios/scenario_projection.hurl.
+
+Selecionar entidades por igualdade — US-28:
+  GET {{base_url}}/products
+  HTTP 200
+  [Captures]
+  pizza_id: jsonpath "$[?(@.slug=='pizza')].id"
+  [Asserts]
+  jsonpath "$[?(@.slug=='pizza')].active" == true
+  GET {{base_url}}/products/{{pizza_id}}
+  HTTP 200
+Filtro [?(@.caminho == literal escalar)] estático, em assertions e capturas.
+Caminho do atributo: propriedades por ponto e índices não negativos, no próprio item.
+Literal: string com aspas simples/duplas e escapes, número JSON exato, booleano ou null.
+Ausente não corresponde nem a null; sem coerção ou mistura entre entidades.
+Composição com [*] e filtros aninhados; redução somente ao final, sem achatamento.
+count conta o array reduzido, não correspondências; null único é captura válida.
+Captura plural é JSON tipado, nunca texto em URL/header ou escolha do primeiro ID.
+Percurso incompatível no atributo ou filtro em não array: 2, sem resultado parcial.
+Status → assertions → capturas; falha impede publicação e próxima requisição.
+Sem outros operadores, existência, lógica, regex, funções ou operandos dinâmicos no filtro.
+Placeholder em literal é dado estático; consultas inválidas tardias impedem todo HTTP.
+Consulta apresentada oculta sempre os literais do filtro; planos não entram no resultado.
+Exemplo executável: testdata/scenarios/scenario_filter.hurl; diferenças: docs/compatibility.md.
 
 Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
   httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
@@ -668,8 +693,8 @@ Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo co
   Authorization: Bearer {{accessToken}}
   HTTP 200
   httpgo test products.hurl --var base_url=http://localhost:8080 --var username=demo --var password=senha-ficticia --secret password --secret accessToken
-JSONPath limitado: raiz $, propriedades por ponto, índices não negativos e [*]
-de arrays, como $.items[*].code. Aceita string, número, booleano, null, array ou objeto,
+JSONPath limitado: raiz $, propriedades por ponto, índices não negativos, [*]
+de arrays e filtros estáticos por igualdade (US-28), como $[?(@.slug=='pizza')].id. Aceita string, número, booleano, null, array ou objeto,
 inclusive raiz e vazios. Números mantêm precisão, também nas estruturas.
   POST {{base_url}}/products
   Content-Type: application/json

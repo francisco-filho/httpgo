@@ -1,0 +1,32 @@
+{
+  "response_json": "[]",
+  "classification": "ausência de resultados impede captura e envio dependente, códigos 2/3",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

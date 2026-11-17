@@ -1,0 +1,45 @@
+{
+  "response_json": "[{\"v\":\"{{static}}\",\"id\":\"selected\"}]",
+  "variables": [
+    "static=replaced"
+  ],
+  "classification": "diferença deliberada: literal estático aqui mesmo com variável definida; Hurl interpola e diverge",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

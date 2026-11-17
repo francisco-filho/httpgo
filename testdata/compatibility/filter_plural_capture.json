@@ -1,0 +1,39 @@
+{
+  "response_json": "[{\"x\":1,\"id\":9223372036854775809},{\"x\":1,\"id\":9007199254740993}]",
+  "classification": "diferença de reutilização: array numérico tipado enviado em JSON completo aqui; Hurl não renderiza composto (3)",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "[9223372036854775809,9007199254740993]",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}
