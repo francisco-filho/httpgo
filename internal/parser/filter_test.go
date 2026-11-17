@@ -11,7 +11,7 @@ import (
 // the original source position in both LF and CRLF files.
 func TestFilterDeclarations(t *testing.T) {
 	for _, nl := range []string{"\n", "\r\n"} {
-		for _, path := range []string{`$[?(@.slug=='pizza')].id`, `$[?(@.slug == "it's \"pizza\"")].id`, `$[?(@.n == 9223372036854775809)]`, `$[?(@.x == '{{static}}')]`} {
+		for _, path := range []string{`$[?(@.slug=='pizza')].id`, `$[?(@.slug == "it's \"pizza\"")].id`, `$[?(@.n == 9223372036854775809)]`} {
 			source := "GET http://example.test\nHTTP *\n[Asserts]\njsonpath " + strconv.Quote(path) + " exists\n[Captures]\nx: jsonpath " + strconv.Quote(path)
 			s, err := Parse("filter.hurl", strings.NewReader(strings.ReplaceAll(source, "\n", nl)))
 			if err != nil || !s.Entries[0].Assertions[0].JSON.Path.Expansive() || !s.Entries[0].Captures[0].Path.Expansive() {

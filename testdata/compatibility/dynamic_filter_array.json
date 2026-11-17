@@ -1,0 +1,20 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[]",
+  "variables": [
+    "v=[]"
+  ],
+  "classification": "restrição escalar: array como operando completo retorna erro 2 na avaliação aqui; Hurl também reprova (4), sem aprovação de negação",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

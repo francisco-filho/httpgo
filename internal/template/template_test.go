@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{`"x')].id[?(@.n=='other"`, `"a\"\\[]雪"`, `"{{missing}}"`, `1e99999999999999999999`, `1.00000000000000000000002`, `null`, `[]`, `{}`} {
+		f.Add("Order {{x}}", value)
+	}
 	for _, value := range []string{`"a[0-9]+"`, `"(?=private)"`, `"{{missing}}"`, `""`, `null`, `[]`, `{}`} {
 		f.Add("^prefix-{{x}}-suffix$", value)
 	}

@@ -1,0 +1,21 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":\"x')].id[?(@.v=='other\",\"id\":1},{\"v\":\"other\",\"id\":2}]",
+  "variables": [
+    "v=x')].id[?(@.v=='other"
+  ],
+  "classification": "diferença deliberada: string composta vincula aspas e delimitadores como dados, sem reparse; Hurl reprova após interpolação (4)",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

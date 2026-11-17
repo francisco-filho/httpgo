@@ -3,29 +3,11 @@
   "variables": [
     "static=replaced"
   ],
-  "classification": "diferença deliberada: literal estático aqui mesmo com variável definida; Hurl interpola e diverge",
+  "classification": "mudança explícita US-31: placeholder em consulta exige opt-in; sem flag HTTPGo rejeita antes da rede, mesmo definido; Hurl interpola e diverge",
   "httpgo": {
-    "exit": 0,
-    "paths": [
-      "/capture",
-      "/health"
-    ],
-    "requests": [
-      {
-        "uri": "/capture",
-        "method": "GET",
-        "body": "",
-        "content_type": "",
-        "probe": ""
-      },
-      {
-        "uri": "/health",
-        "method": "GET",
-        "body": "",
-        "content_type": "",
-        "probe": ""
-      }
-    ]
+    "exit": 2,
+    "paths": [],
+    "requests": null
   },
   "hurl": {
     "exit": 4,

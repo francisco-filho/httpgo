@@ -1,0 +1,21 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":\"a\\\"\\\\[]雪\",\"id\":1}]",
+  "variables": [
+    "v=a\"\\[]雪"
+  ],
+  "classification": "diferença de escapes: aspas, barra, colchetes e Unicode do valor são dados vinculados aqui; Hurl reprova após interpolação (4)",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

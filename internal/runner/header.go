@@ -50,7 +50,7 @@ func checkHeader(session template.Session, declaration parser.HeaderAssertion, h
 
 func pendingSecret(session template.Session, entry parser.Entry) bool {
 	for _, capture := range entry.Captures {
-		if session.IsSecret(capture.Name) {
+		if session.IsSecret(capture.Name) || capture.Path.HasProtectedReference(session.IsSecret) {
 			return true
 		}
 	}

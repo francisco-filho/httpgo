@@ -26,7 +26,6 @@ func TestFilterTypedEquality(t *testing.T) {
 		{`"a\"b/c\\d"`, `"a\"b/c\\d"`, true},
 		{`'\uD83C\uDF55\n\t'`, `"🍕\n\t"`, true},
 		{`'x)].id[?(@.a==1)'`, `"x)].id[?(@.a==1)"`, true},
-		{`'{{literal}}'`, `"{{literal}}"`, true},
 	} {
 		t.Run(tc.literal+tc.value, func(t *testing.T) {
 			source := "$[?(@.v == " + tc.literal + ")].id"

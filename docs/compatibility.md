@@ -1,4 +1,56 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-30
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-31
+
+## Operandos dinâmicos — US-31 / issue #62
+
+**Mudanças explícitas de contrato:** `--render-asserts` habilita operandos de
+igualdade JSONPath em assertions/capturas. Sem flag, placeholders nas consultas
+são rejeitados inclusive em literais. Foram alteradas **somente** as observações
+HTTPGo/classificação dos pares históricos `filter_literal_placeholder` e
+`filter_literal_defined`: agora **2, zero envios**, não literal estático.
+Entradas `.hurl` e observações Hurl desses pares permanecem inalteradas. Isso
+substitui a permissão US-28; não altera esperados literais da US-30.
+
+Acrescentados **19 pares `dynamic_filter_*`**, corpus integrado **406 pares**
+(387 da base + 19). Observações novas atualizadas só pelo prefixo novo, revisadas
+e depois validadas pelo gate completo **sem `-update`**, com Hurl **8.0.0** em
+Linux. Não houve regeneração indiscriminada nem consulta ao código-fonte Hurl.
+O harness existente mantém `httpgo_profile` por par: `render-asserts` só passa a
+flag ao HTTPGo, `literal`/ausente não a ativam; nunca passa a flag própria ao Hurl.
+Fixtures/árvores são independentes, estado é resetado, build é único e execuções
+usam `exec.CommandContext`. São dados sintéticos, não a suíte real.
+
+| Par `dynamic_filter_*` | HTTPGo | Hurl 8.0.0 | Classificação observada |
+|---|---|---|---|
+| `prior_small` | 0; /capture → /capture → /health | igual | número 42 capturado anteriormente seleciona a entidade; Hurl interpola por padrão |
+| `composition`, `boolean`, `null`, `nonrecursive` | 0; /capture → /health | igual | texto composto, booleano/null tipados, ausência distinta de null e conteúdo {{missing}} sem expansão recursiva |
+| `number`, `prior_capture` | 0; avança até /health | 4; para na assertion | HTTPGo conserva 9007199254740993; diferença numérica deste filtro, não afirmação de precisão geral Hurl |
+| `prior_cancelled` | 1; /capture → /capture | 4; mesmo fluxo | outro PLACED não aprova o pedido cancelado; inclui diferença numérica do par anterior |
+| `capture_reuse` | 0; /capture → /capture → POST /health com body `"selected"` | 3; /capture → /capture | HTTPGo reduz seleção única a escalar; Hurl conserva coleção e não a renderiza como body; wire HTTPGo verificado |
+| `string_number` | 0; /capture → /health | 4; /capture | entrada CLI 001 conserva texto HTTPGo; não presumir equivalência da fonte de variáveis Hurl |
+| `injection_bare`, `injection_quoted`, `escapes` | 0; /capture → /health | 4; /capture | aspas/barras/colchetes/texto de filtro são dados vinculados aqui; interpolação Hurl reprova esses exemplos |
+| `array`, `missing` | 2; /capture | 4; /capture | tipo composto não admitido/variável ausente falham na avaliação, mesmo com seleção vazia e negação |
+| `same_response` | 2; /capture | 0; /capture → /health | diferença deliberada: não disponibilizar captura da mesma resposta à assertion |
+| `index` | 2; zero envios | 0; /capture → /health | índice dinâmico é estrutural e permanece fora do recorte HTTPGo |
+| `no_optin` | 2; zero envios | 0; /capture → /health | Hurl interpola por padrão; HTTPGo exige opt-in até em literal de consulta |
+| `invalid_late` | 2; zero envios | igual | template/consulta estaticamente inválido tardio impede todo HTTP |
+
+A aceitação do placeholder **não** amplia a linguagem US-28. HTTPGo não renderiza
+uma expressão: vincula scalar/string ao plano validado sem reinterpretar aspas,
+escapes ou texto de novos passos. Esperado é preparado primeiro; todos os
+operandos da consulta alcançada são resolvidos antes de decode/seleção. Ordem
+status → assertions → capturas atômicas e percurso estrito permanecem. Valores
+iniciais/capturas anteriores são os únicos resolvíveis. Erros dinâmicos são 2,
+divergência 1; escrita 2 prevalece. Segredos/derivados, planos e coleções são
+verificados em testes HTTPGo de resultados/callbacks/streams, sem produzir
+artefatos de credenciais ou coleções sensíveis.
+
+Reprodução: Hurl 8.0.0 no PATH, `make compatibility`, ou
+`go test -tags compatibility ./tests/e2e -run '^TestCompatibility/dynamic_filter_' -count=1 -v`.
+[Subconjunto](subset.md#operandos-dinâmicos--us-31--issue-62),
+[arquitetura](architecture.md#operandos-dinâmicos--us-31--issue-62) e
+[validação executada](validation.md#us-31--issue-62--história-0031).
+As seções seguintes são evidência histórica: as duas observações de placeholders
+US-28 foram explicitamente substituídas nesta história, não silenciosamente.
 
 ## Tipos e vazio — US-29 / issue #58
 
@@ -36,7 +88,8 @@ Diagnóstico dos novos predicados é categórico e não imprime valores/estrutur
 mesmo escalares; metadados protegidos ficam ocultos. `isString` e vazio de
 string/array são atalhos para `matches ""`, `== ""`/`count == 0`. Não há schema,
 novos tipos, negação genérica ou aplicação por item. Consultas/filtros disponíveis
-continuam estáticos. O corpus é sintético e não homologa a suíte real.
+têm estrutura estática; operandos seguem o opt-in US-31 acima. O corpus é
+sintético e não homologa a suíte real.
 
 Reprodução: com Hurl 8.0.0 no PATH, `make compatibility` (sem `-update`), ou
 `go test -tags compatibility ./tests/e2e -run '^TestCompatibility/types_' -count=1 -v`.
@@ -122,7 +175,7 @@ normalização dos dados ou código-fonte Hurl.
 | `plural_capture` | 0; POST /health com [9223372036854775809,9007199254740993] | 3; /capture | **diferença de reuso:** JSON completo tipado aqui; Hurl não renderiza composto |
 | `plural_text` | 2; /capture | 3; /capture | coleção não vira texto nem escolhe primeiro ID; nenhum segundo envio |
 | `strict_property`, `strict_index`, `strict_array` | 2; /capture | 0; /capture → /health | **diferença deliberada:** propriedade em null, índice em objeto ou filtro em não array junto de ramos válidos invalida seleção inteira aqui; Hurl descarta ramo e aprova exists |
-| `literal_placeholder`, `literal_defined` | 0; /capture → /health | 4; /capture | **diferença deliberada:** texto {{static}} dentro do literal é estático aqui; Hurl interpola (ausente ou definido como replaced) |
+| `literal_placeholder`, `literal_defined` | 2; zero envios | 4; /capture | **mudança US-31:** consulta com placeholder agora exige opt-in; observações antigas 0 foram substituídas explicitamente; Hurl continua interpolando |
 | `unsupported_ordering`, `unsupported_existence` | 2; zero envios | 0; /health → /capture → /health | recursos fora do recorte rejeitados estaticamente, não habilitados pela biblioteca |
 | `unsupported_logical`, `unsupported_dynamic`, `unsupported_invalid` | 2; zero envios | 4; /health → /capture | lógica/operando dinâmico fora do recorte ou literal malformado; validação integral antecipada aqui |
 
@@ -147,7 +200,7 @@ operadores continuam negativos. O cenário `unsupported_projection_filter.hurl`
 e as listas de negativos de parser/E2E passaram intencionalmente de igualdade
 para `!=`, ainda fora do recorte; **nenhum par antigo de compatibility mudou**.
 Não se anuncia JSONPath completo, filtros de existência, lógica, regex, funções,
-scripts, operadores além de igualdade, operandos/propriedades/operadores dinâmicos
+scripts, operadores além de igualdade, propriedades/operadores dinâmicos
 ou conformidade RFC integral. Literais de filtro são sempre ocultados em
 consulta apresentada; proteção de metadados/operandos e remoção do plano são
 comprovadas em testes estruturados e streams, sem exigir diagnósticos idênticos.

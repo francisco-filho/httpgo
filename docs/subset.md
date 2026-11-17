@@ -1,10 +1,64 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-30
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-31
 
 Este documento define somente o que o binário implementa nesta história.
 Não implica suporte ao formato Hurl completo. As descrições de esperados
 literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
 [US-30](#esperados-dinâmicos--us-30--issue-60) define sua evolução opt-in com
-`--render-asserts`, sem mudar consultas, operadores ou capturas.
+`--render-asserts`. A US-31 também permite operandos dinâmicos nos filtros por
+igualdade de assertions e capturas, sem ampliar operadores ou passos.
+
+## Operandos dinâmicos — US-31 / issue #62
+
+`--render-asserts` habilita placeholders **somente** em operandos de igualdade
+JSONPath de assertions/capturas. Exemplo:
+
+```hurl
+GET {{base_url}}/orders
+HTTP 200
+[Asserts]
+jsonpath "$.items[?(@.number=={{order_number}})].status" == "PLACED"
+jsonpath "$.items[?(@.name=='Order {{suffix}}')].id" exists
+[Captures]
+selected_id: jsonpath "$.items[?(@.number=={{order_number}})].id"
+```
+
+`order_number`/`suffix` precisam ser iniciais ou capturas **anteriores publicadas**.
+[Exemplo completo](../testdata/scenarios/dynamic_filter.hurl), incluindo captura
+anterior e envio dependente, executado pelo E2E com HTTP real.
+
+- Placeholder completo não delimitado conserva escalar tipado: string, número
+  (`json.Number` exato), booleano ou `null`. Nunca converte string numérica em número.
+- Dentro de literal de aspas simples/duplas, compõe texto pelas regras escalares
+  de URL/header: texto vazio, números, booleanos e `null`; arrays/objetos não têm
+  conversão implícita. Também são rejeitados como operando completo, mesmo vazios.
+- O texto substituído é dado vinculado ao plano, sem expansão recursiva ou reparse
+  JSONPath. Aspas, barras, colchetes ou operadores no valor não criam passos novos.
+  Delimitadores/escapes da string externa `.hurl` e da interna continuam separados.
+- Sem flag, placeholders nas consultas são erro estático **2**, mesmo em strings
+  e com variável definida. É mudança explícita da permissão US-28 de literal
+  semelhante a placeholder, não mudança dos esperados literais US-30.
+- Com flag, toda estrutura estática é validada antes do primeiro HTTP do arquivo,
+  sem resolver valores. Propriedades, índices, caminhos relativos, operadores e
+  consulta inteira dinâmicos são rejeitados, sem ampliar a gramática US-28.
+- Só a consulta alcançada resolve seus operandos. Na assertion, preparado primeiro
+  o esperado US-30, depois **todos** os operandos antes de decode/seleção, inclusive
+  se não houver itens. Ausência/tipo inválido retorna **2** localizado na consulta,
+  sem publicação/avanço. Status/assertion anterior divergente mantém **1** e impede
+  resolução antecipada de consultas posteriores ou capturas.
+- Capturas não veem valores provisórios do próprio lote. Seleção/publicação falha
+  descarta o lote inteiro sem sobrescrever valores anteriores. Proteção já
+  descoberta permanece. Ordem: status → assertions → capturas → callback.
+- Zero/um/vários, ausência versus `null`, preservação de arrays e percurso estrito
+  são os da US-27/28. Coleção capturada não vira URL/header nem primeiro ID.
+- Consulta apresentada usa fonte original sanitizada e operandos ocultos; nunca
+  expressão resolvida ou coleção selecionada. Proveniência secreta protege também
+  derivados, categorias e valores capturados por seleção secreta. Marque segredos
+  arbitrários explicitamente; sanitização não detecta toda codificação desconhecida.
+
+Este opt-in é evolução HTTPGo, não uma opção Hurl. Hurl 8.0.0 interpola sem a
+flag e aceita índice dinâmico; tipos, precisão, escapes e publicação têm
+[diferenças observadas](compatibility.md#operandos-dinâmicos--us-31--issue-62).
+Sem funções/scripts/lógica/novos operadores ou JSONPath completo.
 
 ## Seleção estática por igualdade — US-28 (issue #56)
 
@@ -48,10 +102,18 @@ array ordenado, sem achatamento. Predicados recebem somente esse valor reduzido.
 Captura ausente retorna `2`; `null` é válido. Coleções só podem ser reutilizadas
 como valor JSON completo, nunca como texto em URL/header.
 
-Consultas são estáticas: `{{texto}}` dentro de literal é dado, não template.
-Operandos dinâmicos, operadores além de `==`, existência, funções, scripts,
-regex e operadores lógicos em filtros continuam rejeitados antes de qualquer
-HTTP do arquivo. Status → assertions → capturas permanece inalterado. Falhas
+**Evolução explícita US-31 (issue #62):** placeholders em consultas, inclusive
+em literais, exigem `--render-asserts`; sem a flag são rejeitados antes da rede.
+Com a flag, somente operandos de igualdade admitem `{{nome}}` como valor escalar
+tipado ou composição textual como `'Order {{suffix}}'`. Arrays/objetos não são
+convertidos em texto nem admitidos como operando completo. O plano estrutural é
+validado antes do HTTP; operandos são vinculados na avaliação, nunca concatenados
+ou reinterpretados como expressão. Aspas e texto de filtro inseridos são dados,
+e não há expansão recursiva. Exemplo executável:
+`testdata/scenarios/dynamic_filter.hurl` (usar `--render-asserts`).
+Consultas inteiras, propriedades, índices e operadores dinâmicos continuam
+rejeitados, assim como operadores além de `==`, existência, funções, scripts,
+regex e operadores lógicos em filtros, antes de qualquer HTTP do arquivo. Status → assertions → capturas permanece inalterado. Falhas
 não imprimem coleções; literais dos filtros são sempre ocultados na consulta
 apresentada, inclusive escapes de segredos, e o plano não entra nos relatórios.
 Exemplo versionado: `testdata/scenarios/scenario_filter.hurl`.
@@ -1074,7 +1136,8 @@ variável ausente ou tipo esperado incompatível é avaliação **2**, enquanto
 comparação divergente é **1**. Status e assertions anteriores têm precedência;
 capturas da própria resposta ainda não estão publicadas. Valores secretos e
 seus derivados ficam protegidos antes dos callbacks, sem reter planos nos
-resultados. A flag não altera consultas nem a ordem de publicação.
+resultados. A flag não altera estrutura de consultas nem ordem de publicação;
+a US-31 acima também habilita operandos de igualdade em consultas.
 
 O mesmo opt-in resolve os esperados textuais de headers/body e os padrões
 `matches` JSON/header. Operandos continuam exigindo strings entre aspas, com
@@ -1097,8 +1160,8 @@ não suportado é erro de avaliação **2**, sem expor o erro bruto da engine.
 A substituição não é recursiva, inclusive em regex. Ausência/vazio, pertencimento
 JSON tipado e primeira ocorrência de header mantêm as regras existentes.
 Negação não aprova esperado inválido; headers sensíveis ocultam ambos os lados.
-A flag não habilita regex de body, operadores novos, consultas dinâmicas ou
-interpolação de padrões de captura.
+A flag não habilita regex de body, operadores novos, consultas inteiras/estrutura
+dinâmica ou interpolação de padrões de captura. Operandos de filtros seguem US-31.
 
 ## Igualdade JSON — US-08 / issue #20
 

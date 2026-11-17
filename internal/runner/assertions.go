@@ -209,6 +209,14 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 					return fail(err.Error())
 				}
 			}
+			bound, secret, err := bindQuery(session, declaration.Path)
+			if err != nil {
+				pos = declaration.QueryPosition
+				pos.File = session.Sanitize(pos.File)
+				return fail("não foi possível resolver operando JSONPath: " + err.Error())
+			}
+			declaration.Path = bound
+			conceal = conceal || secret
 			if !decoded {
 				var err error
 				document, err = query.Decode(response.Body)

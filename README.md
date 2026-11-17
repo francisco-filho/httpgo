@@ -3,6 +3,62 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Selecionar com valores anteriores (US-31 / issue #62)
+
+```hurl
+GET {{base_url}}/first
+HTTP 200
+[Captures]
+order_number: jsonpath "$.number"
+
+GET {{base_url}}/orders
+HTTP 200
+[Asserts]
+jsonpath "$.items[?(@.number=={{order_number}})].status" == "PLACED"
+[Captures]
+selected_id: jsonpath "$.items[?(@.number=={{order_number}})].id"
+
+GET {{base_url}}/{{selected_id}}
+HTTP 200
+```
+
+Execute o [exemplo versionado](testdata/scenarios/dynamic_filter.hurl):
+`httpgo test testdata/scenarios/dynamic_filter.hurl --render-asserts --var base_url=http://localhost:8080`.
+A fixture requer `/first` retornando `{"number":42}` e `/orders` retornando
+`{"items":[{"number":41,"status":"PLACED","id":"wrong"},{"number":42,"status":"PLACED","id":"selected"}]}`.
+Apenas o pedido **42** aprova e publica `selected_id` para consultar `/selected`.
+Se estiver cancelado ou ausente, retorna **1** sem captura/próximo envio, mesmo
+havendo outro pedido `PLACED`. Os testes usam HTTP local; estas não são rotas
+prometidas pelo dummy nem homologação de uma API real.
+
+- **Evolução explícita HTTPGo:** a flag US-30 também habilita operandos de filtros
+  por igualdade em assertions **e capturas**. Sem ela, placeholders nas consultas
+  são rejeitados antes da rede, **inclusive dentro de strings**. Isso substitui
+  explicitamente o literal semelhante a placeholder permitido pela US-28, mas
+  não altera o modo literal dos **esperados** da US-30.
+- `@.number=={{number}}` preserva string/número exato/booleano/`null` da origem;
+  `@.name=='Order {{suffix}}'` compõe string com conversões escalares existentes.
+  String numérica não vira número. Arrays/objetos, mesmo vazios, retornam **2**.
+- Aspas, apóstrofos, barras, colchetes e texto de expressão substituídos são dados
+  vinculados ao plano; a expressão inteira nunca é renderizada ou reanalisada.
+  Não há expansão recursiva, propriedades/índices/operadores/consulta dinâmicos,
+  nem novos operadores. Os dois níveis de escape de literais estáticos permanecem.
+- Estrutura inválida em qualquer entrada impede **todo HTTP do arquivo**.
+  Valores são resolvidos na consulta alcançada, após preparar seu esperado e
+  antes de decode/seleção, mesmo que o array esteja vazio. Variável ausente/tipo
+  inválido é avaliação **2**, não divergência ou aprovação por negação.
+- Somente iniciais e capturas anteriores publicadas ficam acessíveis. Mantém
+  status → assertions na ordem escrita → lote atômico de capturas → callback.
+  Zero/um/vários e percurso estrito seguem US-27/28, sem escolher primeiro ID.
+  Segredos/derivados são protegidos e planos/operandos não vão aos relatórios.
+
+O Hurl interpola consultas sem opt-in e aceita formas estruturais excluídas aqui,
+como índice dinâmico. Vinculação tipada, precisão, escapes e publicação podem
+divergir: veja [evidência Hurl 8.0.0](docs/compatibility.md#operandos-dinâmicos--us-31--issue-62),
+[subconjunto](docs/subset.md#operandos-dinâmicos--us-31--issue-62),
+[arquitetura](docs/architecture.md#operandos-dinâmicos--us-31--issue-62) e
+[validação](docs/validation.md#us-31--issue-62--história-0031).
+
 ## Validar tipos e valores vazios (US-29 / issue #58)
 
 ```hurl
@@ -90,8 +146,8 @@ perder precisão, capturar a entrada divergente ou enviar a próxima requisiçã
 - Ordem permanece status → assertions na ordem escrita → capturas atômicas.
   Captura própria/futura ainda não está disponível. Segredos/derivados são
   protegidos antes de callbacks; planos e regex operacionais não vão ao resultado.
-- Consultas, nomes de header, padrões de captura e templates de requisição não
-  mudam. Sem regex de body em assertions, expressões, aritmética ou nova env/YAML.
+- A US-31 acima amplia somente operandos de filtros nas consultas. Nomes de
+  header, padrões de captura e templates de requisição não mudam. Sem regex de body em assertions, expressões, aritmética ou nova env/YAML.
   As seções legadas abaixo descrevem o perfil literal, salvo indicação explícita.
 
 [Subconjunto](docs/subset.md#esperados-dinâmicos--us-30--issue-60),
@@ -137,8 +193,9 @@ prometida pelo dummy nem homologação de uma API real.
 - Filtro em não array ou percurso incompatível no atributo invalida **toda** a
   seleção com **2**, inclusive em ramos mistos; ausência só elimina o item.
   JSON inválido continua erro de avaliação, não ausência ou aprovação por negação.
-- Operadores além de `==`, existência/lógica/regex/funções/scripts em filtro e
-  operandos dinâmicos continuam fora. `{{texto}}` dentro de literal é dado estático.
+- Operadores além de `==`, existência/lógica/regex/funções/scripts em filtro
+  continuam fora. Operandos dinâmicos seguem a US-31 acima: placeholders nas
+  consultas exigem `--render-asserts`, inclusive em literais.
   Erro estático tardio impede todos os envios; diagnósticos localizados não
   despejam coleção e sempre ocultam literais de filtro/plano operacional.
 
@@ -313,7 +370,8 @@ nem homologação de uma suíte real.
 - Headers ignoram caixa do nome e consultam apenas a primeira ocorrência,
   sem concatenar valores. `not contains` aprova header ausente; presente vazio
   contém `""`. `Set-Cookie` e demais headers sensíveis continuam ocultos.
-- Consultas/esperados são estáticos; `{{nome}}` em string é literal.
+- Consultas são estruturais estáticas; operandos de filtros seguem US-31.
+  Esperados são literais sem `--render-asserts`, inclusive `{{nome}}` em string.
   Não há negação genérica, `header not exists`, `count contains`, busca
   recursiva ou filtros além da igualdade estática US-28; projeção de arrays `[*]` é o recorte US-27 acima. Sintaxe inválida tardia impede todos
   os envios. JSON inválido, percurso incompatível e falha de execução são **2**,
@@ -1249,7 +1307,7 @@ contra HTTP real pelos E2E. O dummy manual não promete esse contrato JSON.
 **Ampliação intencional:** `jsonpath "consulta" == <literal JSON>` aceita string,
 número, booleano, null, array ou objeto, inclusive vazios. JSONPath combina
 raiz `$`, propriedades por ponto, índices não negativos, `[*]` de arrays e filtros estáticos por igualdade (US-28). Consultas
-são estáticas; os esperados são literais JSON completos na mesma linha, nunca
+têm estrutura estática e operandos opt-in da US-31; no perfil padrão os esperados são literais JSON completos na mesma linha, nunca
 templates: `"{{nome}}"` permanece texto mesmo com a variável definida.
 
 A igualdade preserva tipos: `"4500"` difere de `4500`. Números são comparados
@@ -1278,7 +1336,7 @@ A US-14 acrescenta presença, contagem e limites (abaixo), sem ampliar JSONPath.
 A comparação por regex em JSON restringe-se a strings selecionadas (US-15);
 headers usam `matches` da US-24 e extração de body/header é o recorte US-25. Consulte
 [Validar padrões textuais](docs/subset.md#padrões-textuais--us-15--issue-36). Não há
-interpolação de consultas; padrões só interpolam com o opt-in US-30 acima.
+interpolação estrutural de consultas; operandos de filtros só interpolam com o opt-in US-31 e padrões com o opt-in US-30 acima.
 Hurl 8.0.0 rejeita os literais esperados
 compostos e o literal com expoente testados; a gramática e os códigos próprios
 estão classificados em [compatibilidade](docs/compatibility.md), sem promessa de

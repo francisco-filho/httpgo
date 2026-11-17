@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"number\":9007199254740993,\"items\":[{\"number\":9007199254740992,\"status\":\"PLACED\",\"id\":\"wrong\"},{\"number\":9007199254740993,\"status\":\"CANCELLED\",\"id\":\"selected\"}]}",
+  "classification": "divergência da entidade procurada impede avanço mesmo com outro PLACED; HTTPGo (1), Hurl (4); inclui diferença numérica do caso prior_capture",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture",
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture",
+      "/capture"
+    ]
+  }
+}

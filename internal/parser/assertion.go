@@ -115,7 +115,7 @@ func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAs
 	}
 	queryPos := pos
 	queryPos.Column += len(text) - len(rest) + 1
-	path, err := query.Parse(source)
+	path, err := query.ParseWithOptions(source, options.RenderAsserts)
 	if err != nil {
 		category := "sintaxe inválida"
 		if located, ok := err.(*query.Error); ok && located.Unsupported {

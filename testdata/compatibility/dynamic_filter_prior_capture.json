@@ -1,0 +1,20 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"number\":9007199254740993,\"items\":[{\"number\":9007199254740992,\"status\":\"PLACED\",\"id\":\"wrong\"},{\"number\":9007199254740993,\"status\":\"PLACED\",\"id\":\"selected\"}]}",
+  "classification": "diferença numérica observada: captura anterior 9007199254740993 seleciona o ID exato aqui; Hurl reprova este filtro (4)",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture",
+      "/capture"
+    ]
+  }
+}
