@@ -1,8 +1,8 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-27
+# Arquitetura implementada — US-01 a US-16, US-20 a US-27b
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
 
@@ -94,7 +94,9 @@ Não há framework de CLI, pacote genérico de tipos, domínio rico ou novos pac
 reservados para capacidades futuras. A US-11 acrescenta somente `internal/config`
 e a dependência YAML mantida `go.yaml.in/yaml/v3` **v3.0.6**, isolada nesse pacote.
 A US-21 acrescenta `golang.org/x/text v0.44.0`, encapsulada em `query` para
-rótulos/conversões de charset. O restante usa biblioteca padrão; `go.mod` preserva módulo
+rótulos/conversões de charset. A US-27b acrescenta `github.com/ohler55/ojg`
+**v1.28.9**, com `jp` isolado em `internal/query` para navegar projeções existentes.
+O restante usa biblioteca padrão; `go.mod` preserva módulo
 `capimgrosso.com/httpgo` e Go `1.26.10`.
 
 | Pacote/tipos | Responsabilidade |
@@ -125,15 +127,37 @@ Somente o código de produção em `transport` importa `net/http`.
 
 ## Projeção de arrays — US-27 / issue #52
 
-`query.Parse` amplia `step` com wildcard de array e `Path.Expansive` identifica
-as novas consultas. Sem biblioteca ou engine adicional: `SelectValue` percorre
-iterativamente uma sequência interna de nós, expandindo somente arrays e
-preservando ordem/repetições. Ausências/índices fora do array eliminam ramos;
+`query.Parse` valida `step` com wildcard de array e `Path.Expansive` identifica
+as consultas expansivas. Na US-27b / issue #54, `Path` conserva os passos nativos
+e recebe `projection` privado (`jp.Expr`), composto por `jp.Child`, `jp.Nth` e
+`jp.Wildcard` **somente após a validação própria**. A biblioteca nunca reinterpreta
+a consulta original; parser e consumidores mantêm `Parse`, `Select`, `SelectValue`
+e `Expansive`, sem tipos OjG fora de query.
+
+`SelectValue` escolhe estaticamente `selectNative` para caminhos simples e
+`selectProjection` para wildcards, sem flag, tentativa após erro/ausência ou
+reexecução em outro avaliador. O adapter verifica os tipos de todos os nós antes
+de cada passo e delega a extração/expansão desse passo ao `jp.Expr.Get` sobre cada
+nó compatível. Uma execução integral de `Get` descartaria ramos incompatíveis e
+não satisfaria o contrato estrito. Não há seleção nativa completa seguida de
+repetição na biblioteca. A sequência preserva ordem/repetições e expande somente
+arrays. Ausências/índices fora do array eliminam ramos;
 qualquer ramo com tipo incompatível retorna erro, descartando a seleção inteira.
 A sequência é distinta de cada valor JSON e reduzida somente ao final:
 zero → ausência; um → próprio valor; vários → array. Não há flatten de valores,
 coerção numérica nem serialização intermediária do documento. `Decode` conserva
 `UseNumber`; o contrato público continua valor/presença/erro.
+
+O decode continua exclusivamente em `encoding/json`, rejeitando valores adicionais.
+Não se usa `oj.Parse`, conversão para números OjG ou avaliação numérica por `jp`.
+A biblioteca navega sobre `json.Number`; igualdade/comparação decimal exata
+continua em `internal/assertion/json.go`, sem expansão proporcional ao expoente.
+Capturas usam `encoding/json` e conservam a grafia numérica, inclusive além de
+`int64`, decimais próximos e expoentes extremos. Não há fallback numérico nem
+promessa de precisão para filtros futuros (US-28), que exigem decisão própria.
+`safeEntry` zera **todo** `query.Path`, removendo também `projection`, em qualquer
+desfecho antes dos resultados/callbacks. Nenhuma mensagem da biblioteca ou
+documento operacional é encaminhada à apresentação.
 
 `Path.Select` preserva o adapter legado (percurso incompatível → ausência) apenas
 para caminhos simples. Consultas expansivas propagam o erro controlado também em

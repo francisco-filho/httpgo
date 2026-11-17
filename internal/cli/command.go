@@ -593,6 +593,8 @@ Array vazio selecionado existe; wildcard em array vazio não encontra resultados
 count conta o array reduzido: dois números contam 2; número único/ausência falha com 1.
 Capturas usam a mesma seleção tipada e publicação atômica; zero resultados falha com 2.
 Arrays/objetos capturados exigem valor JSON completo, sem escolher o primeiro elemento.
+Precisão preservada além de int64, decimais próximos e expoentes extremos, sem coerção.
+Sem nova sintaxe ou opção de avaliador; exemplo: testdata/scenarios/scenario_projection_precision.hurl.
 Ramo incompatível invalida toda consulta expansiva com 2, mesmo com ramos válidos.
 Diagnóstico resume presença/tipo/contagem sem coleção ou esperado composto;
 resumos protegidos ficam ocultos, inclusive com captura secreta pendente.
