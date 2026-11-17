@@ -19,7 +19,7 @@ func TestHeaderHelpContract(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%q", code, stderr)
 		}
-		for _, want := range []string{"HTTP *", "[Asserts]", `header "Content-Type" contains "application/json"`, `header "X-Request-Id" exists`, `header "X-Request-Id" == "req-123"`, "primeira ocorrência", "ausente de", "não interpola", "assertions na ordem escrita, capturas", "Set-Cookie", "Diferenças Hurl 8.0.0"} {
+		for _, want := range []string{"HTTP *", "[Asserts]", `header "Content-Type" contains "application/json"`, `header "X-Request-Id" exists`, `header "X-Request-Id" == "req-123"`, "primeira ocorrência", "ausente de", "não interpola", "capturas provisórias, assertions na ordem escrita, confirmação", "Set-Cookie", "Diferenças Hurl 8.0.0"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("help lacks %q", want)
 			}

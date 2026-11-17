@@ -3,6 +3,66 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Validar e renovar capturas na própria resposta (US-34 / issue #70)
+
+**Mudança deliberada de contrato, padrão e sem nova flag:** resposta completa →
+status esperado → todas as capturas → assertions na ordem escrita → confirmação.
+Assertions enxergam o lote atual mesmo se `[Asserts]` vier antes de `[Captures]`.
+
+```hurl
+GET {{base_url}}/jobs/current
+HTTP 200
+[Captures]
+job_id: jsonpath "$.selectedId"
+[Asserts]
+jsonpath "$.jobs[?(@.id=='{{job_id}}')].status" == "READY"
+
+GET {{base_url}}/jobs/{{job_id}}/successor
+HTTP 200
+[Captures]
+job_id: jsonpath "$.id"
+[Asserts]
+jsonpath "$.status" == "READY"
+
+GET {{base_url}}/jobs/{{job_id}}
+HTTP 200
+```
+
+```bash
+httpgo test testdata/scenarios/scenario_capture_renewal.hurl --render-asserts --var base_url=http://localhost:8080 --var job_id=inicial
+```
+
+`/jobs/current` deve devolver `selectedId: "job-a"` e `jobs` contendo esse ID
+com status `READY`; `/jobs/job-a/successor`, `{"id":"job-b","status":"READY"}`.
+O fluxo consulta `/jobs/job-b` e termina com **0**. Selecionado não pronto retorna
+**1**, sem a segunda requisição. O exemplo exige esses endpoints, não os fornece.
+
+- Captura substitui nome **exatamente igual** inicial ou confirmado, inclusive
+  mudando tipo, sem perda de precisão. Não altera configuração ou outros arquivos.
+  Duplicação no lote e conflitos ancestral/descendente continuam **erro 2**;
+  objetos não criam variáveis para suas propriedades.
+- Consultas de captura leem somente iniciais/confirmados anteriores, nunca novas
+  capturas do lote. Assertions usam o novo valor. Para comparar antigo e novo,
+  use nomes distintos. Esperados e operandos de filtro só interpolam com
+  `--render-asserts`; o perfil literal não muda.
+- Erro de captura precede assertions. Status divergente impede capturas. Falha de
+  captura/avaliação, divergência, timeout ou cancelamento antes da confirmação
+  descarta o lote inteiro. Efeitos já feitos na API não são desfeitos.
+- Polling mantém os valores confirmados antes da entrada em todos os reenvios;
+  somente a tentativa aprovada confirma. Erro **2** não é retentado; divergência
+  **1** continua elegível dentro do orçamento existente.
+- Marcas/valores secretos antigos, novos e derivados permanecem protegidos mesmo
+  após descarte e entre arquivos da invocação, sem compartilhar valores resolvíveis.
+  Segredos arbitrários não marcados/transformações desconhecidas não são detectados.
+  Credenciais iniciais vêm do ambiente, nunca de flags.
+- Não habilita query `variable`, encadeamento de capturas do mesmo lote, novas
+  políticas de retry ou de entrada de credenciais.
+
+[Contrato](docs/subset.md#renovação-transacional-de-capturas--us-34--issue-70),
+[arquitetura](docs/architecture.md#renovação-transacional-de-capturas--us-34--issue-70),
+[diferencial Hurl 8.0.0](docs/compatibility.md#renovação-transacional-de-capturas--us-34--issue-70).
+As regras US-34 substituem as restrições antigas de ordem e colisão exata.
+
 ## Publicar resultados JUnit no CI (US-17 / issue #68)
 
 ```bash
@@ -91,10 +151,10 @@ conteúdo diferente; quatro depois falham com **1**, sem imprimir os pedidos.
   tipo não array continuam divergência **1**. Wildcard/filtro respeitam a
   redução US-27/28: zero resultados é ausência; um resultado conserva seu tipo;
   vários formam array sem achatamento. Um único array conserva seu conteúdo.
-- Ordem: status → assertions → capturas atômicas → apresentação → próximo envio.
-  Colisões exatas/hierárquicas com iniciais, capturas anteriores ou mesmo lote
-  rejeitam todo o lote sem sobrescrever. Captura própria não está disponível
-  para assertions da mesma resposta. Erro estático tardio impede todo HTTP.
+- Ordem: status → capturas provisórias → assertions → confirmação atômica →
+  apresentação → próximo envio (US-34). Nome exato pode ser renovado; duplicação
+  no lote e conflito hierárquico rejeitam tudo. Assertions veem o lote atual.
+  Erro estático tardio impede todo HTTP.
 - `--secret orders_before` protege a quantidade e seus usos; comparação posterior
   oculta esperado **e** real, mesmo diferentes. Diagnóstico de captura informa
   consulta, `count`, causa e localização, sem despejar a coleção. Falhas de
@@ -132,8 +192,9 @@ httpgo test rotation.hurl --render-asserts --secret old_token --secret new_token
 ```
 
 A API deve retornar `accessToken` string em login/renovação e aceitar o token novo
-em `/next`. Novo valor passa (**0**); repetição ou ausência falha (**1**) e impede
-a próxima requisição/publicação. JSON inválido, percurso incompatível ou variável
+em `/next`. Novo valor passa (**0**); repetição falha (**1**). Ausência em
+`new_token` é erro de captura (**2**, anterior à assertion desde a US-34).
+Ambas impedem a próxima requisição/confirmação. JSON inválido, percurso incompatível ou variável
 dinâmica ausente são erros (**2**), nunca aprovação por inversão.
 
 - `!=` usa a mesma comparação tipada/exata de `==`: número e string diferem;
@@ -143,8 +204,8 @@ dinâmica ausente são erros (**2**), nunca aprovação por inversão.
   ampliar JSONPath. `HTTP` é obrigatório. `count !=`, header/body `!=` e negação
   genérica continuam rejeitados antes de qualquer envio do arquivo.
 - O perfil literal é preservado: sem `--render-asserts`, `"{{old_token}}"` é texto.
-  Com a flag (evolução explícita HTTPGo), resolve uma vez apenas valores iniciais
-  ou capturas anteriores, antes da consulta/decode da assertion alcançada.
+  Com a flag (evolução explícita HTTPGo), resolve uma vez sobre o lote provisório,
+  confirmados anteriores e iniciais, antes da consulta/decode da assertion alcançada.
 - **Marque segredos explicitamente** como acima: `--secret` fornece nomes, nunca
   credenciais. Valores secretos iniciais vêm do ambiente, não de flags. Operandos
   protegidos/derivados e capturas secretas pendentes ficam ocultos em diagnósticos;
@@ -200,8 +261,8 @@ prometidas pelo dummy nem homologação de uma API real.
   Valores são resolvidos na consulta alcançada, após preparar seu esperado e
   antes de decode/seleção, mesmo que o array esteja vazio. Variável ausente/tipo
   inválido é avaliação **2**, não divergência ou aprovação por negação.
-- Somente iniciais e capturas anteriores publicadas ficam acessíveis. Mantém
-  status → assertions na ordem escrita → lote atômico de capturas → callback.
+- Capturas leem somente iniciais e capturas anteriores confirmadas. Assertions
+  veem também o lote atual: status → capturas → assertions → confirmação → callback.
   Zero/um/vários e percurso estrito seguem US-27/28, sem escolher primeiro ID.
   Segredos/derivados são protegidos e planos/operandos não vão aos relatórios.
 
@@ -241,7 +302,7 @@ com **1**, sem captura nem próxima requisição.
   distinto de vazio e null. JSON inválido/percurso incompatível mantém **2**.
 - Consulta simples, wildcard e filtro estático existentes conservam a redução:
   zero = ausência, um = próprio valor, vários = array; nunca aplicação por item.
-- Ordem status → assertions → capturas preservada. Operando extra, `count`
+- Ordem US-34: status → capturas provisórias → assertions → confirmação. Operando extra, `count`
   combinado com novo unário e construções fora do recorte impedem todo HTTP do
   arquivo. Sem schema, outros tipos, coerção ou negação genérica.
 - Diagnósticos categóricos não imprimem valores/estruturas, mesmo escalares;
@@ -296,8 +357,8 @@ perder precisão, capturar a entrada divergente ou enviar a próxima requisiçã
   final são preparados antes da consulta da assertion alcançada. Falha de
   variável/tipo/regex é avaliação **2**, inclusive em negação com valor ausente.
   Sintaxe inválida e regex sem referências inválida impedem todo HTTP do arquivo.
-- Ordem permanece status → assertions na ordem escrita → capturas atômicas.
-  Captura própria/futura ainda não está disponível. Segredos/derivados são
+- Ordem US-34: status → capturas provisórias → assertions → confirmação atômica.
+  Captura própria válida está disponível; futura, não. Segredos/derivados são
   protegidos antes de callbacks; planos e regex operacionais não vão ao resultado.
 - A US-31 acima amplia somente operandos de filtros nas consultas. Nomes de
   header, padrões de captura e templates de requisição não mudam. Sem regex de body em assertions, expressões, aritmética ou nova env/YAML.
@@ -342,7 +403,7 @@ prometida pelo dummy nem homologação de uma API real.
   demais predicados recebem esse valor reduzido, não cada correspondência.
 - Captura ausente é **2**; `null` único é válido. Coleções mantêm tipos e precisão
   em JSON completo, nunca viram texto em URL/header nem escolhem o primeiro ID.
-  Publicação atômica e status → assertions → capturas permanecem.
+  Confirmação atômica segue status → capturas provisórias → assertions (US-34).
 - Filtro em não array ou percurso incompatível no atributo invalida **toda** a
   seleção com **2**, inclusive em ramos mistos; ausência só elimina o item.
   JSON inválido continua erro de avaliação, não ausência ou aprovação por negação.
@@ -392,7 +453,7 @@ estáticos **2**, impedindo todo HTTP do arquivo.
   arquivos externos e multipart são relidos/reabertos em cada tentativa. Não há
   snapshot dos bytes diante de alteração externa. Redirects recomeçam no destino
   e método originais em cada tentativa, não na última URL redirecionada.
-- Status → assertions → capturas; tentativas divergentes não publicam capturas,
+- Status → capturas provisórias → assertions → confirmação; tentativas divergentes não publicam capturas,
   mas segredos descobertos permanecem protegidos. Respostas/fontes são fechadas
   antes de avaliar/esperar; só aprovação publica o lote de capturas uma vez.
 - Espera cancelável só entre tentativas; prazo HTTP por tentativa, sem timeout
@@ -530,7 +591,7 @@ nem homologação de uma suíte real.
   os envios. JSON inválido, percurso incompatível e falha de execução são **2**,
   nunca aprovação por negação. Ordem e publicação de capturas são preservadas.
 - Falhas localizadas mostram presença/tipo e esperado escalar protegido, não a
-  coleção selecionada. Captura secreta pendente oculta operandos sem antecipá-la;
+  coleção selecionada. Captura secreta provisória oculta operandos sem confirmá-la;
   segredos arbitrários não marcados não são detectados universalmente.
 
 Os **37 pares `membership_*`** foram confrontados com Hurl **8.0.0**: diferenças
@@ -566,13 +627,13 @@ O esperado é uma string literal: `{{nome}}` não interpola. Todo texto contém
 primeiro `Content-Type` é respeitado (rótulos web; ISO-8859-1 → windows-1252);
 sem charset, usa UTF-8 estrito. Charset desconhecido, bytes inválidos/truncados,
 resposta incompleta e erros de consumo/fechamento retornam **2**, nunca aprovação
-de ausência. Somente após consumir e fechar a resposta: status → assertions de
-header/JSON/body na ordem escrita → capturas. Erro estático tardio impede todo
+de ausência. Somente após consumir e fechar a resposta: status → capturas
+provisórias → assertions de header/JSON/body na ordem escrita → confirmação. Erro estático tardio impede todo
 HTTP do arquivo.
 
 Diagnóstico localizado informa operador/esperado protegido, **nunca body ou
-fragmentos recebidos**. Captura secreta pendente oculta esperado sem antecipar sua
-avaliação. Não há assertion regex de body nem inspeção de binários.
+fragmentos recebidos**. Captura secreta provisória oculta esperado antes de sua
+confirmação. Não há assertion regex de body nem inspeção de binários.
 Interpolação de esperados exige o opt-in US-30 acima. Busca literal não prova ausência de todas as codificações de um dado.
 Os exemplos confrontados com Hurl **8.0.0** e as diferenças de códigos estão em
 [`docs/compatibility.md`](docs/compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
@@ -1148,8 +1209,8 @@ ocorrência**, inclusive vazia, é capturada; não junta valores nem divide vír
 O valor permanece string, mesmo se parecer número, booleano, JSON ou placeholder,
 sem interpolação recursiva. Body não JSON não impede uma captura só de header.
 Ausência gera erro de captura **2**; vazio publica string vazia. Só a resposta
-final completa participa, após status e assertions; lotes mistos com JSONPath são
-atômicos, sem sobrescrita e com isolamento por execução.
+final completa participa, após status aceito; lotes mistos com JSONPath são
+confirmados atomicamente após assertions, com renovação exata e isolamento por execução.
 
 `Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` protegem também o
 nome capturado e seus usos compostos/escapes conhecidos, sem alterar o valor
@@ -1200,11 +1261,11 @@ primeiro grupo não participante gera erro de captura **2**, sem próximo envio.
 Padrão é string JSON estática, usando regex Go da US-15, sem interpolação.
 Erro estático tardio rejeita todo o arquivo antes da rede. Body usa decodificação
 textual estrita da US-21; header usa a primeira ocorrência, sem decodificar body.
-Status e assertions continuam antes das capturas, com publicação atômica e sem
-sobrescrita. Grupos de headers sensíveis herdam proteção imediatamente, inclusive
+Status antecede capturas; assertions usam o lote provisório e somente aprovação
+confirma atomicamente, permitindo substituição exata (US-34). Grupos de headers sensíveis herdam proteção imediatamente, inclusive
 se outra captura falhar. OTP/dados do body exigem marcação explícita; não há
 detecção automática de segredos arbitrários. Não há cookie jar, escolha de grupo,
-substituições, pipelines, regex dinâmica ou assertions da captura na mesma resposta.
+substituições, pipelines ou regex dinâmica. Assertions podem usar o lote atual (US-34).
 
 Cenários executáveis: [`scenario_capture_otp.hurl`](testdata/scenarios/scenario_capture_otp.hurl)
 e [`scenario_capture_refresh.hurl`](testdata/scenarios/scenario_capture_refresh.hurl).
@@ -1250,12 +1311,13 @@ qualquer tipo JSON, inclusive raiz, `null`, string vazia, arrays/objetos vazios.
 JSON inválido, caminho ausente ou índice fora do array é erro de captura (código 2).
 Consultas não suportadas em qualquer entrada impedem todos os envios.
 
-Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
-quando esperado, e todas as assertions de headers/JSON declaradas, para URLs, valores de
+Capturas ficam provisoriamente disponíveis às assertions da própria resposta
+após consumir/fechar, aprovar o status e extrair/validar todo o lote. Só após
+aprovação das assertions e contexto ativo ficam confirmadas para URLs, valores de
 headers, JSON inline e JSON externo com `--render-files` seguintes. Strings
 como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
-Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
-variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada arquivo
+Nomes pontuados resolvem por nome exato, que pode substituir inicial ou captura
+anterior. Duplicações no lote e conflitos hierárquicos falham sem confirmação parcial. Cada arquivo
 começa sem capturas, inclusive quando vários arquivos compõem uma suíte. `--secret` pode
 marcar uma captura futura sem criá-la; valores descobertos ficam ocultos nos
 streams e diagnósticos, inclusive variantes de escape conhecidas. Não há garantia
@@ -1370,15 +1432,16 @@ assertions/capturas e permite qualquer status, inclusive 404/503. Sua linha most
 `status aceito por HTTP *`; o resumo conta em `sem_validação`, não em `validadas`.
 Isso dispensa **só a comparação numérica**, não headers nem capturas declarados.
 
-Após consumo/fechamento da resposta final, a ordem é status numérico → assertions
-(headers/JSON/body na ordem escrita) → capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
+Após consumo/fechamento da resposta final, a ordem é status numérico → capturas
+provisórias → assertions (headers/JSON/body na ordem escrita) → confirmação,
+independentemente da ordem das seções. Uma falha de header retorna 1,
 localiza a assertion e esperado/recebido (ausência difere de `""`), não publica
 capturas nem envia a próxima requisição. Erro estrutural tardio retorna 2 sem
 qualquer envio. Escrita, consumo incompleto, timeout e cancelamento continuam 2.
 Valores sensíveis de Authorization/Proxy-Authorization/Cookie/Set-Cookie são
 ocultos nos dois lados, inclusive esperados literais; headers comuns usam a
 proteção de segredos conhecidos. Havendo captura secreta pendente na mesma
-resposta, ambos os operandos são ocultos integralmente, sem antecipar a captura.
+resposta, ambos os operandos são ocultos integralmente, antes de confirmar o lote.
 Nenhum body ou coleção de headers é exibido.
 
 Equivalência com Hurl 8.0.0 é limitada aos pares observados: **repetidos são listas
@@ -1522,7 +1585,7 @@ inteiras como `1.0`/`1e3` são aceitas como quantidade, sem impor grafia inteira
 Condição falsa, ausência ou tipo selecionado incompatível retorna **1**; esperado
 inválido (inclusive count negativo/fracionário) ou sintaxe inválida retorna **2**
 antes de qualquer HTTP. Resposta JSON inválida ou percurso incompatível mantém
-**2**. Ordem status → assertions escritas → capturas e fail-fast são preservados.
+**2**. Ordem US-34: status → capturas provisórias → assertions escritas → confirmação; fail-fast preservado.
 Diagnósticos incluem operador/causa, consulta e localização; count mostra somente
 a quantidade, não a coleção. Segredos conhecidos/derivados continuam sanitizados;
 captura secreta pendente oculta integralmente ambos os operandos, inclusive contagens.

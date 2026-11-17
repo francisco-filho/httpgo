@@ -30,7 +30,7 @@ func TestJSONAssertionOrder(t *testing.T) {
 		{"incompatible", "HTTP *", `jsonpath "$.price.value" == null`, `{"price":1}`, "", 200, JSONFailed, 1, 0},
 		{"empty", "HTTP *", `jsonpath "$" == null`, ``, "", 200, JSONFailed, 1, 0},
 		{"trailing", "HTTP *", `jsonpath "$" == null`, `null {}`, "", 200, JSONFailed, 1, 0},
-		{"assert before broken capture", "HTTP *", `jsonpath "$" == 2`, `1`, "\n[Captures]\nx: jsonpath \"$.missing\"", 200, JSONMismatch, 1, 0},
+		{"broken capture before assertion", "HTTP *", `jsonpath "$" == 2`, `1`, "\n[Captures]\nx: jsonpath \"$.missing\"", 200, CaptureFailed, 1, 0},
 		{"capture after assertions", "HTTP *", `jsonpath "$" == 1`, `1`, "\n[Captures]\nx: jsonpath \"$.missing\"", 200, CaptureFailed, 1, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -145,7 +145,11 @@ func TestPendingSecretConcealsAssertionsAndMetadata(t *testing.T) {
 				}
 				return nil
 			}).Run(context.Background(), s)
-			if !result.Diverged || result.Err != nil || calls != 1 {
+			if capturePath == "$.missing.bad" {
+				if result.Err == nil || result.Diverged || calls != 1 || result.Entries[0].Outcome != CaptureFailed {
+					t.Fatalf("result=%+v", result)
+				}
+			} else if !result.Diverged || result.Err != nil || calls != 1 {
 				t.Fatalf("result=%+v calls=%d", result, calls)
 			}
 			entry := result.Entries[0]

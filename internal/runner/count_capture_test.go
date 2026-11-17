@@ -115,8 +115,8 @@ func TestCountCaptureComparisonsAndOrder(t *testing.T) {
 		outcome    Outcome
 	}{
 		{503, `jsonpath "$" count == 1`, Mismatch},
-		{200, `jsonpath "$" count == 1`, JSONMismatch},
-		{200, `jsonpath "$" count == {{baseline}}`, JSONFailed},
+		{200, `jsonpath "$" count == 1`, CaptureFailed},
+		{200, `jsonpath "$" count == {{baseline}}`, CaptureFailed},
 	} {
 		s := dynamicScenario(t, "GET http://example.test/\nHTTP 200\n[Captures]\nbaseline: jsonpath \"$.missing\" count\n[Asserts]\n"+tc.assertions+"\nGET http://example.test/next")
 		c, _ := template.New(nil, nil)
@@ -139,9 +139,9 @@ func TestCountCaptureComparisonsAndOrder(t *testing.T) {
 func TestCountCaptureAtomicity(t *testing.T) {
 	for _, tc := range []struct{ name, initial, declarations string }{
 		{"missing other", "", "other: jsonpath \"$.missing\""},
-		{"initial exact", "baseline=7", ""}, {"initial parent", "baseline=7", "child: jsonpath \"$\" count\nbaseline.child: jsonpath \"$\" count"},
+		{"initial exact duplicate", "baseline=7", "baseline: jsonpath \"$\" count"}, {"initial parent", "baseline=7", "child: jsonpath \"$\" count\nbaseline.child: jsonpath \"$\" count"},
 		{"initial descendant", "baseline.child=7", ""},
-		{"previous exact", "", "previous: jsonpath \"$\" count"},
+		{"previous exact duplicate", "", "previous: jsonpath \"$\" count\nprevious: jsonpath \"$\" count"},
 		{"previous parent", "", "previous.child: jsonpath \"$\" count"},
 		{"previous descendant", "", "old: jsonpath \"$\" count"},
 		{"batch exact", "", "baseline: jsonpath \"$\" count"},

@@ -1,4 +1,59 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-33
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-34
+
+## Renovação transacional de capturas — US-34 / issue #70
+
+**Quebra deliberada do contrato anterior**, não correção silenciosa de parser:
+status → capturas provisórias → assertions → confirmação, com substituição exata.
+Assertions podem usar a captura atual; consultas de captura só usam valores
+confirmados anteriores. `--render-asserts` continua obrigatório para interpolação
+em esperados/filtros. Nenhum suporte a query `variable` ou JSONPath adicional.
+
+Referência **Hurl 8.0.0**, binário oficial temporário com checksum conferido,
+sem consulta/cópia/adaptação de seu código-fonte. Harness existente, árvores e
+sequências independentes/resetadas por executável, sem alterar política de retry.
+**11 pares históricos mudaram somente observação HTTPGo/classificação**; entradas
+`.hurl`, respostas e observações Hurl foram preservadas. Os outros 429 pares
+históricos não mudaram. São **8 pares novos `renewal_*`**, total **448**.
+Atualização de golden somente no prefixo novo e depois gate completo sem `-update`.
+
+| Pares históricos afetados | HTTPGo atual | Hurl 8.0.0 | Mudança autorizada |
+|---|---|---|---|
+| `assert_json_capture_precedence`, `headers_capture_precedence`, `capture_header_assertion_first`, `capture_regex_assertion_first` | 2, /capture | 3, /capture | captura inválida precede assertion em ambos; códigos próprios |
+| `captures_collision` | 0, /auth/login → /health | igual | X-Probe `token-ficticio`, substituição inicial JSON |
+| `capture_header_collision` | 0, /capture → /health | igual | X-Probe `new`, substituição inicial header |
+| `capture_regex_collision` | 0, /capture → /health | igual | X-Probe `prenewpost`, substituição inicial regex |
+| `capture_count_collision` | 0, /capture → POST /health | igual | body `{"count":3}`, inicial 7 substituído |
+| `capture_count_same_response`, `dynamic_filter_same_response`, `render_asserts_same_response` | 0, /capture → /health | igual | lote atual disponível a esperado/filtro |
+
+| Par novo `renewal_…` | HTTPGo | Hurl 8.0.0 | Wire e diferenças observadas |
+|---|---|---|---|
+| `same_response_inverted` | 0, /capture → /health | igual | Asserts antes de Captures, id inicial old renovado; X-Probe `new` |
+| `polling_success` | 0, /poll ×2 → /health | mesmo fluxo/código | HTTPGo reenvia body `{"id":"old"}`/X-Probe `old`; Hurl usa `rejected` no segundo envio; próximo envio usa `accepted` em ambos |
+| `polling_exhausted` | 1, /poll ×3 | 4, /poll ×3 | HTTPGo usa `old` em todos os envios; Hurl usa old/rejected-a/rejected-b; sem /health |
+| `polling_capture_error` | 2, /poll | 0, /poll ×2 → /health | HTTPGo encerra captura ausente sem retry; Hurl retenta e chega a X-Probe `accepted` |
+| `polling_status_gate` | 0, /poll ×2 → /health | igual | 503/JSON inválido antes de 200/id accepted; reenvio usa `old`, final `accepted` |
+| `batch_prior` | 0, /capture → /health, X-Probe `2` | 0, mesmo fluxo, X-Probe `3` | HTTPGo não encadeia captura nova no lote; Hurl usa id renovado na consulta seguinte |
+| `duplicate` | 2, /capture | 0, /capture → /health, X-Probe `new-b` | duplicação no lote continua erro HTTPGo, sem confirmação parcial |
+| `variable_unsupported` | 2, zero HTTP | 0, /health → /capture | query fora do recorte continua rejeitada estaticamente |
+
+Não prometemos equivalência integral de atomicidade, encadeamento ou códigos:
+a diferença de renovação após assertion reprovada é observável nos bodies/headers
+de retry acima. Isolamento entre arquivos e proteção de segredos são contratos
+HTTPGo testados à parte, não inferências sobre segurança Hurl. A política US-26
+de retry em categoria 1, nunca 2, não mudou. Corpus sintético local não homologa
+suíte real ou cenários do Borapedir. YAML hierárquico/interpolação externa seguem
+**extensões HTTPGo**.
+
+Reprodução: Hurl 8.0.0 no PATH e `make compatibility`, ou
+`go test -tags compatibility ./tests/e2e -run '^TestCompatibility/renewal_' -count=1 -v`.
+[Contrato](subset.md#renovação-transacional-de-capturas--us-34--issue-70),
+[arquitetura](architecture.md#renovação-transacional-de-capturas--us-34--issue-70),
+[validação](validation.md#us-34--issue-70--história-0034).
+
+As seções seguintes registram observações **históricas** por história. Seus totais
+e regras antigas de ordem/colisão exata foram substituídos pela matriz US-34 acima;
+não descrevem o contrato atual desses 11 pares.
+
 
 ## Relatório JUnit — US-17 / issue #68
 

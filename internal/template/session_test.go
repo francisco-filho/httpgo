@@ -34,7 +34,7 @@ func TestCaptureStringsAndIsolation(t *testing.T) {
 
 func TestCapturePublicationAtomicConflicts(t *testing.T) {
 	for _, initialValue := range []string{"text", `null`, `[]`, `{"x":1}`} {
-		for _, names := range [][]string{{"base"}, {"base.child"}, {"auth"}, {"auth.token.child"}, {"new", "new"}, {"new", "new.child"}, {"new.child", "new"}} {
+		for _, names := range [][]string{{"base.child"}, {"auth"}, {"auth.token.child"}, {"new", "new"}, {"new", "new.child"}, {"new.child", "new"}} {
 			initial, _ := New([]string{"base=" + initialValue}, nil)
 			s := initial.NewSession()
 			if err := s.Publish([]Capture{{"auth.token", captureString("original")}}); err != nil {

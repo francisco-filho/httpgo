@@ -120,7 +120,7 @@ func TestCaptureConflictsAndInvalidDependentRequests(t *testing.T) {
 		assign, capture, body, next string
 		want                        Outcome
 	}{
-		{"token=null", "token", `"new"`, "GET http://example.test/next", CaptureFailed},
+		{"token=null", "token.child", `"new"`, "GET http://example.test/next", CaptureFailed},
 		{"token=[]", "token.child", `"new"`, "GET http://example.test/next", CaptureFailed},
 		{"token.child={}", "token", `"new"`, "GET http://example.test/next", CaptureFailed},
 		{"", "token", `"bad space"`, "GET http://example.test/{{token}}", RenderFailed},

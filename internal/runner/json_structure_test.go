@@ -12,7 +12,7 @@ import (
 func TestJSONStructurePendingSecret(t *testing.T) {
 	for _, line := range []string{`jsonpath "$.missing" exists`, `jsonpath "$.items" count == 987654321`, `jsonpath "$.value" count == 987654321`} {
 		c, _ := template.New(nil, []string{"token"})
-		s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\nGET http://example.test/next")
+		s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$\"\nGET http://example.test/next")
 		calls := 0
 		result := NewWithRenderer(executorFunc(func(_ context.Context, req Request) (Response, error) {
 			calls++
@@ -55,7 +55,7 @@ func TestJSONStructureOrder(t *testing.T) {
 		{"jsonpath \"$.missing\" exists\njsonpath \"$.x.bad\" exists", `{"x":null}`, JSONMismatch},
 		{"jsonpath \"$.items\" count == 2\njsonpath \"$.x.bad\" exists", `{"items":[],"x":null}`, JSONMismatch},
 	} {
-		s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+tc.lines+"\n[Captures]\nx: jsonpath \"$.absent\"\nGET http://example.test/next")
+		s := parseCaptureScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+tc.lines+"\n[Captures]\nx: regex \"(.*)\"\nGET http://example.test/next")
 		calls := 0
 		result := New(executorFunc(func(context.Context, Request) (Response, error) {
 			calls++

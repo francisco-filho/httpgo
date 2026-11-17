@@ -163,9 +163,9 @@ func TestJSONPrecedenceByBinary(t *testing.T) {
 		status, code                              int
 	}{
 		{"HTTP 200", `jsonpath "$" == null`, `invalid`, "status divergente", 503, 1},
-		{"HTTP *", "header \"X\" exists\njsonpath \"$\" == null", `invalid`, "assertion header", 200, 1},
-		{"HTTP *", "jsonpath \"$\" == null\nheader \"X\" exists", `invalid`, "erro de avaliação JSON", 200, 2},
-		{"HTTP *", "jsonpath \"$\" == 2\njsonpath \"$.bad\" == null", `1`, "assertion jsonpath", 200, 1},
+		{"HTTP *", "header \"X\" exists\njsonpath \"$\" == null", `invalid`, "erro de captura", 200, 2},
+		{"HTTP *", "jsonpath \"$\" == null\nheader \"X\" exists", `invalid`, "erro de captura", 200, 2},
+		{"HTTP *", "jsonpath \"$\" == 2\njsonpath \"$.bad\" == null", `1`, "erro de captura", 200, 2},
 		{"HTTP *", `jsonpath "$" == 1`, `1`, "erro de captura", 200, 2},
 	} {
 		var hits atomic.Int32
@@ -219,7 +219,7 @@ func TestJSONSecretsByBinary(t *testing.T) {
 			}))
 			source := "GET {{base}}/assert\nHTTP *\n[Asserts]\n" + expression + "\nGET {{base}}/next"
 			if pending {
-				source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\n[Asserts]", 1)
+				source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: jsonpath \"$\"\n[Asserts]", 1)
 			} else {
 				source = "GET {{base}}/login\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\n" + source
 			}

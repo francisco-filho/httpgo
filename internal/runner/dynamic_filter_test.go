@@ -34,13 +34,13 @@ func TestDynamicFilterValuesAndOrder(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := `$[?(@.n==` + tc.operand + `)].id`
-			source := "GET http://example.test/first\nHTTP 200\n[Asserts]\njsonpath " + strconv.Quote(path) + " == 1\n[Captures]\nselected: jsonpath " + strconv.Quote(path) + "\nGET http://example.test/{{selected}}"
+			source := "GET http://example.test/first\nHTTP 200\n[Asserts]\njsonpath " + strconv.Quote(path) + " == 1\n[Captures]\nselected: regex \"(.*)\"\nGET http://example.test/next"
 			s := dynamicScenario(t, source)
 			c, _ := template.New([]string{"v=" + tc.value}, nil)
 			calls := 0
 			result := NewWithRenderer(executorFunc(func(_ context.Context, r Request) (Response, error) {
 				calls++
-				if calls == 2 && r.URL != "http://example.test/1" {
+				if calls == 2 && r.URL != "http://example.test/next" {
 					t.Fatal(r.URL)
 				}
 				return Response{Status: 200, Body: []byte(tc.body)}, nil

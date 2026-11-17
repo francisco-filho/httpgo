@@ -15,7 +15,7 @@ func TestBodySecretsAndPendingCapturesCLI(t *testing.T) {
 		calls := 0
 		source := "GET http://example.test\nHTTP 200\n[Asserts]\nbody contains \"expected-private\"\nGET http://example.test/next"
 		if pending {
-			source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\n[Asserts]", 1)
+			source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: regex \"(.*)\"\n[Asserts]", 1)
 		}
 		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			calls++

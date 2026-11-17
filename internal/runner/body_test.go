@@ -29,7 +29,7 @@ func TestBodyAssertionOrder(t *testing.T) {
 		{"body before JSON", "HTTP *", "body contains \"absent\"\njsonpath \"$\" == null", "invalid JSON", "", "", 200, BodyMismatch, 1},
 		{"JSON before body", "HTTP *", "jsonpath \"$\" == null\nbody contains \"absent\"", "invalid JSON", "", "", 200, JSONFailed, 1},
 		{"interleaved", "HTTP *", "body contains \"{\\\"x\\\": 1}\"\njsonpath \"$.x\" == 1\nbody not contains \"no\"", `{"x": 1}`, "", "", 200, Wildcard, 2},
-		{"stops broken capture", "HTTP *", `body contains "absent"`, "not JSON", "", "\n[Captures]\nx: jsonpath \"$.missing\"", 200, BodyMismatch, 1},
+		{"capture fails before body", "HTTP *", `body contains "absent"`, "not JSON", "", "\n[Captures]\nx: jsonpath \"$.missing\"", 200, CaptureFailed, 1},
 		{"allows capture", "HTTP *", `body contains "null"`, "null", "", "\n[Captures]\nx: jsonpath \"$\"", 200, Wildcard, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

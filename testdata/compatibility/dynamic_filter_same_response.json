@@ -1,11 +1,12 @@
 {
   "httpgo_profile": "render-asserts",
   "response_json": "[{\"v\":1,\"id\":1}]",
-  "classification": "diferença de ordem: captura da mesma resposta permanece indisponível em HTTPGo",
+  "classification": "US-34: filtro da assertion resolve captura da própria resposta com opt-in HTTPGo; ambos aprovam",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/capture"
+      "/capture",
+      "/health"
     ]
   },
   "hurl": {

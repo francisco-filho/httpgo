@@ -1,4 +1,89 @@
-# Validação — US-01 a US-17, US-20 a US-33
+# Validação — US-01 a US-17, US-20 a US-34
+
+## US-34 — issue #70 / história 0034
+
+Plano da issue #70 executado sem planner, somente backend, com quatro tasks
+registradas/autoaprovadas na fila 0034. `back:1`: `81db181` (sessão provisória,
+ordem transacional e demonstração); `back:2`: `5af86f9` (polling, fontes/tipos,
+cancelamento e isolamento); `back:3`: `9dc437f` (proteção monotônica,
+callbacks/writers e suíte texto/JUnit); `back:4`: esta alteração (contrato,
+compatibilidade, ajuda e fuzzing). Base `e18c519`. Sem frontend/estáticos,
+novas dependências, alteração de Go, transporte, CI ou lint. Backdev não executou
+SonarQube. Nenhum código-fonte Hurl foi consultado/copiado/adaptado.
+
+### Ambiente e validações efetivamente executadas
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports`/`golangci-lint` existentes em
+`/home/ff/go/bin`. O Hurl padrão era 8.0.1. Com autorização explícita do usuário,
+o binário oficial **8.0.0** foi baixado para
+`/tmp/httpgo-0034-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, sem alterar a
+instalação existente. SHA-256 do arquivo tar conferido contra o asset oficial:
+`6ab1d6703b94086ece6d2f994d73f8d215926997b292ba29b894799425afbf67`.
+Aviso de metadados libcurl não impediu identificação nem execução de 8.0.0.
+
+Passaram:
+
+- Task 1: `go test ./internal/template ./internal/runner ./internal/cli ./internal/parser`
+  e `go test ./tests/e2e -count=1`, incluindo o cenário publicado com servidor
+  local real, seleção própria, renovação sucessiva e seções invertidas.
+- Task 2: `go test ./internal/template ./internal/runner ./internal/suite ./internal/cli ./internal/transport`.
+  Executor falso e espera controlada, sem sleeps/API externa, verificam valores
+  anteriores em URL/body de reenvio, lote atual nas assertions, esgotamento,
+  erro terminal de captura, cancelamento na espera e após Stage antes de confirmar.
+- Task 3: `go test ./internal/template ./internal/runner ./internal/cli ./internal/suite ./internal/report`
+  e `go test ./tests/e2e -count=1`. Inspecionados callbacks, metadados, stdout,
+  stderr e XML, além de códigos/requests. Falhas/short writes não reenviam nem
+  reimprimem; sobrescrita e descarte preservam valores secretos/derivados.
+- Em **cada task**, `make fmt lint test`, `go vet ./...` e `go build ./...`
+  passaram antes do commit. Lint **0 issues**; `make test` usa **-race -cover**.
+- Gate integrado da task 4: `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build`, `make compatibility` e `make e2e` passaram em Linux. Coberturas:
+  template **96,1%**, runner **94,9%**, CLI **98,0%**, suite **95,1%**,
+  transport **90,4%**, report **100%**.
+- `make compatibility`: **448 pares**, Hurl **8.0.0** obrigatório, sem skip,
+  sem `-update`. São 440 históricos + 8 novos; somente 11 observações
+  HTTPGo/classificações antigas foram alteradas deliberadamente. Nenhuma entrada
+  `.hurl` histórica ou observação Hurl mudou. Novos goldens colhidos somente com
+  `go test -tags compatibility ./tests/e2e -run '^TestCompatibility/renewal_' -count=1 -update -v`,
+  revisados pelo wire e conferidos posteriormente no gate completo.
+- Fuzzers executados **separadamente**, com seeds e oráculo de overlay/descarte:
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**18.669** execuções) e o mesmo comando com `'^FuzzRenderJSON$'`
+  (**69.932** execuções), ambos sem crash/falha.
+- `git diff --check`, `gofmt -l` dos arquivos alterados e verificação dos links
+  locais adicionados; ajuda e exemplo publicados cobertos pelo binário real.
+
+### Rastreabilidade GO-459–GO-474
+
+| GO | Evidência automatizada |
+|---|---|
+| 459 | E2E `TestCaptureRenewalDemonstration`: cenário versionado, seção normal/invertida, caminhos job-a/successor e job-b; PENDING encerra com 1 |
+| 460–461 | template `TestStagedCaptureReplacement`, `TestDiscardedOverlaySharesOnlyProtection`; runner `TestRenewalCaptureSourcesAndRunIsolation`, `TestTransactionalCaptureAttempt`; negativos históricos mantidos para duplicação/hierarquia |
+| 462–464 | runner `TestTransactionalCaptureAttempt`, `TestOwnCaptureLiteralExpected`; testes anteriores de status, templates JSON/header/body/regex/filtros adaptados à nova ordem, mantendo perfil literal |
+| 465–466 | runner `TestTransactionalPolling`: lote novo apenas após aprovação; requests anteriores e métricas/callback terminal, sem confirmação parcial em divergência/avaliação |
+| 467–468 | runner `TestDiscardedRenewalProtectsOldNewAndDerivedBeforeCallback`; CLI `TestInvocationProvisionalProtectionAndResolution`; E2E `TestCaptureRenewalSecretSuiteByBinary`, texto/XML e valores iniciais preservados no segundo arquivo |
+| 469 | E2E `TestCaptureRenewalHelpAndLateValidation`, negativo diferencial `renewal_variable_unsupported`: sintaxe tardia/variable sem nenhum HTTP do arquivo |
+| 470–472 | runner `TestCancelBeforeCaptureConfirmation`, `TestCaptureExtractionErrorsPrecedeAssertionsAndNeverRetry`; CLI `TestCaptureRenewalWriterFailures`; regressões de transporte/recursos existentes |
+| 473 | reuso de runner/cenário, contexto inicial imutável, visão descartada e invocação nova sem estado de resolução/proteção anterior |
+| 474 | 448 pares completos, incluindo 8 `renewal_*`: diferença observada em reenvios Hurl, encadeamento no lote, duplicação, erros e query ainda excluída |
+
+### Limites e mudança pública
+
+A ordem padrão e a substituição exata são mudanças **breaking** intencionais.
+Hurl usa capturas reprovadas no próximo retry (body/header); HTTPGo preserva os
+confirmados antes da entrada. Hurl encadeia capturas do lote e aceita duplicação
+nos casos observados; HTTPGo não. Erro de captura não é condição de retry aqui.
+Essas diferenças foram registradas, não eliminadas nem generalizadas para outras
+versões. Códigos próprios 0/1/2, com 2 prioritário, permanecem.
+
+Corpus sintético/HTTP local não homologa API/suíte real nem cenários do Borapedir.
+macOS/Windows não executados (opcionais pelo plano v4). Não foram executados CI
+remoto ou análise SonarQube. A proteção não detecta todo segredo arbitrário nem
+codificações desconhecidas e não pode redigir retroativamente stderr já escrito.
+A transação é de variáveis, não desfaz efeitos da API nem escrita de relatório.
+Query `variable`, novas políticas de retry, encadeamento de capturas e mudanças
+na entrada de credenciais permanecem excluídos.
+
 
 ## US-17 — issue #68 / história 0017
 

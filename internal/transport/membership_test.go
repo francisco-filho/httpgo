@@ -112,7 +112,11 @@ func TestMembershipFinalResponseAndCancellation(t *testing.T) {
 					}
 				}))
 				defer server.Close()
-				s, err := parser.Parse("membership.hurl", strings.NewReader("GET "+server.URL+"/start\nHTTP *\n[Asserts]\n"+predicate+"\n[Captures]\nx: header \"Absent\"\nGET "+server.URL+"/never"))
+				captureHeader := "Absent"
+				if mode == "forbidden final" {
+					captureHeader = "X"
+				}
+				s, err := parser.Parse("membership.hurl", strings.NewReader("GET "+server.URL+"/start\nHTTP *\n[Asserts]\n"+predicate+"\n[Captures]\nx: header \""+captureHeader+"\"\nGET "+server.URL+"/never"))
 				if err != nil {
 					t.Fatal(err)
 				}

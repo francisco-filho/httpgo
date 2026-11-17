@@ -27,7 +27,7 @@ func TestCountCaptureConflictDirections(t *testing.T) {
 					}
 				}
 				declarations := "fresh: jsonpath \"$\" count\n"
-				if source == "batch" {
+				if source == "batch" || names[0] == names[1] {
 					declarations += names[0] + ": jsonpath \"$\" count\n"
 				}
 				declarations += names[1] + ": jsonpath \"$\" count\n"

@@ -87,7 +87,7 @@ func TestInvalidCapturePayloadAtomicAndProtected(t *testing.T) {
 
 func TestTypedCaptureConflictProtection(t *testing.T) {
 	for _, raw := range []string{`null`, `true`, `9007199254740993`, `[]`, `{"s":"sensitive-part"}`} {
-		for _, names := range [][]string{{"base"}, {"base.child"}, {"auth"}, {"auth.token.child"}, {"next", "next"}, {"next", "next.child"}, {"next.child", "next"}} {
+		for _, names := range [][]string{{"base.child"}, {"base.child"}, {"auth"}, {"auth.token.child"}, {"next", "next"}, {"next", "next.child"}, {"next.child", "next"}} {
 			initial, _ := New([]string{`base={}`}, []string{"secret"})
 			s := initial.NewSession()
 			if err := s.Publish([]Capture{{"auth.token", json.RawMessage(raw)}}); err != nil {

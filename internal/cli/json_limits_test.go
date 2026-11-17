@@ -58,7 +58,7 @@ func TestJSONLimitsPendingSecretsCLI(t *testing.T) {
 	for _, line := range []string{`jsonpath "$.missing" exists`, `jsonpath "$.items" count == 987654321`, `jsonpath "$.number" > 987654321`, `jsonpath "$.private" > 987654321`} {
 		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			return runner.Response{Status: 200, Body: []byte(`{"items":["body-private"],"number":123456789,"private":"actual-private"}`)}, nil
-		}), "test", writeScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\nGET http://example.test/next"), "--secret", "token")
+		}), "test", writeScenario(t, "GET http://example.test\nHTTP *\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$\"\nGET http://example.test/next"), "--secret", "token")
 		if code != 1 || !strings.Contains(stderr, "esperado [oculto], recebido [oculto]") || !strings.Contains(out, "não_iniciadas=1") {
 			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
 		}

@@ -29,7 +29,7 @@ func TestPollingByBinary(t *testing.T) {
 					if ready && n >= 3 {
 						_, _ = io.WriteString(w, `{"status":"READY","value":"next"}`)
 					} else {
-						_, _ = io.WriteString(w, `{"status":"PENDING"}`)
+						_, _ = io.WriteString(w, `{"status":"PENDING","value":"rejected"}`)
 					}
 				}))
 				defer server.Close()

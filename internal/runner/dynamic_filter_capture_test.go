@@ -21,7 +21,7 @@ func TestDynamicFilterCaptureAtomicity(t *testing.T) {
 		`next: jsonpath "$.items[?(@.id=={{key}})].absent"`,
 		`next: jsonpath "$.bad[?(@.id.x=={{key}})]"`,
 		`ids.child: jsonpath "$.items[?(@.key=={{key}})].id"`,
-		`previous: jsonpath "$.items[?(@.key=={{key}})].id"`,
+		`previous.child: jsonpath "$.items[?(@.key=={{key}})].id"`,
 	} {
 		t.Run(late, func(t *testing.T) {
 			c, _ := template.New([]string{`key="private-key"`}, []string{"key"})
@@ -136,7 +136,7 @@ func TestDynamicFilterPredicatesAndFailures(t *testing.T) {
 	}
 }
 
-func TestDynamicFilterOwnCaptureUnavailable(t *testing.T) {
+func TestDynamicFilterOwnCaptureBoundaries(t *testing.T) {
 	for _, assertion := range []bool{false, true} {
 		declaration := "[Captures]\n" + `own: jsonpath "$[?(@.x=={{own}})].id"`
 		if assertion {
@@ -147,7 +147,11 @@ func TestDynamicFilterOwnCaptureUnavailable(t *testing.T) {
 			calls++
 			return Response{Status: 200, Body: []byte(`[]`)}, nil
 		}), nil).Run(context.Background(), dynamicScenario(t, "GET http://example.test\nHTTP 200\n"+declaration+"\nGET http://example.test/never"))
-		if calls != 1 || result.Err == nil || !strings.Contains(result.Err.Error(), "variável ausente") {
+		detail := "variável ausente"
+		if assertion {
+			detail = "exige valor escalar"
+		}
+		if calls != 1 || result.Err == nil || !strings.Contains(result.Err.Error(), detail) {
 			t.Fatalf("calls=%d result=%+v err=%v", calls, result, result.Err)
 		}
 	}

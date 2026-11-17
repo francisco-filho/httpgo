@@ -22,8 +22,8 @@ func TestHeaderPrecedenceAndPublication(t *testing.T) {
 		{"success", "HTTP 200", `"captured"`, 200, []query.HeaderValue{{Name: "X-Test", Value: "ok"}}, Passed, 2, 1},
 		{"wildcard success", "HTTP *", `"captured"`, 503, []query.HeaderValue{{Name: "X-Test", Value: "ok"}}, Wildcard, 2, 0},
 		{"status first", "HTTP 200", `invalid`, 503, nil, Mismatch, 1, 0},
-		{"header before capture", "HTTP 200", `invalid`, 200, nil, HeaderMismatch, 1, 1},
-		{"wildcard header failure", "HTTP *", `invalid`, 404, nil, HeaderMismatch, 1, 0},
+		{"header before capture", "HTTP 200", `"captured"`, 200, nil, HeaderMismatch, 1, 1},
+		{"wildcard header failure", "HTTP *", `"captured"`, 404, nil, HeaderMismatch, 1, 0},
 		{"capture after header", "HTTP 200", `invalid`, 200, []query.HeaderValue{{Name: "X-Test", Value: "ok"}}, CaptureFailed, 1, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

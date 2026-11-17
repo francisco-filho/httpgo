@@ -19,7 +19,7 @@ func TestProjectionPlanRemovedFromEveryReport(t *testing.T) {
 	}{
 		{`{"private_path":[9007199254740992,9007199254740993]}`, Passed},
 		{`{"private_path":[9007199254740992,9007199254740992]}`, JSONMismatch},
-		{`{"private_path":null}`, JSONFailed},
+		{`{"private_path":null}`, CaptureFailed},
 		{`{"private_path":[9007199254740992,9007199254740993],"bad":[{},null]}`, CaptureFailed},
 	} {
 		t.Run(string(tc.outcome), func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestProjectionPlanRemovedFromEveryReport(t *testing.T) {
 // GO-451,455: strict traversal and late conflicts never publish a numeric batch.
 func TestProjectionExactBatchAtomicAndProtected(t *testing.T) {
 	const numbers = `[9007199254740992,9007199254740993,9223372036854775809,1.0000000000000000000002,1e-99999999999999999999999]`
-	for _, late := range []string{"missing: jsonpath \"$.missing[*]\"", "bad: jsonpath \"$.bad[*].x\"", "ids.child: jsonpath \"$.values[0]\"", "previous: jsonpath \"$.values[0]\""} {
+	for _, late := range []string{"missing: jsonpath \"$.missing[*]\"", "bad: jsonpath \"$.bad[*].x\"", "ids.child: jsonpath \"$.values[0]\"", "previous.child: jsonpath \"$.values[0]\""} {
 		c, _ := template.New(nil, []string{"ids"})
 		session := c.NewSession()
 		if err := session.Publish([]template.Capture{{Name: "previous", Value: json.RawMessage(`7`)}}); err != nil {

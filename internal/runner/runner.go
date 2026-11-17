@@ -289,8 +289,25 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 			result.Diverged = true
 		}
 	}
-	if err == nil && !result.Diverged {
-		if assertionErr := checkAssertions(session, entry, response, &current); assertionErr != nil {
+	view := session
+	var batch []template.Capture
+	if err == nil && !result.Diverged && len(entry.Captures) > 0 {
+		var captureErr *CaptureError
+		batch, captureErr = extractCaptures(session, entry.Captures, response)
+		if captureErr == nil {
+			var stageErr error
+			view, stageErr = session.Stage(batch)
+			if stageErr != nil {
+				captureErr = captureBatchFailure(session, entry.Captures, stageErr)
+			}
+		}
+		if captureErr != nil {
+			current.Outcome = CaptureFailed
+			result.Err, result.ErrorPosition = captureErr, captureErr.Position
+		}
+	}
+	if err == nil && result.Err == nil && !result.Diverged {
+		if assertionErr := checkAssertions(view, entry, response, &current); assertionErr != nil {
 			result.Err = assertionErr
 			var jsonErr *JSONError
 			var bodyErr *BodyError
@@ -309,10 +326,16 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 		}
 		result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil
 	}
-	if err == nil && result.Err == nil && !result.Diverged && len(entry.Captures) > 0 {
-		if captureErr := captureResponse(session, entry.Captures, response); captureErr != nil {
-			current.Outcome = CaptureFailed
-			result.Err, result.ErrorPosition = captureErr, captureErr.Position
+	if result.Err == nil {
+		if cancelErr := ctx.Err(); cancelErr != nil {
+			current.Outcome = Cancelled
+			result.Err, result.ErrorPosition, result.Diverged = cancelErr, entry.Position, false
+		} else if !result.Diverged && len(batch) > 0 {
+			if publishErr := session.Publish(batch); publishErr != nil {
+				captureErr := captureBatchFailure(session, entry.Captures, publishErr)
+				current.Outcome = CaptureFailed
+				result.Err, result.ErrorPosition = captureErr, captureErr.Position
+			}
 		}
 	}
 	current.Entry = safeEntry(session, entry)

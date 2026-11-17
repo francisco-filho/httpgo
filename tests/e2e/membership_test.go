@@ -16,10 +16,10 @@ func TestMembershipDemonstrationByBinary(t *testing.T) {
 		code               int
 	}{
 		{"demo", `{"codes":["REQUIRED","INVALID"],"name":"Pizza"}`, "sid=private; Secure", 0},
-		{"required removed", `{"codes":["INVALID"]}`, "sid=private", 1},
-		{"other tenant", `{"codes":["REQUIRED","OTHER_TENANT"]}`, "sid=private", 1},
-		{"null present", `{"codes":["REQUIRED"],"passwordHash":null}`, "sid=private", 1},
-		{"domain", `{"codes":["REQUIRED"]}`, "sid=private; Domain=x", 1},
+		{"required removed", `{"name":"Pizza","codes":["INVALID"]}`, "sid=private", 1},
+		{"other tenant", `{"name":"Pizza","codes":["REQUIRED","OTHER_TENANT"]}`, "sid=private", 1},
+		{"null present", `{"name":"Pizza","codes":["REQUIRED"],"passwordHash":null}`, "sid=private", 1},
+		{"domain", `{"name":"Pizza","codes":["REQUIRED"]}`, "sid=private; Domain=x", 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var hits atomic.Int32

@@ -41,7 +41,7 @@ func TestProjectionByBinary(t *testing.T) {
 			if tc.code == 0 {
 				want = 2
 			}
-			if code != tc.code || hits.Load() != want || tc.code == 0 && stderr != "" || tc.code != 0 && !strings.Contains(stderr, ":4:1:") && !strings.Contains(stderr, ":5:1:") {
+			if code != tc.code || hits.Load() != want || tc.code == 0 && stderr != "" || tc.code != 0 && !strings.Contains(stderr, ":4:1:") && !strings.Contains(stderr, ":5:1:") && !strings.Contains(stderr, ":7:18:") {
 				t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
 			}
 		})

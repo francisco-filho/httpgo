@@ -53,8 +53,8 @@ func TestHeaderCaptureGatesAndMixedBatch(t *testing.T) {
 		{"missing", "HTTP 200\n", `x: header "Missing"`, "not JSON", 200, nil, CaptureFailed, false},
 		{"empty first", "HTTP 200\n", `x: header "X"`, "not JSON", 200, []query.HeaderValue{{Name: "x", Value: ""}, {Name: "X", Value: "later"}}, Passed, false},
 		{"status first", "HTTP 200\n", `x: header "Missing"`, "not JSON", 503, nil, Mismatch, false},
-		{"assertion first", "HTTP 200\n[Asserts]\nheader \"Missing\" exists\n", `x: header "Missing"`, "not JSON", 200, nil, HeaderMismatch, false},
-		{"assertion evaluation first", "HTTP *\n[Asserts]\njsonpath \"$\" == 1\n", `x: header "Missing"`, "not JSON", 200, nil, JSONFailed, true},
+		{"assertion first", "HTTP 200\n[Asserts]\nheader \"Missing\" exists\n", `x: header "Missing"`, "not JSON", 200, nil, CaptureFailed, false},
+		{"assertion evaluation first", "HTTP *\n[Asserts]\njsonpath \"$\" == 1\n", `x: header "Missing"`, "not JSON", 200, nil, CaptureFailed, true},
 		{"mixed success", "HTTP *\n", "x: header \"X\"\ny: jsonpath \"$\"", "42", 500, []query.HeaderValue{{Name: "X", Value: "literal"}}, Wildcard, true},
 		{"mixed JSON fails", "", "x: header \"X\"\ny: jsonpath \"$.missing\"", "{}", 200, []query.HeaderValue{{Name: "X", Value: "literal"}}, CaptureFailed, true},
 		{"mixed header fails", "", "y: jsonpath \"$\"\nx: header \"Missing\"", "42", 200, nil, CaptureFailed, true},
@@ -86,9 +86,9 @@ func TestHeaderCaptureAtomicPublicationAndConflicts(t *testing.T) {
 		"x: header \"X\"\ny: jsonpath \"$.missing\"",
 		"y: jsonpath \"$\"\nx: header \"Missing\"",
 		"x: header \"X\"\nx.child: jsonpath \"$\"",
-		"x: header \"X\"\ninitial: header \"X\"",
+		"x: header \"X\"\ninitial: header \"X\"\ninitial: header \"X\"",
 		"x: header \"X\"\ninitial.child: header \"X\"",
-		"x: header \"X\"\nprevious: header \"X\"",
+		"x: header \"X\"\nprevious: header \"X\"\nprevious: header \"X\"",
 		"x: header \"X\"\nprevious.child: header \"X\"",
 	} {
 		t.Run(declarations, func(t *testing.T) {

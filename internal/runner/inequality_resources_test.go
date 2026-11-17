@@ -18,7 +18,7 @@ func TestJSONInequalityExternalFailures(t *testing.T) {
 			if mode == "expected" || mode == "report evaluation" {
 				expected = `{{missing}}`
 			}
-			capturePath := "$.invalid.bad"
+			capturePath := "$"
 			if mode == "report success" {
 				capturePath = "$"
 			}

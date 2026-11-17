@@ -80,7 +80,7 @@ func TestRegexCaptureSelectionAndPrecedence(t *testing.T) {
 		{name: "header empty", decl: `x: header "X" regex "()"`, headers: []query.HeaderValue{{Name: "X", Value: ""}}, want: Passed},
 		{name: "header first only", decl: `x: header "X" regex "(token)"`, headers: []query.HeaderValue{{Name: "X", Value: "wrong"}, {Name: "x", Value: "token"}}, want: CaptureFailed},
 		{name: "status first", status: 503, decl: `x: regex "no-group"`, body: string([]byte{0xff}), want: Mismatch},
-		{name: "assertion first", expect: "[Asserts]\nheader \"Missing\" exists\n", decl: `x: regex "no-group"`, body: string([]byte{0xff}), want: HeaderMismatch},
+		{name: "assertion first", expect: "[Asserts]\nheader \"Missing\" exists\n", decl: `x: regex "no-group"`, body: string([]byte{0xff}), want: CaptureFailed},
 		{name: "JSON assertion first", expect: "[Asserts]\njsonpath \"$\" == 42\n", decl: `x: regex "no-group"`, body: "42", want: CaptureFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestRegexCaptureAtomicMixedBatches(t *testing.T) {
 		"x: regex \"(42)\"\nx.child: jsonpath \"$\"",
 		"x: regex \"(42)\"\nx: header \"X\"",
 		"x: regex \"(42)\"\ninitial.child: regex \"(42)\"",
-		"x: regex \"(42)\"\nprevious: regex \"(42)\"",
+		"x: regex \"(42)\"\nprevious.child: regex \"(42)\"",
 	} {
 		t.Run(decl, func(t *testing.T) {
 			renderer, _ := template.New([]string{"initial=original"}, []string{"x"})

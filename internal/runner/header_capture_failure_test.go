@@ -26,7 +26,7 @@ func TestHeaderCaptureFailuresNeverPublish(t *testing.T) {
 				declarations += "y: jsonpath \"$.missing\"\n"
 			}
 			if mode == "collision" {
-				declarations += "initial: header \"Set-Cookie\"\n"
+				declarations += "initial.child: header \"Set-Cookie\"\n"
 			}
 			source := "GET http://example.test/first\nHTTP 200\n[Captures]\n" + declarations
 			if mode == "assertion" {
@@ -138,7 +138,7 @@ func TestMixedHeaderCapturePublishesTypedValues(t *testing.T) {
 		t.Fatalf("%s %v", raw, err)
 	}
 	// Ancestor and descendant conflicts with previously published captures keep both values.
-	for _, name := range []string{"x", "x.child"} {
+	for _, name := range []string{"x.child"} {
 		if err := session.Publish([]template.Capture{{Name: name, Value: json.RawMessage(`"replacement"`)}}); err == nil {
 			t.Fatal("overwrite accepted")
 		}

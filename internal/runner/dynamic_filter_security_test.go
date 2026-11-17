@@ -68,7 +68,7 @@ func TestDynamicFilterSafeResultsAndReuse(t *testing.T) {
 				case "mismatch", "pending":
 					want = JSONMismatch
 				case "type", "missing":
-					want = JSONFailed
+					want = CaptureFailed
 				case "capture":
 					want = CaptureFailed
 				}
@@ -110,8 +110,8 @@ func TestDynamicFilterPendingDerivedSecret(t *testing.T) {
 		result := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) {
 			return Response{Status: 200, Body: []byte(`{"id":"derived-private"}`), Headers: []query.HeaderValue{{Name: "X", Value: "derived-private"}}}, nil
 		}), c, nil).Run(context.Background(), s)
-		if result.Err != nil || !result.Diverged {
-			t.Fatalf("capture prepared early: %+v", result)
+		if result.Err == nil || result.Diverged || result.Entries[0].Outcome != CaptureFailed {
+			t.Fatalf("capture must fail before assertions: %+v", result)
 		}
 		raw, _ := json.Marshal(result)
 		for _, bad := range []string{"derived-private", "not-selected", "private-key", "{{missing}}"} {

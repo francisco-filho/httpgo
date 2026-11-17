@@ -1,0 +1,29 @@
+{
+  "response_json": "{\"id\":\"new\"}",
+  "classification": "US-34 não habilita query variable: HTTPGo rejeita arquivo inteiro antes de HTTP, Hurl suporta",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

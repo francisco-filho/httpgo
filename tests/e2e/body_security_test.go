@@ -22,7 +22,7 @@ func TestBodySecretExpectedByBinary(t *testing.T) {
 		}))
 		source := "GET {{base}}/assert\nHTTP *\n[Asserts]\nbody contains \"captured-private\"\nGET {{base}}/never"
 		if pending {
-			source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\n[Asserts]", 1)
+			source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: regex \"(.*)\"\n[Asserts]", 1)
 		} else {
 			// Known captured literal is used as the prohibited text in a later entry.
 			source = "GET {{base}}/login\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\n" + strings.Replace(source, "body contains", "body not contains", 1)

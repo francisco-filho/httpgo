@@ -41,7 +41,7 @@ func TestFilterWriterFailureOverridesOutcomes(t *testing.T) {
 // capture is not evaluated early just to obtain protection.
 func TestFilterProtectedDiagnosticsCLI(t *testing.T) {
 	for _, body := range []string{`[{"key":"known-private","v":"unrelated-private"},{"key":"known-private","v":"second"}]`, `[{"key":"known-private"},null]`, `not JSON`} {
-		source := "GET http://example.test\nHTTP *\n[Asserts]\njsonpath \"$[?(@.key=='known-\\\\u0070rivate')].v\" count == 0\n[Captures]\nfuture: jsonpath \"$.none.bad\""
+		source := "GET http://example.test\nHTTP *\n[Asserts]\njsonpath \"$[?(@.key=='known-\\\\u0070rivate')].v\" count == 0\n[Captures]\nfuture: regex \"(.*)\""
 		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			return runner.Response{Status: 200, Body: []byte(body)}, nil
 		}), "test", writeScenario(t, source), "--secret", "future")

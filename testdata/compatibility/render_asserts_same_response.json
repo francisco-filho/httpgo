@@ -1,11 +1,12 @@
 {
   "httpgo_profile": "render-asserts",
   "response_json": "9007199254740993",
-  "classification": "diferença deliberada: HTTPGo assertions antes de capturas; Hurl captura própria disponível",
+  "classification": "US-34: esperado usa captura da própria resposta com precisão; HTTPGo exige opt-in, ambos aprovam",
   "httpgo": {
-    "exit": 2,
+    "exit": 0,
     "paths": [
-      "/capture"
+      "/capture",
+      "/health"
     ]
   },
   "hurl": {

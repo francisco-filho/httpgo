@@ -20,7 +20,7 @@ func TestCountCaptureBoundaryFailures(t *testing.T) {
 				source += "other: jsonpath \"$.missing\"\n"
 			}
 			if mode == "collision" {
-				source += "initial: jsonpath \"$\" count\n"
+				source += "initial.child: jsonpath \"$\" count\n"
 			}
 			if mode == "pending assertion" {
 				source += "[Asserts]\njsonpath \"$\" count == 98\n"
@@ -74,8 +74,8 @@ func TestCountCaptureBoundaryFailures(t *testing.T) {
 					t.Fatal("rejected batch lost protection")
 				}
 			}
-			if mode == "pending assertion" && session.Sanitize("3") != "3" {
-				t.Fatal("pending secret evaluated prematurely")
+			if mode == "pending assertion" && session.Sanitize("3") != "[oculto]" {
+				t.Fatal("discarded secret lost protection")
 			}
 			if text, err := session.Render("{{initial}}"); err != nil || text.Value != "7" {
 				t.Fatalf("initial changed: %+v %v", text, err)
