@@ -3,6 +3,36 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Compartilhar resultados HTML offline (US-35 / issue #72)
+
+```bash
+httpgo test tests/ --fail-fast --output html --output-file target/report.html
+```
+
+Funciona para arquivo único ou suíte. `--output html` exige destino antes de
+qualquer HTTP; stdout fica vazio e stderr informa o caminho final somente após
+escrita/fechamento. `target/report.html` é um **nome-base**: gera, por exemplo,
+`target/report-20261117T193045123Z.html` (UTC), com `-1`, `-2` etc. na primeira
+colisão livre, sem sobrescrever relatórios anteriores. Cria pais quando possível.
+
+HTML único, autossuficiente e legível offline, com tema somente claro, resumo,
+estados textuais por arquivo, detalhes seguros por requisição e duração lógica
+incluindo preparação/tentativas/esperas, sem reenvios para apresentação. Arquivos
+não analisados têm contagens desconhecidas; ausência de assertion não é validação.
+Segredos conhecidos/marcados/derivados são protegidos e textos escapados; sem
+bodies/headers integrais. Não detecta todo segredo arbitrário não marcado.
+
+Se health passa, products recebe 503 em vez de 200 e profile não inicia pelo
+fail-fast, o relatório mostra um sucesso, uma falha de assertion e um não executado,
+com **código 1**. **0/1/2** permanecem; geração ou confirmação falha retorna **2**,
+sem anúncio falso. Erro global antes da execução não gera resultados fictícios;
+escrita falha pode deixar arquivo parcial. JUnit mantém sua política de substituição.
+
+[Demonstração versionada](testdata/scenarios/html_suite/),
+[contrato, limites de sigilo e exemplos](docs/html.md).
+Não há tema escuro, HTML/JUnit simultâneos ou compatibilidade anunciada com flags
+HTML do Hurl. YAML e interpolação externa continuam extensões HTTPGo.
+
 ## Validar e renovar capturas na própria resposta (US-34 / issue #70)
 
 **Mudança deliberada de contrato, padrão e sem nova flag:** resposta completa →
@@ -97,7 +127,8 @@ O XML não inclui bodies/headers integrais e reutiliza a proteção de valores
 conhecidos/derivados; segredos arbitrários não marcados não são detectados.
 Credenciais vêm do ambiente do processo, nunca de flags. YAML hierárquico e
 interpolação externa continuam **extensões HTTPGo**, não recursos do formato Hurl.
-Não há envio para serviço externo, dashboard ou formatos além de texto/JUnit.
+Não há envio para serviço externo ou dashboard. HTML offline é o formato opt-in
+separado da US-35, sem publicação em CI por este workflow.
 
 O [workflow de referência](.github/workflows/junit.yml) usa
 `dorny/test-reporter` **v2.6.0** (`java-junit`), fixado por commit, para validar e
@@ -686,7 +717,8 @@ A API demonstrativa deve responder 200 em `/health` e `/profile` e 503 em
   completo; ausência de assertion nunca é validação. **2 prevalece sobre 1**.
 
 Sem paralelismo, dependências entre arquivos ou login compartilhado. A US-17
-acrescenta JUnit opt-in; texto continua o padrão. O contrato detalhado dos contadores
+acrescenta JUnit e a US-35 acrescenta HTML offline opt-in; texto continua o padrão.
+O contrato detalhado dos contadores
 está em [`docs/subset.md`](docs/subset.md#cli-e-saída).
 
 ## Executar

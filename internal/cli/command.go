@@ -370,7 +370,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers, JSON e body
 
 Uso:
-  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--output junit --output-file caminho] [--render-files] [--render-asserts] [--var nome=valor] [--secret nome]
+  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--output junit|html --output-file caminho] [--render-files] [--render-asserts] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -491,7 +491,21 @@ Tempos em segundos por arquivo; nenhum reenvio para gerar o XML.
 Resultado vai somente ao arquivo, stdout vazio; diagnósticos seguros em stderr.
 Artefato também em falha de assertion (1) ou execução (2); erro de escrita/fechamento
 retorna 2, sem anunciar publicação. Configuração/descoberta inválida não cria relatório.
-Sem bodies/headers integrais, outros formatos ou envio para serviços externos.
+Sem bodies/headers integrais ou envio para serviços externos.
+HTML: httpgo test tests/ --fail-fast --output html --output-file target/report.html
+--output html exige --output-file antes de qualquer HTTP; também aceita arquivo único.
+O destino é um nome-base: gera report-YYYYMMDDTHHMMSSmmmZ.html em UTC,
+com -1, -2 etc. na primeira colisão livre, sem substituir relatórios anteriores.
+Cria o pai quando possível; informa o caminho final em stderr só após gravar e fechar.
+HTML único offline, somente tema claro, tabelas e detalhes por requisição,
+com duração lógica (preparação, tentativas e esperas, sem apresentação).
+Estados e contagens desconhecidas explícitos; ausência de assertion não é validação.
+Nomes/URLs/diagnósticos escapados como texto, sem bodies/headers integrais.
+Proteção final cobre também segredos conhecidos em arquivo posterior; stderr já emitido
+não pode ser redigido retroativamente. Segredos arbitrários não marcados não são detectados.
+Sem reenvios para gerar HTML; códigos 0/1/2 preservados, geração/confirmação falha retorna 2.
+Erros globais anteriores à execução não geram relatório; falha de gravação pode deixar
+arquivo parcial. Sem HTML e JUnit simultâneos, tema escuro ou flags HTML do Hurl.
 Resumo por arquivo preserva contadores e inclui resultado/duração; resumo suíte
 agrega arquivos/requisições. total e não_iniciadas desconhecidos sem parsing completo;
 zero envios não significa zero requisições planejadas. validadas conta só status,

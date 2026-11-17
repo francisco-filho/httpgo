@@ -25,6 +25,31 @@ func readHTML(t *testing.T, base string) (string, string) {
 	return paths[0], string(data)
 }
 
+func TestHTMLArguments(t *testing.T) {
+	for _, args := range [][]string{
+		{"test", "input", "--output", "html", "--output-file", "out.html"},
+		{"test", "--output-file=out.html", "input", "--output=html"},
+	} {
+		got, err := parseArguments(args)
+		if err != nil || got.output != "html" || got.outputFile != "out.html" {
+			t.Fatalf("args=%v got=%+v err=%v", args, got, err)
+		}
+	}
+	for _, flags := range [][]string{
+		{"--output=html"}, {"--output=html", "--output-file="},
+		{"--output=html", "--output=html", "--output-file=out.html"},
+		{"--output=html", "--output=junit", "--output-file=out.html"},
+		{"--output=junit", "--output=html", "--output-file=out.html"},
+		{"--output=html", "--output-file=out.html", "--output-file=out.html"},
+	} {
+		fake := &fakeExecutor{}
+		code, out, stderr := execute(t, context.Background(), fake, append([]string{"test", "input"}, flags...)...)
+		if code != 2 || out != "" || stderr == "" || len(fake.calls) != 0 {
+			t.Fatalf("flags=%v code=%d out=%q err=%q calls=%v", flags, code, out, stderr, fake.calls)
+		}
+	}
+}
+
 func TestHTMLResultsAndKnownCounts(t *testing.T) {
 	for _, mode := range []string{"success", "assertion", "parse", "render", "single", "unvalidated"} {
 		for _, fast := range []bool{false, true} {

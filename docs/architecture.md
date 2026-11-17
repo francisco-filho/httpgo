@@ -1,10 +1,52 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-34
+# Arquitetura implementada — US-01 a US-17, US-20 a US-35
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
 #50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33), #68 (US-17), #70 (US-34) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## HTML offline — US-35 / issue #72
+
+`internal/report/html.go` define `HTMLDocument`, `HTMLFile`, `HTMLEntry` e
+`WriteHTML(io.Writer, HTMLDocument)`. Modelo concreto compacto: contagens/estados
+já decididos pela suíte, textos protegidos, número da requisição e duração. Não
+retém `parser.Entry`, cenário, sessão, resposta ou erros operacionais completos.
+`report` usa `html/template` com template/CSS estáticos incorporados, sem tipos
+que desabilitem escaping, scripts, recursos externos ou dados variáveis em CSS/
+atributos executáveis. Não abre arquivos nem decide aprovação; `completeWriter`
+detecta short writes também no HTML. Sem dependência ou pacote novo.
+
+`cli/arguments.go` exige par de flags e aceita HTML. `command.go` desabilita linhas
+texto/resumos neste modo e coleta pelo callback por arquivo de `Suite.Run`.
+`cli/html.go` reutiliza `renderEntry`/`junitDiagnostic` para transformar o resultado
+transitório em apresentação segura, com `displayURL`. Diagnósticos continuam
+síncronos em stderr; falha interrompe a suíte, sem insistir no stream falho.
+Após `Run`, todos os textos recebem novamente `executionProtection` **antes**
+do escaping, cobrindo segredos descobertos depois da coleta. Sem sanitizar chunks
+de HTML ou ampliar `suite.FileResult` para reter requests.
+
+`runner.EntryResult.Duration` mede a entrada lógica ao redor de `pollEntry`, com
+`Runner.now` privado por instância: preparação, tentativas, avaliações e esperas,
+antes do callback, não negativa. Continua um resultado terminal por entrada e
+métricas de tentativas separadas; sem mudar transporte, prazo, polling ou capturas.
+
+A CLI cria pais `0700`, captura uma vez `Command.reportNow` (default `time.Now`)
+em UTC e tenta `os.OpenFile(O_CREATE|O_EXCL|O_WRONLY, 0600)`, usando `openReport`
+privado quando injetado. Timestamp antes da última extensão; apenas erro de
+existência avança sufixo para o primeiro nome livre. O nome-base/candidatos
+existentes não são truncados. Diretório como nome-base é rejeitado. Abertura,
+serialização e fechamento conservam causas com `errors.Join`; diagnóstico público
+é seguro e confirmação do caminho em stderr só ocorre após write/close.
+JUnit preserva abertura com truncamento e seu contrato anterior.
+
+Após iniciar a suíte, cancelamento/falha de apresentação ainda permitem HTML dos
+resultados disponíveis, sem novos envios; erro global prévio não abre destino.
+Erro de geração/escrita/fechamento/confirmação prevalece com 2; não há promessa
+transacional/remoção de parcial. `ExecuteContext` mantém a coleta e a proteção
+locais por invocação. Fluxo novo **cli → report → suite**, sem dependência inversa,
+sem modificar corpus Hurl, parser, transporte, Go, dependências, CI ou lint.
+[Contrato e exemplo](html.md).
 
 ## Renovação transacional de capturas — US-34 / issue #70
 
@@ -421,6 +463,7 @@ cmd/httpgo/main.go
     → resumo por arquivo na CLI antes do próximo arquivo
   → resumo agregado da suíte na CLI (texto padrão)
   → cli/junit.go → internal/report/junit.go (JUnit opt-in, após execução)
+  → cli/html.go → internal/report/html.go (HTML opt-in, após execução, exclusivo com JUnit)
 ```
 
 O diagrama é fluxo de execução; `runner` **não importa** o adapter HTTP.
@@ -452,6 +495,7 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `suite.Suite`, `File`, `FileResult`, `State`, `Summary`, `Result`, `Options` | Descoberta completa, carga/fechamento por arquivo, reutilização do runner com sessão nova, estados e contagens compactos, fail-fast e interrupções globais; não importa CLI ou transporte |
 | `report.WriteJUnit` | Serializa resultados por arquivo e diagnósticos protegidos em um writer; não executa nem decide sucesso |
+| `report.HTMLDocument`, `HTMLFile`, `HTMLEntry`, `WriteHTML` | Apresentação compacta protegida de arquivos/requisições; HTML/CSS estáticos e texto escapado, sem abrir destino nem reexecutar |
 | `cli.Command`, `BuildInfo` | Argumentos/streams (`SetArgs/SetIn/SetOut/SetErr`), configuração única, montagem da suíte, saída segura e exit code; não reavalia assertion |
 | `main.run` | Monta dependências, `signal.NotifyContext`, streams do processo; seus defers terminam antes do único os.Exit de produção em main |
 

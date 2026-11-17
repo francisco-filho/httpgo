@@ -1,4 +1,83 @@
-# Validação — US-01 a US-17, US-20 a US-34
+# Validação — US-01 a US-17, US-20 a US-35
+
+## US-35 — issue #72 / história 0035
+
+Plano da issue #72 executado sem planner, somente backend, com quatro tasks
+registradas e autoaprovadas na fila 0035. `back:1`: `51af3d2` (CLI/renderer HTML,
+detalhes seguros e duração lógica); `back:2`: `ee62ac3` (destinos exclusivos,
+colisões, permissões e falhas de I/O); `back:3`: `d4b1990` (sigilo, interrupções,
+isolamento e equivalência de execução); `back:4`: esta alteração (ajuda,
+contrato/exemplos e regressão integrada). Base `6ba52fd`. Sem frontend/estáticos,
+nova dependência, atualização de Go, alteração de parser/transporte, CI, lint ou
+corpus de compatibilidade. Não foi consultado/copiado/adaptado código-fonte Hurl.
+
+### Evidência executada em Linux
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, ferramentas Go existentes em
+`/home/ff/go/bin`, golangci-lint `2.15.0`. Para o gate diferencial foi reutilizado
+Hurl **8.0.0**, já disponível em
+`/tmp/httpgo-0034-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, somente via PATH.
+Nenhuma ferramenta foi instalada; Hurl padrão 8.0.1 não foi usado como substituto
+do gate 8.0.0. Aviso de metadados libcurl não impediu a identificação/execução.
+
+Passaram:
+
+- Task 1: `go test ./internal/runner ./internal/report ./internal/cli` e
+  `go test ./tests/e2e -count=1`, com binário real e HTTP local, códigos 0/1/2,
+  fail-fast, erro de cenário, arquivo único, escaping e contagens desconhecidas.
+- Task 2: `go test ./internal/cli ./internal/report` e E2E `TestHTML*`.
+  Relógio controlado comprova UTC/milissegundos, captura única do instante,
+  primeiro sufixo livre e bytes anteriores preservados. Falhas injetadas cobrem
+  open/write/short write/close/confirmação e preservação de causas. Permissão
+  negada real em processo Linux sem privilégios (`uid=1000`; teste também
+  rebaixa credenciais quando executado como root), sem tomar só chmod como prova.
+- Task 3: `go test ./internal/cli ./internal/suite ./internal/runner ./internal/report`
+  e `go test ./tests/e2e -count=1`. Inspeção do HTML **inteiro**, stdout/stderr,
+  requests, capturas/derivados e metadados tardios; cancelamento por SIGINT real,
+  writers com falha e comparação texto/JUnit/HTML sem replay.
+- Em cada task de código, `make fmt lint test`, `go vet ./...` e `go build ./...`
+  passaram antes do commit. Lint: **0 issues**; testes com **-race -cover**.
+- Gate integrado: `make build`, `make fmt lint test`, `go vet ./...`,
+  `go build ./...`, `make e2e` e `make compatibility` passaram. **448 pares**
+  históricos com Hurl **8.0.0**, sem skips, `-update` ou alteração dos goldens.
+  Coberturas: CLI **98,3%**, report **97,1%**, runner **95,0%**, suite **95,1%**,
+  template **96,1%**, parser **97,4%**, transport **90,4%**.
+- Fuzzing separado, 20s e 2 workers em cada comando:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**14.308** execuções);
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**80.062** execuções) e equivalente para `'^FuzzRenderJSON$'`
+  (**31.985** execuções). Todos sem crash/falha.
+- Golden `testdata/report/html.html` gerado com `-update` e conferido depois sem
+  atualização. **Conferência manual offline feita e confirmada pelo usuário**
+  nesta sessão: aparência/conteúdo corretos, tema claro, tabelas e texto de script
+  escapado, sem execução. O agente não executou navegador neste ambiente.
+- Ajuda e demonstração versionada validadas pelo binário real em
+  `TestHTMLDocumentedSuiteAndHelp`, com/sem fail-fast; `git diff --check` e
+  `gofmt -l` dos arquivos Go alterados sem diferenças de formatação.
+
+### Rastreabilidade GO-475–GO-486
+
+| GO | Evidência |
+|---|---|
+| 475 | CLI `TestHTMLResultsAndKnownCounts`, E2E `TestHTMLRealDemonstration` e `TestHTMLDocumentedSuiteAndHelp`: arquivo único/suíte, 0/1/2, detalhes/status e caminho efetivo |
+| 476 | CLI `TestHTMLPreexecutionErrorsDoNotOpenReportOrSend`, `TestHTMLArguments`; E2E `TestHTMLMissingDestinationPreventsRealHTTP`: erro global/uso sem rede nem artefato fictício |
+| 477 | `TestHTMLTimestampCollisionAndPermissions`, `TestHTMLCreatesPrivateDestination`, E2E `TestHTMLRealRepeatedNamesPreserveArtifacts`: UTC, pontos/extensão, sufixos, pais e preservação |
+| 478–479 | report `TestHTMLGoldenOfflineAndEscaping`, CLI de resultados e E2E de sigilo: golden, CSS claro embutido, sem recursos externos, aspas/Unicode/marcação como texto; confirmação offline pelo usuário |
+| 480 | CLI `TestHTMLFinalProtectionCoversEarlierNamesURLsAndDiagnostics`, E2E `TestHTMLRealSecretsAreNotInSerializedDocument`: ambiente, captura/derivação, URL/query, esperado/real, headers e descoberta posterior, sem dumps |
+| 481 | E2E `TestHTMLRealPollingCapturesAndIsolationMatchOtherFormats`: sequência idêntica texto/JUnit/HTML, polling/captura/isolamento, cinco envios reais contra quatro entradas lógicas iniciadas |
+| 482 | CLI de resultados/interrupções e E2E de demonstração: não iniciadas conhecidas, pré-validação sem envios, skipped desconhecido, sem sucesso inventado |
+| 483 | runner `TestLogicalEntryDurationIncludesPreparationRetriesAndWait`: relógio controlado inclui preparo/retry/espera, exclui callback; duração não negativa, um terminal e métricas preservadas |
+| 484 | CLI `TestHTMLDestinationFailuresAndResourceClosure`, `TestHTMLExclusiveOpenCollisionAndJoinedCauses`, report `TestHTMLWriterFailures`, E2E `TestHTMLRealPermissionFailure`: falhas, causas, close e confirmação |
+| 485 | CLI `TestHTMLInterruptionsKeepAvailableResultsWithoutRetryingStderr`, E2E `TestHTMLRealCancellationStillGeneratesAvailableResults`: sem próximo envio ou retry no stream, artefato disponível |
+| 486 | CLI `TestHTMLCommandReuseDoesNotRetainDataOrDestinations` e teste de colisão: invocações isoladas, sem herdar capturas/proteção/detalhes/caminho final |
+
+Limites: HTML próprio de apresentação, sem prometer flags equivalentes às do Hurl,
+publicação externa, gravação transacional ou remoção de parcial. stderr não pode
+redigir retroativamente um valor desconhecido; proteção não detecta todo segredo
+arbitrário/transformação não marcada. Nenhuma homologação de API externa, CI remoto,
+SonarQube ou execução nativa macOS/Windows foi realizada (estas plataformas são
+opcionais na história). SonarQube continua exclusivo do agente QA.
 
 ## US-34 — issue #70 / história 0034
 

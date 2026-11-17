@@ -16,7 +16,7 @@ import (
 	"capimgrosso.com/httpgo/internal/suite"
 )
 
-var update = flag.Bool("update", false, "update JUnit golden file")
+var update = flag.Bool("update", false, "update report golden files")
 
 func TestJUnitResults(t *testing.T) {
 	result := suite.Result{
