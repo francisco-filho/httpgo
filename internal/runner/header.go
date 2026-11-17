@@ -85,6 +85,7 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 		}
 		if entry.Assertions[i].JSON != nil {
 			declaration := *entry.Assertions[i].JSON
+			declaration.ExpectedTemplate = nil
 			declaration.Expected = nil // Never deliver the raw literal to reports.
 			declaration.Pattern = ""
 			declaration.Compiled = nil // Compiled regexps retain their source pattern.

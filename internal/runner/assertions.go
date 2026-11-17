@@ -107,12 +107,34 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 				return nil
 			}
 		case item.JSON != nil && item.Header == nil && item.Body == nil:
-			declaration := item.JSON
+			resolved := *item.JSON // Evaluation must never mutate the reusable scenario.
+			declaration := &resolved
 			pos := declaration.Position
 			pos.File = session.Sanitize(pos.File)
 			fail := func(detail string) *JSONError {
 				current.Outcome = JSONFailed
 				return &JSONError{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Detail: detail}
+			}
+			if plan := declaration.ExpectedTemplate; plan != nil {
+				secret := false
+				for _, ref := range plan.JSON.References {
+					secret = secret || session.IsSecret(ref.Name)
+				}
+				rendered, err := session.RenderJSON([]byte(plan.Source))
+				if err != nil {
+					return fail("não foi possível resolver o esperado JSON: " + err.Error())
+				}
+				if secret {
+					session.ProtectValue(string(rendered))
+					conceal = true
+				}
+				declaration.Expected, err = query.Decode(rendered)
+				if err != nil {
+					return fail("esperado JSON renderizado inválido")
+				}
+				if err := assertion.ValidateJSONExpected(declaration.Operator, declaration.Count, declaration.Expected); err != nil {
+					return fail(err.Error())
+				}
 			}
 			if !decoded {
 				var err error

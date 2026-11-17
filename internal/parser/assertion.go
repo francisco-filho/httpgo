@@ -8,6 +8,7 @@ import (
 
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/query"
+	"capimgrosso.com/httpgo/internal/template"
 )
 
 // HeaderAssertion contains literal values, never template expressions.
@@ -33,27 +34,35 @@ type Assertion struct {
 	Body   *BodyAssertion
 }
 
-// JSONAssertion owns an already validated literal, never a template plan.
-type JSONAssertion struct {
-	Query         string
-	Path          query.Path
-	Operator      assertion.JSONOperator
-	Count         bool
-	Expected      any
-	Pattern       string
-	Compiled      *regexp.Regexp
-	Position      Position
-	QueryPosition Position
+// ExpectedTemplate is operational metadata and must never be delivered to reports.
+type ExpectedTemplate struct {
+	Source     string
+	JSON       template.JSONPlan
+	References []template.Reference
 }
 
-func parseAssertion(text string, pos Position) (Assertion, error) {
+// JSONAssertion owns a validated literal or an opt-in expected template.
+type JSONAssertion struct {
+	ExpectedTemplate *ExpectedTemplate
+	Query            string
+	Path             query.Path
+	Operator         assertion.JSONOperator
+	Count            bool
+	Expected         any
+	Pattern          string
+	Compiled         *regexp.Regexp
+	Position         Position
+	QueryPosition    Position
+}
+
+func parseAssertion(text string, pos Position, options ParseOptions) (Assertion, error) {
 	fields := strings.Fields(text)
 	if len(fields) > 0 && fields[0] == "body" {
 		declaration, err := parseBodyAssertion(text, pos)
 		return Assertion{Body: &declaration}, err
 	}
 	if len(fields) > 0 && fields[0] == "jsonpath" {
-		declaration, err := parseJSONAssertion(text, pos)
+		declaration, err := parseJSONAssertion(text, pos, options)
 		return Assertion{JSON: &declaration}, err
 	}
 	declaration, err := parseHeaderAssertion(text, pos)
@@ -89,7 +98,7 @@ func parseBodyAssertion(text string, pos Position) (BodyAssertion, error) {
 	return BodyAssertion{Operator: assertion.BodyOperator(operator), Expected: expected, Position: pos}, nil
 }
 
-func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
+func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAssertion, error) {
 	fail := func(position Position, category, detail string) (JSONAssertion, error) {
 		return JSONAssertion{}, &Error{Position: position, Category: category, Detail: detail}
 	}
@@ -170,25 +179,39 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 	default:
 		return fail(pos, "construção não suportada", "operador ou filtro de assertion JSON não suportado")
 	}
+	if options.RenderAsserts {
+		plan, err := template.ParseJSON([]byte(rest))
+		if err != nil || strings.TrimSpace(rest[plan.End:]) != "" {
+			return fail(pos, "sintaxe inválida", "assertion exige um único template JSON esperado válido")
+		}
+		if len(plan.References) > 0 {
+			// Only a complete value reference may change the operand's outer type.
+			complete := len(plan.References) == 1 && !plan.References[0].InString && plan.References[0].Start == 0 && plan.References[0].End == len(rest)
+			if !complete {
+				masked := rest
+				for i := len(plan.References) - 1; i >= 0; i-- {
+					ref := plan.References[i]
+					replacement := "null"
+					if ref.InString {
+						replacement = "x"
+					}
+					masked = masked[:ref.Start] + replacement + masked[ref.End:]
+				}
+				value, _ := query.Decode([]byte(masked))
+				if err := assertion.ValidateJSONExpected(declaration.Operator, declaration.Count, value); err != nil {
+					return fail(pos, "sintaxe inválida", err.Error())
+				}
+			}
+			declaration.ExpectedTemplate = &ExpectedTemplate{Source: rest, JSON: plan}
+			return declaration, nil
+		}
+	}
 	expected, err := query.Decode([]byte(rest))
 	if err != nil {
 		return fail(pos, "sintaxe inválida", "assertion exige um único literal JSON esperado válido")
 	}
-	if declaration.Count && !assertion.ValidCount(expected) {
-		return fail(pos, "sintaxe inválida", "count exige quantidade inteira não negativa")
-	}
-	switch declaration.Operator {
-	case assertion.JSONContains, assertion.JSONNotContains:
-		switch expected.(type) {
-		case nil, string, json.Number, bool:
-		default:
-			return fail(pos, "sintaxe inválida", "contains e not contains exigem literal JSON escalar")
-		}
-	case assertion.JSONEqualOperator:
-	default:
-		if _, ok := expected.(json.Number); !ok {
-			return fail(pos, "sintaxe inválida", "comparação ordenada exige número JSON esperado")
-		}
+	if err := assertion.ValidateJSONExpected(declaration.Operator, declaration.Count, expected); err != nil {
+		return fail(pos, "sintaxe inválida", err.Error())
 	}
 	declaration.Expected = expected
 	return declaration, nil

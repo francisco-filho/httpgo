@@ -1033,6 +1033,36 @@ Primeira ocorrência em vez de lista, esperado estático em vez de interpolado,
 validação antecipada e códigos são contratos próprios, não equivalência geral
 de engine/gramática. Corpus sintético não é homologação da suíte real.
 
+## Esperados JSON dinâmicos — US-30 / issue #60
+
+`--render-asserts` é um opt-in por invocação e uma evolução explícita do
+contrato HTTPGo. Sem a flag, permanece o perfil **literal** descrito abaixo.
+Com a flag, operandos JSON de igualdade, comparação, contagem e pertencimento
+podem usar variáveis iniciais ou capturas de entradas anteriores:
+
+```hurl
+GET {{base_url}}/orders/{{order_number}}
+HTTP 200
+[Asserts]
+jsonpath "$.number" == {{order_number}}
+jsonpath "$.name" == "{{order_name}}"
+```
+
+Execute com `httpgo test order.hurl --render-asserts --var base_url=http://localhost:8080`
+após uma entrada que capture `order_number` e `order_name`. Valores completos
+preservam tipo e precisão (incluindo `9007199254740993`); dentro de strings,
+escalares viram texto escapado, nunca código ou um segundo template. Arrays e
+objetos só cabem em valor JSON completo e nos operadores que já os aceitam.
+`count` exige inteiro não negativo e comparação ordenada exige número.
+
+Todo erro estático continua impedindo HTTP do arquivo inteiro. O esperado da
+assertion alcançada é resolvido e validado **antes** de consultar a resposta;
+variável ausente ou tipo esperado incompatível é avaliação **2**, enquanto
+comparação divergente é **1**. Status e assertions anteriores têm precedência;
+capturas da própria resposta ainda não estão publicadas. Valores secretos e
+seus derivados ficam protegidos antes dos callbacks, sem reter planos nos
+resultados. A flag não altera consultas nem a ordem de publicação.
+
 ## Igualdade JSON — US-08 / issue #20
 
 **Ampliação intencional:** `[Asserts]` passa a aceitar também

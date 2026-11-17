@@ -133,8 +133,9 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 
 // Options applies to one execution only. The zero value preserves external bytes.
 type Options struct {
-	Timeout     time.Duration // Zero preserves the default ten-second transport policy.
-	RenderFiles bool
+	Timeout       time.Duration // Zero preserves the default ten-second transport policy.
+	RenderFiles   bool
+	RenderAsserts bool // Used by suite loading to select the matching parser profile.
 }
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {

@@ -81,7 +81,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if err != nil {
 		return c.fail(err.Error())
 	}
-	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, Timeout: settings.Timeout}, FailFast: args.failFast}, c.renderFile)
+	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}, c.renderFile)
 	if result.ReportErr != nil {
 		pos := result.ReportPosition
 		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))

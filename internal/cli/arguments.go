@@ -12,6 +12,7 @@ import (
 
 type arguments struct {
 	renderFiles        bool
+	renderAsserts      bool
 	failFast           bool
 	files              []string
 	config             string
@@ -33,6 +34,11 @@ func parseArguments(args []string) (arguments, error) {
 				invalid = true
 			}
 			result.failFast = true
+		case "--render-asserts":
+			if inline {
+				invalid = true
+			}
+			result.renderAsserts = true
 		case "--render-files":
 			if inline {
 				invalid = true
