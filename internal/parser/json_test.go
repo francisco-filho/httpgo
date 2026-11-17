@@ -60,6 +60,13 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, operator := range []string{"isString", "isInteger", "isBoolean", "isEmpty", "isInteger 3", "count isEmpty", "not isString", "isNumber"} {
+		for _, path := range []string{"$.value", "$[*].value", "$[?(@.key=='x')].value"} {
+			for _, newline := range []string{"\n", "\r\n"} {
+				f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP *\n[Asserts]\n  jsonpath "+strconv.Quote(path)+" "+operator, "\n", newline))
+			}
+		}
+	}
 	for _, path := range []string{`$[?(@.slug=='pizza')].id`, `$.groups[*].items[?(@.meta.keys[0]=="a\"b")].id`, `$[?(@.x==9223372036854775809)]`, `$[?(@.x==1e-99999999999999999999999)]`, `$[?(@.x=='\uD83C\uDF55')].id`, `$[?(@.x=='{{literal}}')]`, `$[?(@.x==null)]`, `$[?(@.x==true)]`, `$[?(@.x!='unsupported')]`, `$[?(@.x=='unterminated)]`, `$[?(@.x=={{dynamic}})]`, `$[?(@.x==[]) ]`} {
 		for _, newline := range []string{"\n", "\r\n"} {
 			f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP *\n[Asserts]\njsonpath "+strconv.Quote(path)+" exists\n[Captures]\nx: jsonpath "+strconv.Quote(path), "\n", newline))

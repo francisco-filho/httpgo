@@ -3,6 +3,48 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Validar tipos e valores vazios (US-29 / issue #58)
+
+```hurl
+GET {{base_url}}/session-info
+HTTP 200
+[Asserts]
+jsonpath "$.token" isString
+jsonpath "$.attempts" isInteger
+jsonpath "$.active" isBoolean
+jsonpath "$.issues" isEmpty
+```
+
+Execute o [exemplo versionado](testdata/scenarios/json_types.hurl):
+`httpgo test testdata/scenarios/json_types.hurl --var base_url=http://localhost:8080`.
+A resposta sintética `{"token":"abc","attempts":3,"active":false,"issues":[]}`
+aprova com **0**. `/session-info` é fixture dos testes, não rota prometida pelo
+dummy nem homologação de API real. `attempts` como `"3"`, `3.0` ou `3e0` falha
+com **1**, sem captura nem próxima requisição.
+
+- Predicados unários, **sem esperado** e sem coerção. `isString` inclui string
+  vazia; `isBoolean` inclui false. `isInteger` exige **notação inteira JSON**,
+  inclusive negativos e -0, sem limite de máquina nem conversão a float64.
+- Igualdade numérica permanece exata: `3`, `3.0` e `3e0` são equivalentes. `count`
+  ainda aceita esperado integral decimal/exponencial; isso não é `isInteger`.
+- `isEmpty` aprova string/array/objeto vazios. Whitespace, `[null]`, `{"x":null}`,
+  null, números e booleanos não passam. Campo/índice ausente falha com **1**,
+  distinto de vazio e null. JSON inválido/percurso incompatível mantém **2**.
+- Consulta simples, wildcard e filtro estático existentes conservam a redução:
+  zero = ausência, um = próprio valor, vários = array; nunca aplicação por item.
+- Ordem status → assertions → capturas preservada. Operando extra, `count`
+  combinado com novo unário e construções fora do recorte impedem todo HTTP do
+  arquivo. Sem schema, outros tipos, coerção ou negação genérica.
+- Diagnósticos categóricos não imprimem valores/estruturas, mesmo escalares;
+  metadados protegidos e captura secreta pendente seguem a ocultação existente.
+  `isString` e vazio de string/array são atalhos para verificações já possíveis
+  com `matches ""`, `== ""` e `count == 0`, não substitutos dos operadores.
+
+[Subconjunto](docs/subset.md#tipos-e-valores-vazios-json--us-29--issue-58),
+[arquitetura](docs/architecture.md#tipos-e-vazio--us-29--issue-58),
+[compatibilidade Hurl 8.0.0](docs/compatibility.md#tipos-e-vazio--us-29--issue-58)
+e [validação](docs/validation.md#us-29--issue-58--história-0029).
+
 ## Selecionar a entidade correta pelo conteúdo (US-28 / issue #56)
 
 ```hurl

@@ -248,6 +248,9 @@ func jsonDiagnostic(failure *runner.JSONFailure) string {
 		operator = "count " + operator
 	}
 	diagnostic := fmt.Sprintf("assertion jsonpath %q %s: esperado %s, recebido %s", failure.Query, operator, failure.Expected, actual)
+	if failure.Operator.TypePredicate() {
+		diagnostic = fmt.Sprintf("assertion jsonpath %q %s: recebido %s; condição falsa", failure.Query, operator, actual)
+	}
 	if failure.Detail != "" {
 		diagnostic += "; " + failure.Detail
 	}
@@ -557,6 +560,29 @@ Sem negação genérica, header not exists, count contains ou wildcard de objeto
 Filtros JSONPath estáticos por igualdade são o recorte US-28 abaixo.
 Falhas mostram presença/tipo e esperado protegido, nunca arrays/objetos selecionados.
 Primeira falha impede capturas/envios; sintaxe inválida tardia impede todo HTTP.
+Tipos e valores vazios — US-29:
+  GET {{base_url}}/session-info
+  HTTP 200
+  [Asserts]
+  jsonpath "$.token" isString
+  jsonpath "$.attempts" isInteger
+  jsonpath "$.active" isBoolean
+  jsonpath "$.issues" isEmpty
+Resposta: {"token":"abc","attempts":3,"active":false,"issues":[]}; saída 0.
+Exemplo: httpgo test testdata/scenarios/json_types.hurl --var base_url=http://localhost:8080
+Unários sem esperado: isString aceita string inclusive vazia; isBoolean aceita true/false.
+isInteger exige notação inteira JSON, inclusive negativo e -0, sem limite de máquina;
+3.0, 3e0 e string "3" falham. Igualdade numérica continua aceitando 3 == 3.0 == 3e0;
+count aceita quantidades integrais como 3.0/3e0, sem mudar o contrato anterior.
+isEmpty aprova string/array/objeto vazios; whitespace, [null], {"x":null}, null,
+número e booleano não passam. Ausência/tipo incompatível/condição falsa: 1.
+JSON inválido/percurso incompatível: 2; operando extra ou count isInteger (e outros
+unários) impede todo HTTP do arquivo. Sem schema, outros tipos ou negação genérica.
+Predicado aplicado uma vez ao valor reduzido, nunca implicitamente por item:
+zero resultados é ausência; um conserva tipo; vários formam array não vazio.
+Diagnóstico categórico de consulta/predicado/presença/tipo, sem valores ou estruturas;
+metadados protegidos e captura secreta pendente são ocultos, sem antecipar capturas.
+Atalhos: matches "" verifica tipo string; == ""/count == 0 verificam vazios específicos.
 Estrutura, quantidade e limites:
   GET {{base_url}}/products
   HTTP 200

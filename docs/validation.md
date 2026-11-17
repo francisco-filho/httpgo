@@ -1,4 +1,85 @@
-# Validação — US-01 a US-16, US-20 a US-28
+# Validação — US-01 a US-16, US-20 a US-29
+
+## US-29 — issue #58 / história 0029
+
+Plano da issue #58 executado sem planner, somente backend, nas três tasks
+aprovadas da fila 0029: `back:1` em `3315dc9` (predicados ponta a ponta),
+`back:2` em `dd6d671` (seleção plural, sigilo e fronteiras), `back:3` nesta
+alteração (compatibilidade, ajuda/documentação e validação integrada).
+Sem frontend/estáticos, nova dependência, atualização de Go ou alteração de
+CI/lint. Query, transporte e sessão de produção não foram modificados.
+Nenhum código-fonte Hurl consultado/copiado/adaptado. Gates locais não substituem
+review; backdev não executou SonarQube.
+
+### Ambiente e execução efetiva
+
+Linux amd64 em **2026-11-17**, Go `go1.26.10-X:nodwarf5`, ferramentas existentes
+em `/home/ff/go/bin` (`goimports`, `golangci-lint`). Hurl **8.0.0** existente em
+`/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, selecionado via PATH
+sem instalar/substituir ferramentas. O aviso de metadados de libcurl não impediu
+a identificação nem execução do binário de referência.
+
+- Task 1: passaram `go test ./internal/parser ./internal/assertion ./internal/runner
+  ./internal/cli`, `go test ./tests/e2e -run 'TestJSON' -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram `go test ./internal/query ./internal/assertion ./internal/runner
+  ./internal/cli ./internal/transport ./internal/suite`, E2E JSON com binário/HTTP
+  real e os mesmos gates `make fmt lint test`, vet e build antes do commit.
+- Task 3: passaram testes específicos de parser/assertion/runner/CLI e E2E JSON;
+  `make compatibility` com **367 pares**, Hurl **8.0.0** obrigatório, sem skip e
+  sem `-update` no gate completo; `make fmt lint test` (**0 issues**, race/cobertura),
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e`.
+- Os **43 pares novos `types_*`** foram observados com atualização limitada a
+  `go test -tags compatibility ./tests/e2e -run '^TestCompatibility/types_' -count=1 -update`,
+  inspecionados e classificados individualmente antes do gate sem atualização.
+  **Nenhum dos 324 pares anteriores mudou.** As novas construções são uma
+  ampliação explícita do subconjunto, não mudança da igualdade/contagem existente.
+- Observado 0/0 para a demonstração, false booleano, notação inteira negativa/-0,
+  inteiros grandes e string/array/objeto vazios. Decimal/expoente/string numérica,
+  whitespace, null, tipo errado e ausência divergem com HTTPGo 1/Hurl 4.
+  Pluralidade preserva redução zero/um/vários, sem aplicação por item.
+- Diferenças de percurso estrito e rejeição estática integral de `count isInteger`
+  e negação fora do recorte estão classificadas em
+  [compatibility.md](compatibility.md#tipos-e-vazio--us-29--issue-58).
+  Aprovar o **tipo** de um inteiro grande não demonstra precisão de igualdade
+  da referência. Não foi imposto limite de máquina para imitá-la.
+- Cobertura integrada: assertion **96,5%**, CLI **97,5%**, config **96,0%**,
+  parser **97,3%**, query **88,3%**, runner **94,6%**, suite **95,5%**,
+  template **96,1%**, transport **90,4%**. Nenhuma meta/verificação reduzida.
+- Seeds de parser ampliadas com unários válidos/inválidos, seleção simples,
+  wildcard/filtro e LF/CRLF; seeds de JSON incluem grafias numéricas, false e
+  vazios. Fuzzers executados e aprovados, sem crash:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+    (**121.910 execuções**);
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+    (**29.354 execuções**);
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+    (**16.029 execuções**). Contagens correspondem apenas a esta rodada.
+- `TestJSONTypeHelpAndPublishedExample` confere ajuda root/test e o exemplo
+  versionado idêntico no README/subset, executando `/session-info` em HTTP local.
+  `TestJSONTypeStructuralCorpusByBinary` cobre os novos arquivos negativos;
+  testes estáticos LF/CRLF contam zero envios. Links locais, exemplos,
+  `git diff --check` e `gofmt -l` conferidos.
+- macOS/Windows não executados: opcionais nesta história conforme plano v4.
+  Corpus sintético não homologa suíte real, schema ou JSONPath/Hurl integral.
+
+### Rastreabilidade GO-361–GO-376
+
+| GO | Evidência executada |
+|---|---|
+| 361 | `TestJSONTypeDemoAndCapture`, `TestJSONTypeByBinary`, `TestJSONTypeHelpAndPublishedExample`, par `types_demo`: quatro assertions aprovadas, false aceito e captura libera envio dependente |
+| 362–363 | `TestJSONTypePredicates`, `TestJSONTypeByBinary`, pares `types_integer_*`, `types_string_*`, `types_boolean_*`: tipos sem coerção, -0/negativos/alta precisão, decimal/expoente reprovam |
+| 364–365 | Mesmos tabelados, pares `types_empty_*`: vazios na raiz passam; whitespace, null em coleção, null/número/bool não passam |
+| 366 | `TestJSONTypeOrderAndFailures`, `TestJSONTypePredicates`, pares `types_*_missing`: ausência/índice ausente falha sem captura/avanço |
+| 367 | `TestJSONTypeAfterReduction`, `TestJSONTypeReducedSelection`, E2E e pares `types_plural_*`: zero/um/vários e arrays sem flatten, nunca predicado por elemento |
+| 368 | `TestJSONTypeDeclarations`, `TestJSONTypeInvalidNeverSends`, corpus negativo e pares `types_late_*`: categorias e posições LF/CRLF, validação integral antes da rede |
+| 369 | `TestJSONTypeOrderAndFailures`: status e ordem escrita prevalecem, header anterior evita decode inválido; `HTTP *` dispensa somente status nos E2E |
+| 370 | `TestJSONTypeProtectedResultsAndReuse`, `TestJSONTypeProtectedMetadataCLI`, `TestJSONTypeSuiteProtectionAndIsolation`: valores/estruturas e metadados derivados ocultos, captura pendente, planos removidos, callbacks/cenário reutilizados sem mutação |
+| 371 | `TestJSONTypePredicates`, `TestJSONTypeByBinary`, `types_equality_notation` e regressões existentes: igualdade exata, quantidade integral, limites e matches inalterados |
+| 372 | `TestCompatibility` (367 pares, 43 novos), ajuda root/test e cenário publicado executados, diferenças classificadas sem generalizar compatibilidade |
+| 373–374 | `TestJSONTypeOrderAndFailures`, `TestJSONTypeReducedSelection`, `TestJSONTypeByBinary`, pares `types_strict_*`: JSON vazio/malformado/adicional e ramo incompatível são erro 2, sem parcial/ausência falsa |
+| 375 | `TestJSONTypeFinalAndInterruptedResponse`, `TestJSONTypeReadCloseBeforeReport`, `TestJSONTypeFinalAndIncompleteByBinary`: resposta final completa, read/close/prazo/cancelamento e recursos encerrados antes do report, sem captura/avanço |
+| 376 | `TestJSONTypeCallbackFailure`, `TestJSONTypeWriterFailureOverridesOutcomes`: callback/erro/short write em aprovação/divergência/avaliação mantém 2, contagens/resultados anteriores, sem reimpressão/envio seguinte |
 
 ## US-28 — issue #56 / história 0028
 
