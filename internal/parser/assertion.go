@@ -140,6 +140,14 @@ func parseJSONAssertion(text string, pos Position) (JSONAssertion, error) {
 		return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
 	}
 	switch declaration.Operator {
+	case assertion.JSONIsString, assertion.JSONIsInteger, assertion.JSONIsBoolean, assertion.JSONIsEmpty:
+		if declaration.Count {
+			return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
+		}
+		if rest != "" {
+			return fail(pos, "sintaxe inválida", "predicado de tipo ou vazio não aceita valor esperado")
+		}
+		return declaration, nil
 	case assertion.JSONExists, assertion.JSONNotExists:
 		if declaration.Count {
 			return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")

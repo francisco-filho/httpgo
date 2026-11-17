@@ -13,6 +13,10 @@ type JSONOperator string
 const (
 	JSONEqualOperator JSONOperator = "=="
 	JSONMatches       JSONOperator = "matches"
+	JSONIsString      JSONOperator = "isString"
+	JSONIsInteger     JSONOperator = "isInteger"
+	JSONIsBoolean     JSONOperator = "isBoolean"
+	JSONIsEmpty       JSONOperator = "isEmpty"
 	JSONExists        JSONOperator = "exists"
 	JSONNotExists     JSONOperator = "not exists"
 	JSONContains      JSONOperator = "contains"
@@ -22,6 +26,16 @@ const (
 	JSONLess          JSONOperator = "<"
 	JSONLessEqual     JSONOperator = "<="
 )
+
+// TypePredicate reports whether the operator checks type or emptiness without an operand.
+func (operator JSONOperator) TypePredicate() bool {
+	switch operator {
+	case JSONIsString, JSONIsInteger, JSONIsBoolean, JSONIsEmpty:
+		return true
+	default:
+		return false
+	}
+}
 
 // JSONEvaluation contains the compared value, never collections for count,
 // membership or absence predicates.
@@ -34,6 +48,12 @@ type JSONEvaluation struct {
 
 // EvaluateJSON decides assertions; query only supplies value and presence.
 func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, present bool) (JSONEvaluation, error) {
+	if operator.TypePredicate() {
+		if count {
+			return JSONEvaluation{}, fmt.Errorf("count não aceita predicado de tipo ou vazio")
+		}
+		return evaluateType(operator, actual, present), nil
+	}
 	result := JSONEvaluation{Actual: actual}
 	if operator == JSONContains || operator == JSONNotContains || operator == JSONNotExists {
 		if count {
@@ -92,6 +112,46 @@ func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, prese
 		return JSONEvaluation{}, fmt.Errorf("predicado JSON não suportado")
 	}
 	return result, nil
+}
+
+// evaluateType keeps only categorical information, never the selected operand.
+func evaluateType(operator JSONOperator, actual any, present bool) JSONEvaluation {
+	result := JSONEvaluation{}
+	if !present {
+		result.Detail = "valor ausente"
+		return result
+	}
+	result.Detail = "tipo " + JSONType(actual)
+	switch operator {
+	case JSONIsString:
+		_, result.Matched = actual.(string)
+	case JSONIsBoolean:
+		_, result.Matched = actual.(bool)
+	case JSONIsInteger:
+		if number, ok := actual.(json.Number); ok {
+			// Decode has already validated JSON grammar. Keep the original notation
+			// and precision; mathematical integrality is a different predicate.
+			result.Matched = !strings.ContainsAny(string(number), ".eE")
+			if !result.Matched {
+				result.Detail += "; notação não inteira"
+			}
+		}
+	case JSONIsEmpty:
+		switch value := actual.(type) {
+		case string:
+			result.Matched = len(value) == 0
+		case []any:
+			result.Matched = len(value) == 0
+		case map[string]any:
+			result.Matched = len(value) == 0
+		default:
+			result.Detail += "; isEmpty exige string, array ou objeto"
+		}
+	}
+	if !result.Matched {
+		result.Detail += "; condição falsa"
+	}
+	return result
 }
 
 // evaluateMembership separates absence and applicability from the condition:

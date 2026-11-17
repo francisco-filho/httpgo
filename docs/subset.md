@@ -1159,6 +1159,42 @@ na pré-validação aqui, mas chega à assertion no Hurl observado. Quantidade m
 que inteiro de máquina passa no par de ambos; não se deduz precisão numérica geral
 da referência. A semântica aprovada não é alterada para forçar equivalência.
 
+## Tipos e valores vazios JSON — US-29 / issue #58
+
+```hurl
+GET {{base_url}}/session-info
+HTTP 200
+[Asserts]
+jsonpath "$.token" isString
+jsonpath "$.attempts" isInteger
+jsonpath "$.active" isBoolean
+jsonpath "$.issues" isEmpty
+```
+
+Os quatro predicados são unários, sem esperado. `isString` aceita inclusive a
+string vazia; `isBoolean` aceita true e false. `isInteger` exige número JSON em
+**notação inteira**, inclusive negativo e -0, sem limite de inteiro de máquina.
+Strings numéricas, decimais (`3.0`) e expoentes (`3e0`) falham, sem coerção.
+Igualdade numérica continua exata e considera `3`, `3.0` e `3e0` equivalentes;
+`count == 3.0`/`3e0` continua aceitando uma quantidade integral.
+
+`isEmpty` aceita somente string vazia, array sem elementos e objeto sem
+propriedades. Whitespace é conteúdo; `[null]`, `{"x":null}`, null, números e
+booleanos não passam. Ausência é distinta de null/vazio e falha com 1 em todos
+os quatro predicados. JSON inválido ou percurso incompatível mantém erro 2.
+Operando extra é sintaxe inválida; `count isInteger` (ou outro novo unário),
+negação genérica e outros tipos são não suportados. Todos são rejeitados antes
+de qualquer envio do arquivo, inclusive em declaração tardia.
+
+O predicado recebe uma única vez o valor reduzido da consulta: zero resultados
+é ausência, um preserva seu tipo, vários formam array sem aplicação por item.
+A primeira falha impede capturas e próxima requisição. Diagnósticos informam
+consulta, predicado, presença/tipo e causa sem imprimir valores ou estruturas;
+metadados protegidos e captura secreta pendente seguem a ocultação existente.
+`isString` é um atalho para a verificação de tipo via `matches ""`; vazio de
+string/array também pode ser validado por `== ""`/`count == 0`. Não há schema,
+coerção, outros tipos ou negação genérica.
+
 ## Polling local por entrada — US-26 / issue #50
 
 ```hurl

@@ -11,7 +11,7 @@ import (
 )
 
 // JSONFailure contains only sanitized presentation values, not the document.
-// Operands are encoded JSON, so strings, numbers and null remain distinguishable.
+// Binary operands are encoded JSON; type/empty predicates retain categories only.
 type JSONFailure struct {
 	Position         parser.Position
 	Query            string
@@ -48,6 +48,26 @@ type BodyError struct {
 
 func (e *BodyError) Error() string {
 	return fmt.Sprintf("erro de avaliação de body %s: %s", e.Operator, e.Detail)
+}
+
+// typeFailure never encodes an operand or invents an expected JSON literal.
+// Even categorical metadata is concealed when derived from protected content.
+func typeFailure(session template.Session, declaration parser.JSONAssertion, pos parser.Position, actual any, present bool, evaluation assertion.JSONEvaluation, conceal bool) *JSONFailure {
+	failure := &JSONFailure{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Present: present, Operator: declaration.Operator}
+	protectedLiteral := declaration.Path.HasProtectedLiteral(func(value any) bool { return protectedJSON(session, value) })
+	if conceal || protectedLiteral || session.Sanitize(declaration.Query) != declaration.Query || protectedJSON(session, actual) {
+		failure.Actual = "[oculto]"
+		return failure
+	}
+	failure.Actual = "ausente"
+	if present {
+		failure.Actual = "tipo " + assertion.JSONType(actual)
+	}
+	failure.Detail = evaluation.Detail
+	if session.Sanitize(failure.Actual) != failure.Actual || session.Sanitize(failure.Detail) != failure.Detail {
+		failure.Actual, failure.Detail = "[oculto]", ""
+	}
+	return failure
 }
 
 func checkAssertions(session template.Session, entry parser.Entry, response Response, current *EntryResult) error {
@@ -121,6 +141,11 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 			}
 			if evaluation.Matched {
 				continue
+			}
+			if declaration.Operator.TypePredicate() {
+				current.JSONFailure = typeFailure(session, *declaration, pos, actual, present, evaluation, conceal)
+				current.Outcome = JSONMismatch
+				return nil
 			}
 			if declaration.Path.Expansive() {
 				current.JSONFailure = projectionFailure(session, *declaration, pos, actual, present, evaluation, conceal)

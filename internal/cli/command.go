@@ -248,6 +248,9 @@ func jsonDiagnostic(failure *runner.JSONFailure) string {
 		operator = "count " + operator
 	}
 	diagnostic := fmt.Sprintf("assertion jsonpath %q %s: esperado %s, recebido %s", failure.Query, operator, failure.Expected, actual)
+	if failure.Operator.TypePredicate() {
+		diagnostic = fmt.Sprintf("assertion jsonpath %q %s: recebido %s; condição falsa", failure.Query, operator, actual)
+	}
 	if failure.Detail != "" {
 		diagnostic += "; " + failure.Detail
 	}
