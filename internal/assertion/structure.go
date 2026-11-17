@@ -11,20 +11,21 @@ import (
 type JSONOperator string
 
 const (
-	JSONEqualOperator JSONOperator = "=="
-	JSONMatches       JSONOperator = "matches"
-	JSONIsString      JSONOperator = "isString"
-	JSONIsInteger     JSONOperator = "isInteger"
-	JSONIsBoolean     JSONOperator = "isBoolean"
-	JSONIsEmpty       JSONOperator = "isEmpty"
-	JSONExists        JSONOperator = "exists"
-	JSONNotExists     JSONOperator = "not exists"
-	JSONContains      JSONOperator = "contains"
-	JSONNotContains   JSONOperator = "not contains"
-	JSONGreater       JSONOperator = ">"
-	JSONGreaterEqual  JSONOperator = ">="
-	JSONLess          JSONOperator = "<"
-	JSONLessEqual     JSONOperator = "<="
+	JSONEqualOperator    JSONOperator = "=="
+	JSONNotEqualOperator JSONOperator = "!="
+	JSONMatches          JSONOperator = "matches"
+	JSONIsString         JSONOperator = "isString"
+	JSONIsInteger        JSONOperator = "isInteger"
+	JSONIsBoolean        JSONOperator = "isBoolean"
+	JSONIsEmpty          JSONOperator = "isEmpty"
+	JSONExists           JSONOperator = "exists"
+	JSONNotExists        JSONOperator = "not exists"
+	JSONContains         JSONOperator = "contains"
+	JSONNotContains      JSONOperator = "not contains"
+	JSONGreater          JSONOperator = ">"
+	JSONGreaterEqual     JSONOperator = ">="
+	JSONLess             JSONOperator = "<"
+	JSONLessEqual        JSONOperator = "<="
 )
 
 // TypePredicate reports whether the operator checks type or emptiness without an operand.
@@ -49,6 +50,9 @@ type JSONEvaluation struct {
 // ValidateJSONExpected checks applicability independently of the actual response.
 // It is shared by static parsing and late expected-value preparation.
 func ValidateJSONExpected(operator JSONOperator, count bool, expected any) error {
+	if count && operator == JSONNotEqualOperator {
+		return fmt.Errorf("count não aceita !=")
+	}
 	if count && !ValidCount(expected) {
 		return fmt.Errorf("count exige quantidade inteira não negativa")
 	}
@@ -63,7 +67,7 @@ func ValidateJSONExpected(operator JSONOperator, count bool, expected any) error
 		if _, ok := expected.(json.Number); !ok {
 			return fmt.Errorf("comparação ordenada exige número JSON esperado")
 		}
-	case JSONEqualOperator, JSONExists, JSONNotExists, JSONMatches:
+	case JSONEqualOperator, JSONNotEqualOperator, JSONExists, JSONNotExists, JSONMatches:
 	default:
 		return fmt.Errorf("predicado JSON não suportado")
 	}
@@ -72,6 +76,9 @@ func ValidateJSONExpected(operator JSONOperator, count bool, expected any) error
 
 // EvaluateJSON decides assertions; query only supplies value and presence.
 func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, present bool) (JSONEvaluation, error) {
+	if count && operator == JSONNotEqualOperator {
+		return JSONEvaluation{}, fmt.Errorf("count não aceita !=")
+	}
 	if operator.TypePredicate() {
 		if count {
 			return JSONEvaluation{}, fmt.Errorf("count não aceita predicado de tipo ou vazio")
@@ -107,6 +114,8 @@ func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, prese
 		result.Matched = present
 	case JSONEqualOperator:
 		result.Matched = present && JSONEqual(expected, actual)
+	case JSONNotEqualOperator:
+		result.Matched = present && !JSONEqual(expected, actual)
 	case JSONGreater, JSONGreaterEqual, JSONLess, JSONLessEqual:
 		b, ok := expected.(json.Number)
 		if !ok {

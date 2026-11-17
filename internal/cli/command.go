@@ -490,6 +490,28 @@ Não habilita novos operadores, consultas inteiras, nomes de header ou regex de 
 dinâmicos, nem assertion regex de body. Filtros aceitam operandos conforme US-31 abaixo. Ordem: status → assertions na ordem escrita → capturas.
 Perfis e diferenças Hurl 8.0.0: docs/subset.md e docs/compatibility.md.
 
+Desigualdade JSON — US-32 (somente valor presente):
+  httpgo test rotation.hurl --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8080
+  POST {{base_url}}/session/login
+  HTTP 200
+  [Captures]
+  old_token: jsonpath "$.accessToken"
+  POST {{base_url}}/session/renew
+  HTTP 200
+  [Asserts]
+  jsonpath "$.accessToken" != "{{old_token}}"
+Novo token passa com 0; repetição ou ausência falha com 1. null presente é valor.
+Mesmo contrato tipado/exato de ==: 1, 1.0 e 1e0 não diferem; tipos diferentes diferem.
+Objetos ignoram ordem de chaves; ordem de arrays participa. Coleções não são despejadas.
+JSON inválido/percurso incompatível/variável dinâmica ausente retornam 2, nunca sucesso.
+Sem --render-asserts, placeholders em strings permanecem literais. HTTP é obrigatório.
+--secret marca nomes de capturas sem fornecer valores; marque os tokens e derivados.
+Segredo pendente oculta ambos os operandos sem avaliação antecipada da captura.
+count !=, header/body != e negação genérica continuam não suportados.
+Diferença não garante revogação do token antigo, validade do novo ou outros efeitos;
+verifique essas propriedades com requisições independentes. Exemplo completo:
+testdata/scenarios/scenario_json_inequality_rotation.hurl (inclui uso de new_token).
+
 Assertions de body: salve privacy.hurl e execute
   httpgo test privacy.hurl --var base_url=http://localhost:8080
   GET {{base_url}}/export

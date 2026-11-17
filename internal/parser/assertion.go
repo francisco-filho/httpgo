@@ -151,7 +151,7 @@ func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAs
 		rest = strings.TrimSpace(rest[len(fields[0]):])
 	}
 	declaration.Operator = assertion.JSONOperator(operator)
-	if declaration.Count && (declaration.Operator == assertion.JSONContains || declaration.Operator == assertion.JSONNotContains || declaration.Operator == assertion.JSONNotExists) {
+	if declaration.Count && (declaration.Operator == assertion.JSONContains || declaration.Operator == assertion.JSONNotContains || declaration.Operator == assertion.JSONNotExists || declaration.Operator == assertion.JSONNotEqualOperator) {
 		return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
 	}
 	switch declaration.Operator {
@@ -171,7 +171,7 @@ func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAs
 			return fail(pos, "sintaxe inválida", "exists e not exists não aceitam valor esperado")
 		}
 		return declaration, nil
-	case assertion.JSONEqualOperator, assertion.JSONContains, assertion.JSONNotContains:
+	case assertion.JSONEqualOperator, assertion.JSONNotEqualOperator, assertion.JSONContains, assertion.JSONNotContains:
 	case assertion.JSONMatches:
 		if declaration.Count {
 			return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")

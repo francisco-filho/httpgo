@@ -99,7 +99,7 @@ func TestJSONNumericInvalidNeverSends(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
 	defer server.Close()
-	for _, expression := range []string{`jsonpath "$" > "1"`, `jsonpath "$" >= true`, `jsonpath "$" < null`, `jsonpath "$" <= []`, `jsonpath "$" > {}`, `jsonpath "$" > {{n}}`, `jsonpath "$" > 1 2`, `jsonpath "$" >`, `jsonpath "$[0:1]" > 0`, `jsonpath "$" != 1`} {
+	for _, expression := range []string{`jsonpath "$" > "1"`, `jsonpath "$" >= true`, `jsonpath "$" < null`, `jsonpath "$" <= []`, `jsonpath "$" > {}`, `jsonpath "$" > {{n}}`, `jsonpath "$" > 1 2`, `jsonpath "$" >`, `jsonpath "$[0:1]" > 0`, `jsonpath "$" count != 1`} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/first\nGET "+server.URL+"/late\nHTTP *\n[Asserts]\n"+expression))
 		if code != 2 || !prevalidationSummary(out) || !strings.Contains(stderr, ":5:") || hits.Load() != 0 {
 			t.Fatalf("%s: code=%d hits=%d out=%s err=%s", expression, code, hits.Load(), out, stderr)

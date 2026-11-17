@@ -1,0 +1,6 @@
+{
+  "response_json": "present",
+  "classification": "intentional body != restriction remains unchanged",
+  "httpgo": {"exit": 2, "paths": null},
+  "hurl": {"exit": 0, "paths": ["/capture", "/health"]}
+}

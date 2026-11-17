@@ -1,0 +1,6 @@
+{
+  "response_json": "{}",
+  "classification": "absence does not prove a value changed: both runners fail the assertion",
+  "httpgo": {"exit": 1, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

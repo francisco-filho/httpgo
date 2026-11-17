@@ -88,6 +88,11 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
+	// US-32: expected operands reuse this renderer, including exact extremes.
+	for _, value := range []string{`-0e999999999999999999`, `1e-999999999999999999`, `{"old":[9007199254740993,"{{not_recursive}}"]}`, `"rotation\"\\\n雪"`} {
+		f.Add(`{{x}}`, value)
+		f.Add(`{"token":"prefix-{{captured}}","baseline":{{x}}}`, value)
+	}
 	for _, value := range []string{`"x')].id[?(@.n=='other"`, `"a\"\\[]雪"`, `"{{missing}}"`, `1e99999999999999999999`, `1.00000000000000000000002`, `null`, `[]`, `{}`} {
 		f.Add(`{{x}}`, value)
 		f.Add(`"Order {{x}}"`, value)

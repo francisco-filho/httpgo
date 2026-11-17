@@ -1,0 +1,7 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"token\":\"synthetic-old\"}",
+  "classification": "explicit HTTPGo opt-in versus implicit Hurl interpolation; repeated captured value fails in both",
+  "httpgo": {"exit": 1, "paths": ["/capture", "/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture", "/capture"]}
+}

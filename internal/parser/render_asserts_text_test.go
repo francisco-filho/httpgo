@@ -38,7 +38,7 @@ func TestRenderAssertsTextParsing(t *testing.T) {
 			`body contains "{{v}}" "tail"`, `header "X" == {{v}}`,
 			`body matches "{{v}}"`, `jsonpath "$" count matches "{{v}}"`,
 			`header "{{name}}" == "value"`, `jsonpath "$.{{name}}" == 1`,
-			`jsonpath "$" != {{v}}`, `header "X" count == {{v}}`,
+			`jsonpath "$" count != {{v}}`, `header "X" count == {{v}}`,
 		} {
 			source := strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP *\n[Asserts]\n  "+line, "\n", nl)
 			s, err := ParseWithOptions("late.hurl", strings.NewReader(source), ParseOptions{RenderAsserts: true})
