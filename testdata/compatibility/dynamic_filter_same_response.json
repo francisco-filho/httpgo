@@ -1,0 +1,18 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":1,\"id\":1}]",
+  "classification": "diferença de ordem: captura da mesma resposta permanece indisponível em HTTPGo",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

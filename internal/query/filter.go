@@ -87,21 +87,24 @@ func parseEqualityFilter(source string, start int, renderAsserts bool) (*equalit
 		if parseErr != nil || len(refs) != 1 {
 			return nil, i, filterError(i, false)
 		}
-		operand = &filterOperand{source: source[i:end], complete: true}
+		operand = &filterOperand{source: source[i:end], complete: true, references: refs}
 		i = end
 	} else if source[i] == '\'' || source[i] == '"' {
 		literal, i, err = filterString(source, i)
 		if err != nil {
 			return nil, i, err
 		}
+		text := literal.(string)
+		if !renderAsserts && (strings.Contains(text, "{{") || strings.Contains(text, "}}")) {
+			return nil, literalStart, filterError(literalStart, true)
+		}
 		if renderAsserts {
-			text := literal.(string)
 			refs, parseErr := template.Parse(text)
 			if parseErr != nil {
 				return nil, literalStart, filterError(literalStart, false)
 			}
 			if len(refs) > 0 {
-				operand = &filterOperand{source: text}
+				operand = &filterOperand{source: text, references: refs}
 				literal = nil
 			}
 		}

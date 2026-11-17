@@ -11,14 +11,14 @@ import (
 )
 
 // GO-356: the published scenario is the same one exercised against real HTTP;
-// help advertises only the implemented grammar, including static-only limits.
+// help advertises only the implemented grammar, including the explicit US-31 opt-in evolution.
 func TestFilterHelpAndPublishedExample(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
 		code, out, stderr := run(t, args...)
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{`pizza_id: jsonpath "$[?(@.slug=='pizza')].id"`, `jsonpath "$[?(@.slug=='pizza')].active" == true`, "Filtro [?(@.caminho == literal escalar)] estático", "Ausente não corresponde nem a null", "operandos dinâmicos no filtro", "Consulta apresentada oculta sempre os literais", "scenario_filter.hurl"} {
+		for _, term := range []string{`pizza_id: jsonpath "$[?(@.slug=='pizza')].id"`, `jsonpath "$[?(@.slug=='pizza')].active" == true`, "Filtro [?(@.caminho == literal escalar)] estático", "Ausente não corresponde nem a null", "Operandos dinâmicos exigem --render-asserts (US-31)", "Consulta apresentada oculta sempre os literais", "scenario_filter.hurl"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("missing help term %q", term)
 			}

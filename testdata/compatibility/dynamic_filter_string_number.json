@@ -1,0 +1,21 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":\"001\",\"id\":1},{\"v\":1,\"id\":2}]",
+  "variables": [
+    "v=001"
+  ],
+  "classification": "diferença de variável inicial: HTTPGo mantém 001 como texto; Hurl --variable reprova este caso de string (4), sem equivalência presumida de fontes CLI",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

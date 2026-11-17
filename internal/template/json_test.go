@@ -88,6 +88,10 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
+	for _, value := range []string{`"x')].id[?(@.n=='other"`, `"a\"\\[]雪"`, `"{{missing}}"`, `1e99999999999999999999`, `1.00000000000000000000002`, `null`, `[]`, `{}`} {
+		f.Add(`{{x}}`, value)
+		f.Add(`"Order {{x}}"`, value)
+	}
 	for _, value := range []string{`-0`, `3`, `3.0`, `3e0`, `999999999999999999999999999999999999`, `false`, `""`, `[]`, `{}`, `[[],[]]`} {
 		f.Add(`{"selected":{{x}}}`, value)
 	}

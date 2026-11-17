@@ -1,10 +1,57 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-30
+# Arquitetura implementada — US-01 a US-16, US-20 a US-31
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Operandos dinâmicos — US-31 / issue #62
+
+O perfil US-30 por invocação (`runner.Options.RenderAsserts` → suíte →
+`parser.ParseOptions`) também vale para operandos de consultas em assertions e
+capturas. O parser chama `query.ParseWithOptions(source, renderAsserts)`; `Parse`
+conserva a entrada sem opt-in. Nenhuma nova flag/env/YAML, dependência ou engine.
+
+`query.equalityFilter` conserva `attribute`, literal e posições originais;
+`filterOperand` privado distingue `source` validada, `complete` (referência
+completa tipada versus literal textual composto) e referências operacionais. `template.Parse` valida nomes
+e delimitadores após os dois níveis de escape, sem consultar valores. Fora do
+operando, o scanner não aceita referências. Sem flag, placeholders inclusive
+em literais são rejeitados antes de HTTP (evolução explícita da US-28).
+
+`Path.Bind` clona os passos e somente os filtros dinâmicos, chama o resolver
+para cada operando e valida resultado escalar, sem gerar expressão. Os planos
+compartilhados permanecem imutáveis; valores vinculados vivem só na avaliação.
+`SelectValue` recusa plano ainda não vinculado, mesmo em documento vazio.
+`runner.bindQuery` fornece a resolução da sessão: `RenderJSON` + `query.Decode`
+com `UseNumber` para referência completa, `Render` para literal composto.
+Arrays/objetos são rejeitados, sem float64, coerção ou interpretação recursiva.
+A igualdade, percurso e redução zero/um/vários reutilizam US-27/28 sem alterações.
+Nenhum operando entra em `jp` ou no parser JSONPath após resolução.
+
+`checkAssertions` prepara o esperado US-30 primeiro, vincula todos os operandos
+da consulta alcançada, depois decodifica/seleciona. `captureResponse` vincula
+cada consulta só após status/assertions aprovados, sem publicar até o lote todo
+validar. Não há acesso ao próprio lote provisório nem preparação de consultas
+posteriores. Erro de vinculação é `JSONError`/`JSONFailed` ou `CaptureError`,
+categoria 2 com posição original da consulta; divergência continua 1. Nenhuma
+alteração de retry, retenção, deadline, cancelamento, recursos HTTP ou writers.
+
+O resolver inspeciona `IsSecret` antes da substituição e registra derivados com
+`ProtectValue`. Seleção por operando secreto marca a captura (`MarkSecret`) antes
+de `ProtectCapture`/publicação. Proteção sobrevive ao descarte do lote. Falhas
+usam fonte sanitizada com `RedactLiterals`; `safeEntry` remove Path, referências,
+capturas e esperado/regex operacionais. `pendingSecret` continua protegendo sem
+avaliar capturas antecipadamente: `Path.HasProtectedReference` inspeciona somente
+nomes já validados para ocultar também captura pendente derivada de operando
+secreto, inclusive se outra referência sua estiver ausente. Resultados/callbacks não guardam planos,
+valores vinculados ou documentos. Sessões/invocações não compartilham capturas.
+
+Testes `dynamic_filter*` cobrem parser, query, runner, suíte, CLI, transporte e
+binário real. O diferencial usa `httpgo_profile` por par, fixtures independentes,
+build único e `exec.CommandContext` existentes; não passa a flag ao Hurl.
+[Limites e evidência](compatibility.md#operandos-dinâmicos--us-31--issue-62).
 
 ## Tipos e vazio — US-29 / issue #58
 
@@ -61,8 +108,8 @@ reutiliza `template.ParseJSON` e exige consumo integral do operando; máscara de
 referências valida a forma externa estaticamente conhecida, sem resolver valores.
 `parseTextExpected` usa `template.Parse` sobre strings já decodificadas com os
 escapes do contexto. `parseMatches` compila regex sem referências antes da rede;
-somente regex dinâmica adia compilação. Consultas, nomes, operadores, captura por
-regex e requisições não passam por esse novo perfil.
+somente regex dinâmica adia compilação. A US-31 acima amplia operandos de
+consultas; nomes, operadores, captura por regex e requisições não mudam.
 
 `runner.checkAssertions` copia apenas a declaração alcançada: após status e
 assertions anteriores, mas **antes da consulta/decode** correspondente, usa a
@@ -99,7 +146,8 @@ caminho relativo por propriedades/índices e decodifica o literal separadamente.
 `filterString` separa aspas simples/duplas e escapes internos dos escapes da
 string `.hurl`, já decodificada no parser. Números entram via `Decode`/`UseNumber`;
 nem a consulta completa filtrada nem seu literal passam por `jp.ParseString`.
-Não há `oj.Parse`, avaliação de código, interpolação ou coerção para float/string.
+Não há `oj.Parse`, avaliação de código ou coerção para float/string. A US-31
+acima permite vinculação tipada de operandos, nunca interpolação de expressão.
 
 `Path.Expansive` inclui filtros, mesmo sem wildcard. Caminhos simples continuam
 nativos; projeções e filtros são planos estáticos executados por
@@ -136,7 +184,8 @@ os operandos decodificados na borda sem exportar o plano: até literal secreto
 escapado que seleciona apenas valores públicos protege metadados derivados. `JSONError` usa a mesma consulta segura.
 Resultados/callbacks não retêm plano, operandos ou documento operacional; o
 cenário original permanece reutilizável. Não se anuncia JSONPath completo nem
-operandos dinâmicos, filtros de existência/lógica/regex/funções/outros operadores.
+interpolação estrutural ou filtros de existência/lógica/regex/funções/outros operadores.
+Operandos dinâmicos seguem somente o opt-in US-31 acima.
 
 ## Polling por entrada — US-26 / issue #50
 

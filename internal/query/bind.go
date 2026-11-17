@@ -4,13 +4,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+
+	"capimgrosso.com/httpgo/internal/template"
 )
 
 // filterOperand contains validated source only; substituted content never enters
 // the JSONPath parser. A complete reference is typed, a composed literal is text.
 type filterOperand struct {
-	source   string
-	complete bool
+	source     string
+	complete   bool
+	references []template.Reference
+}
+
+// HasProtectedReference inspects validated provenance without resolving operands.
+// It lets presentation conceal pending secret captures without evaluating them.
+func (p Path) HasProtectedReference(protected func(string) bool) bool {
+	for _, s := range p.steps {
+		if s.filter == nil || s.filter.operand == nil {
+			continue
+		}
+		for _, ref := range s.filter.operand.references {
+			if protected(ref.Name) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Bind resolves every dynamic operand before selection, including operands in

@@ -27,6 +27,9 @@ func TestBindFilterOperands(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if !plan.HasProtectedReference(func(name string) bool { return name == "v" }) || plan.HasProtectedReference(func(string) bool { return false }) {
+				t.Fatal("lost source provenance")
+			}
 			bound, err := plan.Bind(func(s string, complete bool) (any, error) {
 				if s != "{{v}}" || !complete {
 					t.Fatalf("operand=%q complete=%v", s, complete)
@@ -35,6 +38,9 @@ func TestBindFilterOperands(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatal(err)
+			}
+			if bound.HasProtectedReference(func(string) bool { return true }) {
+				t.Fatal("bound plan retained operational references")
 			}
 			value, present, err := bound.Select([]byte(`[{"v":` + tc.actual + `,"id":"selected"},{"v":"other","id":"wrong"}]`))
 			if err != nil || present != tc.present || present && value != "selected" {
@@ -64,7 +70,7 @@ func TestDynamicFilterValidation(t *testing.T) {
 		}
 	}
 	// US-31 explicitly replaces US-28's permission for placeholder-looking literals.
-	for _, source := range []string{`$[?(@.x=={{v}})]`, `$[?(@.x=='{{v}}')]`} {
+	for _, source := range []string{`$[?(@.x=={{v}})]`, `$[?(@.x=='{{v}}')]`, `$[?(@.x=='\u007b\u007bv\u007d\u007d')]`} {
 		if _, err := Parse(source); err == nil {
 			t.Errorf("accepted without opt-in: %s", source)
 		}

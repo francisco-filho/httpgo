@@ -60,6 +60,12 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	// US-31: both profiles, both quote boundaries, operand-only interpolation.
+	for _, path := range []string{`$.items[?(@.number=={{number}})].id`, `$[?(@.name=='Order {{suffix}}')]`, `$[?(@.name=="a\\\"{{suffix}}")].id`, `$.groups[*].items[?(@.meta.keys[0]=={{key}})].parts[?(@.n=='{{n}}')].id`, `$[?(@.x=={{x}}extra)]`, `$[?(@.x=='{{broken')]`, `$[{{index}}]`, `$[?(@.{{field}}==1)]`, `$[?(@.x {{op}} 1)]`, `{{path}}`} {
+		for _, nl := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP 200\n[Asserts]\njsonpath "+strconv.Quote(path)+" exists\n[Captures]\nx: jsonpath "+strconv.Quote(path), "\n", nl))
+		}
+	}
 	for _, operator := range []string{"isString", "isInteger", "isBoolean", "isEmpty", "isInteger 3", "count isEmpty", "not isString", "isNumber"} {
 		for _, path := range []string{"$.value", "$[*].value", "$[?(@.key=='x')].value"} {
 			for _, newline := range []string{"\n", "\r\n"} {

@@ -101,6 +101,27 @@ func TestDynamicFilterDerivedSecret(t *testing.T) {
 	}
 }
 
+// GO-409: secret provenance of a pending capture is inspected without resolving
+// even a missing operand, so earlier header/JSON/body failures cannot expose IDs.
+func TestDynamicFilterPendingDerivedSecret(t *testing.T) {
+	for _, line := range []string{`header "X" == "not-selected"`, `jsonpath "$.id" == "not-selected"`, `body contains "not-selected"`} {
+		c, _ := template.New([]string{`key="private-key"`}, []string{"key"})
+		s := dynamicScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+line+"\n[Captures]\n"+`selected: jsonpath "$.items[?(@.key=='{{key}}')].parts[?(@.n=={{missing}})].id"`)
+		result := NewWithRenderer(executorFunc(func(context.Context, Request) (Response, error) {
+			return Response{Status: 200, Body: []byte(`{"id":"derived-private"}`), Headers: []query.HeaderValue{{Name: "X", Value: "derived-private"}}}, nil
+		}), c, nil).Run(context.Background(), s)
+		if result.Err != nil || !result.Diverged {
+			t.Fatalf("capture prepared early: %+v", result)
+		}
+		raw, _ := json.Marshal(result)
+		for _, bad := range []string{"derived-private", "not-selected", "private-key", "{{missing}}"} {
+			if strings.Contains(string(raw), bad) {
+				t.Fatalf("pending secret leaked: %s", raw)
+			}
+		}
+	}
+}
+
 // GO-412–413: transport errors never evaluate a partial response; report errors
 // retain category 2 and stop without retries, capture or subsequent sends.
 func TestDynamicFilterExternalFailureOrder(t *testing.T) {

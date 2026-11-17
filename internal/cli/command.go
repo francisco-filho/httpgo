@@ -475,7 +475,7 @@ Requer POST e GET retornando {"number":9007199254740993,"name":"Pizza"}.
 --render-asserts é flag sem valor, válida para todos os arquivos desta invocação.
 Sem ela, o perfil literal abaixo não interpola esperados, mesmo definidos/ausentes;
 placeholder fora de literal válido continua rejeitado antes da rede.
-Com ela, resolve somente o esperado da assertion alcançada, antes da consulta.
+Com ela, resolve o esperado da assertion alcançada antes dos operandos da consulta.
 JSON completo preserva tipo/precisão; dentro de string usa texto escalar escapado.
 Assim, == {{number}} difere de == "{{number}}". Count exige inteiro não negativo,
 comparação ordenada exige número, pertencimento JSON exige escalar.
@@ -486,8 +486,8 @@ sem referências continua compilada antes da rede. Substituição nunca é recur
 Variável ausente, captura própria/futura, tipo ou regex final inválidos: avaliação 2,
 sem captura nem próximo envio. Status/assertion anterior divergente continua 1.
 Segredos e derivados são protegidos antes de resultados/callbacks.
-Não habilita operadores, consultas, nomes de header ou regex de captura dinâmicos,
-nem assertion regex de body. Ordem: status → assertions na ordem escrita → capturas.
+Não habilita novos operadores, consultas inteiras, nomes de header ou regex de captura
+dinâmicos, nem assertion regex de body. Filtros aceitam operandos conforme US-31 abaixo. Ordem: status → assertions na ordem escrita → capturas.
 Perfis e diferenças Hurl 8.0.0: docs/subset.md e docs/compatibility.md.
 
 Assertions de body: salve privacy.hurl e execute
@@ -687,10 +687,40 @@ count conta o array reduzido, não correspondências; null único é captura vá
 Captura plural é JSON tipado, nunca texto em URL/header ou escolha do primeiro ID.
 Percurso incompatível no atributo ou filtro em não array: 2, sem resultado parcial.
 Status → assertions → capturas; falha impede publicação e próxima requisição.
-Sem outros operadores, existência, lógica, regex, funções ou operandos dinâmicos no filtro.
-Placeholder em literal é dado estático; consultas inválidas tardias impedem todo HTTP.
+Sem outros operadores, existência, lógica, regex ou funções no filtro.
+Operandos dinâmicos exigem --render-asserts (US-31); sem a flag, placeholders na
+consulta são rejeitados, inclusive em literal. Consulta inválida tardia impede todo HTTP.
 Consulta apresentada oculta sempre os literais do filtro; planos não entram no resultado.
 Exemplo executável: testdata/scenarios/scenario_filter.hurl; diferenças: docs/compatibility.md.
+
+Selecionar com valores anteriores — US-31 (evolução explícita HTTPGo):
+  httpgo test testdata/scenarios/dynamic_filter.hurl --render-asserts --var base_url=http://localhost:8080
+  GET {{base_url}}/first
+  HTTP 200
+  [Captures]
+  order_number: jsonpath "$.number"
+  GET {{base_url}}/orders
+  HTTP 200
+  [Asserts]
+  jsonpath "$.items[?(@.number=={{order_number}})].status" == "PLACED"
+  [Captures]
+  selected_id: jsonpath "$.items[?(@.number=={{order_number}})].id"
+Requer /first com {"number":42} e /orders com
+{"items":[{"number":42,"status":"PLACED","id":"selected"}]}.
+O exemplo versionado também consulta /selected após publicar a captura.
+Placeholder completo conserva string, número exato, booleano ou null; composição
+como @.name=='Order {{suffix}}' sempre produz string. Array/objeto é avaliação 2,
+inclusive vazio. Aspas, barras, colchetes e texto de filtro inseridos são dados:
+operandos vinculados ao plano validado, sem renderizar/reanalisar a expressão.
+Sem recursão, coerção de string numérica ou placeholders em propriedades, índices,
+caminhos relativos, operadores ou consulta inteira. Não amplia a linguagem US-28.
+Valida estrutura de todo arquivo antes da rede, sem resolver variável. Ao avaliar,
+prepara esperado primeiro, depois todos os operandos antes de decode/seleção,
+mesmo com seleção vazia.
+Ausência/tipo inválido: 2 localizado, sem publicar lote ou enviar próxima entrada.
+Usa só valores iniciais/capturas anteriores; status → assertions → capturas atômicas.
+Hurl interpola por padrão e admite formas estruturais excluídas aqui; tipos,
+escapes e publicação podem divergir. Veja docs/compatibility.md e docs/subset.md.
 
 Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
   httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token

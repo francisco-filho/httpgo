@@ -1,4 +1,94 @@
-# Validação — US-01 a US-16, US-20 a US-30
+# Validação — US-01 a US-16, US-20 a US-31
+
+## US-31 — issue #62 / história 0031
+
+Plano da issue #62 executado sem planner, somente backend, nas quatro tasks
+registradas/aprovadas da fila 0031: `back:1` em `e8764bc` (seleção dinâmica tipada
+ponta a ponta), `back:2` em `c18940c` (composição/cardinalidade/publicação),
+`back:3` em `ec66269` (sigilo/isolamento/falhas externas) e `back:4` nesta alteração
+(corpus, ajuda/docs, seeds e gates integrados). Dependências US-28/30 presentes
+na base `0d65918`. Sem frontend/estáticos, novas dependências, alteração de Go,
+CI/lint ou transporte de produção. Nenhum código-fonte Hurl consultado/copiado/
+adaptado. Gates locais não substituem review; backdev não executou SonarQube.
+
+### Ambiente e execução efetiva
+
+Linux amd64 em **2026-11-17**, Go `go1.26.10-X:nodwarf5`, `goimports` e
+`golangci-lint 2.15.0` existentes em `/home/ff/go/bin`. Hurl **8.0.0** existente
+em `/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` escolhido via
+PATH (o padrão do ambiente é 8.0.1), sem instalar ferramentas. O aviso de
+metadados de libcurl não impediu identificação/execução da referência 8.0.0.
+
+- Task 1: passaram `go test ./internal/query ./internal/parser ./internal/template
+  ./internal/runner ./internal/suite ./internal/cli`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram `go test ./internal/query ./internal/assertion ./internal/template
+  ./internal/runner`, `go test ./tests/e2e -count=1`, `make fmt lint test` e
+  `go vet ./...` antes do commit.
+- Task 3: passaram `go test ./internal/runner ./internal/suite ./internal/cli
+  ./internal/transport`, `go test ./tests/e2e -count=1`, `make fmt lint test` e
+  `go vet ./...` antes do commit, incluindo novo E2E de sigilo em streams.
+- Task 4: passaram testes específicos de todos os pacotes alterados, E2E completo,
+  `make compatibility` com **406 pares**, Hurl **8.0.0** obrigatório sem skip ou
+  `-update` no gate completo; `make fmt lint test` (**0 issues**, `-race -cover`),
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e`.
+- Observações dos **19 pares novos `dynamic_filter_*`** foram colhidas com
+  atualização restrita ao prefixo novo e depois conferidas sem `-update`.
+  Só dois pares históricos mudaram, manual e explicitamente:
+  `filter_literal_placeholder.json`/`filter_literal_defined.json`, parte HTTPGo
+  (agora **2, zero envios**) e classificação. Entradas e observações Hurl desses
+  pares não mudaram; os outros **385 pares da base** permaneceram inalterados.
+- Seeds ampliadas nos dois perfis, LF/CRLF, duas fronteiras de escape e conteúdo
+  adversarial. Passaram os comandos exigidos, com `-parallel=2` e sem crash:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+    — 177.733 execuções na última rodada registrada;
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+    — 27.345 execuções;
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+    — 67.675 execuções.
+
+### Evidência rastreável GO-396–GO-414
+
+| GO | Testes/evidência executados |
+|---|---|
+| 396 | `TestDynamicFilterDemonstration`: binário/HTTP real, número anterior exato, pedido correto versus cancelado/ausente, captura/envio só após aprovação |
+| 397 | `TestBindFilterOperands`, `TestDynamicFilterValuesAndOrder`, `TestDynamicFilterCaptureReuse`: string/número/bool/null, inteiros grandes, decimais próximos e expoente extremo sem float64 |
+| 398 | `TestDynamicFilterValuesAndOrder`: aspas simples/duplas, texto vazio, números/bool/null e escapes escalares |
+| 399 | query `TestBindFilterOperands`, runner `TestDynamicFilterValuesAndOrder`: arrays/objetos vazios completos/compostos são erro, mesmo em resposta vazia |
+| 400 | query/runner tests e pares `injection_bare/quoted`, `escapes`, `nonrecursive`: valores não geram expressão nem nova resolução |
+| 401 | `TestDynamicFilterValidation`, `TestDynamicFilterFileValidation`, `TestDynamicFilterStructuralCorpusByBinary`: consulta/propriedade/índice/caminho relativo/operador/concatenação excluídos, zero rede |
+| 402 | `TestDynamicFilterInvocationIsolation`, parser/query opt-in, pares `no_optin` e históricos atualizados: literal com placeholder rejeitado sem flag, inclusive com braces codificadas por escape interno |
+| 403 | parser `TestDynamicFilterFileValidation`: LF/CRLF e posições originais para ambas as declarações, sem resolver variável futura; E2E negativo tardio impede HTTP |
+| 404 | runner `TestDynamicFilterValuesAndOrder`, `TestDynamicFilterOwnCaptureUnavailable`, `TestDynamicFilterCaptureAtomicity`, pares `missing/same_response`: ausência, própria/futura e arrays vazios |
+| 405 | `TestDynamicFilterFirstFailure`: status/assertion anterior prevalece, esperado antes dos operandos, operandos antes de decode/seleção |
+| 406 | `TestDynamicFilterCaptureAtomicity`: sem acesso ao lote provisório, publicação parcial ou sobrescrita; proteção descoberta permanece em resolução/seleção/colisão tardias |
+| 407 | `TestDynamicFilterPredicatesAndFailures`, `TestDynamicFilterCaptureReuse`, E2E `TestDynamicFilterCaptureContracts`: redução, null, captura plural tipada e erro pré-envio textual |
+| 408 | `TestDynamicFilterComposition`: filtros sobre propriedades/índices e wildcards aninhados, ordem, associação e arrays sem achatamento |
+| 409 | `TestDynamicFilterSafeResultsAndReuse`, `TestDynamicFilterDerivedSecret`, `TestDynamicFilterPendingDerivedSecret`, `TestDynamicFilterSecretStreams`, suíte/CLI: proveniência, captura pendente, resultados/callbacks/streams sem plano/valor protegido |
+| 410 | `TestDynamicFilterPublishedExample`, corpus de 19 pares, ajuda de raiz/test e `make compatibility`: evidência Hurl 8.0.0 e diferenças classificadas |
+| 411 | `TestDynamicFilterPredicatesAndFailures`, E2E `TestDynamicFilterCaptureContracts`: JSON vazio/inválido/adicional e ramos incompatíveis não aprovam negação nem publicam seleção parcial |
+| 412 | transporte `TestDynamicFilterFinalResponseAndCancellation` e `TestDynamicFilterReadCloseBeforeReport`, runner `TestDynamicFilterExternalFailureOrder`: final completa, read/close/prazo/cancelamento, recursos antes do callback |
+| 413 | CLI `TestDynamicFilterSecretWriterPriority`: erro/short write após sucesso/divergência/resolução inválida mantém 2 e interrompe sem reimprimir no writer falho |
+| 414 | `TestDynamicFilterSafeResultsAndReuse`, `TestDynamicFilterSuiteIsolation`, `TestDynamicFilterInvocationIsolation`: cenário imutável, valores por sessão e opt-in sem retenção na próxima invocação |
+
+### Contratos e limites
+
+**Breaking change explícita:** placeholder em literal de consulta não é mais
+tratado como dado estático sem flag. A US-31 substitui essa permissão US-28;
+o modo literal dos esperados US-30 permanece inalterado. Também foram fechadas
+as fronteiras de consulta inteira dinâmica (erro não suportado) e placeholders
+codificados em literais internos (opt-in necessário após decode). A inspeção de
+referências validadas também protege captura pendente derivada de operando
+secreto, sem resolver/avaliar sua consulta (mesmo contendo referência ausente).
+
+O diferencial não anuncia equivalência integral: Hurl interpola sem flag,
+admite índice dinâmico e diverge em precisão/escapes, cardinalidade de captura
+e acesso à captura da mesma resposta. Vinculação tipada não reinterpreta valor
+como expressão. O corpus é **sintético**, separado da homologação da suíte real.
+`backend` indica área trabalhada, não aprovação automática da história.
+macOS/Windows opcionais durante a história, conforme plano v4, sem alegar
+execução nativa ou portabilidade validada nessas plataformas.
+
 
 ## US-29 — issue #58 / história 0029
 

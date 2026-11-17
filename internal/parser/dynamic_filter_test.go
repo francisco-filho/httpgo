@@ -18,6 +18,8 @@ func TestDynamicFilterFileValidation(t *testing.T) {
 				{`$.items[?(@.n=={{future}})].id`, true, true},
 				{`$.items[?(@.n=='Order {{suffix}}')].id`, true, true},
 				{`$.items[?(@.n=='{{literal}}')].id`, false, false},
+				{`$.items[?(@.n=='\u007b\u007bfuture\u007d\u007d')].id`, false, false},
+				{`$.items[?(@.n=='\u007b\u007bfuture\u007d\u007d')].id`, true, true},
 				{`$.items[?(@.n=={{future}})].id`, false, false},
 				{`$.items[?(@.n=='{{broken')].id`, true, false},
 				{`$.items[?(@.n=={{v}})].{{field}}`, true, false},

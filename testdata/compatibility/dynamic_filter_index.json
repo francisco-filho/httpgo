@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"id\":1}]",
+  "variables": [
+    "index=0"
+  ],
+  "classification": "não suportado HTTPGo: índice dinâmico é interpolação estrutural, mesmo com opt-in",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

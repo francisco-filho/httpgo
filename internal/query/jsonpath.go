@@ -48,11 +48,11 @@ func ParseWithOptions(source string, renderAsserts bool) (Path, error) {
 		}
 		return Path{}, &Error{offset, unsupported, detail}
 	}
-	if len(source) == 0 || source[0] != '$' {
-		return fail(0, false)
-	}
 	if !renderAsserts && (bytes.Contains([]byte(source), []byte("{{")) || bytes.Contains([]byte(source), []byte("}}"))) {
 		return fail(0, true)
+	}
+	if len(source) == 0 || source[0] != '$' {
+		return fail(0, bytes.HasPrefix([]byte(source), []byte("{{")))
 	}
 	var p Path
 	for i := 1; i < len(source); {

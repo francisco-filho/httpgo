@@ -1,0 +1,22 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":true,\"id\":1},{\"v\":1,\"id\":2}]",
+  "variables": [
+    "v=true"
+  ],
+  "classification": "evolução HTTPGo opt-in: operando vinculado como dado; observação sintética com Hurl 8.0.0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}
