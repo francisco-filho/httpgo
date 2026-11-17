@@ -46,6 +46,30 @@ type JSONEvaluation struct {
 	Detail  string
 }
 
+// ValidateJSONExpected checks applicability independently of the actual response.
+// It is shared by static parsing and late expected-value preparation.
+func ValidateJSONExpected(operator JSONOperator, count bool, expected any) error {
+	if count && !ValidCount(expected) {
+		return fmt.Errorf("count exige quantidade inteira não negativa")
+	}
+	switch operator {
+	case JSONContains, JSONNotContains:
+		switch expected.(type) {
+		case nil, string, json.Number, bool:
+		default:
+			return fmt.Errorf("contains e not contains exigem literal JSON escalar")
+		}
+	case JSONGreater, JSONGreaterEqual, JSONLess, JSONLessEqual:
+		if _, ok := expected.(json.Number); !ok {
+			return fmt.Errorf("comparação ordenada exige número JSON esperado")
+		}
+	case JSONEqualOperator, JSONExists, JSONNotExists, JSONMatches:
+	default:
+		return fmt.Errorf("predicado JSON não suportado")
+	}
+	return nil
+}
+
 // EvaluateJSON decides assertions; query only supplies value and presence.
 func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, present bool) (JSONEvaluation, error) {
 	if operator.TypePredicate() {

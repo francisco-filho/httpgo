@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{`"a[0-9]+"`, `"(?=private)"`, `"{{missing}}"`, `""`, `null`, `[]`, `{}`} {
+		f.Add("^prefix-{{x}}-suffix$", value)
+	}
 	for _, value := range []string{`[[],[1],[[2]]]`, `[9007199254740993,1.2300e+99]`, `[null,"{{literal}}",{"x":[]}]`} {
 		f.Add("prefix-{{typed}}-{{x}}", value)
 	}

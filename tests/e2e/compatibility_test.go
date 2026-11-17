@@ -69,6 +69,7 @@ type pollResponse struct {
 }
 
 type comparison struct {
+	HTTPGoProfile    string         `json:"httpgo_profile,omitempty"` // Empty and literal preserve every older pair.
 	ResponseSequence []pollResponse `json:"response_sequence,omitempty"`
 	HurlRetry        *int           `json:"hurl_retry,omitempty"`
 	ResponseHeaders  []wireHeader   `json:"response_headers,omitempty"`
@@ -278,6 +279,13 @@ func TestCompatibility(t *testing.T) {
 			text := strings.ReplaceAll(string(input), "http://example.invalid", server.URL)
 			generated := compatibilityScenario(t, filepath.Base(file), text)
 			httpgoArgs := []string{"test", generated}
+			switch expected.HTTPGoProfile {
+			case "", "literal":
+			case "render-asserts":
+				httpgoArgs = append(httpgoArgs, "--render-asserts")
+			default:
+				t.Fatalf("unsupported HTTPGo profile %q", expected.HTTPGoProfile)
+			}
 			var variableArgs []string
 			for _, variable := range expected.Variables {
 				assignment := strings.ReplaceAll(variable, "http://example.invalid", server.URL)
@@ -327,7 +335,7 @@ func TestCompatibility(t *testing.T) {
 			if expected.Hurl.Requests == nil {
 				hurlRequests = nil
 			}
-			got := comparison{ResponseSequence: expected.ResponseSequence, HurlRetry: expected.HurlRetry, ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, ResponseBody: expected.ResponseBody, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
+			got := comparison{HTTPGoProfile: expected.HTTPGoProfile, ResponseSequence: expected.ResponseSequence, HurlRetry: expected.HurlRetry, ResponseHeaders: expected.ResponseHeaders, ResponseJSON: expected.ResponseJSON, ResponseBody: expected.ResponseBody, Variables: expected.Variables, Classification: expected.Classification, HTTPGo: observation{Exit: code, Paths: httpgoPaths, Requests: httpgoRequests}, Hurl: observation{Exit: hurlCode, Paths: hurlPaths, Requests: hurlRequests}}
 			if *updateCompatibility {
 				encoded, err := json.MarshalIndent(got, "", "  ")
 				if err != nil {

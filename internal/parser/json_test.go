@@ -67,6 +67,11 @@ func FuzzParse(f *testing.F) {
 			}
 		}
 	}
+	for _, line := range []string{`jsonpath "$" == {{v}}`, `jsonpath "$" == {"x":[{{v}},"{{text}}"]}`, `jsonpath "$" count >= {{count}}`, `jsonpath "$" matches "^{{pattern}}$"`, `header "X" not contains "{{v}}"`, `body contains "{{v}}"`, `jsonpath "$" == {{broken`, `jsonpath "$" == {{v}} null`, `jsonpath "$" count matches "{{v}}"`} {
+		for _, nl := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\n[Asserts]\n"+line, "\n", nl))
+		}
+	}
 	for _, path := range []string{`$[?(@.slug=='pizza')].id`, `$.groups[*].items[?(@.meta.keys[0]=="a\"b")].id`, `$[?(@.x==9223372036854775809)]`, `$[?(@.x==1e-99999999999999999999999)]`, `$[?(@.x=='\uD83C\uDF55')].id`, `$[?(@.x=='{{literal}}')]`, `$[?(@.x==null)]`, `$[?(@.x==true)]`, `$[?(@.x!='unsupported')]`, `$[?(@.x=='unterminated)]`, `$[?(@.x=={{dynamic}})]`, `$[?(@.x==[]) ]`} {
 		for _, newline := range []string{"\n", "\r\n"} {
 			f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP *\n[Asserts]\njsonpath "+strconv.Quote(path)+" exists\n[Captures]\nx: jsonpath "+strconv.Quote(path), "\n", newline))
@@ -158,12 +163,14 @@ func FuzzParse(f *testing.F) {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, input string) {
-		got, err := Parse("fuzz.hurl", strings.NewReader(input))
-		if err != nil && len(got.Entries) != 0 {
-			t.Fatal("invalid input returned executable entries")
-		}
-		if err == nil && len(got.Entries) == 0 {
-			t.Fatal("accepted empty scenario")
+		for _, enabled := range []bool{false, true} {
+			got, err := ParseWithOptions("fuzz.hurl", strings.NewReader(input), ParseOptions{RenderAsserts: enabled})
+			if err != nil && len(got.Entries) != 0 {
+				t.Fatal("invalid input returned executable entries")
+			}
+			if err == nil && len(got.Entries) == 0 {
+				t.Fatal("accepted empty scenario")
+			}
 		}
 	})
 }

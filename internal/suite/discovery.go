@@ -206,7 +206,7 @@ func (s *Suite) discover(ctx context.Context, cwd, path string, explicit bool, f
 // RunFile loads and closes the entire scenario before calling the runner. A
 // partial parse, including a late read/close failure, never reaches HTTP.
 func (s *Suite) RunFile(ctx context.Context, file File, options runner.Options) (runner.Result, error) {
-	scenario, err := s.load(ctx, file)
+	scenario, err := s.load(ctx, file, parser.ParseOptions{RenderAsserts: options.RenderAsserts})
 	if err != nil {
 		return runner.Result{}, s.protectError(err)
 	}
@@ -227,7 +227,13 @@ func (s *Suite) protectRunError(err error) error {
 	var fileErr *runner.FileError
 	var captureErr *runner.CaptureError
 	var jsonErr *runner.JSONError
+	var bodyErr *runner.BodyError
+	var headerErr *runner.HeaderError
 	switch {
+	case errors.As(err, &headerErr):
+		detail = headerErr.Error()
+	case errors.As(err, &bodyErr):
+		detail = bodyErr.Error()
 	case errors.As(err, &renderErr):
 		detail = renderErr.Error()
 	case errors.As(err, &fileErr):
@@ -244,7 +250,7 @@ func (s *Suite) protectRunError(err error) error {
 	return &protectedError{message: s.protect(detail), cause: err}
 }
 
-func (s *Suite) load(ctx context.Context, file File) (parser.Scenario, error) {
+func (s *Suite) load(ctx context.Context, file File, options parser.ParseOptions) (parser.Scenario, error) {
 	if err := ctx.Err(); err != nil {
 		return parser.Scenario{}, &Error{File: file.Name, Detail: "leitura do cenário cancelada", cause: err}
 	}
@@ -257,7 +263,7 @@ func (s *Suite) load(ctx context.Context, file File) (parser.Scenario, error) {
 		closeErr := input.Close()
 		return parser.Scenario{}, &Error{File: file.Name, Detail: "cenário deve ser um arquivo regular legível", cause: errors.Join(statErr, closeErr)}
 	}
-	scenario, parseErr := parser.Parse(s.protect(file.Name), input)
+	scenario, parseErr := parser.ParseWithOptions(s.protect(file.Name), input, options)
 	closeErr := input.Close()
 	if closeErr != nil {
 		return parser.Scenario{}, errors.Join(parseErr, &Error{File: file.Name, Detail: "não foi possível fechar o cenário", cause: closeErr})

@@ -1,7 +1,10 @@
-# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-28
+# Subconjunto suportado e extensões — US-01 a US-16, US-20 a US-30
 
 Este documento define somente o que o binário implementa nesta história.
-Não implica suporte ao formato Hurl completo.
+Não implica suporte ao formato Hurl completo. As descrições de esperados
+literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
+[US-30](#esperados-dinâmicos--us-30--issue-60) define sua evolução opt-in com
+`--render-asserts`, sem mudar consultas, operadores ou capturas.
 
 ## Seleção estática por igualdade — US-28 (issue #56)
 
@@ -149,7 +152,8 @@ próximas requisições. Condição falsa retorna `1`, sucesso `0`.
 Diagnósticos localizados identificam operador e esperado protegido, nunca body
 ou fragmentos recebidos. Captura secreta pendente oculta o esperado sem antecipar
 sua avaliação. Busca literal não detecta todas as codificações de dados sensíveis.
-Assertions regex de body, filtros, outros predicados e interpolação de esperados não são suportados. Extração regex de body em `[Captures]` é o recorte US-25.
+Assertions regex de body, filtros e outros predicados não são suportados.
+Interpolação de esperados só com `--render-asserts` (US-30). Extração regex de body em `[Captures]` é o recorte US-25.
 Os 19 pares `body_*` confrontados com Hurl 8.0.0 são publicados em
 [compatibilidade](compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
 ISO-8859-1 resolve para windows-1252 (incluindo byte 0x80 → €), conforme esse
@@ -1023,7 +1027,8 @@ formato divergente ou header ausente falham com **1**, sem captura/próximo envi
   retém sua fonte, mesmo em sucesso ou erro. O cenário original não é mutado.
 - Placeholders `{{nome}}` permanecem **literais e estáticos**, definidos ou não;
   continuam sujeitos à sintaxe regex, não são automaticamente escapados e não
-  passam pelo renderer. Não há flag `--render-asserts` nem antecipação da US-30.
+  passam pelo renderer no perfil literal. O opt-in `--render-asserts` da US-30
+  abaixo habilita resolução tardia apenas do esperado.
   Assertions regex de body/variável, filtros e todas as ocorrências ficam
   fora do suporte. Extração regex de body/header é o recorte US-25.
 
@@ -1032,6 +1037,68 @@ Os **30 pares `header_matches_*`** com Hurl **8.0.0** estão classificados na
 Primeira ocorrência em vez de lista, esperado estático em vez de interpolado,
 validação antecipada e códigos são contratos próprios, não equivalência geral
 de engine/gramática. Corpus sintético não é homologação da suíte real.
+
+## Esperados dinâmicos — US-30 / issue #60
+
+`--render-asserts` é um opt-in por invocação e uma evolução explícita do
+contrato HTTPGo. Sem a flag, permanece o perfil **literal** descrito abaixo.
+Com a flag, operandos JSON de igualdade, comparação, contagem e pertencimento
+podem usar variáveis iniciais ou capturas de entradas anteriores:
+
+```hurl
+POST {{base_url}}/orders
+HTTP 200
+[Captures]
+order_number: jsonpath "$.number"
+order_name: jsonpath "$.name"
+
+GET {{base_url}}/orders/{{order_number}}
+HTTP 200
+[Asserts]
+jsonpath "$.number" == {{order_number}}
+jsonpath "$.name" == "{{order_name}}"
+```
+
+Execute com `httpgo test order.hurl --render-asserts --var base_url=http://localhost:8080`
+contra POST/GET retornando `{"number":9007199254740993,"name":"Pizza"}`.
+[Exemplo versionado](../testdata/scenarios/scenario_render_asserts.hurl).
+Valores completos
+preservam tipo e precisão (incluindo `9007199254740993`); dentro de strings,
+escalares viram texto escapado, nunca código ou um segundo template. Arrays e
+objetos só cabem em valor JSON completo e nos operadores que já os aceitam.
+`count` exige inteiro não negativo e comparação ordenada exige número.
+
+Todo erro estático continua impedindo HTTP do arquivo inteiro. O esperado da
+assertion alcançada é resolvido e validado **antes** de consultar a resposta;
+variável ausente ou tipo esperado incompatível é avaliação **2**, enquanto
+comparação divergente é **1**. Status e assertions anteriores têm precedência;
+capturas da própria resposta ainda não estão publicadas. Valores secretos e
+seus derivados ficam protegidos antes dos callbacks, sem reter planos nos
+resultados. A flag não altera consultas nem a ordem de publicação.
+
+O mesmo opt-in resolve os esperados textuais de headers/body e os padrões
+`matches` JSON/header. Operandos continuam exigindo strings entre aspas, com
+os escapes já aceitos em cada contexto; números, booleanos e `null` inseridos
+viram texto escalar, nunca arrays/objetos serializados. Por exemplo:
+
+```hurl
+GET {{base_url}}/orders/{{order_number}}
+HTTP 200
+[Asserts]
+header "X-Order" contains "{{order_number}}"
+body not contains "{{forbidden}}"
+jsonpath "$.name" matches "^{{order_pattern}}$"
+```
+
+Metacaracteres inseridos participam da regex **sem escape automático**. Um
+padrão sem referências é compilado antes da rede; um padrão dinâmico é compilado
+somente ao alcançar a assertion, antes da consulta. Padrão final inválido ou
+não suportado é erro de avaliação **2**, sem expor o erro bruto da engine.
+A substituição não é recursiva, inclusive em regex. Ausência/vazio, pertencimento
+JSON tipado e primeira ocorrência de header mantêm as regras existentes.
+Negação não aprova esperado inválido; headers sensíveis ocultam ambos os lados.
+A flag não habilita regex de body, operadores novos, consultas dinâmicas ou
+interpolação de padrões de captura.
 
 ## Igualdade JSON — US-08 / issue #20
 
@@ -1113,7 +1180,8 @@ O padrão é um literal string JSON em aspas duplas; escapes são interpretados 
 
 String divergente, consulta ausente ou valor selecionado não string falha como assertion (**1**), sem coerção. Ausência e tipo incompatível são diagnosticados separadamente; arrays/objetos não são impressos. JSON inválido e percurso incompatível permanecem erro de avaliação (**2**). Regex inválida/não suportada ou escape JSON inválido rejeita o arquivo inteiro antes de qualquer HTTP, inclusive se a declaração for tardia. A ordem continua status → assertions na ordem escrita → capturas; a primeira falha interrompe capturas e próximos envios. Padrão e valor são sanitizados, e captura secreta pendente oculta os dois integralmente sem avaliação antecipada. Resultados não conservam padrão operacional nem regexp compilada.
 
-O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. A US-24 acrescenta `matches` em headers; `matches` em body/variáveis e interpolação continuam fora do suporte. Extração por regex de body/header tem o recorte separado da US-25.
+O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. A US-24 acrescenta `matches` em headers; `matches` em body/variáveis continua fora; interpolação de esperados exige
+`--render-asserts` (US-30), sem modificar o perfil literal descrito aqui. Extração por regex de body/header tem o recorte separado da US-25.
 
 ### Presença, quantidade e limites — US-14 / issue #34
 
@@ -1151,7 +1219,8 @@ Ausência, tipo selecionado não numérico e condição falsa falham com 1. Espe
 não numérico é sintaxe inválida (2) antes da rede; JSON inválido e percurso
 incompatível continuam erros de avaliação (2).
 
-Continuam fora do recorte: count em strings/objetos/capturas, filtros além da igualdade estática US-28 e interpolação de consultas ou esperados. `matches` aceita strings selecionadas de JSON e a primeira ocorrência de header, nos recortes documentados acima. A gramática de literais
+Continuam fora do recorte: count em strings/objetos/capturas, filtros além da igualdade estática US-28 e interpolação de consultas.
+Esperados dinâmicos exigem `--render-asserts` (US-30). `matches` aceita strings selecionadas de JSON e a primeira ocorrência de header, nos recortes documentados acima. A gramática de literais
 compostos/expoentes difere dos pares observados com Hurl 8.0.0; veja
 `compatibility.md`. Os novos pares com Hurl 8.0.0 confirmam que null, vazios,
 false e zero presentes satisfazem `exists`. Count negativo/fracionário é rejeitado
@@ -1510,7 +1579,8 @@ Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 - Headers repetidos são listas no Hurl 8.0.0; aqui usa-se somente a primeira
   ocorrência. Com uma ocorrência, caixa/ausência/vazio/vírgula e os operadores
   têm equivalência observada. Hurl interpola o esperado e avalia capturas antes
-  das assertions; aqui o esperado é literal e headers/JSON antecedem capturas.
+  das assertions; aqui o esperado é literal por padrão (opt-in US-30 para renderizar)
+  e headers/JSON antecedem capturas.
 - Igualdade JSON aqui aceita literais esperados compostos e expoentes exatos;
   Hurl 8.0.0 rejeitou array/objeto e `125e-2` nos pares observados. Tipos escalares,
   precisão inteira e decimais têm pares compartilhados, sem equivalência geral.

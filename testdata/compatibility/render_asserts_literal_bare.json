@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "literal",
+  "response_json": "9007199254740993",
+  "variables": [
+    "n=9007199254740993"
+  ],
+  "classification": "perfil literal HTTPGo rejeita placeholder fora de string antes da rede; Hurl interpola",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

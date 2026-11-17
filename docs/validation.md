@@ -1,4 +1,4 @@
-# Validação — US-01 a US-16, US-20 a US-29
+# Validação — US-01 a US-16, US-20 a US-30
 
 ## US-29 — issue #58 / história 0029
 
@@ -80,6 +80,112 @@ a identificação nem execução do binário de referência.
 | 373–374 | `TestJSONTypeOrderAndFailures`, `TestJSONTypeReducedSelection`, `TestJSONTypeByBinary`, pares `types_strict_*`: JSON vazio/malformado/adicional e ramo incompatível são erro 2, sem parcial/ausência falsa |
 | 375 | `TestJSONTypeFinalAndInterruptedResponse`, `TestJSONTypeReadCloseBeforeReport`, `TestJSONTypeFinalAndIncompleteByBinary`: resposta final completa, read/close/prazo/cancelamento e recursos encerrados antes do report, sem captura/avanço |
 | 376 | `TestJSONTypeCallbackFailure`, `TestJSONTypeWriterFailureOverridesOutcomes`: callback/erro/short write em aprovação/divergência/avaliação mantém 2, contagens/resultados anteriores, sem reimpressão/envio seguinte |
+
+## US-30 — issue #60 / história 0030
+
+Plano da issue #60 executado sem planner, somente backend, nas quatro tasks
+aprovadas da fila 0030: `back:1` em `fe79c50` (opt-in e comparação JSON tipada),
+`back:2` em `82089f3` (texto, pertencimento e regex), `back:3` em `797f9f6`
+(isolamento, sigilo e falhas externas), `back:4` nesta alteração (perfis/corpus,
+ajuda/documentação e gates integrados). Sem frontend/estáticos, atualização de
+Go/dependências, CI/lint ou transporte de produção. Nenhum código-fonte Hurl
+consultado/copiado/adaptado. Gates locais não substituem review; backdev não
+executou SonarQube. `backend` descreve área, não aceite final da história.
+Os hashes e as contagens abaixo registram a execução original, anterior ao rebase.
+
+### Revalidação após rebase com develop
+
+Rebase sobre `origin/develop` em `cfcb0c8` (US-29 integrada). Conflitos de
+README/arquitetura/compatibilidade/validação e seeds de parser/JSON resolvidos
+preservando ambas as histórias, sem alterar nenhum par de contrato existente.
+O corpus integrado passa a **387 pares**: 367 da base e 20 da US-30. O perfil
+opt-in não modifica os predicados unários sem esperado da US-29.
+
+Passaram novamente testes específicos de parser/template/assertion/runner/suite/
+CLI/transport, E2E JSON e render-asserts; `make compatibility` com Hurl **8.0.0**
+obrigatório e sem `-update`; `make fmt lint test` (**0 issues**, race/cobertura),
+`go vet ./...`, `go build ./...` e `make e2e`. Coberturas após integração:
+assertion **96,7%**, CLI **97,2%**, parser **97,4%**, runner **95,2%**,
+suite **95,1%**; demais pacotes mantêm as porcentagens originais abaixo.
+Os três fuzzers foram repetidos com `-fuzztime=20s -parallel=2`, todos aprovados:
+`FuzzParse` **142.369**, `FuzzRender` **30.133**, `FuzzRenderJSON` **8.250**
+execuções. As seeds das duas histórias foram preservadas e o parser continua
+exercitando ambos os perfis. Nenhuma análise SonarQube foi executada pelo backdev.
+
+### Ambiente e execução original (antes do rebase)
+
+Linux amd64, **2026-11-17**, Go `go1.26.10-X:nodwarf5`, goimports e
+golangci-lint **2.15.0** existentes em `/home/ff/go/bin`. Hurl **8.0.0** existente
+em `/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, selecionado via
+PATH sem instalar ferramentas nem substituir a versão padrão 8.0.1. O aviso de
+metadados libcurl não impediu identificação/execução da referência.
+
+- Task 1: passaram `go test ./internal/parser ./internal/template
+  ./internal/assertion ./internal/runner ./internal/suite ./internal/cli`,
+  `go test ./tests/e2e -run TestJSON -count=1`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram testes específicos parser/template/assertion/runner/CLI,
+  `go test ./tests/e2e -count=1`, `make fmt lint test`, `go vet ./...` e
+  `go build ./...` antes do commit.
+- Task 3: passaram `go test ./internal/runner ./internal/suite ./internal/cli
+  ./internal/transport`, `go test ./tests/e2e -count=1`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` antes do commit.
+- Task 4: passaram parser/template/CLI e E2E de ajuda/exemplos/perfis,
+  `make compatibility` com **344 pares**, Hurl **8.0.0** obrigatório, sem skip
+  ou atualização no gate completo; `make fmt lint test` (**0 issues**, race e
+  cobertura), `go vet ./...`, `go build ./...`, `make build` e `make e2e`.
+- **20 pares novos `render_asserts_*`** foram observados e revistos com
+  atualização restrita a `TestCompatibility/render_asserts_`, seguida de gate
+  completo sem `-update`. **Nenhum dos 324 pares anteriores foi alterado**.
+  `httpgo_profile` ausente/literal preserva o comando antigo; `render-asserts`
+  passa a flag só ao HTTPGo. As árvores/sessões e fixtures são independentes.
+  Precisão, tipos, padrões, primeira ocorrência, literal padrão e publicação
+  estão classificados em [compatibility.md](compatibility.md#perfis-de-esperados--us-30--issue-60).
+- Evidência real: ambos distinguem o par numérico 9007199254740992/9007199254740993
+  no esperado dinâmico, sem inferir precisão geral Hurl; string esperada difere
+  do número. JSON composto dinâmico é aceito aqui, mas Hurl rejeita sua gramática.
+  Captura da própria resposta é erro 2 aqui e disponível no Hurl. Nenhuma
+  divergência foi ocultada ou normalizada para declarar equivalência completa.
+- Cobertura integrada: assertion **95,8%**, CLI **97,2%**, config **96,0%**,
+  parser **97,4%**, query **88,3%**, runner **94,7%**, suite **95,1%**,
+  template **96,1%**, transport **90,4%**. Sem redução de verificações/limites.
+- Fuzzing com seeds novos e parser exercitando **ambos os perfis**:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**111.793 execuções**), `go test ./internal/template -run '^$' -fuzz '^FuzzRender$'
+  -fuzztime=20s -parallel=2` (**38.039 execuções**) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**66.513 execuções**). Todos passaram sem crash; contagens desta rodada.
+- Ajuda root/test, exemplo versionado/README/subset e negativos são conferidos
+  por `TestRenderAssertsHelpAndPublishedExample` e
+  `TestRenderAssertsStructuralCorpusByBinary`. Teste legado de ajuda de body foi
+  atualizado para exigir o perfil literal e a flag, não mais negar o opt-in.
+  Links locais, exemplos, `git diff --check` e `gofmt -l` revisados.
+- macOS/Windows não executados: opcionais nesta história pelo plano v4.
+  Corpus sintético não homologa suíte real nem anuncia Hurl/JSONPath integral.
+
+### Rastreabilidade GO-377–GO-395
+
+| GO | Evidência executada |
+|---|---|
+| 377 | `TestJSONRenderAssertsDemonstration`, exemplo publicado e par `capture`: POST/captura/GET com ID exato, 0/1/2 e bloqueio de captura/envio após falha |
+| 378 | `TestRenderAssertsJSONValues`, `TestRenderAssertsJSONParsing`, `ValidateJSONExpected`: tipo completo, precisão, estruturas aninhadas, string escapada e ausência de coerção |
+| 379 | `TestRenderAssertsLiteralProfileByBinary`, `TestRenderAssertsInvocationIsolation`, pares `literal_*` novos e corpus antigo intacto: placeholders definidos/ausentes permanecem literais, bare rejeitado sem flag |
+| 380 | `TestRenderAssertsJSONValues`, `TestValidateJSONExpected`, pares count/ordered: zero, 1.0/1e0, quantidade além de inteiro de máquina e comparação exata |
+| 381 | tabelas JSON/texto/parser: esperado inválido é avaliação 2; tipo real incompatível segue divergência 1; arrays/objetos não viram texto |
+| 382 | `TestRenderAssertsTextEvaluation`, `TestRenderAssertsTextByBinary`, pares text/membership/header_repeat: substring, pertencimento tipado, negação e primeira ocorrência |
+| 383 | tabelas textuais/E2E e pares regex: expressão interpolada sem QuoteMeta, regex final inválida/fora da engine é avaliação 2 |
+| 384 | casos não recursivos JSON/texto/regex e par nonrecursive: dado inserido não exige variável mencionada por seu conteúdo |
+| 385 | `TestRenderAssertsJSONOrder`, suite isolation, pares missing/same_response/capture: somente iniciais/capturas anteriores publicadas |
+| 386 | `TestRenderAssertsJSONOrder`, `TestRenderAssertsQueryErrorPrecedence`: status/assertion anterior prevalece; esperado alcançado precede consulta/decode/negação |
+| 387 | tabelas parser LF/CRLF e `TestRenderAssertsStructuralCorpusByBinary`: template/escape/conteúdo adicional/regex estática inválidos impedem todo HTTP |
+| 388 | tabelas parser, negativos versionados e par unsupported_body_regex: flag não amplia operadores, consultas, nomes nem regex de captura |
+| 389 | `TestRenderAssertsInvocationIsolation`, `TestRenderAssertsSuiteIsolation`, `TestRenderAssertsSuiteIsolationByBinary`: comando reutilizado, todos os arquivos, sessões/capturas isoladas, fail-fast/continuação e prioridade 2 |
+| 390 | `TestRenderAssertsJSONSecret`, `TestRenderAssertsTextSecrets`, pending secrets/scenario reuse, callbacks suite e writer CLI: segredo/derivados ocultos e planos/regex removidos; cenário original não mutado |
+| 391 | `TestCompatibility` com 344 pares, 20 novos perfis explícitos; ajuda root/test, exemplo publicado e diferenças observadas classificadas |
+| 392 | `TestRenderAssertsQueryErrorPrecedence`: JSON inválido/percurso incompatível/charset não viram ausência ou aprovação de negação |
+| 393 | tabelas texto/regex: string vazia, null/booleano/número textuais, ausência distinta e estruturas rejeitadas |
+| 394 | `TestRenderAssertsCompleteFinalResponse`, `TestRenderAssertsReadAndCloseFailure`, `TestRenderAssertsTransportAndReportFailures`, E2E final/incomplete: final de redirect, read/close/prazo/cancelamento sem preparação parcial/captura/avanço |
+| 395 | `TestRenderAssertsSecretsAndWriterPriority`: erro e short write em sucesso/divergência/erro de esperado prevalecem como 2, sem reescrever writer nem próximo envio |
 
 ## US-28 — issue #56 / história 0028
 

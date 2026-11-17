@@ -1,0 +1,27 @@
+{
+  "httpgo_profile": "literal",
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "{{needle}}"
+    }
+  ],
+  "response_json": "\"{{needle}}\"",
+  "variables": [
+    "needle=resolved"
+  ],
+  "classification": "perfil literal preservado: esperado não interpola mesmo definido; Hurl interpola",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

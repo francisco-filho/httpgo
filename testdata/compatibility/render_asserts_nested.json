@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"n\":[9007199254740993,true,null]}",
+  "variables": [
+    "n=9007199254740993"
+  ],
+  "classification": "HTTPGo aceita esperado JSON composto tipado; gramática Hurl difere",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

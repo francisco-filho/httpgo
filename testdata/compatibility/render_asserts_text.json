@@ -1,0 +1,28 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "Mini Pizza"
+    }
+  ],
+  "response_json": "{\"name\":\"Pizza\"}",
+  "variables": [
+    "needle=Pizza"
+  ],
+  "classification": "perfil dinâmico HTTPGo opt-in; comportamento observado, códigos próprios",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

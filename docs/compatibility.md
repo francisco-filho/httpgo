@@ -1,4 +1,4 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-29
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-30
 
 ## Tipos e vazio — US-29 / issue #58
 
@@ -42,6 +42,55 @@ Reprodução: com Hurl 8.0.0 no PATH, `make compatibility` (sem `-update`), ou
 `go test -tags compatibility ./tests/e2e -run '^TestCompatibility/types_' -count=1 -v`.
 Veja [subconjunto](subset.md#tipos-e-valores-vazios-json--us-29--issue-58) e
 [validação executada](validation.md#us-29--issue-58--história-0029).
+
+## Perfis de esperados — US-30 / issue #60
+
+**Evolução explícita do contrato HTTPGo:** `--render-asserts` seleciona esperados
+dinâmicos somente na invocação. O padrão continua literal. Acrescentados **20
+pares `render_asserts_*`**, total integrado **387 pares** após o rebase sobre a
+US-29, observados com **Hurl 8.0.0** em Linux. **Nenhum dos 367 pares da base
+foi alterado ou regenerado** (324 anteriores e 43 `types_*` da US-29).
+
+O harness seleciona `httpgo_profile` por par: ausente ou `literal` preserva o
+comando antigo, `render-asserts` acrescenta a flag somente ao HTTPGo, outro valor
+falha explicitamente. A flag própria **nunca** é passada ao Hurl nem ativada
+globalmente. Cada executável usa árvore/sessão independente e reset da fixture.
+Novas observações foram revistas com atualização restrita ao prefixo novo,
+seguida de gate completo sem `-update`; não houve cópia/consulta de fonte Hurl.
+
+| Par `render_asserts_*` | HTTPGo | Hurl 8.0.0 | Evidência/classificação observada |
+|---|---|---|---|
+| `capture` | 0; POST /capture → GET /capture → /health | igual | capturas anteriores de número 9007199254740993 e nome preservam correlação |
+| `number`, `count`, `ordered`, `membership` | 0; /capture → /health | igual | número completo, quantidade, comparação e pertencimento tipado no recorte observado |
+| `precision_mismatch` | 1; /capture | 4; /capture | ambos distinguem 9007199254740992/9007199254740993 neste esperado dinâmico; não implica precisão Hurl geral |
+| `string_number` | 1; /capture | 4; /capture | esperado string interpolada não aprova número real |
+| `nested` | 0; /capture → /health | 2; zero envios | JSON composto com valor interpolado é permitido aqui; gramática Hurl difere |
+| `text`, `header_regex`, `json_regex` | 0; /capture → /health | igual | substring textual e regex com metacaracteres inseridos sem escape automático |
+| `header_repeat` | 1; /capture | 4; /capture | HTTPGo consulta primeira ocorrência bad; Hurl recebe lista, não equivale a escolher segunda ocorrência ok |
+| `invalid_regex` | 2; /capture | 4; /capture | padrão final inválido falha em avaliação, sem contato seguinte; categorias/códigos próprios |
+| `missing` | 2; /capture | 4; /capture | variável ausente só ao alcançar assertion |
+| `same_response` | 2; /capture | 0; /capture → /health | diferença deliberada: assertions antes de capturas aqui, própria captura indisponível |
+| `nonrecursive` | 0; /capture → /capture → /health | igual | placeholder recebido/capturado é dado, sem exigir variável mencionada por seu conteúdo |
+| `literal_bare` (perfil literal) | 2; zero envios | 0; /capture → /health | sem flag não passa a aceitar placeholder fora de literal válido |
+| `literal_defined` (perfil literal) | 0; /capture → /health | 4; /capture | string com placeholder permanece literal, mesmo com variável definida; Hurl interpola |
+| `invalid_late` | 2; zero envios | igual | template malformado tardio impede todo HTTP |
+| `unsupported_body_regex` | 2; zero envios | 0; /capture → /health | flag não amplia operadores: regex de body em assertions continua fora |
+
+Primeira ocorrência de header, escapes, engine Go sem lookaround/backreferences,
+precisão exata HTTPGo e status → assertions → capturas não foram adaptados ao
+Hurl. Arrays/objetos só cabem nos contextos JSON já aceitos, não em texto.
+Esperado final inválido precede consulta/decode; falha anterior impede sua
+resolução. Padrão estático inválido continua impedindo toda rede do arquivo.
+Segredos/derivados e planos são verificados pelos testes HTTPGo de resultados,
+callbacks e streams, sem persistir causas/payloads sensíveis no corpus.
+
+As matrizes históricas abaixo continuam descrevendo **perfil literal**, salvo
+seleção explícita por par. YAML hierárquico/renderização externa são extensões;
+o novo opt-in é evolução própria, não compatibilidade completa com Hurl nem
+homologação da suíte real. `backend` é área de implementação/documentação,
+não status de aceite. [Subconjunto](subset.md#esperados-dinâmicos--us-30--issue-60),
+[exemplo](../testdata/scenarios/scenario_render_asserts.hurl) e
+[validação executada](validation.md#us-30--issue-60--história-0030).
 
 ## Filtros estáticos por igualdade — US-28 / issue #56
 
@@ -269,7 +318,7 @@ testes HTTPGo, não por comparação de diagnósticos com Hurl. Evidências em
 [validation.md](validation.md#us-24--issue-46--história-0024).
 Assertions regex de body/variável e todas as ocorrências continuam fora
 do suporte; extração regex de body/header é a US-25 abaixo. Placeholders permanecem
-estáticos, sem `--render-asserts`.
+estáticos, sem `--render-asserts` nesses pares históricos (opt-in US-30 acima).
 Corpus sintético não é homologação da suíte real. Extensões YAML hierárquico e
 interpolação de arquivos externos continuam explicitamente próprias do HTTPGo.
 

@@ -3,6 +3,7 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"capimgrosso.com/httpgo/internal/assertion"
 	"capimgrosso.com/httpgo/internal/parser"
@@ -30,6 +31,41 @@ type JSONError struct {
 
 func (e *JSONError) Error() string {
 	return fmt.Sprintf("erro de avaliação JSON: consulta %q: %s", e.Query, e.Detail)
+}
+
+// HeaderError is a controlled expected-value evaluation error, not a mismatch.
+type HeaderError struct {
+	Position     parser.Position
+	Name, Detail string
+}
+
+func (e *HeaderError) Error() string {
+	return fmt.Sprintf("erro de avaliação de header %q: %s", e.Name, e.Detail)
+}
+
+// prepareTextExpected resolves once and protects complete secret derivatives before
+// compilation, comparison or presentation. It never reinterprets inserted text.
+func prepareTextExpected(session template.Session, plan *parser.ExpectedTemplate, sensitive bool) (string, bool, error) {
+	secret := sensitive
+	for _, ref := range plan.References {
+		secret = secret || session.IsSecret(ref.Name)
+	}
+	text, err := session.Render(plan.Source)
+	if err != nil {
+		return "", secret, err
+	}
+	if secret {
+		session.ProtectValue(text.Value)
+	}
+	return text.Value, secret, nil
+}
+
+func compileExpected(pattern string) (*regexp.Regexp, error) {
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("padrão matches inválido ou não suportado")
+	}
+	return compiled, nil
 }
 
 // BodyFailure contains presentation metadata only, never response text.
@@ -78,9 +114,19 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 	for _, item := range entry.Assertions {
 		switch {
 		case item.Body != nil && item.Header == nil && item.JSON == nil:
-			declaration := item.Body
+			declaration := *item.Body
 			pos := declaration.Position
 			pos.File = session.Sanitize(pos.File)
+			if plan := declaration.ExpectedTemplate; plan != nil {
+				value, secret, err := prepareTextExpected(session, plan, false)
+				if err != nil {
+					current.Outcome = BodyFailed
+					current.BodyError = &BodyError{Position: pos, Operator: declaration.Operator, Detail: "não foi possível resolver o esperado textual: " + err.Error()}
+					return current.BodyError
+				}
+				declaration.Expected = value
+				conceal = conceal || secret
+			}
 			if !textDecoded {
 				var err error
 				text, err = query.BodyText(response.Body, response.Headers)
@@ -101,18 +147,67 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 				return nil
 			}
 		case item.Header != nil && item.JSON == nil && item.Body == nil:
-			current.HeaderFailure = checkHeader(session, *item.Header, response.Headers, conceal)
+			declaration := *item.Header
+			if plan := declaration.ExpectedTemplate; plan != nil {
+				value, secret, err := prepareTextExpected(session, plan, sensitiveHeader(declaration.Name))
+				if err == nil && declaration.Operator == assertion.HeaderMatches {
+					declaration.Compiled, err = compileExpected(value)
+				}
+				if err != nil {
+					pos := declaration.Position
+					pos.File = session.Sanitize(pos.File)
+					current.Outcome = HeaderFailed
+					current.HeaderError = &HeaderError{Position: pos, Name: session.Sanitize(declaration.Name), Detail: "esperado textual inválido: " + err.Error()}
+					return current.HeaderError
+				}
+				declaration.Expected = value
+				conceal = conceal || secret
+			}
+			current.HeaderFailure = checkHeader(session, declaration, response.Headers, conceal)
 			if current.HeaderFailure != nil {
 				current.Outcome = HeaderMismatch
 				return nil
 			}
 		case item.JSON != nil && item.Header == nil && item.Body == nil:
-			declaration := item.JSON
+			resolved := *item.JSON // Evaluation must never mutate the reusable scenario.
+			declaration := &resolved
 			pos := declaration.Position
 			pos.File = session.Sanitize(pos.File)
 			fail := func(detail string) *JSONError {
 				current.Outcome = JSONFailed
 				return &JSONError{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Detail: detail}
+			}
+			if plan := declaration.ExpectedTemplate; plan != nil && declaration.Operator == assertion.JSONMatches {
+				value, secret, err := prepareTextExpected(session, plan, false)
+				if err != nil {
+					return fail("não foi possível resolver o padrão: " + err.Error())
+				}
+				declaration.Expected, declaration.Pattern = value, value
+				declaration.Compiled, err = compileExpected(value)
+				if err != nil {
+					return fail(err.Error())
+				}
+				conceal = conceal || secret
+			} else if plan != nil {
+				secret := false
+				for _, ref := range plan.JSON.References {
+					secret = secret || session.IsSecret(ref.Name)
+				}
+				rendered, err := session.RenderJSON([]byte(plan.Source))
+				if err != nil {
+					return fail("não foi possível resolver o esperado JSON: " + err.Error())
+				}
+				if secret {
+					session.ProtectValue(string(rendered))
+					conceal = true
+				}
+				declaration.Expected, err = query.Decode(rendered)
+				if err != nil {
+					return fail("esperado JSON renderizado inválido")
+				}
+				if err := assertion.ValidateJSONExpected(declaration.Operator, declaration.Count, declaration.Expected); err != nil {
+					return fail(err.Error())
+				}
 			}
 			if !decoded {
 				var err error

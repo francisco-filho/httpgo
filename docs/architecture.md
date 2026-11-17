@@ -1,8 +1,8 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-29
+# Arquitetura implementada — US-01 a US-16, US-20 a US-30
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
 
@@ -44,6 +44,52 @@ Regressões por executor falso, callbacks e HTTP/binário reais estão em
 `type*_test.go`, `json_type*_test.go` nos pacotes existentes e `tests/e2e`.
 Diferenças estritas e evidência numérica observada com Hurl 8.0.0 estão em
 [compatibility.md](compatibility.md#tipos-e-vazio--us-29--issue-58).
+
+## Esperados dinâmicos — US-30 / issue #60
+
+`cli.arguments.renderAsserts` recebe `--render-asserts` booleana sem valor.
+`command.go` passa `runner.Options.RenderAsserts` pela suíte a todos os arquivos;
+`Suite.load` usa `parser.ParseWithOptions` com `parser.ParseOptions.RenderAsserts`.
+`parser.Parse` e opções zero continuam no perfil literal. Não há estado global,
+nova env/YAML, pacote, interface de produção, dependência ou versão Go alterada.
+As descrições de esperados estáticos nas seções legadas referem-se a esse perfil.
+
+`parser.ExpectedTemplate` mantém `Source`, `JSON` (`template.JSONPlan`) ou
+`References` textuais, acessível em `ExpectedTemplate` das variantes
+`JSONAssertion`, `HeaderAssertion` e `BodyAssertion`. `parseJSONAssertion`
+reutiliza `template.ParseJSON` e exige consumo integral do operando; máscara de
+referências valida a forma externa estaticamente conhecida, sem resolver valores.
+`parseTextExpected` usa `template.Parse` sobre strings já decodificadas com os
+escapes do contexto. `parseMatches` compila regex sem referências antes da rede;
+somente regex dinâmica adia compilação. Consultas, nomes, operadores, captura por
+regex e requisições não passam por esse novo perfil.
+
+`runner.checkAssertions` copia apenas a declaração alcançada: após status e
+assertions anteriores, mas **antes da consulta/decode** correspondente, usa a
+mesma `template.Session` do arquivo. JSON usa `RenderJSON` e `query.Decode`
+(`UseNumber`); texto usa `prepareTextExpected`/`Render`, uma vez. Regex final é
+compilada localmente por `compileExpected`, nunca globalmente ou no cenário.
+`assertion.ValidateJSONExpected` compartilha entre parser e runner a aplicação
+de número ordenado, count inteiro não negativo e pertencimento escalar. O valor
+real incompatível segue o predicado existente, sem coerção ou erro artificial.
+
+Erros de esperado JSON usam `JSONError`/`JSONFailed`; body usa
+`BodyError`/`BodyFailed`; header usa `HeaderError`/`HeaderFailed`, acrescentados
+para distinguir avaliação de divergência. São erros controlados de categoria 2,
+sem regex/causa bruta. Suíte preserva categorias no roteamento seguro e CLI
+localiza nome/consulta/operador; não os classifica como renderização pré-envio
+nem falha de comparação. Erro 2 não é elegível para polling. Capturas só publicam
+após todas as assertions e nunca são antecipadas para resolver um esperado.
+
+Proveniência secreta (`IsSecret` nas referências) e headers sensíveis protegem o
+valor resolvido completo com `ProtectValue` antes de compilar/comparar/reportar;
+`pendingSecret` continua ocultando os dois lados sem consultar capturas futuras.
+`safeEntry` elimina `ExpectedTemplate` nas três variantes, valores JSON/textos
+brutos dinâmicos e regex compiladas. Falhas mantêm somente apresentação segura,
+sem reter valores/regex entre entradas, tentativas ou sessões; o cenário é
+reutilizável. Recursos HTTP, deadline/cancelamento e prioridade de escrita não
+mudaram. Evidência em [validação](validation.md#us-30--issue-60--história-0030) e
+[perfis diferenciais](compatibility.md#perfis-de-esperados--us-30--issue-60).
 
 ## Seleção estática por igualdade — US-28 / issue #56
 
@@ -198,9 +244,9 @@ O restante usa biblioteca padrão; `go.mod` preserva módulo
 | `query.Path`, `query.Error`, `query.Decode` | Pacote folha sem interface: validar JSONPath limitado; decodificar exatamente um JSON com UseNumber; SelectValue distingue presença/ausência/percurso incompatível e Select mantém contrato de capturas |
 | `query.HeaderValue`, `query.Header` | Ocorrências nome/valor sem net/http; seleção pura da primeira, com presença distinta de vazio e nome case-insensitive |
 | `assertion.Status`, `HeaderOperator`, `assertion.Header`, `assertion.JSONEqual`, `assertion.MatchString` | Comparação de status/headers, igualdade JSON tipada e correspondência regex de string sem coerção; não conhece runner, HTTP ou apresentação |
-| `parser.JSONAssertion.Pattern`, `Compiled` | `matches` conserva literal de padrão e `*regexp.Regexp` validado durante parse integral; padrão não passa por renderer e é removido dos metadados pelo `safeEntry` |
+| `parser.JSONAssertion.Pattern`, `Compiled` | `matches` conserva literal e regex estática, ou `ExpectedTemplate` no opt-in US-30; cópia local resolve/compila na avaliação; `safeEntry` remove ambos |
 | `parser.HeaderAssertion.Expected`, `Compiled` | US-24: padrão decodificado em `Expected` (sem fonte duplicada) e `*regexp.Regexp` validado pelo helper privado `parseMatches`, compartilhado com JSON; `safeEntry` clona a declaração e remove `Compiled` antes de apresentar |
-| `runner.HeaderFailure`, `JSONFailure`, `JSONError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
+| `runner.HeaderFailure`, `JSONFailure`, `JSONError`, `HeaderError`, `BodyError` | Divergências e erros de avaliação localizados; nome/consulta, esperado/recebido sanitizados e presença explícita; sem coleção/body/documento bruto |
 | `transport.NetHTTPExecutor`, `Error`, `ErrorKind` | HTTP real, prazo, redirects, consumo/fechamento e classificação segura com causa preservada via Unwrap |
 | `suite.Suite`, `File`, `FileResult`, `State`, `Summary`, `Result`, `Options` | Descoberta completa, carga/fechamento por arquivo, reutilização do runner com sessão nova, estados e contagens compactos, fail-fast e interrupções globais; não importa CLI ou transporte |
 | `cli.Command`, `BuildInfo` | Argumentos/streams (`SetArgs/SetIn/SetOut/SetErr`), configuração única, montagem da suíte, saída segura e exit code; não reavalia assertion |

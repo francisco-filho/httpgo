@@ -1,0 +1,17 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "null",
+  "classification": "variável ausente só ao alcançar assertion; categorias de avaliação próprias",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

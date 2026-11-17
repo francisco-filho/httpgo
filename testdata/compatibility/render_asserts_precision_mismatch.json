@@ -1,0 +1,20 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "9007199254740992",
+  "variables": [
+    "n=9007199254740993"
+  ],
+  "classification": "ambos distinguem 9007199254740992 de esperado dinâmico 9007199254740993 neste par; códigos próprios, sem inferir equivalência numérica geral",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

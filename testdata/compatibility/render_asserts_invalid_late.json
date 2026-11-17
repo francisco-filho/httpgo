@@ -1,0 +1,13 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "null",
+  "classification": "template tardio malformado impede todo HTTP do arquivo",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

@@ -90,7 +90,16 @@ func (e *Error) Error() string {
 }
 func (e *Error) Unwrap() error { return e.cause }
 
+// ParseOptions selects an invocation-local assertion profile. Zero preserves literals.
+type ParseOptions struct {
+	RenderAsserts bool
+}
+
 func Parse(file string, input io.Reader) (Scenario, error) {
+	return ParseWithOptions(file, input, ParseOptions{})
+}
+
+func ParseWithOptions(file string, input io.Reader, options ParseOptions) (Scenario, error) {
 	data, err := io.ReadAll(input)
 	if err != nil {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "erro de leitura", Detail: "não foi possível ler o arquivo", cause: err}
@@ -273,7 +282,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				return fail("construção não suportada", construction)
 			}
 			if asserts {
-				declaration, err := parseAssertion(text, pos)
+				declaration, err := parseAssertion(text, pos, options)
 				if err != nil {
 					return Scenario{}, err
 				}
