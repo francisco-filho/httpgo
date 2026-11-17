@@ -11,20 +11,22 @@ import (
 	"capimgrosso.com/httpgo/internal/template"
 )
 
-// HeaderAssertion contains literal values, never template expressions.
+// HeaderAssertion contains a literal or an opt-in expected template.
 type HeaderAssertion struct {
-	Name     string
-	Operator assertion.HeaderOperator
-	Expected string
-	Compiled *regexp.Regexp
-	Position Position
+	ExpectedTemplate *ExpectedTemplate
+	Name             string
+	Operator         assertion.HeaderOperator
+	Expected         string
+	Compiled         *regexp.Regexp
+	Position         Position
 }
 
-// BodyAssertion contains a literal substring, never a template expression.
+// BodyAssertion contains a literal substring or an opt-in expected template.
 type BodyAssertion struct {
-	Operator assertion.BodyOperator
-	Expected string
-	Position Position
+	ExpectedTemplate *ExpectedTemplate
+	Operator         assertion.BodyOperator
+	Expected         string
+	Position         Position
 }
 
 // Assertion is one of the concrete header/JSON/body variants, in source order.
@@ -58,18 +60,18 @@ type JSONAssertion struct {
 func parseAssertion(text string, pos Position, options ParseOptions) (Assertion, error) {
 	fields := strings.Fields(text)
 	if len(fields) > 0 && fields[0] == "body" {
-		declaration, err := parseBodyAssertion(text, pos)
+		declaration, err := parseBodyAssertion(text, pos, options)
 		return Assertion{Body: &declaration}, err
 	}
 	if len(fields) > 0 && fields[0] == "jsonpath" {
 		declaration, err := parseJSONAssertion(text, pos, options)
 		return Assertion{JSON: &declaration}, err
 	}
-	declaration, err := parseHeaderAssertion(text, pos)
+	declaration, err := parseHeaderAssertion(text, pos, options)
 	return Assertion{Header: &declaration}, err
 }
 
-func parseBodyAssertion(text string, pos Position) (BodyAssertion, error) {
+func parseBodyAssertion(text string, pos Position, options ParseOptions) (BodyAssertion, error) {
 	fail := func(category, detail string) (BodyAssertion, error) {
 		return BodyAssertion{}, &Error{Position: pos, Category: category, Detail: detail}
 	}
@@ -95,7 +97,11 @@ func parseBodyAssertion(text string, pos Position) (BodyAssertion, error) {
 	if !ok || strings.TrimSpace(tail) != "" {
 		return fail("sintaxe inválida", "assertion de body exige somente uma string literal entre aspas duplas")
 	}
-	return BodyAssertion{Operator: assertion.BodyOperator(operator), Expected: expected, Position: pos}, nil
+	plan, err := parseTextExpected(expected, pos, options)
+	if err != nil {
+		return BodyAssertion{}, err
+	}
+	return BodyAssertion{Operator: assertion.BodyOperator(operator), Expected: expected, ExpectedTemplate: plan, Position: pos}, nil
 }
 
 func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAssertion, error) {
@@ -167,10 +173,14 @@ func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAs
 		return declaration, nil
 	case assertion.JSONEqualOperator, assertion.JSONContains, assertion.JSONNotContains:
 	case assertion.JSONMatches:
-		pattern, compiled, err := parseMatches(rest, pos)
+		if declaration.Count {
+			return fail(pos, "construção não suportada", "count aceita somente ==, >, >=, < ou <=")
+		}
+		pattern, compiled, plan, err := parseMatches(rest, pos, options)
 		if err != nil {
 			return JSONAssertion{}, err
 		}
+		declaration.ExpectedTemplate = plan
 		declaration.Expected = pattern
 		declaration.Pattern = pattern
 		declaration.Compiled = compiled
@@ -217,7 +227,7 @@ func parseJSONAssertion(text string, pos Position, options ParseOptions) (JSONAs
 	return declaration, nil
 }
 
-func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
+func parseHeaderAssertion(text string, pos Position, options ParseOptions) (HeaderAssertion, error) {
 	fail := func(category, detail string) (HeaderAssertion, error) {
 		return HeaderAssertion{}, &Error{Position: pos, Category: category, Detail: detail}
 	}
@@ -260,29 +270,54 @@ func parseHeaderAssertion(text string, pos Position) (HeaderAssertion, error) {
 			return fail("sintaxe inválida", "exists não aceita valor esperado")
 		}
 	case assertion.HeaderMatches:
-		pattern, compiled, err := parseMatches(rest, pos)
+		pattern, compiled, plan, err := parseMatches(rest, pos, options)
 		if err != nil {
 			return HeaderAssertion{}, err
 		}
-		return HeaderAssertion{Name: name, Operator: operator, Expected: pattern, Compiled: compiled, Position: pos}, nil
+		return HeaderAssertion{Name: name, Operator: operator, Expected: pattern, ExpectedTemplate: plan, Compiled: compiled, Position: pos}, nil
 	case assertion.HeaderEqual, assertion.HeaderContains, assertion.HeaderNotContains:
 		expected, tail, valid := assertionString(rest)
 		if !valid || strings.TrimSpace(tail) != "" {
 			return fail("sintaxe inválida", "assertion exige somente uma string literal esperada entre aspas duplas")
 		}
-		return HeaderAssertion{Name: name, Operator: operator, Expected: expected, Position: pos}, nil
+		plan, err := parseTextExpected(expected, pos, options)
+		if err != nil {
+			return HeaderAssertion{}, err
+		}
+		return HeaderAssertion{Name: name, Operator: operator, Expected: expected, ExpectedTemplate: plan, Position: pos}, nil
 	default:
 		return fail("construção não suportada", "operador ou filtro de assertion não suportado")
 	}
 	return HeaderAssertion{Name: name, Operator: operator, Position: pos}, nil
 }
 
-// parseMatches validates the static JSON operand without exposing its contents or
-// the regexp library's error, which can contain protected pattern fragments.
-func parseMatches(text string, pos Position) (string, *regexp.Regexp, error) {
+func parseTextExpected(source string, pos Position, options ParseOptions) (*ExpectedTemplate, error) {
+	if !options.RenderAsserts {
+		return nil, nil
+	}
+	refs, err := template.Parse(source)
+	if err != nil {
+		return nil, &Error{Position: pos, Category: "sintaxe inválida", Detail: err.Error()}
+	}
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	return &ExpectedTemplate{Source: source, References: refs}, nil
+}
+
+// parseMatches validates the operand without exposing its contents or regex causes.
+// Only patterns with references postpone regex compilation until evaluation.
+func parseMatches(text string, pos Position, options ParseOptions) (string, *regexp.Regexp, *ExpectedTemplate, error) {
 	pattern, trailing, valid := jsonString(text)
 	if !valid || strings.TrimSpace(trailing) != "" {
-		return "", nil, &Error{Position: pos, Category: "sintaxe inválida", Detail: "matches exige somente uma string JSON entre aspas duplas"}
+		return "", nil, nil, &Error{Position: pos, Category: "sintaxe inválida", Detail: "matches exige somente uma string JSON entre aspas duplas"}
+	}
+	plan, err := parseTextExpected(pattern, pos, options)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if plan != nil {
+		return pattern, nil, plan, nil
 	}
 	compiled, err := regexp.Compile(pattern)
 	if err != nil {
@@ -290,9 +325,9 @@ func parseMatches(text string, pos Position) (string, *regexp.Regexp, error) {
 		if unsupportedRegexp(pattern) {
 			category = "construção não suportada"
 		}
-		return "", nil, &Error{Position: pos, Category: category, Detail: "padrão matches inválido ou não suportado"}
+		return "", nil, nil, &Error{Position: pos, Category: category, Detail: "padrão matches inválido ou não suportado"}
 	}
-	return pattern, compiled, nil
+	return pattern, compiled, nil, nil
 }
 
 func jsonString(text string) (string, string, bool) {

@@ -78,6 +78,7 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	for i := range entry.Assertions {
 		if entry.Assertions[i].Body != nil {
 			declaration := *entry.Assertions[i].Body
+			declaration.ExpectedTemplate = nil
 			declaration.Expected = "" // Raw substring literals are not report metadata.
 			declaration.Position.File = session.Sanitize(declaration.Position.File)
 			entry.Assertions[i].Body = &declaration
@@ -103,6 +104,10 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 		entry.Assertions[i].Header = &copy
 		declaration := &copy
 		declaration.Compiled = nil // Compiled regexps retain their source pattern.
+		if declaration.ExpectedTemplate != nil {
+			declaration.Expected = ""
+		}
+		declaration.ExpectedTemplate = nil
 		if conceal || sensitiveHeader(declaration.Name) {
 			declaration.Expected = "[oculto]"
 		} else {

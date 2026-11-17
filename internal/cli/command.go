@@ -108,6 +108,8 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += fmt.Sprintf(" (esperado %d, recebido %d)", *entry.Entry.ExpectedStatus, entry.Status)
 	case runner.Unvalidated, runner.Wildcard:
 		line += fmt.Sprintf(" (recebido %d)", entry.Status)
+	case runner.HeaderFailed:
+		line += ": " + entry.HeaderError.Error()
 	case runner.HeaderMismatch:
 		line += ": " + headerDiagnostic(entry.HeaderFailure)
 	case runner.BodyMismatch:
@@ -131,8 +133,11 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
+	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
 		pos := entry.Entry.Position
+		if entry.HeaderError != nil {
+			pos = entry.HeaderError.Position
+		}
 		if entry.HeaderFailure != nil {
 			pos = entry.HeaderFailure.Position
 		}
@@ -197,6 +202,10 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		var jsonErr *runner.JSONError
 		if errors.As(result.Err, &jsonErr) {
 			diagnostic = jsonErr.Error()
+		}
+		var headerErr *runner.HeaderError
+		if errors.As(result.Err, &headerErr) {
+			diagnostic = headerErr.Error()
 		}
 		var bodyErr *runner.BodyError
 		if errors.As(result.Err, &bodyErr) {

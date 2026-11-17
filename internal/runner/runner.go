@@ -48,6 +48,7 @@ const (
 	FileFailed     Outcome = "erro de arquivo externo"
 	CaptureFailed  Outcome = "erro de captura"
 	HeaderMismatch Outcome = "assertion de header divergente"
+	HeaderFailed   Outcome = "erro de avaliação de header"
 	JSONMismatch   Outcome = "assertion JSON divergente"
 	JSONFailed     Outcome = "erro de avaliação JSON"
 	BodyMismatch   Outcome = "assertion de body divergente"
@@ -61,6 +62,7 @@ type EntryResult struct {
 	JSONFailure   *JSONFailure
 	JSONError     *JSONError
 	HeaderFailure *HeaderFailure
+	HeaderError   *HeaderError
 	Entry         parser.Entry
 	Outcome       Outcome
 	Status        int
@@ -292,7 +294,10 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 			result.Err = assertionErr
 			var jsonErr *JSONError
 			var bodyErr *BodyError
+			var headerErr *HeaderError
 			switch {
+			case errors.As(assertionErr, &headerErr):
+				result.ErrorPosition = headerErr.Position
 			case errors.As(assertionErr, &jsonErr):
 				current.JSONError = jsonErr
 				result.ErrorPosition = jsonErr.Position

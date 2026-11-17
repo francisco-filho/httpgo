@@ -1033,7 +1033,7 @@ Primeira ocorrência em vez de lista, esperado estático em vez de interpolado,
 validação antecipada e códigos são contratos próprios, não equivalência geral
 de engine/gramática. Corpus sintético não é homologação da suíte real.
 
-## Esperados JSON dinâmicos — US-30 / issue #60
+## Esperados dinâmicos — US-30 / issue #60
 
 `--render-asserts` é um opt-in por invocação e uma evolução explícita do
 contrato HTTPGo. Sem a flag, permanece o perfil **literal** descrito abaixo.
@@ -1062,6 +1062,30 @@ comparação divergente é **1**. Status e assertions anteriores têm precedênc
 capturas da própria resposta ainda não estão publicadas. Valores secretos e
 seus derivados ficam protegidos antes dos callbacks, sem reter planos nos
 resultados. A flag não altera consultas nem a ordem de publicação.
+
+O mesmo opt-in resolve os esperados textuais de headers/body e os padrões
+`matches` JSON/header. Operandos continuam exigindo strings entre aspas, com
+os escapes já aceitos em cada contexto; números, booleanos e `null` inseridos
+viram texto escalar, nunca arrays/objetos serializados. Por exemplo:
+
+```hurl
+GET {{base_url}}/orders/{{order_number}}
+HTTP 200
+[Asserts]
+header "X-Order" contains "{{order_number}}"
+body not contains "{{forbidden}}"
+jsonpath "$.name" matches "^{{order_pattern}}$"
+```
+
+Metacaracteres inseridos participam da regex **sem escape automático**. Um
+padrão sem referências é compilado antes da rede; um padrão dinâmico é compilado
+somente ao alcançar a assertion, antes da consulta. Padrão final inválido ou
+não suportado é erro de avaliação **2**, sem expor o erro bruto da engine.
+A substituição não é recursiva, inclusive em regex. Ausência/vazio, pertencimento
+JSON tipado e primeira ocorrência de header mantêm as regras existentes.
+Negação não aprova esperado inválido; headers sensíveis ocultam ambos os lados.
+A flag não habilita regex de body, operadores novos, consultas dinâmicas ou
+interpolação de padrões de captura.
 
 ## Igualdade JSON — US-08 / issue #20
 

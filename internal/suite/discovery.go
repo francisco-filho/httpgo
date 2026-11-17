@@ -227,7 +227,13 @@ func (s *Suite) protectRunError(err error) error {
 	var fileErr *runner.FileError
 	var captureErr *runner.CaptureError
 	var jsonErr *runner.JSONError
+	var bodyErr *runner.BodyError
+	var headerErr *runner.HeaderError
 	switch {
+	case errors.As(err, &headerErr):
+		detail = headerErr.Error()
+	case errors.As(err, &bodyErr):
+		detail = bodyErr.Error()
 	case errors.As(err, &renderErr):
 		detail = renderErr.Error()
 	case errors.As(err, &fileErr):
