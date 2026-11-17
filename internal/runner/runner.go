@@ -56,6 +56,7 @@ const (
 )
 
 type EntryResult struct {
+	Duration      time.Duration // Logical entry, including preparation, attempts and waits; excludes reporting.
 	Attempts      int
 	BodyFailure   *BodyFailure
 	BodyError     *BodyError
@@ -118,6 +119,7 @@ type Runner struct {
 	readFile   func(context.Context, string) ([]byte, error)
 	openUpload func(string) (uploadFile, error)
 	wait       func(context.Context, time.Duration) error
+	now        func() time.Time
 }
 
 // New accepts an optional synchronous reporter, called before the next entry.
@@ -130,7 +132,7 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 	if renderer == nil {
 		renderer, _ = template.New(nil, nil)
 	}
-	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload, wait: waitInterval}
+	return &Runner{executor: executor, renderer: renderer, report: report, readFile: readPayload, openUpload: openUpload, wait: waitInterval, now: time.Now}
 }
 
 // Options applies to one execution only. The zero value preserves external bytes.

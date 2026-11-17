@@ -60,7 +60,7 @@ func parseArguments(args []string) (arguments, error) {
 			}
 			switch name {
 			case "--output":
-				if outputSeen || value != "junit" {
+				if outputSeen || (value != "junit" && value != "html") {
 					invalid = true
 				}
 				outputSeen, result.output = true, value
@@ -99,6 +99,9 @@ func parseArguments(args []string) (arguments, error) {
 		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
 	}
 	if outputSeen != outputFileSeen {
+		if result.output == "html" {
+			return result, fmt.Errorf("HTML exige --output html e --output-file <caminho>; use httpgo --help")
+		}
 		return result, fmt.Errorf("JUnit exige --output junit e --output-file <caminho>; use httpgo --help")
 	}
 	if invalid || len(result.files) == 0 {

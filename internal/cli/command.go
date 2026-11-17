@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"capimgrosso.com/httpgo/internal/config"
+	"capimgrosso.com/httpgo/internal/report"
 	"capimgrosso.com/httpgo/internal/runner"
 	"capimgrosso.com/httpgo/internal/suite"
 	"capimgrosso.com/httpgo/internal/transport"
@@ -21,6 +22,7 @@ type BuildInfo struct{ Version, Commit, Date string }
 type Command struct {
 	executor   runner.HTTPExecutor
 	openReport func(string) (io.WriteCloser, error)
+	reportNow  func() time.Time
 	build      BuildInfo
 	args       []string
 	in         io.Reader
@@ -80,11 +82,16 @@ func (c *Command) executeContext(ctx context.Context) int {
 	entryReporter := c.renderEntry
 	fileReporter := c.renderFile
 	var diagnostics []string
-	if args.output == "junit" {
+	var htmlDetails []report.HTMLFile
+	if args.output == "junit" || args.output == "html" {
 		entryReporter = nil
 		fileReporter = func(_ suite.FileResult, run runner.Result, loadErr error) error {
 			text := c.junitDiagnostic(run, loadErr)
-			diagnostics = append(diagnostics, text)
+			if args.output == "html" {
+				htmlDetails = append(htmlDetails, report.HTMLFile{Diagnostic: text, Entries: c.htmlEntries(run)})
+			} else {
+				diagnostics = append(diagnostics, text)
+			}
 			if text == "" {
 				return nil
 			}
@@ -103,6 +110,14 @@ func (c *Command) executeContext(ctx context.Context) int {
 			return c.fail(fmt.Sprintf("não foi possível gravar relatório JUnit em %q; verifique o destino e as permissões de escrita", args.outputFile))
 		}
 	}
+	var htmlPath string
+	if args.output == "html" {
+		var err error
+		htmlPath, err = c.writeHTML(args.outputFile, result, htmlDetails)
+		if err != nil {
+			return c.fail(fmt.Sprintf("não foi possível gravar relatório HTML em %q; verifique o destino e as permissões de escrita", args.outputFile))
+		}
+	}
 	if result.ReportErr != nil {
 		pos := result.ReportPosition
 		return c.fail(fmt.Sprintf("%q:%d:%d: não foi possível escrever o resultado; execução interrompida", pos.File, pos.Line, pos.Column))
@@ -112,7 +127,12 @@ func (c *Command) executeContext(ctx context.Context) int {
 			return 2
 		}
 	}
-	if args.output == "junit" {
+	if args.output == "html" {
+		if _, err := fmt.Fprintf(c.err, "relatório HTML gerado em %q\n", htmlPath); err != nil {
+			return 2
+		}
+	}
+	if args.output == "junit" || args.output == "html" {
 		return result.Code
 	}
 	if err := c.renderSuite(result.Summary); err != nil {

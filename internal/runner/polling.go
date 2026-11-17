@@ -34,7 +34,12 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 			result.Err, result.ErrorPosition = err, entry.Position
 			return result
 		}
+		begin := r.now()
 		execution := r.pollEntry(ctx, scenario, entry, options, session)
+		duration := max(time.Duration(0), r.now().Sub(begin))
+		for i := range execution.Entries {
+			execution.Entries[i].Duration = duration
+		}
 		result.Attempts.Started += execution.Attempts.Started
 		result.Attempts.Completed += execution.Attempts.Completed
 		result.Attempts.StatusChecks += execution.Attempts.StatusChecks
