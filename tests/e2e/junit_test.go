@@ -3,6 +3,7 @@ package e2e
 import (
 	"encoding/json"
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 )
+
+var junitArtifactDir = flag.String("junit-artifact-dir", "", "retain real CLI JUnit artifacts for CI consumer validation")
 
 type junitResult struct {
 	Tests    int     `xml:"tests,attr"`
@@ -92,6 +95,14 @@ func TestJUnitRealSuiteAndUnchangedRequests(t *testing.T) {
 			for _, tc := range doc.Cases {
 				if tc.Time < 0 || (tc.Skipped != nil && tc.Time != 0) {
 					t.Fatalf("invalid duration: %+v", tc)
+				}
+			}
+			if *junitArtifactDir != "" {
+				if err := os.MkdirAll(*junitArtifactDir, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(*junitArtifactDir, mode+".xml"), []byte(raw), 0600); err != nil {
+					t.Fatal(err)
 				}
 			}
 		})

@@ -1,4 +1,25 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-33
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-33
+
+## Relatório JUnit — US-17 / issue #68
+
+`--output junit --output-file <caminho>` é contrato da CLI HTTPGo, não nova
+construção `.hurl` nem promessa de relatório idêntico ao Hurl. O modo texto padrão
+não muda. JUnit possui um testcase por arquivo, nomes normalizados, tempos em
+segundos e distinção de `failure` (assertion), `error` (execução/entrada) e
+`skipped` (não executado). Exit codes próprios continuam 0/1/2, com 2 prioritário.
+YAML hierárquico e interpolação externa permanecem extensões explícitas HTTPGo.
+
+Nenhum par em `testdata/compatibility/` foi alterado: a gramática/execução HTTP não
+mudou. A aceitação do XML é verificada separadamente com o parser original do
+consumidor **dorny/test-reporter v2.6.0**, `java-junit`, commit
+`3d76b34a4535afbd0600d347b09a6ee5deb3ed7f`. Ele agrupa `failure` e `error` como
+falhos na interface, mas preservamos sua distinção no artefato. Nomes com aspas,
+Unicode e caracteres XML e diagnósticos escapados são testados. Não há equivalência
+universal de todos os consumidores JUnit nem anotação clicável de fonte prometida
+pelo parser Java para arquivos `.hurl`.
+
+[Contrato/CI](junit.md), [arquitetura](architecture.md#serialização-junit--us-17--issue-68)
+e [evidência](validation.md#us-17--issue-68--história-0017).
 
 ## Captura de contagem — US-33 / issue #66
 
@@ -674,8 +695,8 @@ não recebe contagem planejada inventada. Exit codes próprios continuam 0/1/2,
 com 2 prevalecendo sobre 1; itens não executados nunca são aprovados. Configuração
 única, sessão/capturas novas por arquivo e ausência de cookie jar continuam
 restrições explícitas. A proteção de variantes persiste entre arquivos da mesma
-invocação sem compartilhar variáveis capturadas. Não anuncia JUnit, paralelismo,
-dependências entre arquivos nem login compartilhado.
+invocação sem compartilhar variáveis capturadas. JUnit é acrescentado na US-17;
+paralelismo, dependências entre arquivos e login compartilhado seguem fora do recorte.
 
 Não há modificação do corpus de **139 pares** nem regeneração das observações
 anteriores nesta história. O gate permanece `make compatibility` com binário
@@ -744,7 +765,8 @@ HTTP; vazio presente e literais numéricos/boolean/null permanecem strings. Cont
 recebido não é expandido novamente. Destinos são marcados antes de overrides,
 acumulando `secrets`/`--secret`; protege valores conhecidos, substitutos e derivados
 nos resultados/assertions/callbacks/streams. Credenciais reais em flags continuam
-proibidas. Sem dotenv, stdin, overrides `HTTPGO_*`, cofres ou JUnit.
+proibidas. Sem dotenv, stdin, overrides `HTTPGO_*` ou cofres. A US-17 reutiliza
+esta proteção no relatório JUnit.
 
 `TestProcess*` em config, CLI, runner e E2E comprova o contrato separadamente,
 com consulta falsa contada e HTTP real no binário, ambiente de filho controlado,

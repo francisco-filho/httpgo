@@ -3,6 +3,48 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Publicar resultados JUnit no CI (US-17 / issue #68)
+
+```bash
+httpgo test tests/ --output junit --output-file target/test-results.xml
+```
+
+Um arquivo de cenário corresponde a um `testcase`: assertion divergente vira
+`failure`, erro de entrada/captura/renderização/transporte vira `error`, e arquivo
+não executado por `--fail-fast` vira `skipped`. Os nomes são os caminhos relativos
+normalizados da descoberta (fallback absoluto entre unidades); duração em segundos.
+O relatório reutiliza a execução, **sem reenviar requisições**.
+
+Exemplo mínimo [versionado](testdata/scenarios/scenario_junit.hurl):
+
+```hurl
+GET {{base_url}}/health
+HTTP 200
+```
+
+```bash
+httpgo test testdata/scenarios/scenario_junit.hurl --var base_url=http://localhost:8080 --output junit --output-file target/test-results.xml
+```
+
+Requer um servidor com `/health`: 200 retorna **0**, outro status retorna **1** e
+produz o artefato com `failure`. `--output junit` exige `--output-file`; cria o
+pai quando possível, substitui o destino existente e deixa stdout vazio.
+Diagnósticos seguros vão a stderr. Erro de execução ou escrita/fechamento retorna
+**2**, que prevalece sobre **1**, sem anunciar publicação bem-sucedida. Falha de
+configuração/descoberta anterior à execução não cria nem modifica o relatório.
+
+O XML não inclui bodies/headers integrais e reutiliza a proteção de valores
+conhecidos/derivados; segredos arbitrários não marcados não são detectados.
+Credenciais vêm do ambiente do processo, nunca de flags. YAML hierárquico e
+interpolação externa continuam **extensões HTTPGo**, não recursos do formato Hurl.
+Não há envio para serviço externo, dashboard ou formatos além de texto/JUnit.
+
+O [workflow de referência](.github/workflows/junit.yml) usa
+`dorny/test-reporter` **v2.6.0** (`java-junit`), fixado por commit, para validar e
+apresentar artefatos gerados pelo binário real. O consumidor apresenta `failure`
+e `error` como testes falhos, mantendo a distinção no XML. Detalhes de ingestão,
+permissões e reprodução em [docs/junit.md](docs/junit.md).
+
 ## Comparar a quantidade antes e depois (US-33 / issue #66)
 
 ```hurl
@@ -582,8 +624,8 @@ A API demonstrativa deve responder 200 em `/health` e `/profile` e 503 em
   contagem desconhecida explícita. `validadas` conta status aprovado, não sucesso
   completo; ausência de assertion nunca é validação. **2 prevalece sobre 1**.
 
-Sem paralelismo, dependências entre arquivos, login compartilhado, JUnit,
-`--output`/`--output-file` ou novos formatos. O contrato detalhado dos contadores
+Sem paralelismo, dependências entre arquivos ou login compartilhado. A US-17
+acrescenta JUnit opt-in; texto continua o padrão. O contrato detalhado dos contadores
 está em [`docs/subset.md`](docs/subset.md#cli-e-saída).
 
 ## Executar
@@ -864,7 +906,7 @@ se a resposta ecoar o segredo em header comum ou JSON.
   arbitrárias; não protege o ambiente contra acesso por outros processos privilegiados.
 
 Sem importar outras variáveis do sistema, overrides automáticos `HTTPGO_*`, dotenv,
-stdin, composição parcial, referências em listas ou JUnit. É **extensão HTTPGo**,
+stdin, composição parcial ou referências em listas. É **extensão HTTPGo**,
 não sintaxe Hurl; YAML continua fora do corpus diferencial.
 
 ## Payload de arquivo externo (US-09 / issue #22)

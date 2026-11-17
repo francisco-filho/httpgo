@@ -1,4 +1,84 @@
-# Validação — US-01 a US-16, US-20 a US-33
+# Validação — US-01 a US-17, US-20 a US-33
+
+## US-17 — issue #68 / história 0017
+
+Plano da issue #68 executado sem planner, somente backend, nas três tasks
+registradas e autoaprovadas na fila 0017. `back:1`: `7aa77a7` (renderer JUnit e
+parser do consumidor); `back:2`: `b00dc13` (flags/destino/segurança e E2E);
+`back:3`: esta alteração (workflow de referência, documentação e regressão).
+Sem frontend/estáticos, dependências de runtime novas, alteração de Go, lint ou
+contratos de parsing/execução. Nenhum arquivo em `testdata/compatibility/` mudou.
+O novo workflow foi explicitamente previsto na task 3. Nenhum código-fonte Hurl
+foi consultado/adaptado; backdev não executou SonarQube.
+
+### Ambiente e comandos executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; ferramentas existentes `goimports` e
+`golangci-lint` selecionadas pelo PATH `/home/ff/go/bin`. Para o consumidor de
+CI, Node 24 e npm, checkout isolado de `dorny/test-reporter` v2.6.0 no commit
+`3d76b34a4535afbd0600d347b09a6ee5deb3ed7f`; `npm ci --ignore-scripts` e
+`npm run build` executados sem alterar seu código-fonte. São dependências de
+desenvolvimento/CI do consumidor, não do binário Go.
+
+Passaram:
+
+- Task 1: `go test ./internal/report`; golden gerado somente com `-update` e
+  conferido sem atualização. `node tests/ci/junit-consumer.mjs <consumer>
+  testdata/report/junit.xml` confirmou quatro testcases, um sucesso, dois
+  falhos (`failure`/`error`), um skipped, Unicode/aspas/caracteres reservados,
+  durações e diagnóstico exatamente preservados após parse.
+- Task 2: `go test ./internal/cli ./internal/report` e
+  `go test ./tests/e2e -run '^TestJUnit' -count=1`, com binário compilado e
+  `httptest.Server`. Permissão negada testada em processo realmente não
+  privilegiado (inclusive se harness roda como root); `/dev/full` comprova I/O
+  real, sem limitar a validação a writer falso.
+- Em **cada task com código**, `make fmt lint test`, `go vet ./...` e
+  `make build` passaram antes do commit. Lint: **0 issues**; testes com
+  **`-race -cover`**, report **100%**, CLI **97,9%** na validação integrada.
+- Gate final da task 3: `go test ./tests/e2e -count=1`, `make e2e`,
+  `make fmt lint test`, `go vet ./...`, `go build ./...`, `make build`,
+  `git diff --check` e `gofmt -l` nos arquivos Go alterados passaram.
+- Ingestão dos XMLs do binário:
+  `go test ./tests/e2e -run '^TestJUnit' -count=1 -junit-artifact-dir=<dir>` e
+  `node tests/ci/junit-execution.mjs <consumer> <dir>` passaram. Sucesso:
+  **4/0/0**; misto: **2/2/0**; fail-fast de assertion: **1/1/2**;
+  fail-fast de transporte: **2/1/1**, na ordem aprovados/falhos/skipped.
+  O consumidor apresenta `failure` e `error` ambos como failed; o XML distingue.
+- Regressão adicional `make compatibility`: **440 pares**, Hurl **8.0.0**
+  existente selecionado pelo PATH, sem skip, atualização ou alteração de corpus.
+- Fuzzing adicional de parser e template: `FuzzParse` e `FuzzRender` com
+  `-fuzztime=5s -parallel=2`, **2.788** e **18.950** execuções, sem crash.
+- YAML do workflow lido por parser YAML local; scripts de ingestão executados
+  com o parser original que será usado pela action fixada.
+
+### Rastreabilidade GO-170–GO-175
+
+| GO | Evidência automatizada |
+|---|---|
+| 170 | `report.TestJUnitResults`, E2E `TestJUnitRealSuiteAndUnchangedRequests` e scripts `tests/ci/`: contagens, durações, identidade por arquivo e estados; modos contínuo e fail-fast |
+| 171 | `cli.TestJUnitSuiteClassificationAndNoReexecution`, E2E acima e `TestJUnitDocumentedExample`: flags intercaladas/inline, criação de pais, artefato em falha, código preservado e mesma quantidade de requests que texto |
+| 172 | `cli.TestJUnitPreexecutionErrorsLeaveDestinationUntouched`, E2E `TestJUnitRealPreexecutionAndDestinationErrors`: configuração/descoberta/cancelamento prévio sem HTTP nem relatório fictício; destino prévio intacto |
+| 173 | `report.TestJUnitResults`, `TestJUnitUnknownStateAndInvalidXMLCharacters`, E2E de suíte/segredos e parser original: aspas/Unicode/`&`/`<` escapados, caracteres XML inválidos substituídos por U+FFFD |
+| 174 | `report.TestJUnitWriteErrors`, `cli.TestJUnitDestinationFailures`, `TestJUnitDiagnosticFailureAndCancellationStillReport`, E2E `TestJUnitRealWriteAndPermissionFailures`: open/write/short/close, destino inválido/sem permissão, prioridade 2 e fechamento garantido |
+| 175 | `cli.TestJUnitSecretExpectedAndActualOperands`, `TestJUnitProtectsEarlierDiagnosticsAndNames`, E2E `TestJUnitRealSecretsAndEscaping`: ambiente/capturas, operandos esperados/reais, headers sensíveis, nomes e descoberta posterior protegidos; valores enviados intactos |
+
+### Limites da evidência
+
+O [workflow](../.github/workflows/junit.yml) está configurado para ingerir,
+reter e apresentar os artefatos reais, com verificação dos totais publicados.
+**A publicação visual de checks no GitHub Actions não foi executada nesta sessão**:
+não houve push nem disparo remoto. A evidência local é de ingestão efetiva pelo
+parser original do mesmo consumidor fixado, não uma declaração de execução remota.
+PRs de fork mantêm parser/artefatos, mas não publicação de check por token read-only.
+
+Falhas sintéticas deliberadas no relatório de demonstração não são falhas dos
+testes Go: os estados/exit codes/requests são verificados antes da publicação.
+O workflow não relaxa os gates `make test/lint`. Corpus sintético não equivale à
+homologação de API real; outros consumidores JUnit não foram certificados.
+macOS/Windows não executados (opcionais nesta história pelo plano v4).
+Segredos arbitrários não marcados/transformações desconhecidas permanecem fora
+da garantia, assim como redação retroativa de stderr incremental. Escrita não é
+transacional; uma falha de I/O pode deixar artefato parcial e sempre retorna 2.
 
 ## US-33 — issue #66 / história 0033
 
