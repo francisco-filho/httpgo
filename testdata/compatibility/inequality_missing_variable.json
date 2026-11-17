@@ -1,0 +1,7 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "1",
+  "classification": "missing expected variable is an evaluation error, not successful inequality",
+  "httpgo": {"exit": 2, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

@@ -1,0 +1,6 @@
+{
+  "response_json": "1",
+  "classification": "malformed late expected is rejected before any network request by both runners",
+  "httpgo": {"exit": 2, "paths": null},
+  "hurl": {"exit": 2, "paths": null}
+}

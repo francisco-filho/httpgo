@@ -1,0 +1,6 @@
+{
+  "response_json": "[1]",
+  "classification": "intentional count != restriction: HTTPGo validates whole file before first send",
+  "httpgo": {"exit": 2, "paths": null},
+  "hurl": {"exit": 0, "paths": ["/health", "/capture", "/health"]}
+}

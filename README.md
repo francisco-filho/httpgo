@@ -3,6 +3,57 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Verificar mudança de valor JSON (US-32 / issue #64)
+
+```hurl
+POST {{base_url}}/session/login
+HTTP 200
+[Captures]
+old_token: jsonpath "$.accessToken"
+
+POST {{base_url}}/session/renew
+HTTP 200
+[Asserts]
+jsonpath "$.accessToken" != "{{old_token}}"
+[Captures]
+new_token: jsonpath "$.accessToken"
+
+GET {{base_url}}/next
+Authorization: Bearer {{new_token}}
+HTTP 200
+```
+
+Salve como `rotation.hurl` ou use o [cenário versionado](testdata/scenarios/scenario_json_inequality_rotation.hurl):
+
+```bash
+httpgo test rotation.hurl --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8080
+```
+
+A API deve retornar `accessToken` string em login/renovação e aceitar o token novo
+em `/next`. Novo valor passa (**0**); repetição ou ausência falha (**1**) e impede
+a próxima requisição/publicação. JSON inválido, percurso incompatível ou variável
+dinâmica ausente são erros (**2**), nunca aprovação por inversão.
+
+- `!=` usa a mesma comparação tipada/exata de `==`: número e string diferem;
+  `1`, `1.0`, `1e0` não. Objetos ignoram ordem das chaves; arrays preservam ordem.
+  `null` presente é valor e difere de string vazia/número, mas não de `null`.
+- Aceita os seis tipos JSON da igualdade e as consultas já disponíveis, sem
+  ampliar JSONPath. `HTTP` é obrigatório. `count !=`, header/body `!=` e negação
+  genérica continuam rejeitados antes de qualquer envio do arquivo.
+- O perfil literal é preservado: sem `--render-asserts`, `"{{old_token}}"` é texto.
+  Com a flag (evolução explícita HTTPGo), resolve uma vez apenas valores iniciais
+  ou capturas anteriores, antes da consulta/decode da assertion alcançada.
+- **Marque segredos explicitamente** como acima: `--secret` fornece nomes, nunca
+  credenciais. Valores secretos iniciais vêm do ambiente, não de flags. Operandos
+  protegidos/derivados e capturas secretas pendentes ficam ocultos em diagnósticos;
+  coleções são somente resumos. A ferramenta não detecta todo segredo arbitrário.
+- **Diferença não garante revogação do token antigo, validade do novo ou ausência
+  de outros efeitos**. Faça requisições/verificações independentes para prová-los.
+
+[Contrato](docs/subset.md#desigualdade-json--us-32--issue-64),
+[arquitetura](docs/architecture.md#desigualdade-json--us-32--issue-64) e
+[diferenças observadas com Hurl 8.0.0](docs/compatibility.md#desigualdade-json--us-32--issue-64).
+
 ## Selecionar com valores anteriores (US-31 / issue #62)
 
 ```hurl

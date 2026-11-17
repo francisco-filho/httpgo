@@ -1,0 +1,6 @@
+{
+  "response_json": "1.0",
+  "classification": "equivalent numeric representations are equal: inequality fails in both runners",
+  "httpgo": {"exit": 1, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

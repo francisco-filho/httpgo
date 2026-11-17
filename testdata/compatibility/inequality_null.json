@@ -1,0 +1,6 @@
+{
+  "response_json": "null",
+  "classification": "present null equals null: inequality fails in both runners",
+  "httpgo": {"exit": 1, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

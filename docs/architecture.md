@@ -1,10 +1,41 @@
-# Arquitetura implementada — US-01 a US-16, US-20 a US-31
+# Arquitetura implementada — US-01 a US-16, US-20 a US-32
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
-#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31) e plano v4 referenciado nelas.
+#50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Desigualdade JSON — US-32 / issue #64
+
+A fatia reutiliza o modelo `parser.JSONAssertion` e os planos de esperado da
+US-30, sem novo pacote/interface/dependência. `parseJSONAssertion` reconhece
+`assertion.JSONNotEqualOperator` (`!=`) na comparação direta, não em `count`,
+headers/body ou negação genérica. Validação integral do arquivo e posições
+originais são as existentes; JSONPath não muda.
+
+`assertion.ValidateJSONExpected` admite os mesmos seis tipos de `==`.
+`EvaluateJSON` exige presença e nega **somente** `JSONEqual(expected, actual)`,
+nunca ausência ou erro. Reutiliza números decimais exatos e comparação recursiva:
+sem float64, sem expansão proporcional ao expoente, chaves sem ordem, arrays com
+ordem. Ausência/igualdade são divergência 1; decode/percurso são avaliação 2.
+
+`runner.checkAssertions` prepara o esperado alcançado US-30 antes de vincular a
+consulta/decode. A declaração resolvida é cópia local: cenário/planos originais
+não mudam. Status → assertions na ordem escrita → publicação atômica de capturas
+→ callback continua inalterado. Captura própria/futura não é esperado disponível.
+
+Para `!=`, `projectionFailure` também atende caminhos singulares: escalares seguros
+conservam JSON tipado; estruturas são resumo de tipo (array inclui contagem),
+nunca coleções completas. Proveniência, `protectedJSON` e `pendingSecret` ocultam
+ambos os operandos, sem avaliar captura antecipadamente. `safeEntry` elimina
+esperados/planos operacionais nos resultados/callbacks. A CLI apenas apresenta
+`JSONFailure` e localização/operador, sem reavaliar nem inverter erros.
+
+Transporte não muda: resposta final consumida/fechada antes da avaliação, contexto
+e prazo propagados. Falha de transporte ou apresentação encerra; erro de escrita
+mantém prioridade 2 e não reimprime no writer falho. Nenhum retry novo foi criado.
+Diferença de valor não implica revogação/validade de credenciais ou outros efeitos.
 
 ## Operandos dinâmicos — US-31 / issue #62
 

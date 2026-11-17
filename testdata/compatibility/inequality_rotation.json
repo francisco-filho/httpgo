@@ -1,0 +1,10 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_sequence": [
+    {"status": 200, "response_json": "{\"token\":\"synthetic-old\"}"},
+    {"status": 200, "response_json": "{\"token\":\"synthetic-new\"}"}
+  ],
+  "classification": "independent rotation fixture: different captured value passes; HTTPGo profile opt-in versus Hurl implicit interpolation",
+  "httpgo": {"exit": 0, "paths": ["/poll", "/poll", "/health"]},
+  "hurl": {"exit": 0, "paths": ["/poll", "/poll", "/health"]}
+}

@@ -1,0 +1,6 @@
+{
+  "response_json": "{\"b\":[true,null],\"a\":1}",
+  "classification": "HTTPGo accepts structured JSON expected values; Hurl grammar restricts this expected operand",
+  "httpgo": {"exit": 1, "paths": ["/capture"]},
+  "hurl": {"exit": 2, "paths": null}
+}

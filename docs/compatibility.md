@@ -1,4 +1,45 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-31
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-32
+
+## Desigualdade JSON — US-32 / issue #64
+
+**Ampliação intencional de contrato:** o par histórico
+`assert_json_operator_unsupported` conserva seu nome/entrada, mas passa de
+HTTPGo **2, zero envios** para **0, /capture → /health**. A observação Hurl não
+muda. Nenhum outro par histórico foi alterado; o negativo de scenarios com nome
+semelhante agora rejeita `count !=`, que permanece fora do recorte.
+
+São **18 pares novos `inequality_*`**, total integrado **424 pares** (406 + 18).
+O harness da US-30 continua selecionando `httpgo_profile` por par: a flag própria
+só vai ao HTTPGo, nunca ao Hurl. Cada runner recebe fixture independente/resetada.
+Hurl de referência **8.0.0**, obrigatório, sem skip; evidência Linux com binário
+real/HTTP local. Não equivale à homologação da suíte real.
+
+| Par `inequality_…` | HTTPGo | Hurl 8.0.0 | Classificação observada |
+|---|---|---|---|
+| `types` | 0, /capture → /health | 0, mesmo fluxo | número difere de string numérica |
+| `equal` | 1, /capture | 4, /capture | 1 e 1.0 não diferem |
+| `null` | 1, /capture | 4, /capture | null presente não difere de null |
+| `absent` | 1, /capture | 4, /capture | ausência não comprova mudança |
+| `precision` | 0, /capture → /health | 0, mesmo fluxo | ambos distinguem estes inteiros adjacentes além de float64; não prova precisão irrestrita Hurl |
+| `object` | 1, /capture | 2, zero envios | HTTPGo aceita objeto esperado; chaves reordenadas são iguais; gramática Hurl rejeita operando |
+| `array` | 0, /capture → /health | 2, zero envios | HTTPGo aceita array esperado e preserva ordem; gramática Hurl rejeita operando |
+| `invalid_json` | 2, /capture | 4, /capture | nenhum aprova JSON inválido; categorias diferem |
+| `traversal` | 2, /capture | 4, /capture | percurso estrito é erro HTTPGo, assertion falha Hurl |
+| `literal` | 0, /capture → /health | 4, /capture | HTTPGo não interpola esperado sem opt-in; Hurl interpola |
+| `dynamic` | 1, /capture → /capture | 4, mesmo fluxo | captura anterior repetida falha; opt-in explícito versus interpolação implícita |
+| `rotation` | 0, /poll → /poll → /health | 0, mesmo fluxo | valor novo difere do anterior |
+| `dynamic_number` | 1, /capture | 4, /capture | esperado completo dinâmico conserva tipo numérico |
+| `missing_variable` | 2, /capture | 4, /capture | esperado ausente não aprova por inversão |
+| `invalid_late` | 2, zero envios | 2, zero envios | esperado adicional rejeita arquivo inteiro |
+| `count_unsupported` | 2, zero envios | 0, /health → /capture → /health | limite intencional HTTPGo |
+| `header_unsupported` | 2, zero envios | 0, /health → /health | desigualdade só JSON direto |
+| `body_unsupported` | 2, zero envios | 0, /capture → /health | desigualdade só JSON direto |
+
+Compatibilidade não exige stdout ou códigos numéricos iguais. Os testes HTTPGo
+cobrem ainda os seis tipos, vazios, zeros/expoentes extremos, precisão aninhada,
+primeira falha, capturas atômicas e segredos. Exemplos de rotação usam marcação
+explícita de tokens; corpus contém somente dados sintéticos. `!=` prova diferença
+de valor, não revogação do token anterior, validade do novo ou outros efeitos.
 
 ## Operandos dinâmicos — US-31 / issue #62
 
@@ -198,7 +239,7 @@ permanece diferente da ordem do Hurl já documentada.
 Os negativos históricos `unsupported_capture_filter.hurl` (existência) e demais
 operadores continuam negativos. O cenário `unsupported_projection_filter.hurl`
 e as listas de negativos de parser/E2E passaram intencionalmente de igualdade
-para `!=`, ainda fora do recorte; **nenhum par antigo de compatibility mudou**.
+para `!=`, fora do recorte naquela entrega (agora suportado para JSON direto pela US-32); **nenhum par antigo de compatibility mudou naquela entrega**.
 Não se anuncia JSONPath completo, filtros de existência, lógica, regex, funções,
 scripts, operadores além de igualdade, propriedades/operadores dinâmicos
 ou conformidade RFC integral. Literais de filtro são sempre ocultados em
@@ -606,7 +647,7 @@ As observações estão versionadas nos pares `.hurl`/`.json`; resposta é JSON 
 
 **Ampliação intencional do contrato:** `exists` JSON, `count` de arrays e os
 comparadores `>`, `>=`, `<`, `<=` deixam de ser rejeitados. No corpus de cenários,
-as antigas rejeições globais de exists/count passam a `!=`/`length`, que continuam
+as antigas rejeições globais de exists/count passaram a `!=`/`length`, que naquela entrega continuavam
 não suportados. Novos negativos documentam esperados inválidos e count em captura.
 São **20 novos pares `structure_*`**, total **136**; as **116 observações antigas
 permanecem inalteradas**. Sem reutilizar código-fonte Hurl, alterar o harness ou
@@ -1049,7 +1090,7 @@ nem atualização automática indiscriminada das observações.
 | `assert_json_literal` | 0; /capture → /health | 4; somente /capture | esperado `{{name}}` é literal aqui, mesmo definido; Hurl interpola |
 | `assert_json_invalid_late`, `assert_json_without_http` | 2; zero envios | 2; zero envios | literal malformado/ausência de HTTP em entrada tardia rejeita arquivo integral |
 | `assert_json_query_unsupported` | **0 na US-27**; /health → /capture | 0; mesmos paths | wildcard de array passa a suportado intencionalmente na issue #52 |
-| `assert_json_operator_unsupported` | 2; zero envios | 0; /capture → /health | `!=` continua fora do recorte aqui |
+| `assert_json_operator_unsupported` | 0; /capture → /health | 0; /capture → /health | **ampliação US-32:** `!=` JSON direto agora suportado |
 
 A primeira rodada encontrou a rejeição do esperado com expoente e a aceitação
 do wildcard no Hurl; somente as duas novas observações foram corrigidas e os

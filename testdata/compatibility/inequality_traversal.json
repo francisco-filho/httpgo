@@ -1,0 +1,6 @@
+{
+  "response_json": "{\"x\":1}",
+  "classification": "HTTPGo strict traversal is evaluation error 2; Hurl reports failed assertion 4; neither approves",
+  "httpgo": {"exit": 2, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

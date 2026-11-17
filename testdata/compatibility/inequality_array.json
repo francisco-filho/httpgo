@@ -1,0 +1,6 @@
+{
+  "response_json": "[2,1]",
+  "classification": "HTTPGo structured expected compares ordered arrays; Hurl grammar restricts this operand",
+  "httpgo": {"exit": 0, "paths": ["/capture", "/health"]},
+  "hurl": {"exit": 2, "paths": null}
+}

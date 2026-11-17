@@ -1,0 +1,8 @@
+{
+  "httpgo_profile": "literal",
+  "response_json": "\"resolved\"",
+  "variables": ["v=resolved"],
+  "classification": "HTTPGo preserves literal placeholders without opt-in; Hurl interpolates expected value",
+  "httpgo": {"exit": 0, "paths": ["/capture", "/health"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

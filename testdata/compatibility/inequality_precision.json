@@ -1,0 +1,6 @@
+{
+  "response_json": "9007199254740992",
+  "classification": "both runners distinguish these adjacent integers beyond float64; this pair does not establish unrestricted Hurl precision",
+  "httpgo": {"exit": 0, "paths": ["/capture", "/health"]},
+  "hurl": {"exit": 0, "paths": ["/capture", "/health"]}
+}

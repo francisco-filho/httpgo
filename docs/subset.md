@@ -22,7 +22,26 @@ continua obrigatório; erro estático em qualquer entrada impede todo envio.
 `count !=`, desigualdade de header/body e negação genérica não são suportados.
 
 [Rotação completa](../testdata/scenarios/scenario_json_inequality_rotation.hurl):
-execute com `--render-asserts --secret old_token --secret new_token` e
+
+```hurl
+POST {{base_url}}/session/login
+HTTP 200
+[Captures]
+old_token: jsonpath "$.accessToken"
+
+POST {{base_url}}/session/renew
+HTTP 200
+[Asserts]
+jsonpath "$.accessToken" != "{{old_token}}"
+[Captures]
+new_token: jsonpath "$.accessToken"
+
+GET {{base_url}}/next
+Authorization: Bearer {{new_token}}
+HTTP 200
+```
+
+Execute com `--render-asserts --secret old_token --secret new_token` e
 `--var base_url=http://localhost:8080`. As flags `--secret` marcam nomes, nunca
 fornecem credenciais. Diagnósticos ocultam operandos secretos/derivados e capturas
 secretas pendentes; coleções são resumos de tipo, não seu conteúdo.

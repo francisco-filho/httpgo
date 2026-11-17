@@ -1,4 +1,83 @@
-# Validação — US-01 a US-16, US-20 a US-31
+# Validação — US-01 a US-16, US-20 a US-32
+
+## US-32 — issue #64 / história 0032
+
+Plano da issue #64 executado sem planner, somente backend, em três tasks
+registradas/aprovadas na fila 0032. `back:1`: `5f137d8` (desigualdade literal e
+dinâmica ponta a ponta); `back:2`: `f0fbb58` (segurança/falhas externas);
+`back:3`: esta alteração (corpus, ajuda/docs, seeds e gates). Base `221f9ea`,
+com US-08/30 disponíveis. Sem frontend/estáticos, dependências novas, alteração
+de Go, CI/lint ou transporte de produção. Nenhum código-fonte Hurl consultado,
+copiado ou adaptado. Gates locais não substituem revisão; não foi executado
+SonarQube pelo backdev.
+
+### Ambiente e comandos efetivamente executados
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports` e `golangci-lint` existentes
+em `/home/ff/go/bin`. Hurl **8.0.0** existente em
+`/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, selecionado via
+PATH (padrão local 8.0.1), sem instalação. Aviso de metadados libcurl não impediu
+identificação/execução da referência obrigatória.
+
+- Task 1: passaram `go test ./internal/assertion`,
+  `go test ./internal/parser ./internal/runner ./internal/cli`,
+  `go test ./tests/e2e -run 'TestJSON' -count=1`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram `go test ./internal/runner ./internal/cli ./internal/transport`,
+  `go test ./tests/e2e -count=1`, `make fmt lint test`, `go vet ./...` e
+  `go build ./...` antes do commit.
+- Entrega integrada: passaram `make compatibility` com **424 pares** e Hurl
+  **8.0.0**, sem skip ou `-update`; `make fmt lint test` (**0 issues**, testes
+  `-race -cover`), `go vet ./...`, `go build ./...`, `make build` e `make e2e`.
+  Links locais/âncoras Markdown de README/subset/architecture/compatibility
+  conferidos e exemplos publicados comparados com o cenário executado em E2E.
+- Fuzzing com seeds ampliadas, sem crash nos três comandos:
+  - `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+    — 88.698 execuções;
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+    — 12.678 execuções;
+  - `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+    — 7.317 execuções.
+
+### Rastreabilidade GO-415–GO-429
+
+| GO | Evidência automatizada executada |
+|---|---|
+| 415 | `TestJSONInequalityRotation`: login/captura secreta/renovação/binário real, novo token 0, repetido 1, streams seguros e envio dependente bloqueado |
+| 416 | assertion `TestJSONNotEqual`: matriz dos seis tipos/vazios; E2E `TestJSONInequalityValues` distingue número/string/null |
+| 417 | assertion `TestJSONNotEqual` e E2E: 1/1.0/1e0 e zeros com sinal/expoente não diferem |
+| 418 | assertion e E2E: chaves reordenadas iguais, mudança aninhada/ordem de arrays diferentes |
+| 419 | runner `TestJSONInequalityOrderAndPublication`, E2E: propriedade/índice ausente falham 1, diagnóstico ausente distinto de null e sem publicação/avanço |
+| 420 | mesmos testes: JSON inválido/percurso incompatível retornam 2, não sucesso por inversão |
+| 421 | runner `TestJSONInequalityLiteralProfile`, `TestJSONInequalityOrderAndPublication`, CLI `TestJSONInequalityProfilesAndValidation`: literal com variável definida/ausente, tipos/escapes/precisão e não recursão |
+| 422 | runner: variável ausente, captura própria/futura são erro ao alcançar; captura anterior utilizável no E2E de rotação e no teste de derivado |
+| 423 | parser `TestJSONInequalityParsing`, CLI, E2E `TestJSONInequalityDocumentation`: LF/CRLF, HTTP obrigatório, esperado/query inválidos, negativos header/body/count/negação antes da rede |
+| 424 | runner `TestJSONInequalityOrderAndPublication`: status/primeira assertion precedem esperados posteriores; esperado antes de decode/seleção; publicação atômica e erro posterior de captura |
+| 425 | runner `TestJSONInequalitySafeOperands`, `TestJSONInequalityCapturedDerivative`, `TestJSONInequalityExternalFailures`: callbacks/resultados sem planos/operandos/coleções brutos; pendente oculta ambos sem avaliar captura; E2E valida streams |
+| 426 | `TestJSONInequalityDocumentation`, corpus diferencial novo e gate integral: ajuda/exemplos, perfis e diferenças Hurl 8.0.0 |
+| 427 | assertion/runner/E2E: inteiros além de float64, precisão aninhada e expoentes extremos, sem expandir potências |
+| 428 | transporte `TestJSONInequalityRequiresReadAndClose`, `TestJSONInequalityFinalAndCancellation`, runner e E2E `TestJSONInequalityFinalResponse`: resposta final/read/close/prazo/cancelamento sem aprovar parcial ou avançar |
+| 429 | runner `TestJSONInequalityExternalFailures`, CLI `TestJSONInequalityWriterPriority`, E2E Linux `TestJSONInequalityRealOutputFailure`: falha/short write mantém 2 sobre sucesso/divergência/avaliação, sem reimprimir ou próximo envio |
+
+### Mudança de contrato e limites
+
+**Mudança intencional em `testdata/compatibility/`:** somente a observação HTTPGo
+(e classificação) de `assert_json_operator_unsupported.json` muda na base:
+**2, zero envios → 0, /capture → /health**. Entrada e observação Hurl preservadas.
+Adicionados **18 pares `inequality_*`**; outros **405 pares históricos** não
+mudaram. Observações novas conferidas/corrigidas pontualmente a partir de execução
+real e depois validadas integralmente sem regeneração indiscriminada.
+
+Hurl 8.0.0 também falha por ausência; distingue os inteiros adjacentes usados
+neste corpus; gramática rejeita objetos/arrays esperados diretos aceitos pelo
+HTTPGo. Perfis literal/dinâmico divergem pela seleção explícita; percurso inválido
+é erro 2 HTTPGo versus assertion 4 Hurl. Matriz publica essas diferenças, não
+compatibilidade irrestrita. Segredos precisam de marcação explícita; `!=` não
+comprova revogação/validade de tokens nem ausência de efeitos externos.
+
+Corpus é sintético/local, não homologação de suíte real. Não houve builds/testes
+macOS/Windows; opcionais nesta história conforme plano v4, sem bloquear o gate
+Linux. Nenhuma evidência de execução nativa nessas plataformas é anunciada.
 
 ## US-31 — issue #62 / história 0031
 
