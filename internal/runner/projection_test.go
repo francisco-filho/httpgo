@@ -58,7 +58,7 @@ func TestProjectionPredicatesAndOrder(t *testing.T) {
 
 // GO-331,332: captures preserve precision, numeric spelling and literal strings.
 func TestProjectionCaptureReuse(t *testing.T) {
-	for _, raw := range []string{`null`, `true`, `9007199254740993`, `1.2300e+99`, `"{{literal}}"`, `[]`, `{}`, `[9007199254740993,1.00]`, `{"x":[1.2300e+99]}`} {
+	for _, raw := range []string{`null`, `true`, `9007199254740993`, `9223372036854775809`, `1.0000000000000000000002`, `1e99999999999999999999999`, `1e-99999999999999999999999`, `1.2300e+99`, `"{{literal}}"`, `[]`, `{}`, `[9007199254740992,9007199254740993,9223372036854775809,1.00,1e-99999999999999999999999]`, `{"x":[1.2300e+99]}`} {
 		for _, multiple := range []bool{false, true} {
 			body, want := "["+raw+"]", raw
 			if multiple {

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/ohler55/ojg/jp"
 )
 
 // Error never includes the query or response content.
@@ -24,17 +26,13 @@ type step struct {
 	array    bool
 	wildcard bool
 }
-type Path struct{ steps []step }
+type Path struct {
+	steps      []step
+	projection jp.Expr // Compiled only for expansive paths; never report metadata.
+}
 
 // Expansive reports whether the path projects array elements.
-func (p Path) Expansive() bool {
-	for _, s := range p.steps {
-		if s.wildcard {
-			return true
-		}
-	}
-	return false
-}
+func (p Path) Expansive() bool { return len(p.projection) != 0 }
 
 func Parse(source string) (Path, error) {
 	fail := func(offset int, unsupported bool) (Path, error) {
@@ -94,7 +92,28 @@ func Parse(source string) (Path, error) {
 			return fail(i, true)
 		}
 	}
+	for _, s := range p.steps {
+		if s.wildcard {
+			p.compileProjection()
+			break
+		}
+	}
 	return p, nil
+}
+
+// compileProjection composes only validated steps, not the library's wider dialect.
+func (p *Path) compileProjection() {
+	p.projection = make(jp.Expr, 0, len(p.steps))
+	for _, s := range p.steps {
+		switch {
+		case s.wildcard:
+			p.projection = append(p.projection, jp.Wildcard('*'))
+		case s.array:
+			p.projection = append(p.projection, jp.Nth(s.index))
+		default:
+			p.projection = append(p.projection, jp.Child(s.property))
+		}
+	}
 }
 
 // Decode reads exactly one JSON value, preserving numbers without float conversion.
@@ -129,6 +148,13 @@ func (p Path) Select(body []byte) (any, bool, error) {
 // SelectValue distinguishes absence from traversal through an incompatible type.
 // A present null is a value; traversing through it is an evaluation error.
 func (p Path) SelectValue(value any) (any, bool, error) {
+	if p.Expansive() {
+		return p.selectProjection(value)
+	}
+	return p.selectNative(value)
+}
+
+func (p Path) selectNative(value any) (any, bool, error) {
 	nodes := []any{value}
 	for _, s := range p.steps {
 		var next []any
@@ -138,9 +164,7 @@ func (p Path) SelectValue(value any) (any, bool, error) {
 				if !ok {
 					return nil, false, fmt.Errorf("percurso JSONPath exige array")
 				}
-				if s.wildcard {
-					next = append(next, array...)
-				} else if s.index < len(array) {
+				if s.index < len(array) {
 					next = append(next, array[s.index])
 				}
 			} else {
@@ -155,6 +179,34 @@ func (p Path) SelectValue(value any) (any, bool, error) {
 		}
 		nodes = next
 	}
+	return reduce(nodes)
+}
+
+// selectProjection checks every reached node before delegating a single step.
+// Full-expression Get would silently discard incompatible branches, so it cannot
+// implement our strict traversal contract. No numeric evaluation happens here.
+func (p Path) selectProjection(value any) (any, bool, error) {
+	nodes := []any{value}
+	for i, s := range p.steps {
+		for _, node := range nodes {
+			if s.array {
+				if _, ok := node.([]any); !ok {
+					return nil, false, fmt.Errorf("percurso JSONPath exige array")
+				}
+			} else if _, ok := node.(map[string]any); !ok {
+				return nil, false, fmt.Errorf("percurso JSONPath exige objeto")
+			}
+		}
+		var next []any
+		for _, node := range nodes {
+			next = append(next, p.projection[i:i+1].Get(node)...)
+		}
+		nodes = next
+	}
+	return reduce(nodes)
+}
+
+func reduce(nodes []any) (any, bool, error) {
 	switch len(nodes) {
 	case 0:
 		return nil, false, nil

@@ -11,7 +11,7 @@ import (
 )
 
 func TestProjectionWriterFailureOverridesOutcomes(t *testing.T) {
-	for _, body := range []string{`[]`, `["forbidden","second"]`, `{}`} {
+	for _, body := range []string{`[]`, `["forbidden","second"]`, `{}`, `[9007199254740992,9007199254740993,9223372036854775809,1e-99999999999999999999999]`} {
 		for _, short := range []bool{false, true} {
 			calls := 0
 			c := NewRootCommand(executorFunc(func(context.Context, runner.Request) (runner.Response, error) {

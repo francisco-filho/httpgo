@@ -1,4 +1,30 @@
-# Matriz de compatibilidade — US-01 a US-16, US-20 a US-27
+# Matriz de compatibilidade — US-01 a US-16, US-20 a US-27b
+
+## Preservação de JSONPath — US-27b / issue #54
+
+Integração interna de `github.com/ohler55/ojg/jp` **v1.28.9** limitada à navegação
+de projeções já entregues. Caminhos simples continuam nativos; seleção estática,
+sem flag de avaliador ou fallback. Não há ampliação de gramática, mudança de
+referência Hurl **8.0.0** nem alteração dos **293 pares** existentes. O gate usa
+os mesmos arquivos/observações, sem regeneração para acomodar a biblioteca.
+
+Pares `projection_cardinality`, `projection_*_capture`, `projection_scalar_count`
+e `projection_strict_*` continuam o contrato de redução, ausência/null, ordem,
+arrays selecionados, captura tipada e percurso estrito. Diferenças deliberadas
+com Hurl descritas na seção US-27 abaixo permanecem: ramos incompatíveis são erros
+2 aqui, e reuso de coleção capturada como JSON completo não implica equivalência
+com Hurl. Nenhuma observação anterior foi normalizada ou reclassificada.
+
+Regressões próprias ampliam precisão além de `2^53` e `int64`, decimais próximos,
+formas equivalentes e expoentes extremos em seleções/assertions/capturas. Isso
+comprova o contrato HTTPGo, não igualdade numérica ou filtros de Hurl/OjG em geral.
+Apenas `query.Decode` usa `UseNumber`; `jp` não decodifica nem compara números.
+O [exemplo de precisão](../testdata/scenarios/scenario_projection_precision.hurl)
+é executado por binário real e HTTP local, incluindo resposta alterada com falha 1.
+Funções, filtros, interpolação estrutural e demais recursos fora do recorte
+continuam erros estáticos 2, inclusive em entrada tardia e antes de todo HTTP.
+Evidências executadas em [validation.md](validation.md#us-27b--issue-54--história-0027b).
+Corpus sintético não homologa suíte real nem anuncia conformidade RFC integral.
 
 ## Polling — US-26 / issue #50
 

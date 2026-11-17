@@ -15,7 +15,7 @@ func TestProjectionDeclarations(t *testing.T) {
 				t.Fatalf("%s: %v", path, err)
 			}
 		}
-		for _, path := range []string{"$[*", "$[**]", "$[*:]", "$.*", "$..x", "$[0:1]", "$[0,1]", "$[?(@.x)]"} {
+		for _, path := range []string{"$[*", "$[**]", "$[*:]", "$.*", "$..x", "$[0:1]", "$[0,1]", "$[?(@.x)]", "$[?(@.x == 1)]", "$.length()", "$.{{field}}", "$[{{index}}]"} {
 			for _, declaration := range []string{"[Asserts]\n  jsonpath \"" + path + "\" exists", "[Captures]\n  x: jsonpath \"" + path + "\""} {
 				source := "GET http://example.test/first\nGET http://example.test/late\nHTTP *\n" + declaration
 				s, err := Parse("late.hurl", strings.NewReader(strings.ReplaceAll(source, "\n", nl)))

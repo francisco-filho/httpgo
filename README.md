@@ -97,6 +97,43 @@ não representa homologação de uma API real.
   estática integral impede todos os envios do arquivo em caso de consulta inválida.
   Diferenças deliberadas frente ao Hurl 8.0.0 estão em [docs/compatibility.md](docs/compatibility.md#projeção-de-arrays--us-27--issue-52).
 
+## Preservar precisão nas consultas (US-27b / issue #54)
+
+A evolução interna mantém o mesmo subconjunto, sem novas expressões ou opção de
+avaliador. Para `{"products":[{"id":9007199254740992},{"id":9007199254740993}]}`:
+
+```hurl
+GET {{base_url}}/products
+
+HTTP 200
+[Asserts]
+jsonpath "$.products[0].id" == 9007199254740992
+jsonpath "$.products[1].id" == 9007199254740993
+jsonpath "$.products[*].id" count == 2
+[Captures]
+product_ids: jsonpath "$.products[*].id"
+
+POST {{base_url}}/echo
+{{product_ids}}
+HTTP 204
+```
+
+Execute o [exemplo versionado](testdata/scenarios/scenario_projection_precision.hurl)
+com `httpgo test testdata/scenarios/scenario_projection_precision.hurl --var base_url=http://localhost:8080`.
+`/products` e `/echo` são contratos sintéticos dos testes locais. A captura envia
+`[9007199254740992,9007199254740993]` como JSON completo; trocar o segundo ID pelo
+primeiro falha com **1**, sem publicar captura nem enviar o POST.
+
+Números selecionados, comparados e capturados mantêm tipos e precisão além de
+`2^53` e de `int64`, decimais próximos e expoentes extremos, sem virar strings,
+infinito ou zero por perda de representação. Grafias capturadas são preservadas;
+igualdade numérica existente continua aceitando formas equivalentes (`1.00`, `1e0`).
+Projeções usam OjG `jp` somente para navegação, caminhos simples permanecem nativos.
+Isso **não** habilita filtros, funções ou conformidade JSONPath/RFC integral nem
+altera cardinalidade, erros, sigilo ou restrições de uso textual de coleções.
+Veja [arquitetura](docs/architecture.md#projeção-de-arrays--us-27--issue-52) e
+[compatibilidade preservada](docs/compatibility.md#preservação-de-jsonpath--us-27b--issue-54).
+
 ## Validar inclusão e ausência (US-23 / issue #44)
 
 Salve `validation.hurl` e execute

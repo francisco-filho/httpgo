@@ -16,7 +16,7 @@ func TestProjectionHelpAndPublishedExample(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{`jsonpath "$.issues[*].code" contains "REQUIRED"`, "zero resultados = ausência", "count conta o array reduzido", "Sem .*, slices, unions", "sem coleção ou esperado composto"} {
+		for _, term := range []string{`jsonpath "$.issues[*].code" contains "REQUIRED"`, "zero resultados = ausência", "count conta o array reduzido", "Sem .*, slices, unions", "sem coleção ou esperado composto", "Precisão preservada além de int64", "Sem nova sintaxe ou opção de avaliador"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}
@@ -62,7 +62,7 @@ func TestProjectionStructuralCorpusByBinary(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
 	defer server.Close()
-	for _, name := range []string{"invalid_projection_wildcard", "unsupported_projection_slice", "unsupported_projection_union", "unsupported_projection_recursive", "unsupported_projection_filter"} {
+	for _, name := range []string{"invalid_projection_wildcard", "unsupported_projection_slice", "unsupported_projection_union", "unsupported_projection_recursive", "unsupported_projection_filter", "unsupported_projection_function", "unsupported_projection_dynamic"} {
 		code, out, stderr := run(t, "test", "../../testdata/scenarios/"+name+".hurl", "--var", "base_url="+server.URL)
 		category := "construção não suportada"
 		if strings.HasPrefix(name, "invalid_") {

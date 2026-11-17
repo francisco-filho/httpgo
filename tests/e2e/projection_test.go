@@ -52,11 +52,17 @@ func TestProjectionInvalidLateNeverSends(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
 	defer server.Close()
-	for _, path := range []string{"$[*", "$[**]", "$.*", "$..x", "$[0:1]", "$[0,1]", "$[?(@.x)]"} {
+	for _, path := range []string{"$[*", "$[**]", "$.*", "$..x", "$[0:1]", "$[0,1]", "$[?(@.x)]", "$[?(@.x == 1)]", "$.length()", "$.{{field}}", "$[{{index}}]"} {
 		for _, nl := range []string{"\n", "\r\n"} {
-			code, out, stderr := run(t, "test", scenario(t, strings.ReplaceAll("GET "+server.URL+"/first\nGET "+server.URL+"/late\nHTTP *\n[Asserts]\njsonpath \""+path+"\" exists", "\n", nl)))
-			if code != 2 || hits.Load() != 0 || !prevalidationSummary(out) || !strings.Contains(stderr, ":5:11:") {
-				t.Fatalf("%s: code=%d hits=%d out=%s err=%s", path, code, hits.Load(), out, stderr)
+			for _, declaration := range []string{"[Asserts]\njsonpath \"" + path + "\" exists", "[Captures]\nx: jsonpath \"" + path + "\""} {
+				code, out, stderr := run(t, "test", scenario(t, strings.ReplaceAll("GET "+server.URL+"/first\nGET "+server.URL+"/late\nHTTP *\n"+declaration, "\n", nl)))
+				column := ":5:11:"
+				if strings.HasPrefix(declaration, "[Captures]") {
+					column = ":5:14:"
+				}
+				if code != 2 || hits.Load() != 0 || !prevalidationSummary(out) || !strings.Contains(stderr, column) {
+					t.Fatalf("%s: code=%d hits=%d out=%s err=%s", path, code, hits.Load(), out, stderr)
+				}
 			}
 		}
 	}

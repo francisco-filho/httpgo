@@ -773,6 +773,24 @@ Exemplo: `testdata/scenarios/scenario_projection.hurl`; execute com
 Consultas inválidas/não suportadas e nomes inválidos em entrada tardia rejeitam
 **todo** o arquivo, com arquivo/linha/coluna originais antes de qualquer rede.
 
+**Preservação US-27b / issue #54:** a adoção interna de OjG `jp` é limitada à
+navegação das projeções já aceitas. Caminhos simples permanecem nativos e não há
+flag de avaliador, fallback ou nova sintaxe. Números seguem tipados/exatos, inclusive
+inteiros além de `2^53`/`int64`, decimais próximos e expoentes extremos; grafias
+capturadas são preservadas, sem float, coerção textual, infinito ou underflow.
+Igualdade numérica mantém formas equivalentes como `1.00` e `1e0`.
+
+O [exemplo de precisão](../testdata/scenarios/scenario_projection_precision.hurl)
+seleciona `9007199254740992` e `9007199254740993` por caminhos simples, conta a
+projeção e reutiliza a captura como `[9007199254740992,9007199254740993]` em POST.
+Com os IDs distintos termina em 0; substituir o segundo pelo primeiro falha em 1,
+sem publicação nem POST. Use
+`httpgo test testdata/scenarios/scenario_projection_precision.hurl --var base_url=http://localhost:8080`
+contra `/products` e `/echo` do contrato sintético do exemplo. Isso não declara
+suporte a filtros/funções nem RFC integral; cardinalidade, ausência/null, erros
+estritos, atomicidade e sigilo acima continuam inalterados. Ver
+[compatibilidade](compatibility.md#preservação-de-jsonpath--us-27b--issue-54).
+
 Para capturas JSONPath, a resposta final deve conter exatamente um valor JSON válido. **Ampliação
 intencional da US-06:** a seleção aceita string, número, booleano, `null`, array
 ou objeto, inclusive na raiz. Campo ausente/índice fora do array ou percurso

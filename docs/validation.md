@@ -1,4 +1,72 @@
-# Validação — US-01 a US-16, US-20 a US-27
+# Validação — US-01 a US-16, US-20 a US-27b
+
+## US-27b — issue #54 / história 0027b
+
+Plano da issue #54 executado sem planner, somente backend, na ordem das três
+tasks aprovadas: `back:1` em `367be14` (adapter híbrido e precisão), `back:2`
+em `acd4f7f` (atomicidade, sigilo e fronteiras), `back:3` nesta alteração
+(documentação, corpus negativo e gates integrados). Acrescentada somente a
+dependência autorizada `github.com/ohler55/ojg v1.28.9`, encapsulada em query.
+Sem alteração de Go, frontend/estáticos, transporte de produção, CI/lint ou
+contrato público. Nenhum código-fonte Hurl consultado/copiado/adaptado; observação
+apenas do binário de referência. Gates locais não substituem review nem QA;
+backdev não executou SonarQube.
+
+### Ambiente e execução efetiva
+
+Linux amd64, em **2026-11-17**, Go `go1.26.10-X:nodwarf5`, golangci-lint **2.15.0**
+e goimports existentes em `/home/ff/go/bin`. Hurl **8.0.0** existente em
+`/tmp/httpgo-0027-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin`, selecionado via
+PATH para o gate, sem substituir a versão padrão 8.0.1 nem instalar ferramentas.
+O aviso de metadados de libcurl não impediu execução/identificação da referência.
+
+- Task 1: passaram `go mod tidy`, `go test ./internal/query ./internal/parser
+  ./internal/assertion`, `go test ./internal/runner ./internal/cli`,
+  `go test ./tests/e2e -run '^TestProjection' -count=1`, `make fmt lint test`,
+  `go vet ./...` e `go build ./...` antes do commit.
+- Task 2: passaram `go test ./internal/template ./internal/runner ./internal/cli
+  ./internal/suite ./internal/transport`, `go test ./tests/e2e -count=1`,
+  `make fmt lint test`, `go vet ./...` e `go build ./...` antes do commit.
+- Task 3: passaram `make compatibility` (**293 pares**, Hurl **8.0.0** obrigatório,
+  sem skip ou `-update`), `make fmt lint test` (**0 issues**, race/cobertura),
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e`.
+  **Nenhum arquivo de `testdata/compatibility/` foi alterado ou regenerado**;
+  cardinalidade, captura composta, precisão e diferenças estritas anteriores
+  continuam com as mesmas observações. Dois novos negativos versionados cobrem
+  função e interpolação estrutural tardias, sem rede.
+- Cobertura integrada: assertion **94,2%**, CLI **97,5%**, config **96,0%**,
+  parser **97,2%**, query **96,7%**, runner **94,1%**, suite **95,5%**,
+  template **96,1%**, transport **90,4%**. E2E usa binário real e HTTP local,
+  verificando dados enviados, stdout/stderr e exit code.
+- Fuzzing preservado, comandos executados com `-fuzztime=20s -parallel=2`:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$'` (**108.576 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$'` (**21.813 execuções**),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$'` (**6.016 execuções**).
+  Todos passaram sem crash; contagens são específicas desta rodada.
+- Ajuda root/test, exemplos versionados e negativos executados pelos testes
+  `TestProjectionHelpAndPublishedExample`, `TestProjectionPrecisionDemo` e
+  `TestProjectionStructuralCorpusByBinary`. Links locais novos, diff e
+  `gofmt -l` dos arquivos Go alterados conferidos.
+- macOS/Windows não executados: opcionais nesta história pelo plano v4, não
+  bloqueios. Corpus sintético não homologa suíte real, filtros ou RFC integral.
+
+### Rastreabilidade GO-445–GO-458
+
+| GO | Evidência executada (novos testes e regressões existentes) |
+|---|---|
+| 445 | `TestProjectionPrecisionDemo`: IDs distintos 0 com POST exato; segundo ID repetido 1, sem captura/POST |
+| 446 | `TestProjectionCompiledSelectionIsStatic`, testes simples de query/parser: caminhos nativos, raiz/nomes/índices e distinção legada Select/SelectValue |
+| 447 | `TestProjectionExactNumbers`, `TestProjectionExactNumberCapture`, `TestProjectionCaptureReuse`, `TestTypedCaptures`, comparações exatas de assertion: além de int64, decimais próximos, formas equivalentes e expoentes extremos, tipos/grafias mantidos |
+| 448–449 | `TestProjectionCardinality`, `TestProjectionPredicatesAndOrder`, `TestProjectionReducedTypesByBinary`, pares existentes: redução única, ordem/repetições, null/ausência, arrays sem flatten, count/presença/pertencimento sobre valor reduzido |
+| 450 | `TestProjectionStrictTraversal`, `TestProjectionPredicatesAndOrder`, `TestProjectionExactBatchAtomicAndProtected`, pares strict: erro inteiro sem parcial ou negação aprovada |
+| 451 | `TestProjectionCaptureReuse`, `TestProjectionExactBatchAtomicAndProtected`, `TestProjectionCollectionTextNeverSends`, `TestTypedCaptures`: null válido, ausência erro, coleção tipada sem uso textual, lote atômico e proteção descoberta |
+| 452 | `TestProjectionDeclarations`, `TestProjectionInvalidLateNeverSends`, `TestProjectionStructuralCorpusByBinary`: assertions/capturas tardias LF/CRLF, posições originais, sintaxe inválida versus não suportada e zero envios |
+| 453 | `TestCompatibility` com 293 pares inalterados e Hurl 8.0.0; ajuda/exemplos e documentação do limite de adoção |
+| 454 | `TestProjectionInvalidJSONPrecedence`, `TestProjectionPredicatesAndOrder`: JSON vazio/malformado/adicional só quando alcançado, status/header anterior prevalece |
+| 455 | `TestProjectionPlanRemovedFromEveryReport`, `TestProjectionExactBatchAtomicAndProtected`, `TestProjectionSafeFailure`, testes CLI/suite: todo Path zerado, operandos/coleções/números secretos ocultos, proteção de captura pendente/descoberta |
+| 456 | `TestProjectionFinalResponseAndCancellation`, `TestProjectionReadCloseBeforeReport`, `TestProjectionFinalAndIncompleteByBinary`: redirect final, read/close/timeout/cancel, recursos e nenhuma captura/envio de parcial |
+| 457 | `TestProjectionCallbackFailurePreservesCounts`, `TestProjectionWriterFailureOverridesOutcomes`: erro/short write prioritário 2 em sucesso/divergência/erro, sem reescrita ou próximo envio |
+| 458 | `TestProjectionFileIsolationAndSafeCallbacks`, `TestProjectionPlanRemovedFromEveryReport`, `TestProjectionReportsAndSessionsIndependent`, `TestProjectionPublishedValuesDoNotCrossRuns`, `TestProjectionSuiteProtectionAndIsolation`: planos/cenários/documentos imutáveis, sem retenção operacional ou captura entre sessões, proteção acumulada só na invocação |
 
 ## US-26 — issue #50 / história 0026
 
