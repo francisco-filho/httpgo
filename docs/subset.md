@@ -57,14 +57,49 @@ literais das US-07/08/14/15/21/23/24 são o **perfil padrão**. A seção
 `--render-asserts`. A US-31 também permite operandos dinâmicos nos filtros por
 igualdade de assertions e capturas, sem ampliar operadores ou passos.
 
+## Relatório HTML — US-35 / issue #72
+
+```bash
+httpgo test tests/ --fail-fast --output html --output-file target/report.html
+```
+
+Formato de apresentação próprio do HTTPGo, sem nova sintaxe `.hurl` e sem
+compatibilidade anunciada com flags HTML do Hurl. Aceita arquivo único e suíte,
+exige destino antes de qualquer HTTP e mantém stdout vazio. Cria pais quando
+possível; nome-base recebe timestamp UTC `YYYYMMDDTHHMMSSmmmZ` antes da extensão,
+com `-1`, `-2` etc. na primeira colisão livre, usando criação exclusiva e sem
+sobrescrever artefatos. Informa o caminho efetivo em stderr protegido só após
+escrita e fechamento bem-sucedidos; falha de confirmação retorna **2**.
+
+HTML autossuficiente offline, tema somente claro, títulos, tabelas e blocos
+monoespaçados. Resumo agregado, arquivos e detalhes por requisição alcançada com
+método, URL protegida, estado textual, duração lógica e diagnósticos localizados.
+Duração inclui preparação/tentativas/esperas, sem apresentação, sem mudar métricas
+ou execução. Requisições interrompidas ficam nas contagens conhecidas; arquivos
+não analisados têm totais desconhecidos, nunca aprovações fictícias. Status
+validado não significa sucesso completo; ausência de assertion não é validação.
+
+Sem bodies/headers integrais; texto escapado, sem scripts ou recursos externos.
+Proteção final anterior ao escaping cobre segredos descobertos em arquivos
+posteriores; stderr já emitido não pode ser redigido retroativamente. Segredos
+arbitrários não marcados/transformações desconhecidas não são detectados.
+Códigos **0/1/2** e precedência preservados. Gera artefato dos resultados disponíveis
+mesmo em falha/cancelamento durante a suíte, sem reenvios. Erro global anterior à
+execução não abre relatório. Falha de geração/escrita/close retorna **2**, com
+diagnóstico seguro e sem confirmação falsa; pode deixar arquivo parcial.
+
+[Contrato completo, nomeação e segurança](html.md) e
+[exemplo executável](../testdata/scenarios/html_suite/). Sem tema escuro, filtros,
+histórico, dashboard, publicação externa ou HTML/JUnit simultâneos.
+
 ## Relatório JUnit — US-17 / issue #68
 
 ```bash
 httpgo test tests/ --output junit --output-file target/test-results.xml
 ```
 
-- `--output` aceita somente `junit`; sem a flag, preserva o texto existente em
-  stdout. JUnit exige `--output-file` não vazio. Ambas aceitam `--flag=valor` ou
+- `--output` aceita `junit` ou `html` (US-35 acima); sem a flag, preserva o texto
+  existente em stdout. JUnit exige `--output-file` não vazio. Ambas aceitam `--flag=valor` ou
   `--flag valor`, em qualquer ordem após `test`, uma ocorrência de cada.
   Formato desconhecido, repetição ou destino sem formato retornam **2** antes
   de qualquer HTTP. `--output text/json`, JUnit em stdout e destino do modo texto
@@ -101,7 +136,7 @@ httpgo test tests/ --output junit --output-file target/test-results.xml
 - Não reenvia requests, não reavalia assertions nem muda sessões/polling.
   [Exemplo mínimo](../testdata/scenarios/scenario_junit.hurl) e
   [consumidor de referência/CI](junit.md). Sem dashboard, histórico persistente,
-  formatos adicionais ou envio para serviços externos.
+  formatos simultâneos ou envio para serviços externos.
 
 ## Captura de contagem — US-33 / issue #66
 
@@ -1676,8 +1711,9 @@ compartilhamento implícito de login, cenário/segredos por stdin ou outras flag
 
 ### Resultados e contagens
 
-`--output junit --output-file <caminho>` seleciona o relatório US-17 descrito
-acima. `check` e configurações futuras não estão implementados ou anunciados.
+`--output junit --output-file <caminho>` seleciona o relatório US-17;
+`--output html --output-file <caminho>` seleciona HTML US-35, com nomeação própria
+por timestamp, ambos descritos acima. `check` e configurações futuras não estão implementados ou anunciados.
 As linhas e contagens a seguir descrevem o **modo texto padrão**.
 
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
