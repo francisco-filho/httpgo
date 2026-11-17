@@ -3,8 +3,9 @@ package assertion
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
+
+	"capimgrosso.com/httpgo/internal/query"
 )
 
 // JSONOperator is a predicate on a selected JSON value or its array count.
@@ -99,11 +100,11 @@ func EvaluateJSON(operator JSONOperator, count bool, expected, actual any, prese
 		if !present {
 			return JSONEvaluation{}, nil
 		}
-		array, ok := actual.([]any)
+		quantity, ok := query.CountArray(actual)
 		if !ok {
 			return JSONEvaluation{Detail: "count exige array; recebido " + JSONType(actual)}, nil
 		}
-		actual = json.Number(strconv.Itoa(len(array)))
+		actual = quantity
 		result.Actual = actual
 	}
 	switch operator {

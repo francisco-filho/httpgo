@@ -34,6 +34,8 @@ const (
 )
 
 type Capture struct {
+	Count           bool // Only the optional JSONPath array transformation.
+	Query           string
 	Kind            CaptureKind
 	Header          string
 	Name            string

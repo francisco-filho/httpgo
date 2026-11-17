@@ -12,16 +12,31 @@ import (
 
 type CaptureError struct {
 	Position parser.Position
+	Query    string
+	Count    bool
 	Detail   string
 }
 
-func (e *CaptureError) Error() string { return fmt.Sprintf("erro de captura: %s", e.Detail) }
+func (e *CaptureError) Error() string {
+	if e.Count {
+		return fmt.Sprintf("erro de captura: consulta %q count: %s", e.Query, e.Detail)
+	}
+	return fmt.Sprintf("erro de captura: %s", e.Detail)
+}
+
+func captureFailure(session template.Session, declaration parser.Capture, pos parser.Position, detail string) *CaptureError {
+	pos.File = session.Sanitize(pos.File)
+	return &CaptureError{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Count: declaration.Count, Detail: session.Sanitize(detail)}
+}
 
 func captureResponse(session template.Session, declarations []parser.Capture, response Response) *CaptureError {
 	batch := make([]template.Capture, 0, len(declarations))
 	var text string
 	textDecoded := false
 	for _, declaration := range declarations {
+		fail := func(detail string) *CaptureError {
+			return captureFailure(session, declaration, declaration.QueryPosition, detail)
+		}
 		var value any
 		var found bool
 		switch declaration.Kind {
@@ -31,11 +46,11 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 				session.MarkSecret(declaration.Name)
 			}
 			if err != nil {
-				return &CaptureError{Position: declaration.QueryPosition, Detail: "não foi possível resolver operando JSONPath: " + err.Error()}
+				return fail("não foi possível resolver operando JSONPath: " + err.Error())
 			}
 			value, found, err = bound.Select(response.Body)
 			if err != nil {
-				return &CaptureError{Position: declaration.QueryPosition, Detail: err.Error()}
+				return fail(err.Error())
 			}
 		case parser.HeaderCapture:
 			value, found = query.Header(response.Headers, declaration.Header)
@@ -44,42 +59,52 @@ func captureResponse(session template.Session, declarations []parser.Capture, re
 				var err error
 				text, err = query.BodyText(response.Body, response.Headers)
 				if err != nil {
-					return &CaptureError{Position: declaration.QueryPosition, Detail: err.Error()}
+					return fail(err.Error())
 				}
 				textDecoded = true
 			}
 			value, found = text, true
 		default:
-			return &CaptureError{Position: declaration.QueryPosition, Detail: "variante de captura não suportada"}
+			return fail("variante de captura não suportada")
 		}
 		if !found {
-			return &CaptureError{Position: declaration.QueryPosition, Detail: "consulta não encontrou valor"}
+			return fail("consulta não encontrou valor")
+		}
+		if declaration.Count {
+			quantity, ok := query.CountArray(value)
+			if !ok {
+				return fail("count exige array")
+			}
+			value = quantity
 		}
 		if declaration.Kind == parser.RegexCapture || declaration.Compiled != nil {
 			selected, err := query.Regex(declaration.Compiled, value.(string))
 			if err != nil {
-				return &CaptureError{Position: declaration.PatternPosition, Detail: err.Error()}
+				return captureFailure(session, declaration, declaration.PatternPosition, err.Error())
 			}
 			value = selected
 		}
 		raw, err := json.Marshal(value)
 		if err != nil {
-			return &CaptureError{Position: declaration.QueryPosition, Detail: "não foi possível serializar valor da captura"}
+			return fail("não foi possível serializar valor da captura")
 		}
 		session.ProtectCapture(declaration.Name, raw)
 		batch = append(batch, template.Capture{Name: declaration.Name, Value: raw})
 	}
 	if err := session.Publish(batch); err != nil {
-		pos := declarations[0].Position
+		declaration := declarations[0]
+		pos := declaration.Position
 		var conflict *template.ConflictError
 		if errors.As(err, &conflict) && conflict.Index >= 0 && conflict.Index < len(declarations) {
-			pos = declarations[conflict.Index].Position
+			declaration = declarations[conflict.Index]
+			pos = declaration.Position
 		}
 		var invalid *template.CaptureValueError
 		if errors.As(err, &invalid) && invalid.Index >= 0 && invalid.Index < len(declarations) {
-			pos = declarations[invalid.Index].QueryPosition
+			declaration = declarations[invalid.Index]
+			pos = declaration.QueryPosition
 		}
-		return &CaptureError{Position: pos, Detail: "não foi possível publicar captura; verifique os valores e nomes inválidos, repetidos ou em conflito ancestral/descendente"}
+		return captureFailure(session, declaration, pos, "não foi possível publicar captura; verifique os valores e nomes inválidos, repetidos ou em conflito ancestral/descendente")
 	}
 	return nil
 }
