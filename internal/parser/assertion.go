@@ -29,8 +29,21 @@ type BodyAssertion struct {
 	Position         Position
 }
 
-// Assertion is one of the concrete header/JSON/body variants, in source order.
+// RegexAssertion keeps extraction static and expected-value rendering opt-in.
+type RegexAssertion struct {
+	Pattern          string
+	Extraction       *regexp.Regexp
+	Operator         assertion.HeaderOperator
+	Expected         string
+	Compiled         *regexp.Regexp
+	ExpectedTemplate *ExpectedTemplate
+	Position         Position // Predicate in the original source.
+	QueryPosition    Position
+}
+
+// Assertion is one of the concrete variants, in source order.
 type Assertion struct {
+	Regex  *RegexAssertion
 	Header *HeaderAssertion
 	JSON   *JSONAssertion
 	Body   *BodyAssertion
@@ -59,6 +72,10 @@ type JSONAssertion struct {
 
 func parseAssertion(text string, pos Position, options ParseOptions) (Assertion, error) {
 	fields := strings.Fields(text)
+	if len(fields) > 0 && fields[0] == "regex" {
+		declaration, err := parseRegexAssertion(text, pos, options)
+		return Assertion{Regex: &declaration}, err
+	}
 	if len(fields) > 0 && fields[0] == "body" {
 		declaration, err := parseBodyAssertion(text, pos, options)
 		return Assertion{Body: &declaration}, err
@@ -69,6 +86,73 @@ func parseAssertion(text string, pos Position, options ParseOptions) (Assertion,
 	}
 	declaration, err := parseHeaderAssertion(text, pos, options)
 	return Assertion{Header: &declaration}, err
+}
+
+func parseRegexAssertion(text string, pos Position, options ParseOptions) (RegexAssertion, error) {
+	fail := func(position Position, category, detail string) (RegexAssertion, error) {
+		return RegexAssertion{}, &Error{Position: position, Category: category, Detail: detail}
+	}
+	rest := text[len("regex"):]
+	if len(rest) == 0 || (rest[0] != ' ' && rest[0] != '\t') {
+		return fail(pos, "sintaxe inválida", "regex exige padrão JSON separado por espaço")
+	}
+	pattern, tail, ok := jsonString(strings.TrimLeft(rest, " \t"))
+	if !ok {
+		return fail(pos, "sintaxe inválida", "regex exige padrão em string JSON válida")
+	}
+	extraction, err := regexp.Compile(pattern)
+	if err != nil {
+		category := "sintaxe inválida"
+		if unsupportedRegexp(pattern) {
+			category = "construção não suportada"
+		}
+		return fail(pos, category, "padrão regex inválido ou não suportado")
+	}
+	if len(tail) == 0 || (tail[0] != ' ' && tail[0] != '\t') {
+		return fail(pos, "sintaxe inválida", "regex exige predicado separado por espaço")
+	}
+	rest = strings.TrimSpace(tail)
+	predicatePos := pos
+	predicatePos.Column += len(text) - len(rest)
+	fields := strings.Fields(rest)
+	if len(fields) == 0 {
+		return fail(predicatePos, "sintaxe inválida", "regex exige predicado")
+	}
+	operator := fields[0]
+	rest = strings.TrimSpace(rest[len(operator):])
+	if operator == "not" {
+		fields = strings.Fields(rest)
+		if len(fields) == 0 {
+			return fail(predicatePos, "sintaxe inválida", "not exige contains")
+		}
+		operator += " " + fields[0]
+		rest = strings.TrimSpace(rest[len(fields[0]):])
+	}
+	declaration := RegexAssertion{Pattern: pattern, Extraction: extraction, Operator: assertion.HeaderOperator(operator), Position: predicatePos, QueryPosition: pos}
+	switch declaration.Operator {
+	case assertion.HeaderExists:
+		if rest != "" {
+			return fail(predicatePos, "sintaxe inválida", "exists não aceita operando")
+		}
+	case assertion.HeaderMatches:
+		declaration.Expected, declaration.Compiled, declaration.ExpectedTemplate, err = parseMatches(rest, predicatePos, options)
+		if err != nil {
+			return RegexAssertion{}, err
+		}
+	case assertion.HeaderEqual, assertion.HeaderContains, assertion.HeaderNotContains:
+		expected, trailing, valid := jsonString(rest)
+		if !valid || strings.TrimSpace(trailing) != "" {
+			return fail(predicatePos, "sintaxe inválida", "regex exige somente um esperado em string JSON válida")
+		}
+		declaration.Expected = expected
+		declaration.ExpectedTemplate, err = parseTextExpected(expected, predicatePos, options)
+		if err != nil {
+			return RegexAssertion{}, err
+		}
+	default:
+		return fail(predicatePos, "construção não suportada", "predicado ou encadeamento em assertion regex não suportado")
+	}
+	return declaration, nil
 }
 
 func parseBodyAssertion(text string, pos Position, options ParseOptions) (BodyAssertion, error) {

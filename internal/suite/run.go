@@ -80,7 +80,7 @@ func (s *Suite) Run(ctx context.Context, files []File, options Options, report f
 				switch entry.Outcome {
 				case runner.Passed, runner.Unvalidated, runner.Wildcard:
 					current.Successful++
-				case runner.Mismatch, runner.HeaderMismatch, runner.JSONMismatch, runner.BodyMismatch:
+				case runner.Mismatch, runner.HeaderMismatch, runner.JSONMismatch, runner.BodyMismatch, runner.RegexMismatch:
 					current.AssertionFailures++
 				default:
 					current.RequestErrors++

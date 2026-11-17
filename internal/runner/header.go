@@ -76,6 +76,16 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	entry.Captures = nil // Compiled queries are not report metadata.
 	entry.Assertions = slices.Clone(entry.Assertions)
 	for i := range entry.Assertions {
+		if entry.Assertions[i].Regex != nil {
+			declaration := *entry.Assertions[i].Regex
+			declaration.Pattern, declaration.Expected = "", ""
+			declaration.Extraction, declaration.Compiled = nil, nil
+			declaration.ExpectedTemplate = nil
+			declaration.Position.File = session.Sanitize(declaration.Position.File)
+			declaration.QueryPosition.File = session.Sanitize(declaration.QueryPosition.File)
+			entry.Assertions[i].Regex = &declaration
+			continue
+		}
 		if entry.Assertions[i].Body != nil {
 			declaration := *entry.Assertions[i].Body
 			declaration.ExpectedTemplate = nil

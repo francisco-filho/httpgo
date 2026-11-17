@@ -53,11 +53,15 @@ const (
 	JSONFailed     Outcome = "erro de avaliação JSON"
 	BodyMismatch   Outcome = "assertion de body divergente"
 	BodyFailed     Outcome = "erro de avaliação de body"
+	RegexMismatch  Outcome = "assertion regex divergente"
+	RegexFailed    Outcome = "erro de avaliação regex"
 )
 
 type EntryResult struct {
 	Duration      time.Duration // Logical entry, including preparation, attempts and waits; excludes reporting.
 	Attempts      int
+	RegexFailure  *RegexFailure
+	RegexError    *RegexError
 	BodyFailure   *BodyFailure
 	BodyError     *BodyError
 	JSONFailure   *JSONFailure
@@ -314,7 +318,10 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 			var jsonErr *JSONError
 			var bodyErr *BodyError
 			var headerErr *HeaderError
+			var regexErr *RegexError
 			switch {
+			case errors.As(assertionErr, &regexErr):
+				result.ErrorPosition = regexErr.Position
 			case errors.As(assertionErr, &headerErr):
 				result.ErrorPosition = headerErr.Position
 			case errors.As(assertionErr, &jsonErr):
@@ -326,7 +333,7 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 				result.ErrorPosition = entry.Position
 			}
 		}
-		result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil
+		result.Diverged = current.HeaderFailure != nil || current.JSONFailure != nil || current.BodyFailure != nil || current.RegexFailure != nil
 	}
 	if result.Err == nil {
 		if cancelErr := ctx.Err(); cancelErr != nil {

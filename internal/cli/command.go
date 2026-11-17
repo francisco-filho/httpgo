@@ -156,6 +156,10 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += ": " + entry.HeaderError.Error()
 	case runner.HeaderMismatch:
 		line += ": " + headerDiagnostic(entry.HeaderFailure)
+	case runner.RegexMismatch:
+		line += ": " + regexDiagnostic(entry.RegexFailure)
+	case runner.RegexFailed:
+		line += ": " + entry.RegexError.Error()
 	case runner.BodyMismatch:
 		line += ": " + bodyDiagnostic(entry.BodyFailure)
 	case runner.BodyFailed:
@@ -177,7 +181,7 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
+	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed || entry.Outcome == runner.RegexMismatch || entry.Outcome == runner.RegexFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderError != nil {
 			pos = entry.HeaderError.Position
@@ -190,6 +194,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		}
 		if entry.JSONError != nil {
 			pos = entry.JSONError.Position
+		}
+		if entry.RegexFailure != nil {
+			pos = entry.RegexFailure.Position
+		}
+		if entry.RegexError != nil {
+			pos = entry.RegexError.Position
 		}
 		if entry.BodyFailure != nil {
 			pos = entry.BodyFailure.Position
@@ -251,6 +261,10 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		if errors.As(result.Err, &headerErr) {
 			diagnostic = headerErr.Error()
 		}
+		var regexErr *runner.RegexError
+		if errors.As(result.Err, &regexErr) {
+			diagnostic = regexErr.Error()
+		}
 		var bodyErr *runner.BodyError
 		if errors.As(result.Err, &bodyErr) {
 			diagnostic = bodyErr.Error()
@@ -272,6 +286,12 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure))
 			return err
 		}
+		if entry.RegexFailure != nil {
+			failure := entry.RegexFailure
+			pos := failure.Position
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, regexDiagnostic(failure))
+			return err
+		}
 		if entry.BodyFailure != nil {
 			failure := entry.BodyFailure
 			pos := failure.Position
@@ -283,6 +303,14 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		return err
 	}
 	return nil
+}
+
+func regexDiagnostic(failure *runner.RegexFailure) string {
+	actual := "grupo presente; condição falsa"
+	if !failure.Present {
+		actual = "grupo ausente"
+	}
+	return fmt.Sprintf("assertion regex %q %s: esperado %q; %s", failure.Pattern, failure.Operator, failure.Expected, actual)
 }
 
 func bodyDiagnostic(failure *runner.BodyFailure) string {

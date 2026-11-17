@@ -11,6 +11,25 @@ import (
 	"capimgrosso.com/httpgo/internal/template"
 )
 
+// RegexFailure deliberately retains neither response text nor selected group.
+type RegexFailure struct {
+	Position          parser.Position
+	Pattern, Expected string
+	Operator          assertion.HeaderOperator
+	Present           bool
+}
+
+// RegexError is categorical and never wraps raw regex or body contents.
+type RegexError struct {
+	Position parser.Position
+	Operator assertion.HeaderOperator
+	Detail   string
+}
+
+func (e *RegexError) Error() string {
+	return fmt.Sprintf("erro de avaliação regex %s: %s", e.Operator, e.Detail)
+}
+
 // JSONFailure contains only sanitized presentation values, not the document.
 // Binary operands are encoded JSON; type/empty predicates retain categories only.
 type JSONFailure struct {
@@ -113,7 +132,58 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 	conceal := pendingSecret(session, entry)
 	for _, item := range entry.Assertions {
 		switch {
-		case item.Body != nil && item.Header == nil && item.JSON == nil:
+		case item.Regex != nil && item.Body == nil && item.Header == nil && item.JSON == nil:
+			declaration := *item.Regex
+			pos := declaration.Position
+			pos.File = session.Sanitize(pos.File)
+			fail := func(detail string) error {
+				current.Outcome = RegexFailed
+				current.RegexError = &RegexError{Position: pos, Operator: declaration.Operator, Detail: session.Sanitize(detail)}
+				return current.RegexError
+			}
+			if plan := declaration.ExpectedTemplate; plan != nil {
+				value, secret, err := prepareTextExpected(session, plan, false)
+				if err == nil && declaration.Operator == assertion.HeaderMatches {
+					declaration.Compiled, err = compileExpected(value)
+				}
+				if err != nil {
+					return fail("esperado textual inválido: " + err.Error())
+				}
+				declaration.Expected = value
+				conceal = conceal || secret
+			}
+			pos = declaration.QueryPosition
+			pos.File = session.Sanitize(pos.File)
+			if !textDecoded {
+				var err error
+				text, err = query.BodyText(response.Body, response.Headers)
+				if err != nil {
+					return fail(err.Error())
+				}
+				textDecoded = true
+			}
+			actual, present, err := query.SelectRegex(declaration.Extraction, text)
+			if err != nil {
+				return fail(err.Error())
+			}
+			matched := false
+			if declaration.Operator == assertion.HeaderMatches {
+				matched = assertion.MatchString(declaration.Compiled, actual, present)
+			} else {
+				matched = assertion.Header(declaration.Operator, declaration.Expected, actual, present)
+			}
+			if !matched {
+				pattern, expected := "[oculto]", "[oculto]"
+				if !conceal {
+					pattern, expected = session.Sanitize(declaration.Pattern), session.Sanitize(declaration.Expected)
+				}
+				pos = declaration.Position
+				pos.File = session.Sanitize(pos.File)
+				current.RegexFailure = &RegexFailure{Position: pos, Pattern: pattern, Expected: expected, Operator: declaration.Operator, Present: present}
+				current.Outcome = RegexMismatch
+				return nil
+			}
+		case item.Body != nil && item.Header == nil && item.JSON == nil && item.Regex == nil:
 			declaration := *item.Body
 			pos := declaration.Position
 			pos.File = session.Sanitize(pos.File)
@@ -146,7 +216,7 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 				current.Outcome = BodyMismatch
 				return nil
 			}
-		case item.Header != nil && item.JSON == nil && item.Body == nil:
+		case item.Header != nil && item.JSON == nil && item.Body == nil && item.Regex == nil:
 			declaration := *item.Header
 			if plan := declaration.ExpectedTemplate; plan != nil {
 				value, secret, err := prepareTextExpected(session, plan, sensitiveHeader(declaration.Name))
@@ -168,7 +238,7 @@ func checkAssertions(session template.Session, entry parser.Entry, response Resp
 				current.Outcome = HeaderMismatch
 				return nil
 			}
-		case item.JSON != nil && item.Header == nil && item.Body == nil:
+		case item.JSON != nil && item.Header == nil && item.Body == nil && item.Regex == nil:
 			resolved := *item.JSON // Evaluation must never mutate the reusable scenario.
 			declaration := &resolved
 			pos := declaration.Position
