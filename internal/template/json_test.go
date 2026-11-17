@@ -91,6 +91,10 @@ func FuzzRenderJSON(f *testing.F) {
 	for _, value := range []string{`-0`, `3`, `3.0`, `3e0`, `999999999999999999999999999999999999`, `false`, `""`, `[]`, `{}`, `[[],[]]`} {
 		f.Add(`{"selected":{{x}}}`, value)
 	}
+	for _, value := range []string{`9007199254740993`, `"9007199254740993"`, `"{{missing}}"`, `"a\"\\雪"`, `null`, `[true,null]`, `{"n":9007199254740993}`} {
+		f.Add(`{"expected":{{x}},"text":"prefix-{{x}}"}`, value)
+		f.Add(`{{x}}`, value)
+	}
 	for _, value := range []string{`[[],[1],[[2]]]`, `[9007199254740993,1.2300e+99]`, `[null,"{{literal}}",{"x":[]}]`} {
 		f.Add(`{"projected":{{typed}},"value":{{x}}}`, value)
 	}

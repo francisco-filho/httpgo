@@ -1,0 +1,30 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "bad"
+    },
+    {
+      "name": "X",
+      "value": "ok"
+    }
+  ],
+  "response_json": "null",
+  "variables": [
+    "pattern=ok"
+  ],
+  "classification": "primeira ocorrência HTTPGo preservada, Hurl avalia lista",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

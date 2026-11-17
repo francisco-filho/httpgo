@@ -326,7 +326,7 @@ func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers, JSON e body
 
 Uso:
-  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--var nome=valor] [--secret nome]
+  httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--render-asserts] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
@@ -453,11 +453,42 @@ Timeout total: default de 10 segundos por requisição, configurável em YAML.
 Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
 Códigos: 0 sucesso, 1 status ou assertion de header/JSON/body divergente,
-2 entrada/arquivo externo/avaliação JSON ou body/captura/renderização/transporte/cancelamento/saída.
+2 entrada/arquivo externo/avaliação de esperado, JSON, header ou body/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
 Bodies e coleções de headers não são impressos, nem em erros de entrada.
 Valores comuns sanitizados podem aparecer no diagnóstico de assertion.
+
+Esperados dinâmicos (evolução explícita HTTPGo, opt-in por invocação):
+  httpgo test order.hurl --render-asserts --var base_url=http://localhost:8080
+  POST {{base_url}}/orders
+  HTTP 200
+  [Captures]
+  order_number: jsonpath "$.number"
+  order_name: jsonpath "$.name"
+  GET {{base_url}}/orders/{{order_number}}
+  HTTP 200
+  [Asserts]
+  jsonpath "$.number" == {{order_number}}
+  jsonpath "$.name" == "{{order_name}}"
+Requer POST e GET retornando {"number":9007199254740993,"name":"Pizza"}.
+--render-asserts é flag sem valor, válida para todos os arquivos desta invocação.
+Sem ela, o perfil literal abaixo não interpola esperados, mesmo definidos/ausentes;
+placeholder fora de literal válido continua rejeitado antes da rede.
+Com ela, resolve somente o esperado da assertion alcançada, antes da consulta.
+JSON completo preserva tipo/precisão; dentro de string usa texto escalar escapado.
+Assim, == {{number}} difere de == "{{number}}". Count exige inteiro não negativo,
+comparação ordenada exige número, pertencimento JSON exige escalar.
+Headers/body e padrões matches JSON/header usam texto, sem converter array/objeto.
+Exemplos: body contains "{{substring}}"; header "X" matches "^{{pattern}}$".
+Regex final usa metacaracteres inseridos sem escape automático, compilada na avaliação;
+sem referências continua compilada antes da rede. Substituição nunca é recursiva.
+Variável ausente, captura própria/futura, tipo ou regex final inválidos: avaliação 2,
+sem captura nem próximo envio. Status/assertion anterior divergente continua 1.
+Segredos e derivados são protegidos antes de resultados/callbacks.
+Não habilita operadores, consultas, nomes de header ou regex de captura dinâmicos,
+nem assertion regex de body. Ordem: status → assertions na ordem escrita → capturas.
+Perfis e diferenças Hurl 8.0.0: docs/subset.md e docs/compatibility.md.
 
 Assertions de body: salve privacy.hurl e execute
   httpgo test privacy.hurl --var base_url=http://localhost:8080
@@ -473,7 +504,7 @@ Todo texto contém "", inclusive body vazio; not contains "" sempre falha.
 Charset do primeiro Content-Type; omitido usa UTF-8 estrito. ISO-8859-1 usa índice web.
 Charset desconhecido ou sequência inválida: erro de avaliação de body (2), inclusive na negação.
 Condição falsa retorna 1. Exige HTTP numérico ou HTTP * e uma única string literal.
-Esperado nunca interpola; sem opt-in de interpolação ou inspeção de binários.
+Perfil literal (sem --render-asserts): Esperado nunca interpola; sem inspeção de binários.
 Regex de body é suportada somente em capturas (US-25), não como assertion.
 Status → assertions de header/JSON/body na ordem escrita → capturas.
 Texto só decodifica na primeira assertion de body, independente do JSON e sem antecipar erros.
@@ -496,7 +527,7 @@ Ausente falha em ==, contains e exists; vazio existe e satisfaz == "".
 header "Set-Cookie" not contains "Domain" aprova ausência ou primeira ocorrência sem trecho.
 Header presente com not contains "" falha, inclusive vazio.
 contains "" passa para qualquer valor presente, inclusive vazio.
-Esperados são strings literais: {{nome}} não interpola, mesmo se definido.
+Sem --render-asserts, esperados são strings literais: {{nome}} não interpola, mesmo se definido.
 Regex de headers: salve session.hurl e execute
   httpgo test session.hurl --var base_url=http://localhost:8080
 (requer um cookie no formato de sessão abaixo):
@@ -504,7 +535,7 @@ Regex de headers: salve session.hurl e execute
   HTTP 200
   [Asserts]
   header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"
-Padrão string JSON literal, sem interpolação; busca parcial, ^/$ ancoram.
+Padrão string JSON literal, sem interpolação no perfil padrão; busca parcial, ^/$ ancoram.
 Opções Go (?i), (?m), (?s) e Unicode seguem a US-15, sem normalização.
 Ausente falha com 1; matches vazio passa em todo header presente, inclusive vazio.
 ^$ passa somente no vazio presente. Somente primeira ocorrência, sem juntar valores.
@@ -519,7 +550,7 @@ Diagnóstico localizado distingue ausente de ""; valores de Authorization,
 Proxy-Authorization, Cookie e Set-Cookie são ocultos nos dois lados.
 Segredos conhecidos também são removidos de headers comuns.
 Diferenças Hurl 8.0.0: repetidos usam primeira ocorrência, não lista;
-esperados são literais e assertions antecedem capturas. Veja docs/compatibility.md.
+esperados são literais sem --render-asserts e assertions antecedem capturas. Veja docs/compatibility.md.
 
 Assertions JSON: salve product.hurl e execute
   httpgo test product.hurl --var base_url=http://localhost:8080
@@ -533,7 +564,7 @@ Assertions JSON: salve product.hurl e execute
 jsonpath "consulta" == <literal JSON>: string, número, booleano, null, array ou objeto,
 inclusive vazios, na mesma linha. Exige HTTP numérico ou HTTP *.
 Consultas estáticas: $, propriedades por ponto, índices não negativos e [*] de arrays.
-Esperados nunca interpolam: "{{nome}}" é texto literal, inclusive aninhado.
+Sem --render-asserts: Esperados nunca interpolam; "{{nome}}" é texto literal, inclusive aninhado.
 Igualdade preserva tipos: "4500" difere de 4500. 1, 1.0 e 1e0 são iguais,
 com precisão exata, também aninhada, sem float64 nem expansão de potências.
 Arrays exigem a mesma ordem; objetos ignoram a ordem das chaves.
@@ -564,7 +595,7 @@ Array vazio não contém escalar; toda string contém "", inclusive vazia.
 Ausência aprova not exists e not contains. null, vazios, false e zero presentes existem.
 Tipo presente incompatível falha com 1 em ambos os sentidos de pertencimento.
 JSON inválido/percurso incompatível/transporte nunca vira sucesso por negação: 2.
-not exists não aceita operando. Consultas e esperados permanecem estáticos/literais.
+not exists não aceita operando. Consultas estáticas; esperados literais sem --render-asserts.
 Sem negação genérica, header not exists, count contains ou wildcard de objeto.
 Filtros JSONPath estáticos por igualdade são o recorte US-28 abaixo.
 Falhas mostram presença/tipo e esperado protegido, nunca arrays/objetos selecionados.
@@ -606,13 +637,13 @@ Ausência ou tipo não array falha com 1; diagnóstico de count não despeja o a
 jsonpath "$.total" >= 1: >, >=, < e <= exigem números, sem coerção de strings.
 Negativos, decimais e expoentes com precisão exata, sem arredondar.
 jsonpath "$.name" matches "^Pizza": encontra trecho em string JSON, sem coerção;
-^/$ ancoram, opções Go como (?i) são aceitas. Padrão JSON literal, sem interpolação.
+^/$ ancoram, opções Go como (?i) são aceitas. Padrão JSON literal, sem interpolação no perfil padrão.
 Ausência/tipo incompatível/condição falsa: 1; JSON inválido: 2.
 Regex Go inválida/não suportada e matches em body/variável: erro 2 antes da rede.
 Headers também aceitam matches, com primeira ocorrência e padrão JSON literal (acima).
 Sem count em strings/objetos/capturas ou JSONPath completo.
 Diferenças Hurl 8.0.0 observadas: literais compostos e esperado 125e-2 rejeitados
-pelo Hurl; esperado literal aqui, sem interpolação. Veja docs/compatibility.md.
+pelo Hurl; esperado literal aqui no perfil padrão, sem interpolação. Veja docs/compatibility.md.
 
 Projeção de coleções — US-27 (arrays, não objetos):
   GET {{base_url}}/validation

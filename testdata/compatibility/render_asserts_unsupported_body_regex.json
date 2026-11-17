@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "\"x\"",
+  "variables": [
+    "pattern=x"
+  ],
+  "classification": "flag não habilita regex de body: não suportado estático HTTPGo, Hurl possui outro recorte",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

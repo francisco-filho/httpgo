@@ -1,0 +1,27 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "{{missing}}"
+    }
+  ],
+  "response_json": "\"{{missing}}\"",
+  "classification": "substituição única preserva placeholder inserido como dado; tipos/grafias podem diferir no Hurl",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ]
+  }
+}
