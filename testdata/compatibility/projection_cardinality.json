@@ -1,0 +1,18 @@
+{
+  "response_json": "{\"empty\":[],\"single\":[7],\"many\":[1,2],\"nulls\":[null],\"missing\":[{},{}],\"one_array\":[[]],\"arrays\":[[],[1]],\"nested\":[{\"products\":[{\"id\":1},{}]},{\"products\":[]},{\"products\":[{\"id\":3}]}],\"indexed\":[[8],[],[9]]}",
+  "classification": "shared: final reduction preserves absence, null, scalar and arrays; nested traversal and index retain order",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

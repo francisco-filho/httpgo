@@ -42,6 +42,11 @@ func projectionFailure(session template.Session, declaration parser.JSONAssertio
 			failure.Expected = session.Sanitize(string(encoded))
 		}
 	}
+	// A synthesized length/type can itself match a protected value even when
+	// none of the selected leaves do. Conceal it before collection/callbacks.
+	if session.Sanitize(failure.Actual) != failure.Actual || session.Sanitize(failure.Expected) != failure.Expected {
+		failure.Expected, failure.Actual, failure.Detail = "[oculto]", "[oculto]", ""
+	}
 	return failure
 }
 

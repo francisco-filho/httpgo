@@ -51,6 +51,52 @@ estáticos **2**, impedindo todo HTTP do arquivo.
 [diferenças observadas com Hurl 8.0.0](docs/compatibility.md#polling--us-26--issue-50)
 e [validação](docs/validation.md#us-26--issue-50--história-0026).
 
+## Verificar coleções sem índices fixos (US-27 / issue #52)
+
+`[*]` projeta elementos de arrays em assertions e capturas, combinando propriedades,
+índices e wildcards aninhados (`$.categories[*].products[*].id`).
+Salve como `collections.hurl` e execute
+`httpgo test collections.hurl --var base_url=http://localhost:8080`:
+
+```hurl
+GET {{base_url}}/validation
+HTTP 200
+[Asserts]
+jsonpath "$.issues[*].code" contains "REQUIRED"
+jsonpath "$.issues[*].code" not contains "OTHER_TENANT"
+[Captures]
+codes: jsonpath "$.issues[*].code"
+POST {{base_url}}/echo
+{{codes}}
+HTTP 204
+```
+
+Requer `/validation` devolvendo `{"issues":[{"code":"REQUIRED"},{"code":"INVALID"}]}`
+e `/echo` aceitando o array JSON com status 204. A ordem dos códigos não importa
+para pertencimento; retirar REQUIRED ou incluir OTHER_TENANT falha com **1**,
+sem captura nem próximo envio. O exemplo versionado é
+`testdata/scenarios/scenario_projection.hurl`, executado pelos E2E com HTTP local;
+não representa homologação de uma API real.
+
+- A redução acontece **somente ao final**: zero resultados = ausência; um = próprio
+  valor; vários = array ordenado por percurso, com repetições. Um número único
+  continua número; `count` falha com 1 nesse caso e na ausência, mas conta 2 para
+  dois números. `contains` usa substring na string única e pertencimento tipado
+  no array reduzido. Nenhum predicado é aplicado implicitamente a cada item.
+- Atributo ausente/índice fora do array elimina só o ramo; `null` selecionado é
+  presente. Selecionar um array vazio é diferente de expandir um array vazio
+  (ausência). Um array selecionado permanece array; vários não são achatados.
+- Percurso por tipo incompatível, inclusive `[*]` em objeto/número/null, invalida
+  a seleção inteira com **2**, sem aproveitar resultados parciais ou aprovar negação.
+- Captura sem resultado falha com **2**; tipos e precisão são preservados no lote
+  atômico. Arrays/objetos exigem valor JSON completo, nunca URL/header/string JSON.
+- Falhas expansivas mostram consulta/predicado/localização e presença/tipo/contagem,
+  sem despejar seleção ou esperado composto. Resumos protegidos ficam ocultos.
+  Caminhos simples mantêm seus contratos anteriores.
+- Continuam fora: `.*`, slices, unions, descida recursiva e filtros. Validação
+  estática integral impede todos os envios do arquivo em caso de consulta inválida.
+  Diferenças deliberadas frente ao Hurl 8.0.0 estão em [docs/compatibility.md](docs/compatibility.md#projeção-de-arrays--us-27--issue-52).
+
 ## Validar inclusão e ausência (US-23 / issue #44)
 
 Salve `validation.hurl` e execute
@@ -87,7 +133,7 @@ nem homologação de uma suíte real.
   contém `""`. `Set-Cookie` e demais headers sensíveis continuam ocultos.
 - Consultas/esperados são estáticos; `{{nome}}` em string é literal.
   Não há negação genérica, `header not exists`, `count contains`, busca
-  recursiva, wildcards ou filtros novos. Sintaxe inválida tardia impede todos
+  recursiva ou filtros; projeção de arrays `[*]` é o recorte US-27 acima. Sintaxe inválida tardia impede todos
   os envios. JSON inválido, percurso incompatível e falha de execução são **2**,
   nunca aprovação por negação. Ordem e publicação de capturas são preservadas.
 - Falhas localizadas mostram presença/tipo e esperado escalar protegido, não a
@@ -805,8 +851,8 @@ credenciais do exemplo são **fictícias**; credenciais reais em argumentos cont
 proibidas.
 
 `[Captures]` associa-se à resposta anterior, depois de `HTTP` quando declarado.
-JSONPath aceita somente raiz `$`, propriedades por ponto (`$.product.id`) e
-índices de array não negativos (`$.items[0]`). Desde a US-06, o resultado aceita
+JSONPath aceita raiz `$`, propriedades por ponto (`$.product.id`), índices de
+array não negativos (`$.items[0]`) e `[*]` de arrays (US-27 acima). Desde a US-06, o resultado aceita
 qualquer tipo JSON, inclusive raiz, `null`, string vazia, arrays/objetos vazios.
 JSON inválido, caminho ausente ou índice fora do array é erro de captura (código 2).
 Consultas não suportadas em qualquer entrada impedem todos os envios.
@@ -1019,8 +1065,8 @@ com headers, ID de alta precisão, consulta e reutilização tipada está em
 contra HTTP real pelos E2E. O dummy manual não promete esse contrato JSON.
 
 **Ampliação intencional:** `jsonpath "consulta" == <literal JSON>` aceita string,
-número, booleano, null, array ou objeto, inclusive vazios. JSONPath mantém somente
-raiz `$`, propriedades por ponto e índices não negativos combináveis. Consultas
+número, booleano, null, array ou objeto, inclusive vazios. JSONPath combina
+raiz `$`, propriedades por ponto, índices não negativos e `[*]` de arrays. Consultas
 são estáticas; os esperados são literais JSON completos na mesma linha, nunca
 templates: `"{{nome}}"` permanece texto mesmo com a variável definida.
 

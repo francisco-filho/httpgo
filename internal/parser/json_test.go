@@ -66,6 +66,9 @@ func FuzzParse(f *testing.F) {
 	}
 	f.Add("POST http://example.test/job\n[Options]\nretry: 1\n[MultipartFormData]\nfile: file,upload;\nHTTP 200")
 	f.Add("POST http://example.test/job\n[Options]\nretry: 1\n{}\nHTTP 200")
+	for _, path := range []string{"$[*]", "$.categories[*].products[*].id", "$[*][0][*]", "$[*", "$[**]", "$.*", "$[0:2]", "$[0,1]"} {
+		f.Add("GET http://example.test\r\nHTTP *\r\n[Asserts]\r\njsonpath \"" + path + "\" count == 2\r\n[Captures]\r\nvalues: jsonpath \"" + path + "\"")
+	}
 	for _, pattern := range []string{`"^session=[^;]+; Secure$"`, `"^a\\s\"b\\\\c/$"`, `"(?i)\\p{L}+"`, `"{{absent}}"`, `""`, `"^$"`, `"private["`, `"(?=private)"`, `"(private)\\1"`, `"\x41private"`, `/private/`, `"private" "extra"`} {
 		for _, newline := range []string{"\n", "\r\n"} {
 			f.Add(strings.ReplaceAll("GET http://example.test/first\nHTTP 200\nGET http://example.test/late\nHTTP *\n[Asserts]\n  header \"Set-Cookie\" matches "+pattern, "\n", newline))

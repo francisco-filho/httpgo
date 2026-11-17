@@ -1,0 +1,39 @@
+{
+  "response_json": "{\"categories\":[{\"products\":[{\"id\":3},{},{\"id\":1}]},{},{\"products\":[{\"id\":3}]}]}",
+  "classification": "intentional typed reuse difference: HTTPGo sends ordered nested results with duplicates and no missing placeholders; Hurl exits 3 before reusing the compound capture",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "[3,1,3]",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

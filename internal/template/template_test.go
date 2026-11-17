@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{`[[],[1],[[2]]]`, `[9007199254740993,1.2300e+99]`, `[null,"{{literal}}",{"x":[]}]`} {
+		f.Add("prefix-{{typed}}-{{x}}", value)
+	}
 	for _, value := range []string{`"catalog-v1"`, `session=private; Path=/; HttpOnly`, "first,whole", "", `{{missing}}`} {
 		f.Add("If-None-Match: {{captured}}", value)
 	}
