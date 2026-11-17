@@ -13,7 +13,7 @@ import (
 // serialized for presentation. Predicate evaluation still receives the real value.
 func projectionFailure(session template.Session, declaration parser.JSONAssertion, pos parser.Position, actual any, present bool, evaluation assertion.JSONEvaluation, conceal bool) *JSONFailure {
 	failure := &JSONFailure{Position: pos, Query: session.Sanitize(declaration.Query), Present: present, Operator: declaration.Operator, Count: declaration.Count}
-	if conceal || protectedJSON(session, actual) || protectedJSON(session, declaration.Expected) || session.Sanitize(declaration.Pattern) != declaration.Pattern {
+	if conceal || session.Sanitize(declaration.Query) != declaration.Query || protectedJSON(session, actual) || protectedJSON(session, declaration.Expected) || session.Sanitize(declaration.Pattern) != declaration.Pattern {
 		failure.Expected, failure.Actual = "[oculto]", "[oculto]"
 		return failure
 	}
