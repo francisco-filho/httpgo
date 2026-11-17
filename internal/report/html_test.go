@@ -2,6 +2,8 @@ package report
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,19 @@ import (
 	"capimgrosso.com/httpgo/internal/runner"
 	"capimgrosso.com/httpgo/internal/suite"
 )
+
+func TestHTMLWriterFailures(t *testing.T) {
+	cause := errors.New("write failed")
+	for _, want := range []error{cause, io.ErrShortWrite} {
+		writer := &brokenWriter{cause: want}
+		if want == io.ErrShortWrite {
+			writer.cause = nil // brokenWriter returns zero bytes with nil error.
+		}
+		if err := WriteHTML(writer, HTMLDocument{}); !errors.Is(err, want) {
+			t.Fatalf("got %v want %v", err, want)
+		}
+	}
+}
 
 func TestHTMLGoldenOfflineAndEscaping(t *testing.T) {
 	document := HTMLDocument{

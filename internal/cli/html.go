@@ -57,6 +57,12 @@ func (c *Command) writeHTML(path string, result suite.Result, details []report.H
 		}
 		document.Files = append(document.Files, current)
 	}
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return "", fmt.Errorf("destino do relatório HTML é um diretório; informe um nome de arquivo")
+	}
+	if strings.HasSuffix(path, string(filepath.Separator)) {
+		return "", fmt.Errorf("destino do relatório HTML exige um nome de arquivo")
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return "", fmt.Errorf("criar diretório do relatório HTML: %w", err)
 	}
