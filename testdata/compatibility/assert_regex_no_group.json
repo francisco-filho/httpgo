@@ -1,0 +1,17 @@
+{
+  "response_body": "aWQ9MTIzNDU2",
+  "classification": "diferença deliberada: expressão sem grupo é erro de avaliação 2 HTTPGo, Hurl aprova negação de seleção ausente",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

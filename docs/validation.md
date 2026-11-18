@@ -1,4 +1,89 @@
-# Validação — US-01 a US-17, US-20 a US-35
+# Validação — US-01 a US-17, US-20 a US-36
+
+## US-36 — issue #74 / história 0036
+
+Plano backend da issue #74 executado sem planner, quatro tasks registradas e
+autoaprovadas na fila 0036. `back:1`: `a49aa13` (variante parser/query/runner/CLI,
+cinco predicados e demonstração); `back:2`: `39f01f8` (perfis, transações, polling,
+recursos e isolamento); `back:3`: `2a29aeb` (sigilo, callbacks, texto/JUnit e falhas
+de escrita); `back:4`: esta alteração (ajuda, documentação, corpus e gates).
+Base `2c0ee3d`. Sem frontend/estáticos, mudança de transporte, novas dependências,
+Go/toolchain, CI ou lint. Nenhuma análise SonarQube foi executada pelo backdev.
+
+### Evidência executada em Linux
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, ferramentas já existentes em
+`/home/ff/go/bin`. Hurl **8.0.0** reutilizado de
+`/tmp/httpgo-0034-hurl/hurl-8.0.0-x86_64-unknown-linux-gnu/bin` via PATH; nenhuma
+instalação, download ou substituição pela versão padrão 8.0.1. O aviso de
+metadados libcurl não impediu identificação/execução. Sem consulta/cópia/adaptação
+de código-fonte Hurl ou contato com API externa/Borapedir.
+
+Passaram:
+
+- Task 1: `go test ./internal/parser ./internal/query ./internal/assertion ./internal/runner ./internal/cli -count=1`
+  e `go test ./tests/e2e -count=1`. Cinco predicados, presença/ausência/vazio,
+  primeiro grupo/match, captura estrita, sem grupo como avaliação 2, pré-validação
+  integral e demonstração com binário real/HTTP local, POST exato e sigilo básico.
+- Task 2: `go test ./internal/runner ./internal/cli ./internal/suite ./internal/transport -count=1`
+  e `go test ./tests/e2e -count=1`. Esperados literal/dinâmico/provisório,
+  extração estática, não recursão, esperado inválido antes de decode/seleção,
+  barreiras/primeira falha, retry só de divergência, reenvio com valores antigos,
+  confirmação/descarte, cancelamento, charsets, redirects, resposta incompleta,
+  leitura/close, timeout e isolamento, sem sleeps/API externa.
+- Task 3: `go test ./internal/runner ./internal/cli ./internal/report ./internal/suite -count=1`
+  e `go test ./tests/e2e -count=1`. Inspeção de resultados/callbacks e stdout,
+  stderr/XML completos; segredos antigos, renovados e derivados também em lotes
+  descartados; writers com erro/short write/close, prioridade 2 e sem replay.
+- Em cada task, `make fmt lint test`, `go vet ./...` e `make build` passaram
+  antes do commit. `make test` usa **-race -cover**; lint: **0 issues**.
+- Gate integrado final: `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build`, `make e2e` e `make compatibility` passaram. **476 pares**, sendo
+  **28 novos `assert_regex_*`** e **448 históricos sem alterações**. Atualização
+  seletiva somente dos novos goldens, revisados e reexecutados sem `-update`;
+  o gate completo também sem atualização ou skips. **Mudança de contrato do corpus
+  sinalizada:** nova query aceita, diferenças deliberadas de extração estática,
+  falta de grupo, códigos, validação integral e transação do polling publicadas
+  em [compatibility.md](compatibility.md#assertions-sobre-extração-regex--us-36--issue-74).
+  O negativo `render_asserts_unsupported_body_regex` continua rejeitando `body matches`.
+- Coberturas finais: parser **97,1%**, query **89,0%**, assertion **96,9%**,
+  runner **95,3%**, CLI **98,4%**, suite **95,1%**, report **97,1%**,
+  template **96,1%**, transport **90,4%**. Nenhum limiar foi relaxado.
+- Seeds ampliados e fuzzing executado separadamente, 20s e 2 workers cada:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**55.452** execuções), `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**25.868**) e equivalente com `'^FuzzRenderJSON$'` (**11.992**).
+  Todos sem crash/falha.
+- Ajuda raiz/test e cenário publicado conferidos pelo binário em
+  `TestRegexAssertionPublishedContract` e `TestRegexAssertionSignupByBinary`;
+  negativos versionados também em LF/CRLF em `TestRegexAssertionStructuralCorpus`.
+  Links locais da documentação alterada conferidos; `git diff --check` e
+  `gofmt -l` nos Go alterados sem diferenças.
+
+### Rastreabilidade GO-487–GO-500
+
+| GO | Evidência |
+|---|---|
+| 487 | E2E `TestRegexAssertionSignupByBinary`: demonstração versionada, POST exato `123456`, códigos 0/1, sigilo e interrupção |
+| 488–489 | query `TestSelectRegex`, runner `TestRegexAssertions`, `TestRegexAssertionDoesNotPublish` e CLI `TestRegexAssertionCLI`: cinco predicados, primeiro grupo/match, opcional ausente e vazio, sem variável implícita |
+| 490 | parser `TestRegexAssertionValidation`, E2E `TestRegexAssertionPreflightByBinary` e corpus estrutural: inválidos tardios/escapes/exclusões, LF/CRLF, nenhuma rede |
+| 491 | runner/CLI de semântica, `TestRegexTransactionalPolling`, diferencial `no_group` e `capture_first`: erro não negável/retentável, captura ausente continua estrita |
+| 492–493 | runner `TestRegexExpectedProfiles`, `TestRegexTransactionalPolling`, E2E perfis/polling: literal/dinâmico, extração estática, captura atual, não recursão, esperado inválido antes de consulta/decode |
+| 494–495 | runner `TestRegexTransactionalPolling`, `TestRegexCancelBeforeConfirmation`, E2E `TestRegexAssertionPollingByBinary`: barreiras, primeira falha, valores antigos nos retries, confirmação só da tentativa aprovada, métricas/callback terminal |
+| 496 | 28 novos pares diferenciais e 476 totais com Hurl 8.0.0, ajuda/docs/exemplo publicado executados |
+| 497 | transport `TestRegexAssertionFinalResponse`, `TestRegexAssertionReadAndClose`: body final, charsets/UTF-8, redirects, incomplete/read/close, timeout/cancelamento |
+| 498 | runner `TestRegexAssertionSafeResults`, E2E `TestRegexAssertionSecretSuiteByBinary`: padrões/esperados/segredos/derivados ocultos, ausência versus divergência e failure/error JUnit |
+| 499 | CLI `TestRegexAssertionWriterFailures`, `TestRegexAssertionJUnitWriterFailures`: erros/short writes/close após 0/1/2, sem replay/anúncio falso, prioridade 2 |
+| 500 | runner de perfis/transações repetidas, suite `TestRegexAssertionFileIsolation`, CLI `TestRegexAssertionCommandReuse`, E2E suíte de segredos: planos imutáveis e isolamento entre tentativas/arquivos/invocações |
+
+Limites: corpus sintético não homologa fluxos reais, engine ou formato Hurl
+completos. Query `variable`, `body matches`, regex dinâmica de extração, pipelines,
+escolha de grupo e regex de header como query de assertion continuam excluídos.
+YAML hierárquico/interpolação externa são extensões HTTPGo. Não há detecção
+universal de segredos arbitrários/transformações desconhecidas; stderr não pode
+redigir retroativamente valores ainda desconhecidos. JUnit conserva schema e
+granularidade por arquivo. Nenhuma execução nativa macOS/Windows ou CI remoto
+foi realizada; portabilidade opcional nesta história conforme plano v4.
 
 ## US-35 — issue #72 / história 0035
 

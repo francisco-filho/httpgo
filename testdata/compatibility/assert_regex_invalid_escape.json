@@ -1,0 +1,12 @@
+{
+  "response_body": "aWQ9MTIzNDU2",
+  "classification": "sintaxe inválida: escape JSON inválido bloqueia HTTP nos dois executáveis",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

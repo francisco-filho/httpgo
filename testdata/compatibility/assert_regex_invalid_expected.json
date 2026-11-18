@@ -1,0 +1,20 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_body": "aWQ9MTIzNDU2",
+  "variables": [
+    "pattern=["
+  ],
+  "classification": "diferença de categoria: regex esperada dinâmica inválida é erro HTTPGo (2); Hurl assertion falha (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

@@ -1,4 +1,53 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-34
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36
+
+## Assertions sobre extração regex — US-36 / issue #74
+
+**Ampliação explícita de contrato:** query `regex "padrão"` em `[Asserts]`, com
+`==`, `contains`, `not contains`, `matches` e `exists`. Extração estática do primeiro
+grupo da primeira correspondência, ausência distinta de erro/vazio. Substitui
+exclusões históricas de **query regex de body** nas seções anteriores; não habilita
+`body matches`, query `variable`, regex de header como query de assertion,
+pipelines, escolha de grupo ou extração dinâmica. `render_asserts_unsupported_body_regex`
+continua negativo: sua entrada é `body matches`, não a nova query `regex`.
+
+**28 pares novos `assert_regex_*`, total 476**, executados com **Hurl 8.0.0**
+fixado pelo projeto, em árvores/sequências independentes por executável. Nenhum
+par histórico foi regenerado. Atualização seletiva somente do prefixo novo,
+revisada e confirmada com execução sem `-update`, seguida do gate completo.
+Não houve consulta, cópia ou adaptação de código-fonte Hurl nem homologação de
+fluxos reais Borapedir. O corpus é sintético e não prova equivalência geral.
+
+| Par `assert_regex_*` | HTTPGo | Hurl 8.0.0 | Observação / classificação |
+|---|---|---|---|
+| `otp` | 0; /capture → /health | igual | código capturado enviado no POST como string exata `123456` |
+| `predicates`, `first_group` | 0; avança | igual | cinco predicados e primeiro grupo da primeira correspondência |
+| `mismatch`, `absent`, `optional_absent` | 1; /capture | 4; /capture | divergência/ausência: códigos próprios, sem próxima entrada |
+| `absent_negated`, `optional_negated` | 0; avança | igual | negação aprova ausência, sem procurar match/grupo posterior |
+| `empty` | 0; avança | igual | vazio participante presente, igualdade e substring vazias |
+| `empty_negated` | 1; /capture | 4; /capture | vazio presente reprova `not contains ""` |
+| `no_group` | 2; /capture | 0; avança | **diferença deliberada:** falta de grupo é erro aqui, não ausência negável |
+| `late_invalid` | 2; nenhum envio | 4; /health → /capture | **diferença:** validação integral antecipada da extração inválida |
+| `lookaround`, `pipeline` | 2; nenhum envio | 4; /capture | **fora do recorte:** rejeição explícita estática, em vez de avaliação |
+| `invalid_escape`, `unquoted`, `exists_operand` | 2; nenhum envio | igual | sintaxe inválida impede HTTP nos dois |
+| `literal_expected` | 1; /capture | 0; avança | **diferença:** esperado literal aqui sem opt-in; Hurl interpola |
+| `static_extraction` | 1; /capture | 0; avança | **diferença:** extração sempre estática aqui, também com `--render-asserts` |
+| `current_expected`, `nonrecursive` | 0; avança | igual | esperado renderizado usa captura atual; inserção não recursiva |
+| `missing_expected`, `invalid_expected` | 2; /capture | 4; /capture | **diferença de categoria:** esperado inválido é erro, não divergência negável |
+| `charset` | 2; /capture | 4; /capture | charset desconhecido é erro, negação não aprova |
+| `latin1` | 0; avança | igual | bytes ISO-8859-1 declarados, sem exigir JSON |
+| `capture_first` | 2; /capture | 3; /capture | captura ausente precede assertion, códigos próprios |
+| `status_first` | 1; /capture | 4; /capture | status impede avaliação de regex válida sem grupo |
+| `polling` | 0; /poll → /poll → /health | mesmos paths/código | **diferença:** X-Probe HTTPGo `old`, `old`, `accepted`; Hurl `old`, `rejected`, `accepted` |
+
+A diferença de reenvio é observada nos headers, não inferida só dos códigos:
+a US-34 conserva valores confirmados antes da entrada até sucesso. A US-26 só
+retenta divergência; erro regex/esperado/decodificação encerra. Contratos próprios
+não foram adaptados para forçar igualdade entre runners.
+
+[Contrato](subset.md#assertions-sobre-extração-regex--us-36--issue-74),
+[arquitetura](architecture.md#assertions-sobre-extração-regex--us-36--issue-74)
+e [gates, sigilo e limites](validation.md#us-36--issue-74--história-0036).
+YAML e interpolação externa continuam extensões explícitas HTTPGo.
 
 ## Renovação transacional de capturas — US-34 / issue #70
 

@@ -1,0 +1,16 @@
+{
+  "response_body": "aWQ9MTIzNDU2",
+  "classification": "compatível no recorte de ordem: captura ausente precede assertion, com códigos próprios 2/3",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

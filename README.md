@@ -3,6 +3,57 @@
 CLI independente em Go para executar um **subconjunto documentado** de arquivos
 `.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
 
+## Validar textos extraídos por regex (US-36 / issue #74)
+
+```hurl
+GET {{mailbox_url}}/message/123
+HTTP 200
+[Captures]
+signup_code: regex "verificação é: ([0-9]{6})"
+[Asserts]
+regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"
+
+POST {{base_url}}/verify
+Content-Type: application/json
+{"code":"{{signup_code}}"}
+HTTP 200
+```
+
+```bash
+httpgo test testdata/scenarios/scenario_regex_assertion_signup.hurl --var mailbox_url=http://localhost:8025 --var base_url=http://localhost:8080 --secret signup_code
+```
+
+Requer `/message/123` retornando, por exemplo, `Seu código de verificação é: 123456`
+e `/verify` aceitando o código. Passa com **0**, envia o POST exato e não revela
+`signup_code`. Exigir sete dígitos no **esperado** retorna **1**, sem POST.
+O cenário não fornece esses serviços nem homologa os fluxos reais do Borapedir.
+
+- Query `regex "padrão"` em `[Asserts]`: `==`, `contains`, `not contains`,
+  `matches` e `exists`. Só `exists` não recebe operando; os outros exigem string
+  JSON entre aspas duplas. Usa texto final decodificado, sem exigir JSON.
+- Seleciona só o **primeiro grupo da primeira correspondência**, sem criar
+  variável. Ausência/grupo opcional não participante falha com **1**, exceto
+  `not contains`, que aprova. Vazio participante está presente: `exists`,
+  `== ""` e `contains ""` passam; `not contains ""` falha.
+- Regex válida sem grupo e texto indecodificável são avaliação **2**, inclusive
+  na negação. Regex/escape inválido ou construção excluída tardia bloqueia todo
+  HTTP do arquivo. Captura regex ausente continua erro **2**, não assertion negável.
+- Extração sempre estática. `--render-asserts` só renderiza esperados, inclusive
+  com captura provisória atual; valida esperado antes da consulta, sem recursão.
+  Sem flag, placeholders nos esperados permanecem literais.
+- Preserva status → capturas provisórias → assertions ordenadas → confirmação.
+  Só divergência **1** permite polling; erro **2** não. Diagnósticos localizados
+  distinguem ausência/divergência/erro sem body/grupo, e ocultam padrões/esperados
+  protegidos também no JUnit e após descarte. Marque segredos; não há detecção
+  universal de valores arbitrários. Credenciais iniciais vêm do ambiente.
+- Não habilita query `variable`, `body matches`, regex de header como query de
+  assertion, pipelines, extração dinâmica ou escolha de grupo.
+
+[Contrato](docs/subset.md#assertions-sobre-extração-regex--us-36--issue-74),
+[arquitetura](docs/architecture.md#assertions-sobre-extração-regex--us-36--issue-74)
+e [comparação Hurl 8.0.0](docs/compatibility.md#assertions-sobre-extração-regex--us-36--issue-74).
+YAML hierárquico e interpolação externa são **extensões HTTPGo**.
+
 ## Compartilhar resultados HTML offline (US-35 / issue #72)
 
 ```bash
@@ -392,7 +443,7 @@ perder precisão, capturar a entrada divergente ou enviar a próxima requisiçã
   Captura própria válida está disponível; futura, não. Segredos/derivados são
   protegidos antes de callbacks; planos e regex operacionais não vão ao resultado.
 - A US-31 acima amplia somente operandos de filtros nas consultas. Nomes de
-  header, padrões de captura e templates de requisição não mudam. Sem regex de body em assertions, expressões, aritmética ou nova env/YAML.
+  header, padrões de captura e templates de requisição não mudam. A query regex da US-36 só renderiza esperados; extração permanece estática. Sem body matches, expressões, aritmética ou nova env/YAML.
   As seções legadas abaixo descrevem o perfil literal, salvo indicação explícita.
 
 [Subconjunto](docs/subset.md#esperados-dinâmicos--us-30--issue-60),

@@ -323,7 +323,7 @@ func parseHeaderAssertion(text string, pos Position, options ParseOptions) (Head
 		rest = strings.TrimLeft(text[len(token):], " \t")
 	}
 	if token != "header" {
-		return fail("construção não suportada", "consulta de assertion não suportada; use header, jsonpath ou body")
+		return fail("construção não suportada", "consulta de assertion não suportada; use header, jsonpath, body ou regex")
 	}
 	name, rest, ok := assertionString(rest)
 	if !ok || !validHeaderName(name) {
