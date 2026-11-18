@@ -126,13 +126,23 @@ func TestReadmeLinksAndProgression(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("help code=%d stderr=%q", code, stderr)
 	}
-	// Every long option used in a published shell command must exist in current help.
+	// HTTPGo options belong to CLI help. curl/Bash/installer commands are
+	// exercised separately by tests/release, not interpreted as CLI flags.
 	blocks := regexp.MustCompile("(?s)```sh\\n(.*?)\\n```")
 	options := regexp.MustCompile(`--[a-z][a-z-]*`)
 	for _, block := range blocks.FindAllStringSubmatch(readme, -1) {
-		for _, option := range options.FindAllString(block[1], -1) {
-			if !strings.Contains(help, option) {
-				t.Errorf("published option not in help: %s", option)
+		commands := strings.ReplaceAll(block[1], "\\\n", "")
+		for _, command := range strings.Split(commands, "\n") {
+			command = strings.TrimSpace(command)
+			isHTTPGo := strings.HasPrefix(command, "httpgo ") ||
+				(strings.HasPrefix(command, `"$HOME/`) && strings.Contains(command, `/httpgo" `))
+			if !isHTTPGo {
+				continue
+			}
+			for _, option := range options.FindAllString(command, -1) {
+				if !strings.Contains(help, option) {
+					t.Errorf("published option not in help: %s", option)
+				}
 			}
 		}
 	}

@@ -1,4 +1,97 @@
-# Validação — US-01 a US-17, US-20 a US-39
+# Validação — US-01 a US-17, US-20 a US-40
+
+## US-40 — issue #82 / história 040
+
+Plano backend da issue #82 executado sem planner. As quatro tasks foram
+registradas e autoaprovadas na fila `040`: empacotamento (`0bec2c2`), instalador
+(`fa579ac`), workflow (`d69720d`) e documentação/testes integrados (esta alteração).
+A implementação local está disponível, mas **a Task 3 e o aceite de distribuição
+pública não estão concluídos**: ainda faltam as evidências externas abaixo.
+A documentação foi finalizada após o pedido do usuário, sem converter essas
+pendências em sucesso nem modificar o plano ou os critérios de aceite.
+
+`scripts/package-release.sh` compila Linux/Darwin amd64/arm64, com CGO desligado,
+metadados por linkedição, um executável por pacote e quatro hashes SHA-256.
+`install.sh` fixa uma tag, valida HTTPS/checksum/conteúdo do arquivo e prepara a
+troca por renomeação no diretório de destino. O README apresenta instalação
+padrão, versão explícita, diretório com espaços e inspeção do script; preserva a
+alternativa por fonte, inclusive Windows, e avisa sobre código remoto e limites
+do checksum. Os comandos públicos são condicionados à existência da release,
+sem alegar publicação ou homologação já realizadas.
+
+O workflow novo `.github/workflows/release.yml` encadeia gates Linux, os mesmos
+artefatos em quatro runners nativos, uploads em rascunho, publicação e smoke
+HTTPS público. A escrita fica restrita ao publicador e a publicação a pushes de
+tag no repositório `capimgrosso/httpgo`. PRs não criam tags ou releases.
+O workflow JUnit e `make portable` continuam independentes. Não foram alterados
+parser, runner, transporte, contratos da CLI, Go, dependências, corpus de
+compatibilidade ou frontend/estáticos.
+
+### Evidência executada em Linux
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; ferramentas já presentes no PATH.
+
+- `bash -n install.sh scripts/package-release.sh` passou. Os blocos Bash do
+  workflow também passaram em `bash -n`, pelo `TestReleaseWorkflowGuards`.
+- O YAML do workflow foi lido com sucesso pelo parser `go.yaml.in/yaml/v3` já
+  existente no módulo, em um programa temporário fora do repositório. Isso é
+  **validação de sintaxe YAML, não execução do GitHub Actions nem actionlint**.
+- `go test ./tests/release -count=1` e
+  `go test ./tests/e2e -run '^(TestReadme|TestMarkdownAnchors)' -count=1` passaram.
+  Os testes do README executam os blocos publicados, incluindo pipe, versão
+  fixa, caminho com espaços e script baixado para inspeção, com um binário Go
+  nativo real e substituto de curl isolado no PATH do harness. Não fazem
+  download público nem comprovam inspeção humana.
+- `make fmt lint test` passou: lint com **0 issues**, testes com **-race -cover**.
+  `go vet ./...`, `go build ./...`, `make build` e `make e2e` passaram.
+  `gofmt -l` nos arquivos Go alterados e `git diff --check` sem problemas.
+- Empacotamento local com a versão sintética `v2.3.4`, sem criar tag Git:
+  `bash scripts/package-release.sh v2.3.4 <temporário>/assets`, seguido de
+  `HTTPGO_RELEASE_ASSETS=<temporário>/assets HTTPGO_RELEASE_TAG=v2.3.4 go test ./tests/release -run '^TestInstallerNativePackage$' -count=1 -v`.
+  O teste instalou **os bytes do pacote produzido**, sem recompilá-lo ou
+  recomprimi-lo, conferiu SHA-256 e iniciou `httpgo --version` em Linux amd64.
+- `sha256sum` foi executado de fato. Este Linux não tem `shasum`: o fallback foi
+  testado com um substituto que valida `-a 256` e encaminha o cálculo ao SHA-256
+  real. A execução de `shasum` real e do Bash 3.2 permanece para os runners
+  macOS. A presença dos testes na matriz **não comprova que ela já executou**.
+
+### Rastreabilidade dos cenários
+
+| Cenário | Evidência local / limite |
+|---|---|
+| GO-510 | `TestPackageRelease`: quatro nomes, membro regular executável único, SHA-256, CGO desligado, OS/arch e metadados; `--version` somente no alvo nativo. Publicação não executada |
+| GO-511 | `TestReleaseTags` classifica pré-release; `TestInstallerSelection` exercita latest estável e pré-release explícita simulados. Classificação pública do GitHub ainda não comprovada |
+| GO-512 | `TestInstallerNativePackage` instala pacote nativo Linux amd64; `TestReadmeInstallCommands` inicia binário nativo pelos comandos publicados. Faltam os outros três ambientes e o smoke público dos quatro |
+| GO-513 | `TestInstallerSelection` e `TestInstallerFailuresPreserveExecutable`: aliases e plataformas recusadas, com uname substituído no harness |
+| GO-514 | `TestInstallerSelection`, `TestInstallerFailuresPreserveExecutable`: verificadores, hashes adulterados, ausentes, duplicados ou divergentes; shasum real pendente conforme nota acima |
+| GO-515 | `TestInstallerFailuresPreserveExecutable`: tag inexistente e pacote ausente, sem fallback nem alteração do binário anterior |
+| GO-516 | `TestInstallerSelection`, `TestInstallerPathAlreadyConfigured`, `TestReadmeInstallCommands`: criação, reinstalação, destinos padrão/relativo/com espaços, mensagens e PATH; sem sudo nem alteração dos arquivos de shell |
+| GO-517 | `TestReadmeInstallContract`, `TestReadmeInstallCommands`, `TestReadmeLinksAndProgression`: pré-requisitos, limites, comandos publicados, execução nativa local e links/flags de cada componente |
+| GO-518 | `TestReleaseTags`, `TestPackagePreparationFailures`, `TestReleaseWorkflowGuards`: SemVer inválido, falhas de build/tar/hash, ordem e gates do workflow. Falha real de upload no GitHub não foi provocada |
+| GO-519 | `TestInstallerFailuresPreserveExecutable`: curl simula erro de rede/TLS com download parcial; argumentos HTTPS/redirecionamentos são verificados, temporários limpos e instalação anterior preservada. Não é handshake TLS público |
+| GO-520 | `TestInstallerFailuresPreserveExecutable`, `TestInstallerRejectsExtraMembers`: gzip inválido, arquivo ausente/vazio, caminho inseguro, links, membros extras e erro na extração |
+| GO-521 | `TestInstallerIOFailures`: falhas injetadas na criação, preparação, cópia, chmod e renomeação, inclusive sob root, sem truncar ou remover os bytes/permissões anteriores |
+| GO-522 | `TestInstallerLatestPinnedWhenReleaseChanges`: o próximo redirecionamento simulado aponta para outra estável, mas pacote e checksum permanecem na primeira tag, com uma única resolução de latest |
+| GO-523 | `TestInstallerPrerequisites`, `TestInstallerFailuresPreserveExecutable`, `TestInstallerHelp`: ferramentas ausentes, opções inválidas/sem valor, fallback SHA e ajuda, antes de alterar o destino |
+
+### Pendências impeditivas para concluir a distribuição pública
+
+- Não houve push, criação de tag, publicação de release nem execução do workflow
+  remoto nesta sessão. A consulta HTTPS de `capimgrosso/httpgo/releases/latest`
+  durante a implementação retornou **404**; os comandos no README não são
+  evidência de assets já disponíveis.
+- O `origin` deste checkout é `francisco-filho/httpgo`, enquanto o plano fixa a
+  origem pública em `capimgrosso/httpgo`. Essa decisão foi preservada; nenhum
+  remote foi reconfigurado e nenhuma publicação foi presumida nesse outro
+  repositório.
+- Faltam execuções reais dos pacotes nos quatro runners da matriz e instalações
+  públicas HTTPS, por tag e, para estáveis, latest. Também não foi comprovado no
+  serviço o fluxo estável → pré-release nem o comportamento de upload incompleto.
+  **CA-02 não está completo**; cross-build, inspeção dos metadados, simulação ou
+  parsing YAML não substituem essas evidências.
+- A fila mantém a Task 3 não concluída e a história não foi enviada ao review
+  final. Não há comentário GitHub de conclusão da história nem análise SonarQube
+  pelo backdev. A entrega não conclui a US-19 ou amplia seu escopo de portabilidade.
 
 ## US-39 — issue #81 / história 0039
 
