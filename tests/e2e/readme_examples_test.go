@@ -14,21 +14,26 @@ import (
 // Read the published input rather than maintaining a second copy in the test.
 func readmeBlock(t *testing.T, marker, language string) string {
 	t.Helper()
-	data, err := os.ReadFile("../../README.md")
+	return guideBlock(t, "README.md", marker, language)
+}
+
+func guideBlock(t *testing.T, path, marker, language string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("../..", path))
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, tail, ok := strings.Cut(string(data), marker)
 	if !ok {
-		t.Fatalf("README marker missing: %q", marker)
+		t.Fatalf("%s marker missing: %q", path, marker)
 	}
 	_, tail, ok = strings.Cut(tail, "```"+language+"\n")
 	if !ok {
-		t.Fatalf("README block missing after %q", marker)
+		t.Fatalf("%s block missing after %q", path, marker)
 	}
 	body, _, ok := strings.Cut(tail, "\n```")
 	if !ok {
-		t.Fatalf("README block not closed after %q", marker)
+		t.Fatalf("%s block not closed after %q", path, marker)
 	}
 	return body + "\n"
 }

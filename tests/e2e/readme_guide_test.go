@@ -141,10 +141,11 @@ func TestReadmeConfigCredentialsSuiteAndReports(t *testing.T) {
 	}
 	first := readmeBlock(t, "conteúdo completo:", "hurl")
 	file := writeReadmeFile(t, dir, "exemplo.httpgo", first)
-	config := writeReadmeFile(t, dir, "guia.yaml", replaceAddress(readmeBlock(t, "salve `guia.yaml`:", "yaml")))
-	writeReadmeFile(t, dir, "environments/local.yaml", replaceAddress(readmeBlock(t, "Crie `environments/local.yaml`:", "yaml")))
-	credentials := writeReadmeFile(t, dir, "credenciais.yaml", replaceAddress(readmeBlock(t, "Salve `credenciais.yaml`:", "yaml")))
-	credentialFile := writeReadmeFile(t, dir, "credenciais.httpgo", readmeBlock(t, "Salve `credenciais.httpgo`:", "hurl"))
+	config := writeReadmeFile(t, dir, ".httpgo.yaml", replaceAddress(guideBlock(t, "docs/configuration.md", "salve `.httpgo.yaml`:", "yaml")))
+	local := strings.ReplaceAll(guideBlock(t, "docs/configuration.md", "Crie `environments/local.yaml`:", "yaml"), "http://localhost:8081", server.URL)
+	writeReadmeFile(t, dir, "environments/local.yaml", local)
+	credentials := writeReadmeFile(t, dir, "credenciais.yaml", replaceAddress(guideBlock(t, "docs/configuration.md", "Salve `credenciais.yaml`:", "yaml")))
+	credentialFile := writeReadmeFile(t, dir, "credenciais.httpgo", guideBlock(t, "docs/configuration.md", "Salve `credenciais.httpgo`:", "hurl"))
 	writeReadmeFile(t, dir, "suite/01-health.httpgo", first)
 	writeReadmeFile(t, dir, "suite/02-produto.httpgo", readmeBlock(t, "Salve `suite/02-produto.httpgo` com:", "hurl"))
 	for _, extra := range [][]string{nil, {"--env", "local"}, {"--env", "local", "--var", "base_url=" + server.URL}} {

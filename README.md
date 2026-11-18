@@ -213,7 +213,7 @@ navegação de propriedades de objetos CLI ou nomes de headers/chaves JSON
 dinâmicos. Consulte [variáveis e templates](docs/subset.md#variáveis-tipadas-e-templates).
 Para encadear valores **recebidos** da API, em vez de fornecidos inicialmente,
 use captures, explicadas a seguir. Credenciais reais vêm do
-[ambiente do processo](#usar-credenciais-sem-colocá-las-em-argumentos), nunca de flags.
+[ambiente do processo](docs/configuration.md#referências-ao-ambiente-do-processo-e-segredos), nunca de flags.
 
 ## Assertions e captures
 
@@ -332,87 +332,13 @@ sem transformar o guia em catálogo de toda a linguagem.
 
 ### Configurar o destino e escolher um ambiente
 
-Para não repetir `--var`, use **configuração YAML, uma extensão HTTPGo**.
-Na pasta de trabalho do guia, salve `guia.yaml`:
-
-```yaml
-version: 1
-defaults:
-  timeout: 2.5
-variables:
-  base_url: http://localhost:8080
-```
-
-Crie `environments/local.yaml`:
-
-```yaml
-variables:
-  base_url: http://127.0.0.1:8080
-```
-
-Reutilize `exemplo.httpgo` com `HTTP 200` da primeira execução:
-
-```sh
-httpgo test exemplo.httpgo --config guia.yaml
-httpgo test exemplo.httpgo --config guia.yaml --env local
-httpgo test exemplo.httpgo --config guia.yaml --env local --var base_url=http://localhost:8080
-```
-
-Os três comandos validam `/health` e retornam **0**. No segundo, o endereço vem
-de `environments/local.yaml`; no terceiro, a CLI prevalece. O timeout é **2,5
-segundos por requisição**, incluindo redirects e consumo da resposta (default
-interno: 10 segundos). A precedência disponível é **CLI > ambiente YAML
-selecionado > YAML base > defaults internos**. Mapas combinam por caminho;
-escalares, listas e null substituem folhas. Não há overrides automáticos
-`HTTPGO_*` nesta versão.
-
-Sem `--config`, busca somente `.httpgo.yaml` do diretório corrente, não dos
-ancestrais. `--env local` busca `environments/local.yaml` ao lado da configuração
-base; sem base, no diretório corrente. Ambiente nomeado não é ambiente do processo.
-Arquivo explicitamente solicitado ausente ou configuração inválida retorna **2**,
-antes de HTTP. [Schema e limites do YAML](docs/subset.md#extensão-httpgo-configuração-yaml)
-e [seleção de ambientes](docs/subset.md#extensão-httpgo-ambientes-nomeados).
-
-### Usar credenciais sem colocá-las em argumentos
-
-Para uma API autenticada real, injete a credencial pelo **ambiente do processo**
-(por exemplo, pelo cofre de segredos do CI), nunca por `--var` ou outra flag.
-Para um exercício sem credenciais reais, configure externamente `OWNER_TOKEN`
-com o valor **fictício** `token-de-demonstracao`. Salve `credenciais.yaml`:
-
-```yaml
-version: 1
-variables:
-  base_url: http://localhost:8080
-  auth:
-    token: ${OWNER_TOKEN}
-```
-
-Salve `credenciais.httpgo`:
-
-```hurl
-GET {{base_url}}/health
-Authorization: Bearer {{auth.token}}
-HTTP 200
-```
-
-```sh
-httpgo test credenciais.httpgo --config credenciais.yaml
-```
-
-Com `OWNER_TOKEN` presente, o comando retorna **0** e envia o header sem mostrar
-seu valor. O dummy ignora o header: isso exercita a injeção, **não testa uma
-política de autenticação**. Sem a variável, retorna **2 antes de HTTP**.
-`${OWNER_TOKEN}` ocupa o valor YAML completo; `Bearer` fica no cenário.
-O valor recebido é string literal e ganha proteção automática. Resolve apenas
-referências efetivas após overrides, não importa todo o ambiente do sistema.
-
-`--secret nome` e `secrets: [nome]` marcam também capturas futuras: **não fornecem
-valor**, nem tornam seguro passar segredos em argumentos. A proteção de saídas
-não cobre histórico do shell, acesso privilegiado ao ambiente, todo segredo
-arbitrário ou codificações desconhecidas. Não há stdin nem dotenv nesta versão.
-Proteja arquivos sensíveis com permissões `0600` e diretórios `0700` em sistemas
-POSIX. Veja [fontes seguras e limites](docs/subset.md#extensão-httpgo-referências-ao-ambiente-do-processo).
+Reutilize destinos e variáveis com **configuração YAML hierárquica, uma extensão
+HTTPGo**. O [guia de configuração](docs/configuration.md) reúne os arquivos
+completos, a precedência base → ambiente → CLI, schema, limites e overrides.
+Ele demonstra `httpgo test exemplo.httpgo --env local --var base_url=http://localhost:9090`
+e distingue ambientes nomeados de referências explícitas `${NOME}` ao processo.
+Credenciais reais vêm do ambiente do processo, **nunca de argumentos**; consulte
+no guia as fontes disponíveis, proteção preservada após override e seus limites.
 
 ### Executar uma suíte e gerar relatórios
 
@@ -497,11 +423,9 @@ abaixo, não essas capacidades genéricas:
 - **Configuração YAML hierárquica**: `.httpgo.yaml`, `--config`, ambientes em
   `environments/<nome>.yaml`, merge tipado e referências completas `${NOME}`.
   Serve para compartilhar destinos, timeouts e nomes de variáveis sem editar
-  cenários. Os arquivos `guia.yaml` e `environments/local.yaml` da seção
-  [Configuração](#configuração-suítes-e-relatórios) já estão completos; ative com
-  `httpgo test exemplo.httpgo --config guia.yaml --env local`: status 200 e código
-  **0**, com o destino do ambiente. Não é sintaxe de cenário nem um formato de
-  configuração intercambiável com Hurl.
+  cenários. O [guia de configuração](docs/configuration.md) traz base, ambiente,
+  cenário, comando e resultado completos. Não é sintaxe de cenário nem um formato
+  de configuração intercambiável com Hurl.
 - **Renderização opt-in de JSON externo**: `--render-files` aplica templates aos
   arquivos usados como body completo, preservando tipos como no JSON inline.
   Permite reutilizar payloads entre cenários sem prometer que Hurl renderize os

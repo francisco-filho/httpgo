@@ -911,9 +911,10 @@ proteção dos valores anteriores/substitutos, variantes, capturas e derivados,
 inclusive em erros antes da sessão. Marcação isolada não cria valor. Cada
 invocação tem configuração/contexto/capturas novos, sem estado compartilhado.
 
-Exemplo completo e demonstração Pizza/Suco: `README.md`,
-`testdata/config/environment_base.yaml`, `testdata/config/environments/{local,staging}.yaml`
-e `testdata/scenarios/scenario_environment_products.httpgo`.
+Exemplo completo de base, ambiente e CLI: [guia de configuração](configuration.md).
+Fixtures adicionais: `testdata/config/environment_base.yaml`,
+`testdata/config/environments/{local,staging}.yaml` e
+`testdata/scenarios/scenario_environment_products.httpgo`.
 Sem múltiplos ambientes, seleção automática, stdin ou mudanças nos caminhos de
 payloads. Referências de processo: US-13 abaixo. Não é uma capacidade Hurl;
 testes separados do corpus diferencial, sem fornecer `--env` à outra ferramenta.
