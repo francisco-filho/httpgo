@@ -1765,6 +1765,116 @@ com indicação explícita de **sem validação de status**.
 
 ## Assertions e captures
 
+**Assertion valida** uma propriedade da resposta; **capture extrai** um valor
+para uso posterior. Capturar `id` não prova que o produto tem o nome correto;
+exigir `HTTP 200` não prova que o JSON está correto. Combine as verificações
+necessárias ao comportamento que você quer testar.
+
+### Validar headers, JSON e texto
+
+O dummy retorna em `GET /products/1` o JSON
+`{"id":1,"name":"Pizza","price":4500}` e Content-Type `application/json`.
+Salve `validacoes.hurl`:
+
+```hurl
+GET {{base_url}}/products/1
+HTTP 200
+[Asserts]
+header "Content-Type" contains "application/json"
+jsonpath "$.name" == "Pizza"
+jsonpath "$.price" >= 1
+body contains "Pizza"
+body not contains "passwordHash"
+```
+
+```sh
+httpgo test validacoes.hurl --var base_url=http://localhost:8080
+```
+
+Resultado: **0**, com status e assertions aprovados. `header` consulta o primeiro
+valor do header (nome sem distinguir caixa); `jsonpath "$.name"` seleciona um
+campo; `body contains` busca substring no texto final decodificado, sem
+normalizar JSON, espaços ou caixa. A busca literal de `passwordHash` não prova
+a ausência de todas as codificações possíveis de um segredo.
+
+Troque `"Pizza"` por `"Suco"` **só no esperado da assertion JSON**: retorna **1**,
+com diagnóstico da consulta e localização da falha; não é erro de transporte.
+Restaure o esperado antes de seguir. Tipos importam: `4500` difere de `"4500"`.
+Campo ausente não é `null` presente. JSON inválido ou percurso incompatível é erro
+de avaliação **2**, não sucesso por negação.
+
+### Capturar um ID e encadear requisições
+
+Salve `encadeamento.hurl`. O POST do dummy sempre retorna `{"id":1}` com 201;
+o GET desse ID retorna o produto acima. São fixtures fixas, não persistência.
+
+```hurl
+POST {{base_url}}/products
+Content-Type: application/json
+{"name":"Pizza","price":4500}
+HTTP 201
+[Captures]
+product_id: jsonpath "$.id"
+[Asserts]
+jsonpath "$.id" == 1
+
+GET {{base_url}}/products/{{product_id}}
+HTTP 200
+[Asserts]
+jsonpath "$.name" == "Pizza"
+```
+
+```sh
+httpgo test encadeamento.hurl --var base_url=http://localhost:8080
+```
+
+Resultado: **0**, dois envios aprovados, sendo o segundo `GET /products/1`.
+O ID capturado conserva o tipo numérico. Para também comparar o ID retornado
+pelo GET com a captura, acrescente `jsonpath "$.id" == {{product_id}}` ao segundo
+`[Asserts]` e use:
+
+```sh
+httpgo test encadeamento.hurl --render-asserts --var base_url=http://localhost:8080
+```
+
+Com essa alteração, continua **0**. `--render-asserts` é um opt-in HTTPGo:
+resolve esperados dinâmicos; sem a flag, strings esperadas com `{{...}}` são
+literais, e placeholders fora de literal válido são rejeitados. Um valor JSON
+completo sem aspas conserva tipo; `"{{product_id}}"` seria string, diferente de 1.
+
+### O que acontece quando uma etapa falha
+
+A ordem é **resposta completa → status → todas as capturas provisórias →
+assertions na ordem escrita → confirmação do lote inteiro**. Assertions podem
+usar capturas da própria resposta, mesmo invertendo a ordem das seções, mas uma
+consulta de captura não pode depender de outra captura do mesmo lote.
+
+- Status divergente retorna **1** antes das capturas. Assertion divergente
+  retorna **1** e descarta o lote provisório. Por exemplo, exigir ID 2 no POST
+  acima impede o GET: `product_id` não é publicado.
+- Captura ausente/inválida é **2** e precede assertions; avaliação inválida,
+  cancelamento ou timeout também impedem confirmação e próximo envio.
+- Não há publicação parcial nem rollback de efeitos na API. Capturas confirmadas
+  pertencem só ao arquivo; o próximo arquivo recomeça com as variáveis iniciais.
+- Captura pode renovar um nome exatamente igual, inclusive inicial, mas nomes
+  duplicados no mesmo lote e conflitos como `item`/`item.id` são erro **2**.
+- Sem `[Options]` de retry, não há reenvio automático. O
+  [polling opt-in](docs/subset.md#polling-local-por-entrada--us-26--issue-50)
+  repete a requisição completa só após divergência **1**, podendo repetir efeitos;
+  somente a tentativa aprovada confirma capturas. Erro **2** não é retentado.
+
+Para aprofundar, consulte a [gramática](docs/subset.md#gramática),
+[assertions de headers](docs/subset.md#assertions-de-headers--us-07--issue-18),
+[igualdade JSON](docs/subset.md#igualdade-json--us-08--issue-20),
+[presença, quantidade e limites](docs/subset.md#presença-quantidade-e-limites--us-14--issue-34),
+[tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json--us-29--issue-58),
+[busca textual](docs/subset.md#busca-textual-no-body--us-21-issue-40),
+[capturas tipadas](docs/subset.md#capturas-tipadas--us-05us-06),
+[esperados dinâmicos](docs/subset.md#esperados-dinâmicos--us-30--issue-60) e
+[publicação transacional](docs/subset.md#renovação-transacional-de-capturas--us-34--issue-70).
+Essas referências contêm a sintaxe completa, consultas, predicados e restrições;
+o guia não promete JSONPath completo nem negação genérica.
+
 ### Validar headers da resposta
 
 Salve como `health.hurl` e execute `bin/httpgo test health.hurl` contra uma API
