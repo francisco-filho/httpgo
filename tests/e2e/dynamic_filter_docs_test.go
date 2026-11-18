@@ -17,12 +17,12 @@ func TestDynamicFilterPublishedExample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readme, err := os.ReadFile("../../README.md")
+	guide, err := os.ReadFile("../../docs/captures.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(readme), strings.TrimSpace(string(input))) {
-		t.Fatal("README differs from versioned scenario")
+	if !strings.Contains(string(guide), strings.TrimSpace(string(input))) {
+		t.Fatal("capture guide differs from versioned scenario")
 	}
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

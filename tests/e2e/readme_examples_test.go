@@ -126,7 +126,11 @@ func TestReadmeAssertionsAndCaptures(t *testing.T) {
 				_, _ = io.WriteString(w, body)
 			}))
 			defer server.Close()
-			input := readmeBlock(t, tc.marker, "hurl")
+			source := "README.md"
+			if tc.marker == "Salve `encadeamento.httpgo`." {
+				source = "docs/captures.md"
+			}
+			input := guideBlock(t, source, tc.marker, "hurl")
 			if tc.from != "" {
 				if !strings.Contains(input, tc.from) {
 					t.Fatalf("expected assertion missing: %s", tc.from)

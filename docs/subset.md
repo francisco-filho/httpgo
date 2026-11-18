@@ -1124,8 +1124,9 @@ isolamento e colisões abaixo. Sintaxe inválida tardia impede todos os envios.
 
 `Authorization`, `Proxy-Authorization`, `Cookie` e `Set-Cookie` são protegidos
 sem distinguir caixa, incluindo a proveniência do nome capturado em composição
-e escapes conhecidos. Marcações explícitas de segredo acumulam; marcas dinâmicas
-não escapam da sessão. Diagnósticos não imprimem coleções de headers nem bodies.
+e escapes conhecidos. Marcações explícitas e proteção dinâmica acumulam na
+invocação, inclusive após descarte/renovação e troca de arquivo (US-34), sem
+compartilhar valores resolvíveis entre arquivos. Diagnósticos não imprimem coleções de headers nem bodies.
 Valor vazio não provoca substituição global; não há detecção de codificações
 arbitrárias. Capturar `Set-Cookie` **não** cria `Cookie`, não extrai atributos e
 não ativa cookie jar; extração de valor de cookie pertence à US-25.
@@ -1335,8 +1336,8 @@ Falha de captura mantém a resposta em `concluídas` e o status aprovado em
 Um valor secreto descoberto, de qualquer tipo, é protegido antes de apresentar
 o resultado, inclusive se outra declaração da resposta falhar. Constituintes de
 arrays/objetos também são protegidos nas formas conhecidas, sem virarem variáveis
-nem alterar dados enviados. A proteção dinâmica é local à
-execução, combina-se com a proteção inicial e cobre variantes JSON/Go/URL
+nem alterar dados enviados. A proteção dinâmica acumula na
+invocação, combina-se com a proteção inicial e cobre variantes JSON/Go/URL
 conhecidas e nomes de arquivo em diagnósticos. Vazio não causa substituição global.
 Bodies e valores capturados nunca entram no relatório/diagnóstico; valores
 selecionados para assertions podem aparecer somente sanitizados conforme abaixo. Nada permite

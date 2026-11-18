@@ -255,78 +255,13 @@ Restaure o esperado antes de seguir. Tipos importam: `4500` difere de `"4500"`.
 Campo ausente não é `null` presente. JSON inválido ou percurso incompatível é erro
 de avaliação **2**, não sucesso por negação.
 
-### Capturar um ID e encadear requisições
+### Capturar e encadear requisições
 
-Salve `encadeamento.httpgo`. O POST do dummy sempre retorna `{"id":1}` com 201;
-o GET desse ID retorna o produto acima. São fixtures fixas, não persistência.
-
-```hurl
-POST {{base_url}}/products
-Content-Type: application/json
-{"name":"Pizza","price":4500}
-HTTP 201
-[Captures]
-product_id: jsonpath "$.id"
-[Asserts]
-jsonpath "$.id" == 1
-
-GET {{base_url}}/products/{{product_id}}
-HTTP 200
-[Asserts]
-jsonpath "$.name" == "Pizza"
-```
-
-```sh
-httpgo test encadeamento.httpgo --var base_url=http://localhost:8080
-```
-
-Resultado: **0**, dois envios aprovados, sendo o segundo `GET /products/1`.
-O ID capturado conserva o tipo numérico. Para também comparar o ID retornado
-pelo GET com a captura, acrescente `jsonpath "$.id" == {{product_id}}` ao segundo
-`[Asserts]` e use:
-
-```sh
-httpgo test encadeamento.httpgo --render-asserts --var base_url=http://localhost:8080
-```
-
-Com essa alteração, continua **0**. `--render-asserts` é um opt-in HTTPGo:
-resolve esperados dinâmicos; sem a flag, strings esperadas com `{{...}}` são
-literais, e placeholders fora de literal válido são rejeitados. Um valor JSON
-completo sem aspas conserva tipo; `"{{product_id}}"` seria string, diferente de 1.
-
-### O que acontece quando uma etapa falha
-
-A ordem é **resposta completa → status → todas as capturas provisórias →
-assertions na ordem escrita → confirmação do lote inteiro**. Assertions podem
-usar capturas da própria resposta, mesmo invertendo a ordem das seções, mas uma
-consulta de captura não pode depender de outra captura do mesmo lote.
-
-- Status divergente retorna **1** antes das capturas. Assertion divergente
-  retorna **1** e descarta o lote provisório. Por exemplo, exigir ID 2 no POST
-  acima impede o GET: `product_id` não é publicado.
-- Captura ausente/inválida é **2** e precede assertions; avaliação inválida,
-  cancelamento ou timeout também impedem confirmação e próximo envio.
-- Não há publicação parcial nem rollback de efeitos na API. Capturas confirmadas
-  pertencem só ao arquivo; o próximo arquivo recomeça com as variáveis iniciais.
-- Captura pode renovar um nome exatamente igual, inclusive inicial, mas nomes
-  duplicados no mesmo lote e conflitos como `item`/`item.id` são erro **2**.
-- Sem `[Options]` de retry, não há reenvio automático. O
-  [polling opt-in](docs/subset.md#polling-local-por-entrada)
-  repete a requisição completa só após divergência **1**, podendo repetir efeitos;
-  somente a tentativa aprovada confirma capturas. Erro **2** não é retentado.
-
-Para aprofundar, consulte a [gramática](docs/subset.md#gramática),
-[assertions de headers](docs/subset.md#assertions-de-headers),
-[igualdade JSON](docs/subset.md#igualdade-json),
-[presença, quantidade e limites](docs/subset.md#presença-quantidade-e-limites),
-[tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json),
-[busca textual](docs/subset.md#busca-textual-no-body),
-[capturas tipadas](docs/subset.md#capturas-tipadas),
-[esperados dinâmicos](docs/subset.md#esperados-dinâmicos) e
-[publicação transacional](docs/subset.md#renovação-transacional-de-capturas).
-Essas referências contêm a sintaxe completa, consultas, predicados e restrições;
-as [receitas adicionais](#receitas-adicionais) mostram combinações opcionais,
-sem transformar o guia em catálogo de toda a linguagem.
+O [guia de captures](docs/captures.md) mostra como extrair valores JSON tipados,
+contagens, headers e grupos regex, e reutilizá-los no mesmo arquivo. Inclui
+exemplos completos, ausência versus vazio/`null`, operandos dinâmicos com opt-in,
+renovação exata, confirmação do lote e sigilo. Capturas não passam entre arquivos;
+falha de captura é **2**, diferente de divergência de assertion (**1**).
 
 ## Configuração, suítes e relatórios
 
@@ -496,27 +431,7 @@ intencionalmente inválidos e não suportados.
 <details>
 <summary>Cache condicional e formato de cookie</summary>
 
-A API de cache responde a `GET /catalog` com 200 e `ETag: "v1"`; com
-`If-None-Match: "v1"`, retorna 304. Salve como `cache.httpgo` ou use a fixture:
-
-```hurl
-GET {{base_url}}/catalog
-HTTP 200
-[Captures]
-catalog_etag: header "ETag"
-
-GET {{base_url}}/catalog
-If-None-Match: {{catalog_etag}}
-HTTP 304
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_capture_cache.httpgo --var base_url=http://localhost:8081
-```
-
-Resultado **0**, dois envios; ausência de ETag é captura **2**, sem segundo envio.
-Capturar header conserva string, aspas e primeira ocorrência. Não cria cookie jar.
-[Referência de captura de header](docs/subset.md#capturas-literais-de-headers).
+Para cache condicional com ETag, veja a [receita de header literal](docs/captures.md#header-literal).
 
 Para outra API, `GET /session` deve responder 200 e
 `Set-Cookie: session=ficticio; Path=/; HttpOnly; Secure; SameSite=Lax`:
@@ -541,28 +456,10 @@ lookaround/backreferences. [Regex de headers](docs/subset.md#regex-de-headers).
 <details>
 <summary>Extrair código de texto e reutilizar cookie explicitamente</summary>
 
-Requer `GET /message/123` com 200 e `Seu código de verificação é: 123456`, e
-`POST /verify` aceitando `{"code":"123456"}` com 200. Extração seleciona o primeiro
-grupo da primeira correspondência; marque o código como segredo:
-
-```hurl
-GET {{mailbox_url}}/message/123
-HTTP 200
-[Captures]
-otp_code: regex "verificação é: ([0-9]{6})"
-
-POST {{base_url}}/verify
-Content-Type: application/json
-{"code":"{{otp_code}}"}
-HTTP 200
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_capture_otp.httpgo --var mailbox_url=http://localhost:8081 --var base_url=http://localhost:8081 --secret otp_code
-```
-
-Resultado **0**, dois envios sem revelar o código. Sem correspondência, captura
-**2**, sem POST. Para também **validar** o texto extraído, use esta variante:
+O [guia de captures](docs/captures.md#regex-de-header-e-body) reúne extração de
+código textual e cookie. Para também **validar** o texto extraído, a API deve
+responder `GET /message/123` com 200 e `Seu código de verificação é: 123456`,
+e aceitar `POST /verify` com `{"code":"123456"}` retornando 200:
 
 ```hurl
 GET {{mailbox_url}}/message/123
@@ -586,25 +483,8 @@ Resultado **0**; exigir sete dígitos só no esperado retorna **1**, sem POST e 
 confirmar a captura. [Capturas regex](docs/subset.md#extração-regex-de-body-e-header)
 e [assertions regex](docs/subset.md#assertions-sobre-extração-regex).
 
-Em outra API, `GET /session` responde 200 e `Set-Cookie: refresh=ficticio; Path=/`;
-`GET /next` aceita `Cookie: refresh=ficticio` e responde 200:
-
-```hurl
-GET {{base_url}}/session
-HTTP 200
-[Captures]
-refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"
-
-GET {{base_url}}/next
-Cookie: refresh={{refresh_token}}
-HTTP 200
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_capture_refresh.httpgo --var base_url=http://localhost:8081 --secret refresh_token
-```
-
-Resultado **0**. Envie só o cookie extraído, não os atributos de `Set-Cookie`.
+Para enviar somente o cookie extraído, sem atributos de resposta, veja
+[extração explícita de cookie](docs/captures.md#extrair-cookie-explicitamente).
 
 </details>
 
@@ -651,57 +531,16 @@ httpgo test testdata/scenarios/json_types.httpgo --var base_url=http://localhost
 Resultado **0**; `attempts: 3.0` falha com **1**: `isInteger` exige notação inteira,
 ao contrário da igualdade numérica. [Tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json).
 
-Para projetar arrays, **outro contrato** de `GET /validation` retorna
-`{"issues":[{"code":"INVALID"},{"code":"REQUIRED"}]}` com 200; `POST /echo` aceita o
-array `["INVALID","REQUIRED"]` e retorna **204**:
-
-```hurl
-GET {{base_url}}/validation
-HTTP 200
-[Asserts]
-jsonpath "$.issues[*].code" contains "REQUIRED"
-jsonpath "$.issues[*].code" not contains "OTHER_TENANT"
-[Captures]
-codes: jsonpath "$.issues[*].code"
-POST {{base_url}}/echo
-{{codes}}
-HTTP 204
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_projection.httpgo --var base_url=http://localhost:8081
-```
-
-Resultado **0**, dois envios. `[*]` projeta arrays; zero resultados é ausência,
-um conserva seu tipo, vários formam array, sem achatamento. Não serve para
-objetos nem implica JSONPath completo. [Seleção e limites](docs/subset.md#igualdade-json).
+A [receita de projeção](docs/captures.md#cardinalidade-e-percurso-estrito) mostra
+como capturar e validar o valor reduzido de wildcards de arrays.
 
 </details>
 
 <details>
 <summary>Selecionar entidades e comparar com valores anteriores</summary>
 
-Para filtro estático, `GET /products` responde 200 com
-`[{"slug":"pizza","id":1,"active":true}]`; `GET /products/1` responde 200:
-
-```hurl
-GET {{base_url}}/products
-HTTP 200
-[Captures]
-pizza_id: jsonpath "$[?(@.slug=='pizza')].id"
-[Asserts]
-jsonpath "$[?(@.slug=='pizza')].active" == true
-
-GET {{base_url}}/products/{{pizza_id}}
-HTTP 200
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_filter.httpgo --var base_url=http://localhost:8081
-```
-
-Resultado **0**; sem pizza, captura **2**, sem GET final. O filtro suporta igualdade
-escalar, não lógica arbitrária. [Filtros estáticos](docs/subset.md#seleção-estática-por-igualdade).
+Para selecionar uma entidade, veja [filtro estático](docs/captures.md#filtro-estático)
+e [operandos dinâmicos com opt-in](docs/captures.md#operandos-dinâmicos-opt-in).
 
 Para esperados dinâmicos, `POST /orders` e `GET /orders/9007199254740993` respondem
 200 com `{"number":9007199254740993,"name":"Pizza"}`:
@@ -726,69 +565,13 @@ httpgo test testdata/scenarios/scenario_render_asserts.httpgo --render-asserts -
 
 Resultado **0**, preservando precisão. Mudar o número só no GET falha com **1**.
 
-Para filtro dinâmico, `GET /first` responde `{"number":42}` com 200;
-`GET /orders` responde `{"items":[{"number":42,"status":"PLACED","id":"selected"}]}`
-com 200; `GET /selected` responde 200:
-
-```hurl
-GET {{base_url}}/first
-HTTP 200
-[Captures]
-order_number: jsonpath "$.number"
-
-GET {{base_url}}/orders
-HTTP 200
-[Asserts]
-jsonpath "$.items[?(@.number=={{order_number}})].status" == "PLACED"
-[Captures]
-selected_id: jsonpath "$.items[?(@.number=={{order_number}})].id"
-
-GET {{base_url}}/{{selected_id}}
-HTTP 200
-```
-
-```sh
-httpgo test testdata/scenarios/dynamic_filter.httpgo --render-asserts --var base_url=http://localhost:8081
-```
-
-Resultado **0**, três envios. Operandos são dados, não nova gramática; a flag não
-habilita propriedades, operadores ou consultas inteiras dinâmicas.
-[Operandos dinâmicos e limites](docs/subset.md#operandos-dinâmicos).
-
 </details>
 
 <details>
 <summary>Comparar quantidade e verificar rotação de token</summary>
 
-`GET /orders` retorna 200 com `{"items":[1,2,3]}` antes e depois;
-`POST /orders/preview` aceita `{"productId":"p1"}` e retorna 200 sem mudar quantidade:
-
-```hurl
-GET {{base_url}}/orders
-
-HTTP 200
-[Captures]
-orders_before: jsonpath "$.items" count
-
-POST {{base_url}}/orders/preview
-Content-Type: application/json
-{"productId":"p1"}
-
-HTTP 200
-
-GET {{base_url}}/orders
-
-HTTP 200
-[Asserts]
-jsonpath "$.items" count == {{orders_before}}
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_count_unchanged.httpgo --render-asserts --var base_url=http://localhost:8081
-```
-
-Resultado **0**; quatro itens depois falham com **1**. `count` conta o array final,
-não conteúdo igual nem tamanho de string. [Captura de contagem](docs/subset.md#captura-de-contagem).
+Para guardar e comparar a quantidade de itens, veja
+[captura de contagem](docs/captures.md#capturar-contagem-e-reutilizar-em-assertion).
 
 Para rotação, `POST /session/login` responde 200 com
 `{"accessToken":"antigo-ficticio"}`; `POST /session/renew`, 200 com

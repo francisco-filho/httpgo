@@ -28,7 +28,7 @@ func TestFilterHelpAndPublishedExample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, file := range []string{"../../README.md", "../../docs/subset.md"} {
+	for _, file := range []string{"../../docs/captures.md", "../../docs/subset.md"} {
 		data, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
