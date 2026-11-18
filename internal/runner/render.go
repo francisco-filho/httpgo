@@ -98,7 +98,7 @@ func render(session template.Session, entry parser.Entry) (Request, string, *Ren
 		retainBody = retainBody || capture.Kind == parser.JSONPathCapture || capture.Kind == parser.RegexCapture
 	}
 	for _, declaration := range entry.Assertions {
-		retainBody = retainBody || declaration.JSON != nil || declaration.Body != nil
+		retainBody = retainBody || declaration.JSON != nil || declaration.Body != nil || declaration.Regex != nil
 	}
 	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: retainBody}, url.Display, nil
 }

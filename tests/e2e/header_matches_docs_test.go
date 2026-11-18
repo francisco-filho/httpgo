@@ -15,7 +15,7 @@ func TestHeaderMatchesHelpAndPublishedExample(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
 		}
-		for _, term := range []string{`header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"`, "Somente primeira ocorrência", "Padrão string JSON literal", "matches vazio", "Sem regex de body/variável", "sem interpolação"} {
+		for _, term := range []string{`header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"`, "Somente primeira ocorrência", "Padrão string JSON literal", "matches vazio", "Sem query variable, regex de header como query de assertion", "sem interpolação"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}

@@ -1,4 +1,77 @@
-# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-34
+# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36
+
+## Assertions sobre extração regex — US-36 / issue #74
+
+Ampliação explícita: `[Asserts]` aceita a query `regex "padrão"` com `==`,
+`contains`, `not contains`, `matches` ou `exists`. Exige `HTTP <status>` ou
+`HTTP *`. Os quatro primeiros recebem exatamente uma string JSON entre aspas
+duplas; `exists` não recebe operando. Strings/escapes e regex seguem a US-15:
+`"\\d"` entrega `\d` à regex; `"\x41"` é inválido como JSON. Sem delimitadores
+`/.../`, lookaround, backreferences ou pipelines.
+
+```hurl
+GET {{mailbox_url}}/message/123
+HTTP 200
+[Captures]
+signup_code: regex "verificação é: ([0-9]{6})"
+[Asserts]
+regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"
+
+POST {{base_url}}/verify
+Content-Type: application/json
+{"code":"{{signup_code}}"}
+HTTP 200
+```
+
+Execute `httpgo test testdata/scenarios/scenario_regex_assertion_signup.hurl --var mailbox_url=http://localhost:8025 --var base_url=http://localhost:8080 --secret signup_code`.
+Requer endpoints que retornem `Seu código de verificação é: 123456` e aceitem
+`{"code":"123456"}`: **0**, sem revelar o código; esperado com sete dígitos:
+**1**, sem POST. [Cenário versionado](../testdata/scenarios/scenario_regex_assertion_signup.hurl).
+
+A consulta usa o body **final completo**, consumido/fechado e decodificado pelas
+regras US-21 (UTF-8 estrito por padrão, charset declarado), sem exigir JSON nem
+normalizar texto. Seleciona como string apenas o primeiro grupo da primeira
+correspondência; não procura grupo/correspondência posterior, não publica variável
+nem altera capturas. Query e predicado seguem posições da fonte LF/CRLF.
+
+| Seleção | `==`, `contains`, `matches` | `exists` | `not contains` |
+|---|---|---|---|
+| Grupo presente | comparação textual, sem coerção | aprova | nega substring |
+| Sem match ou primeiro grupo opcional não participante | reprova 1 | reprova 1 | aprova |
+| Grupo participante vazio | `== ""`, `contains ""`, `matches "^$"` aprovam | aprova | `not contains ""` reprova 1 |
+
+Expressão válida **sem grupo** e body indecodificável são avaliação **2**, também
+com negação. Captura regex continua estrita: ausência é erro de captura **2**.
+Regex estática malformada/não suportada, escape/sintaxe inválida ou construção
+excluída em qualquer entrada bloqueia **todo HTTP** do arquivo com erro localizado
+**2**, distinguindo sintaxe inválida de construção não suportada.
+
+Extração é sempre **estática**, mesmo com `--render-asserts`. A flag só resolve
+esperados desta query, com iniciais/confirmados/provisórios atuais; valida tipo
+textual e `matches` final **antes de selecionar/decodificar a assertion alcançada**.
+Ausência de variável, array/objeto textual ou regex final inválida é **2**, não
+aprovação por negação. Inserções não são templates novos. Sem flag, esperados
+são literais. Regex `matches` sem referências compila antes de HTTP.
+
+Preserva US-34: status → todas as capturas provisórias → assertions ordenadas →
+confirmação com contexto ativo. Falha descarta o lote e impede a próxima entrada.
+Polling só retenta divergência **1**; reenvia com valores confirmados anteriores,
+sem herdar capturas reprovadas. Erro **2** encerra. Texto decodificado é reutilizado
+entre assertions body/regex da mesma resposta, nunca entre tentativas/arquivos.
+
+Diagnóstico distingue grupo ausente, divergência de conteúdo e erro, com predicado
+e localização seguros; **nunca body nem grupo selecionado**. Padrões/esperados
+protegidos ficam ocultos em texto, callbacks e JUnit, inclusive em lotes descartados.
+Metadados não retêm padrões brutos, regex compiladas ou templates. Marque capturas
+secretas; valores arbitrários não marcados/transformações desconhecidas não têm
+garantia de detecção. Falhas de saída/escrita curta/close prevalecem com **2**,
+sem novos envios/reexecução ou anúncio falso. JUnit mantém um testcase por arquivo.
+
+Continuam excluídos `variable`, `body matches`, regex de header como query de
+assertion, escolha de grupo, correspondência inteira implícita, extração dinâmica,
+pipelines e novos predicados. YAML hierárquico/interpolação externa são extensões
+HTTPGo. [Diferenças Hurl 8.0.0](compatibility.md#assertions-sobre-extração-regex--us-36--issue-74)
+e [arquitetura](architecture.md#assertions-sobre-extração-regex--us-36--issue-74).
 
 ## Renovação transacional de capturas — US-34 / issue #70
 
@@ -458,7 +531,8 @@ A primeira falha impede confirmação e próximas requisições. Condição fals
 Diagnósticos localizados identificam operador e esperado protegido, nunca body
 ou fragmentos recebidos. Captura secreta provisória oculta o esperado sem
 confirmar seus valores. Busca literal não detecta todas as codificações de dados sensíveis.
-Assertions regex de body, filtros e outros predicados não são suportados.
+`body matches`, filtros e outros predicados de body não são suportados;
+a query de extração `regex` em assertions segue US-36 acima.
 Interpolação de esperados só com `--render-asserts` (US-30). Extração regex de body em `[Captures]` é o recorte US-25.
 Os 19 pares `body_*` confrontados com Hurl 8.0.0 são publicados em
 [compatibilidade](compatibility.md#ampliação-us-21--busca-textual-no-body-issue-40).
@@ -1336,8 +1410,9 @@ formato divergente ou header ausente falham com **1**, sem captura/próximo envi
   continuam sujeitos à sintaxe regex, não são automaticamente escapados e não
   passam pelo renderer no perfil literal. O opt-in `--render-asserts` da US-30
   abaixo habilita resolução tardia apenas do esperado.
-  Assertions regex de body/variável, filtros e todas as ocorrências ficam
-  fora do suporte. Extração regex de body/header é o recorte US-25.
+  Query variable, regex de header como query de assertion e todas as ocorrências
+  ficam fora do suporte. Extração regex de body/header é o recorte US-25;
+  assertions sobre extração regex de body seguem a US-36 acima.
 
 Os **30 pares `header_matches_*`** com Hurl **8.0.0** estão classificados na
 [matriz diferencial](compatibility.md#regex-de-headers--us-24--issue-46).
@@ -1405,8 +1480,9 @@ não suportado é erro de avaliação **2**, sem expor o erro bruto da engine.
 A substituição não é recursiva, inclusive em regex. Ausência/vazio, pertencimento
 JSON tipado e primeira ocorrência de header mantêm as regras existentes.
 Negação não aprova esperado inválido; headers sensíveis ocultam ambos os lados.
-A flag não habilita regex de body, operadores novos, consultas inteiras/estrutura
-dinâmica ou interpolação de padrões de captura. Operandos de filtros seguem US-31.
+A flag não habilita `body matches`, operadores novos, consultas inteiras/estrutura
+dinâmica ou interpolação de padrões de extração/captura. A query regex da US-36
+renderiza somente esperados. Operandos de filtros seguem US-31.
 
 ## Igualdade JSON — US-08 / issue #20
 
@@ -1475,7 +1551,7 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
 
 ### Padrões textuais — US-15 / issue #36
 
-**Ampliação intencional:** `[Asserts]` aceita `jsonpath "consulta" matches "padrão"`, somente para o valor selecionado por JSONPath. Não amplia a consulta JSONPath; a US-24 reutiliza a regex para headers (seção acima), mas body bruto e variáveis continuam fora do recorte.
+**Ampliação intencional:** `[Asserts]` aceita `jsonpath "consulta" matches "padrão"`, somente para o valor selecionado por JSONPath. Não amplia a consulta JSONPath; a US-24 reutiliza a regex para headers (seção acima), mas `body matches` e variáveis continuam fora do recorte; extração pela query `regex` segue US-36.
 
 ```hurl
 GET {{base_url}}/products/1

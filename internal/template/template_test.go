@@ -54,6 +54,10 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	// US-36: expected strings, including provisional values and nonrecursive regex.
+	for _, value := range []string{`"123456"`, `"{{missing}}"`, `"(a)?b"`, `"["`, `"雪\\\""`, `null`, `[]`} {
+		f.Add("^otp-{{captured}}-{{x}}$", value)
+	}
 	for _, value := range []string{`"replacement"`, `"{{literal}}"`, `null`, `9007199254740993`, `{"child":[]}`} {
 		f.Add("renewed={{x}}/previous={{captured}}", value)
 	}

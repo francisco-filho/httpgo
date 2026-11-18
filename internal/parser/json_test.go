@@ -60,6 +60,12 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	// US-36: extraction remains static in both profiles, predicates consume all input.
+	for _, line := range []string{`regex "id=(\\d+)" == "123"`, `regex "({{x}})" matches "^{{x}}$"`, `regex "(a)?b" exists`, `regex "(a*)b" not contains ""`, `regex "no-group" exists`, `regex "private[" exists`, `regex "(?=x)" exists`, `regex "(x)" == "\\x41"`, `regex "(x)" exists extra`, `regex "(x)" regex "(y)" exists`} {
+		for _, nl := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("GET http://example.test/first\nGET http://example.test/late\nHTTP 200\n[Asserts]\n  "+line, "\n", nl))
+		}
+	}
 	// US-33: optional count, strict suffix consumption and original positions.
 	for _, declaration := range []string{`n: jsonpath "$" count`, `n: jsonpath "$.items[*]" count`, `n: jsonpath "$[?(@.ok==true)].data" count`, `n: jsonpath "$[?(@.n=={{v}})].data" count`, `n: jsonpath "$"count`, `n: jsonpath "$" count count`, `n: jsonpath "$" count 1`, `n: jsonpath "$" count + 1`, `n: jsonpath "$" count regex "x"`, `n: header "X" count`} {
 		for _, nl := range []string{"\n", "\r\n"} {

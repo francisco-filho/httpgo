@@ -1,10 +1,53 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-35
+# Arquitetura implementada — US-01 a US-17, US-20 a US-36
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
 #50 (US-26), #52 (US-27), #54 (US-27b), #56 (US-28), #58 (US-29), #60 (US-30), #62 (US-31), #64 (US-32), #66 (US-33), #68 (US-17), #70 (US-34) e plano v4 referenciado nelas.
 Implementação independente baseada em requisitos/documentação pública, sem
 copiar, adaptar ou traduzir código-fonte Hurl.
+
+## Assertions sobre extração regex — US-36 / issue #74
+
+`parser.Assertion.Regex` contém a variante concreta `RegexAssertion`: `Pattern`
+e `Extraction` estáticos, `Operator`, `Expected`, `Compiled` do `matches`,
+`ExpectedTemplate`, `Position` do predicado e `QueryPosition` da query. Reutiliza
+leitura JSON/validação regex existentes; não amplia a gramática de outras queries.
+O parser valida o arquivo inteiro e compila extração e `matches` estático antes
+de HTTP. Regex válida sem grupo permanece aceita até avaliação, conforme contrato.
+
+`query.SelectRegex(*regexp.Regexp, string) (string, bool, error)` seleciona somente
+o primeiro grupo da primeira correspondência; índices distinguem vazio presente
+de opcional não participante/ausência. Falta de grupo é erro, não ausência.
+`query.Regex` continua estrita para capturas, mantendo diagnósticos da US-25.
+A seleção não publica variável nem decide sucesso. O runner reutiliza
+`assertion.Header` e `assertion.MatchString` para os predicados textuais, sem
+herdar seleção ou diagnóstico de header que exponha o valor extraído.
+
+`runner.render` retém body quando houver query regex. `checkAssertions` copia a
+variante, prepara esperado com `prepareTextExpected` sobre a sessão provisória e
+compila `matches` renderizado antes de consultar/decode. Extração nunca renderiza.
+`query.BodyText` é compartilhado com assertions de body por resposta; variáveis
+locais de avaliação impedem cache entre tentativas e mutação do plano reutilizado.
+`runAttempt` reconhece `RegexMismatch`/`RegexFailed`, `RegexFailure`/`RegexError`
+e suas posições. US-34 e `pollEntry` mantêm confirmação/descartes, cancelamento,
+contagens e retry somente de divergência. `suite` reconhece divergência regex
+nas contagens por requisição, sem alterar prioridade de códigos.
+
+Diagnósticos concretos não retêm body/grupo: só posição, predicado, presença e
+padrão/esperado sanitizados em divergência; erro categórico não inclui causas
+brutas de regex/decodificação. `safeEntry` clona e remove `Pattern`, `Extraction`,
+`Compiled`, `Expected` e `ExpectedTemplate`. Proteção monotônica de capturas e
+esperados derivados ocorre antes de callbacks, inclusive quando o lote é
+reprovado. `cli/command.go` apresenta ausência/divergência/erro e localização;
+JUnit reutiliza o diagnóstico seguro e estados `failure`/`error`, sem schema novo,
+retenção operacional ou replay. Writers continuam com prioridade 2.
+
+Sem pacote/interface/flag, dependência, goroutine, mudança em Go, transporte ou
+contrato `HTTPExecutor`. Não há frontend/estáticos nesta história. Texto final,
+consumo/close e `context.Context` mantêm o contrato de recursos já existente.
+[Contrato](subset.md#assertions-sobre-extração-regex--us-36--issue-74),
+[diferencial](compatibility.md#assertions-sobre-extração-regex--us-36--issue-74)
+e [validação](validation.md#us-36--issue-74--história-0036).
 
 ## HTML offline — US-35 / issue #72
 

@@ -1,0 +1,92 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_headers": [
+        {
+          "name": "X-ID",
+          "value": "rejected"
+        }
+      ],
+      "response_json": "id=rejected;state=PENDING"
+    },
+    {
+      "status": 200,
+      "response_headers": [
+        {
+          "name": "X-ID",
+          "value": "accepted"
+        }
+      ],
+      "response_json": "id=accepted;state=READY"
+    }
+  ],
+  "response_body": "aWQ9MTIzNDU2",
+  "variables": [
+    "id=old"
+  ],
+  "classification": "diferença deliberada: reenvio HTTPGo usa valor confirmado old; Hurl usa captura rejected; somente tentativa aprovada confirma aqui",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "rejected"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  }
+}

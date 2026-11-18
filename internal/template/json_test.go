@@ -88,6 +88,10 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
+	// US-36: extracted OTP is reusable in JSON, without recursive expansion.
+	for _, value := range []string{`"001234"`, `"{{missing}}"`, `"a\\n雪"`, `null`, `[]`} {
+		f.Add(`{"code":"{{x}}","previous":"{{captured}}"}`, value)
+	}
 	for _, value := range []string{`"replacement"`, `"{{literal}}"`, `null`, `9007199254740993`, `{"child":[]}`} {
 		f.Add(`{"renewed":{{x}},"previous":{{captured}}}`, value)
 	}

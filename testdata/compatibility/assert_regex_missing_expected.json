@@ -1,0 +1,17 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_body": "aWQ9MTIzNDU2",
+  "classification": "diferença de categoria: esperado ausente é erro HTTPGo (2); Hurl assertion falha (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

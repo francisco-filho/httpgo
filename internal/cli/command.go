@@ -156,6 +156,10 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		line += ": " + entry.HeaderError.Error()
 	case runner.HeaderMismatch:
 		line += ": " + headerDiagnostic(entry.HeaderFailure)
+	case runner.RegexMismatch:
+		line += ": " + regexDiagnostic(entry.RegexFailure)
+	case runner.RegexFailed:
+		line += ": " + entry.RegexError.Error()
 	case runner.BodyMismatch:
 		line += ": " + bodyDiagnostic(entry.BodyFailure)
 	case runner.BodyFailed:
@@ -177,7 +181,7 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 	default:
 		return fmt.Errorf("resultado de execução desconhecido")
 	}
-	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed {
+	if entry.Outcome == runner.Cancelled || entry.Outcome == runner.FileFailed || entry.Outcome == runner.Mismatch || entry.Outcome == runner.Failed || entry.Outcome == runner.RenderFailed || entry.Outcome == runner.CaptureFailed || entry.Outcome == runner.HeaderFailed || entry.Outcome == runner.HeaderMismatch || entry.Outcome == runner.JSONMismatch || entry.Outcome == runner.JSONFailed || entry.Outcome == runner.BodyMismatch || entry.Outcome == runner.BodyFailed || entry.Outcome == runner.RegexMismatch || entry.Outcome == runner.RegexFailed {
 		pos := entry.Entry.Position
 		if entry.HeaderError != nil {
 			pos = entry.HeaderError.Position
@@ -190,6 +194,12 @@ func (c *Command) renderEntry(entry runner.EntryResult) error {
 		}
 		if entry.JSONError != nil {
 			pos = entry.JSONError.Position
+		}
+		if entry.RegexFailure != nil {
+			pos = entry.RegexFailure.Position
+		}
+		if entry.RegexError != nil {
+			pos = entry.RegexError.Position
 		}
 		if entry.BodyFailure != nil {
 			pos = entry.BodyFailure.Position
@@ -251,6 +261,10 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		if errors.As(result.Err, &headerErr) {
 			diagnostic = headerErr.Error()
 		}
+		var regexErr *runner.RegexError
+		if errors.As(result.Err, &regexErr) {
+			diagnostic = regexErr.Error()
+		}
 		var bodyErr *runner.BodyError
 		if errors.As(result.Err, &bodyErr) {
 			diagnostic = bodyErr.Error()
@@ -272,6 +286,12 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, jsonDiagnostic(failure))
 			return err
 		}
+		if entry.RegexFailure != nil {
+			failure := entry.RegexFailure
+			pos := failure.Position
+			_, err := fmt.Fprintf(c.err, "%q:%d:%d: %s; execução interrompida\n", pos.File, pos.Line, pos.Column, regexDiagnostic(failure))
+			return err
+		}
 		if entry.BodyFailure != nil {
 			failure := entry.BodyFailure
 			pos := failure.Position
@@ -283,6 +303,14 @@ func (c *Command) renderDiagnostic(result runner.Result) error {
 		return err
 	}
 	return nil
+}
+
+func regexDiagnostic(failure *runner.RegexFailure) string {
+	actual := "grupo presente; condição falsa"
+	if !failure.Present {
+		actual = "grupo ausente"
+	}
+	return fmt.Sprintf("assertion regex %q %s: esperado %q; %s", failure.Pattern, failure.Operator, failure.Expected, actual)
 }
 
 func bodyDiagnostic(failure *runner.BodyFailure) string {
@@ -519,7 +547,7 @@ Cada resultado é exibido ao terminar a requisição, antes da próxima; resumo 
 Timeout total: default de 10 segundos por requisição, configurável em YAML.
 Até 10 redirects na mesma origem.
 301/302/303 convertem os novos métodos em GET sem body; 307/308 preservam ambos.
-Códigos: 0 sucesso, 1 status ou assertion de header/JSON/body divergente,
+Códigos: 0 sucesso, 1 status ou assertion de header/JSON/body/regex divergente,
 2 entrada/arquivo externo/avaliação de esperado, JSON, header ou body/captura/renderização/transporte/cancelamento/saída.
 Saída sempre em texto sem cores/animações, inclusive em TTY e com NO_COLOR.
 Credenciais, query inteira e fragmento da URL não são exibidos.
@@ -555,7 +583,8 @@ sem confirmação nem próximo envio. Captura própria válida fica disponível 
 Status/assertion anterior divergente continua 1.
 Segredos e derivados são protegidos antes de resultados/callbacks.
 Não habilita novos operadores, consultas inteiras, nomes de header ou regex de captura
-dinâmicos, nem assertion regex de body. Filtros aceitam operandos conforme US-31 abaixo.
+dinâmicos. A query regex da US-36 mantém extração estática e só renderiza esperados.
+Filtros aceitam operandos conforme US-31 abaixo.
 Ordem: status → capturas provisórias → assertions na ordem escrita → confirmação.
 Perfis e diferenças Hurl 8.0.0: docs/subset.md e docs/compatibility.md.
 
@@ -628,6 +657,30 @@ Sobrescrita exata e captura própria são permitidas; duplicações no lote não
 Diagnóstico mostra consulta/count/causa/localização, não coleção ou quantidade protegida.
 Exemplos: testdata/scenarios/scenario_count_unchanged.hurl e capture_count.hurl.
 
+Validar textos extraídos por regex — US-36:
+  httpgo test testdata/scenarios/scenario_regex_assertion_signup.hurl --var mailbox_url=http://localhost:8025 --var base_url=http://localhost:8080 --secret signup_code
+  GET {{mailbox_url}}/message/123
+  HTTP 200
+  [Captures]
+  signup_code: regex "verificação é: ([0-9]{6})"
+  [Asserts]
+  regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"
+O cenário completo envia POST /verify com o código capturado. Seis dígitos: 0;
+exigir sete no esperado: 1 e nenhum POST. Requer os endpoints, não os fornece.
+Query regex aceita ==, contains, not contains, matches e exists.
+Os quatro primeiros exigem uma string JSON esperada; exists não aceita operando.
+Seleciona somente o primeiro grupo da primeira correspondência no body final textual,
+sem exigir JSON, publicar variável ou escolher grupo/correspondência posterior.
+Ausência ou grupo opcional não participante: falha 1, exceto not contains que aprova.
+Grupo vazio participante está presente: exists, == "" e contains "" passam;
+not contains "" falha. Sem grupo ou texto indecodificável: avaliação 2, mesmo na negação.
+Extração permanece estática inclusive com --render-asserts; só o esperado interpola,
+usando também capturas atuais, sem expansão recursiva e antes de consultar/decodificar.
+Regex/escape inválido ou construção não suportada tardia impede todo HTTP com 2.
+Diagnósticos distinguem ausência, divergência e erro, nunca body/grupo selecionado.
+Marque capturas secretas: padrões/esperados protegidos ficam ocultos inclusive após descarte.
+Sem query variable, body matches, regex dinâmica de extração, pipelines ou escolha de grupo.
+
 Assertions de body: salve privacy.hurl e execute
   httpgo test privacy.hurl --var base_url=http://localhost:8080
   GET {{base_url}}/export
@@ -643,9 +696,9 @@ Charset do primeiro Content-Type; omitido usa UTF-8 estrito. ISO-8859-1 usa índ
 Charset desconhecido ou sequência inválida: erro de avaliação de body (2), inclusive na negação.
 Condição falsa retorna 1. Exige HTTP numérico ou HTTP * e uma única string literal.
 Perfil literal (sem --render-asserts): Esperado nunca interpola; sem inspeção de binários.
-Regex de body é suportada somente em capturas (US-25), não como assertion.
-Status → capturas provisórias → assertions de header/JSON/body na ordem escrita → confirmação.
-Nas assertions, texto decodifica na primeira de body, independente do JSON.
+body matches continua não suportado; extração pela query regex é a US-36 abaixo.
+Status → capturas provisórias → assertions de header/JSON/body/regex na ordem escrita → confirmação.
+Nas assertions, texto decodifica na primeira de body/regex, independente do JSON.
 Capturas anteriores podem exigir decodificação e falhar antes das assertions.
 Falha impede confirmação e próxima requisição; sintaxe inválida tardia impede todo HTTP do arquivo.
 Diagnóstico identifica operador/arquivo/linha/coluna, nunca body ou fragmentos recebidos.
@@ -680,7 +733,7 @@ Ausente falha com 1; matches vazio passa em todo header presente, inclusive vazi
 ^$ passa somente no vazio presente. Somente primeira ocorrência, sem juntar valores.
 Regex/escape inválido, lookaround e backreferences: 2 antes de qualquer HTTP do arquivo.
 Padrão e real de Set-Cookie e demais nomes sensíveis ficam integralmente ocultos.
-Sem regex de body/variável em assertions, filtros ou seleção de todas as ocorrências.
+Sem query variable, regex de header como query de assertion ou seleção de todas as ocorrências.
 Extração regex de body/header é suportada em capturas (US-25, exemplo abaixo).
 Capturas literais de headers são suportadas em [Captures] (exemplo abaixo).
 Ordem: resposta consumida/fechada, status, capturas provisórias, assertions na ordem escrita, confirmação, resultado.

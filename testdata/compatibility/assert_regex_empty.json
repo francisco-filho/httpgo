@@ -1,0 +1,18 @@
+{
+  "response_body": "YiBhYg==",
+  "classification": "compatível no recorte observado: primeiro grupo/presença e predicados textuais, códigos de assertion próprios 1/4",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}
