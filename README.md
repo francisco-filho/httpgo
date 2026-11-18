@@ -1312,6 +1312,78 @@ padrão. Veja [subconjunto](docs/subset.md) e [evidência diferencial](docs/comp
 
 ## Extensões e limites de compatibilidade
 
+### Recursos próprios do HTTPGo
+
+**Extensão própria não significa recurso ausente no Hurl por princípio.** Hurl
+também tem variáveis, captures, assertions, envio de arquivos, multipart,
+configuração e relatórios. O que é próprio aqui são os **contratos concretos**
+abaixo, não essas capacidades genéricas:
+
+- **Configuração YAML hierárquica**: `.httpgo.yaml`, `--config`, ambientes em
+  `environments/<nome>.yaml`, merge tipado e referências completas `${NOME}`.
+  Serve para compartilhar destinos, timeouts e nomes de variáveis sem editar
+  cenários. Os arquivos `guia.yaml` e `environments/local.yaml` da seção
+  [Configuração](#configuração-suítes-e-relatórios) já estão completos; ative com
+  `httpgo test exemplo.hurl --config guia.yaml --env local`: status 200 e código
+  **0**, com o destino do ambiente. Não é sintaxe `.hurl` nem um formato de
+  configuração intercambiável com Hurl.
+- **Renderização opt-in de JSON externo**: `--render-files` aplica templates aos
+  arquivos usados como body completo, preservando tipos como no JSON inline.
+  Permite reutilizar payloads entre cenários sem prometer que Hurl renderize os
+  mesmos arquivos. Sem flag, o envio externo continua sendo bytes literais.
+
+Para experimentar a segunda extensão, salve `payloads/product-template.json` com
+este **template** (antes da substituição, não é um JSON válido):
+
+```text
+{"name":"{{product.name}}","price":{{product.price}}}
+```
+
+Salve `tests/renderizado.hurl`:
+
+```hurl
+POST http://localhost:8080/products
+Content-Type: application/json
+file,../payloads/product-template.json;
+HTTP 201
+```
+
+```sh
+httpgo test tests/renderizado.hurl --render-files --var product.name=Pizza --var product.price=4500
+```
+
+O dummy recebe `{"name":"Pizza","price":4500}` e retorna 201; resultado **0**.
+Sem `--render-files`, o mesmo arquivo é enviado literalmente: neste exemplo o
+dummy rejeita o template não resolvido com 400, causando divergência **1**.
+Não é a CLI validando JSON externo no modo bytes. Com a flag, variável ausente,
+JSON inválido ou tipo incompatível é renderização **2**, antes do envio afetado.
+Anteriores não são desfeitas. A flag vale para todos os bodies externos completos
+da invocação, não depende da extensão do arquivo e **não renderiza multipart**.
+Veja o [contrato de renderização](docs/subset.md#extensão-httpgo-json-externo-com---render-files--us-10-issue-25).
+
+### Separar extensões, diferenças e ausência de suporte
+
+| Classificação | Exemplo e consequência |
+|---|---|
+| Subconjunto compartilhado | Request-line, `HTTP 200`, `[Asserts]`, `[Captures]` e multipart básico, nos recortes com evidência diferencial |
+| Extensão HTTPGo | YAML hierárquico e `--render-files`, testados separadamente; não passe essas opções ao Hurl |
+| Diferença de comportamento | Esperados são literais por padrão; `--render-asserts` opta por esperados dinâmicos. Headers repetidos usam a primeira ocorrência; códigos e relatórios têm contrato próprio |
+| Não suportado | XPath, query `variable`, JSONPath completo, `body matches`, multipart com múltiplos arquivos, execução paralela e `httpgo check` |
+
+Construções reconhecidas fora do subconjunto não são ignoradas: retornam erro
+explícito **2**, com localização, e impedem execução parcial do arquivo por erro
+estático. A [referência do subconjunto](docs/subset.md), as
+[diferenças em relação ao Hurl](docs/subset.md#diferenças-em-relação-ao-hurl) e a
+[matriz de compatibilidade](docs/compatibility.md) são a fonte dos limites.
+A matriz fixa **Hurl 8.0.0** e classifica evidências por cenário; aceitar o parsing
+não comprova equivalência de execução, transporte, segredos ou CLI.
+
+Para comparar os conceitos com a documentação pública do Hurl, consulte
+[templates e fontes de variáveis](https://hurl.dev/docs/templates.html),
+[arquivos de configuração](https://hurl.dev/docs/manual.html#configuration) e
+[opções da CLI e relatórios](https://hurl.dev/docs/manual.html).
+Essas páginas podem evoluir; não substituem a referência versionada da matriz.
+
 ### Parametrizar JSON externo — extensão HTTPGo
 
 Em `payloads/product.json`:

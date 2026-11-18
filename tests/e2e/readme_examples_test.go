@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -30,6 +31,56 @@ func readmeBlock(t *testing.T, marker, language string) string {
 		t.Fatalf("README block not closed after %q", marker)
 	}
 	return body + "\n"
+}
+
+func TestReadmeExternalRendering(t *testing.T) {
+	template := readmeBlock(t, "salve `payloads/product-template.json`", "text")
+	input := readmeBlock(t, "Salve `tests/renderizado.hurl`:", "hurl")
+	for _, render := range []bool{false, true} {
+		t.Run(map[bool]string{false: "literal bytes", true: "rendered JSON"}[render], func(t *testing.T) {
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				data, err := io.ReadAll(r.Body)
+				want := strings.TrimSuffix(template, "\n")
+				if render {
+					want = `{"name":"Pizza","price":4500}`
+				}
+				if err != nil || strings.TrimSuffix(string(data), "\n") != want || r.Method != "POST" || r.URL.Path != "/products" || r.Header.Get("Content-Type") != "application/json" {
+					t.Errorf("request=%s %s body=%q want=%q err=%v", r.Method, r.URL.Path, data, want, err)
+				}
+				if render {
+					w.WriteHeader(201)
+				} else {
+					w.WriteHeader(400)
+				}
+			}))
+			defer server.Close()
+			dir := t.TempDir()
+			for _, name := range []string{"tests", "payloads"} {
+				if err := os.Mkdir(filepath.Join(dir, name), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(dir, "payloads", "product-template.json"), []byte(template), 0600); err != nil {
+				t.Fatal(err)
+			}
+			file := filepath.Join(dir, "tests", "renderizado.hurl")
+			if err := os.WriteFile(file, []byte(strings.ReplaceAll(input, "http://localhost:8080", server.URL)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"test", file, "--var", "product.name=Pizza", "--var", "product.price=4500"}
+			wantCode := 1
+			if render {
+				args = append(args, "--render-files")
+				wantCode = 0
+			}
+			code, out, stderr := run(t, args...)
+			if code != wantCode || calls.Load() != 1 || (render && stderr != "") || (!render && !strings.Contains(stderr, "status divergente")) {
+				t.Fatalf("code=%d want=%d calls=%d out=%q stderr=%q", code, wantCode, calls.Load(), out, stderr)
+			}
+		})
+	}
 }
 
 func TestReadmeAssertionsAndCaptures(t *testing.T) {
