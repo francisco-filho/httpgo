@@ -1,0 +1,194 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      kind: ${{ steps.metadata.outputs.kind }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Validate and classify version before building
+        id: metadata
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          tag=v0.0.0-ci
+          if [[ "$REF_TYPE" == tag ]]; then tag=$REF_NAME; fi
+          kind=$(bash scripts/package-release.sh --validate-tag "$tag")
+          printf 'tag=%s\nkind=%s\n' "$tag" "$kind" >> "$GITHUB_OUTPUT"
+      - name: Install pinned validation tools
+        run: |
+          go install golang.org/x/tools/cmd/goimports@v0.52.0
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+      - name: Linux gates (independent of JUnit workflow)
+        run: |
+          bash -n scripts/package-release.sh install.sh
+          make fmt lint test
+          git diff --exit-code
+          go vet ./...
+          make build e2e
+      - name: Prepare all release assets
+        env:
+          TAG: ${{ steps.metadata.outputs.tag }}
+        run: bash scripts/package-release.sh "$TAG" "$RUNNER_TEMP/release-assets"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  native:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix: &platforms
+        include:
+          - runner: ubuntu-24.04
+            system: Linux
+            machine: x86_64
+          - runner: ubuntu-24.04-arm
+            system: Linux
+            machine: aarch64
+          - runner: macos-15-intel
+            system: Darwin
+            machine: x86_64
+          - runner: macos-15
+            system: Darwin
+            machine: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/release-assets
+      - name: Assert real native platform and test the exact release packages
+        env:
+          EXPECTED_SYSTEM: ${{ matrix.system }}
+          EXPECTED_MACHINE: ${{ matrix.machine }}
+          HTTPGO_RELEASE_ASSETS: ${{ runner.temp }}/release-assets
+          HTTPGO_RELEASE_TAG: ${{ needs.package.outputs.tag }}
+        run: |
+          test "$(uname -s)" = "$EXPECTED_SYSTEM"
+          test "$(uname -m)" = "$EXPECTED_MACHINE"
+          /bin/bash --version
+          /bin/bash -n install.sh scripts/package-release.sh
+          go test ./tests/release -count=1 -v
+          printf 'Native package: %s %s %s — passed\n' "$HTTPGO_RELEASE_TAG" "$EXPECTED_SYSTEM" "$EXPECTED_MACHINE" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'capimgrosso/httpgo'
+    needs: [package, native]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ needs.package.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: assets
+      - name: Verify complete asset set before upload
+        working-directory: assets
+        run: |
+          test "$(find . -type f | wc -l)" -eq 6
+          test "$(wc -l < checksums.txt)" -eq 4
+          for os in linux darwin; do
+            for arch in amd64 arm64; do test -s "httpgo_${os}_${arch}.tar.gz"; done
+          done
+          sha256sum --check --strict checksums.txt
+          test -s install.sh
+          bash -n install.sh
+      - name: Refuse to modify an already published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.package.outputs.tag }}
+        run: |
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            test "$draft" = true || { echo 'release is already published' >&2; exit 1; }
+          fi
+      - name: Upload all assets to a draft (never advertise partial uploads)
+        id: draft
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.package.outputs.tag }}
+          draft: true
+          prerelease: ${{ needs.package.outputs.kind == 'prerelease' }}
+          make_latest: 'false'
+          fail_on_unmatched_files: true
+          files: |
+            assets/httpgo_linux_amd64.tar.gz
+            assets/httpgo_linux_arm64.tar.gz
+            assets/httpgo_darwin_amd64.tar.gz
+            assets/httpgo_darwin_arm64.tar.gz
+            assets/checksums.txt
+            assets/install.sh
+      - name: Publish only after successful upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
+          KIND: ${{ needs.package.outputs.kind }}
+        run: |
+          prerelease=false
+          latest=true
+          if [[ "$KIND" == prerelease ]]; then prerelease=true; latest=false; fi
+          gh api --method PATCH "repos/$GH_REPO/releases/$RELEASE_ID" \
+            -F draft=false -F prerelease="$prerelease" -f make_latest="$latest"
+
+  public-smoke:
+    needs: [package, publish]
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Install from public HTTPS assets in an isolated HOME
+        env:
+          TAG: ${{ needs.publish.outputs.tag }}
+          KIND: ${{ needs.package.outputs.kind }}
+          EXPECTED_SYSTEM: ${{ matrix.system }}
+          EXPECTED_MACHINE: ${{ matrix.machine }}
+        run: |
+          test "$(uname -s)" = "$EXPECTED_SYSTEM"
+          test "$(uname -m)" = "$EXPECTED_MACHINE"
+          export HOME
+          HOME=$(mktemp -d)
+          trap 'rm -rf "$HOME"' EXIT
+          base=https://github.com/capimgrosso/httpgo/releases
+          curl -q -fsSL --proto '=https' --proto-redir '=https' \
+            "$base/download/$TAG/install.sh" -o "$HOME/install.sh"
+          /bin/bash "$HOME/install.sh" --version "$TAG" --bin-dir "$HOME/tag/bin"
+          version=$("$HOME/tag/bin/httpgo" --version)
+          [[ $version == "httpgo $TAG commit="* ]]
+          printf 'Public HTTPS tag: %s %s %s — %s\n' "$TAG" "$EXPECTED_SYSTEM" "$EXPECTED_MACHINE" "$version" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$KIND" == stable ]]; then
+            curl -q -fsSL --proto '=https' --proto-redir '=https' \
+              "$base/latest/download/install.sh" | /bin/bash
+            version=$("$HOME/.local/bin/httpgo" --version)
+            [[ $version == "httpgo $TAG commit="* ]]
+            printf 'Public HTTPS latest: %s %s %s — %s\n' "$TAG" "$EXPECTED_SYSTEM" "$EXPECTED_MACHINE" "$version" >> "$GITHUB_STEP_SUMMARY"
+          fi
