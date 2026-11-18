@@ -6,8 +6,8 @@
 httpgo test tests/ --fail-fast --output html --output-file target/report.html
 ```
 
-Com `01-health.hurl` aprovado, `02-products.hurl` recebendo 503 em vez de 200 e
-`03-profile.hurl` não iniciado pelo fail-fast, a CLI retorna **1**, deixa stdout
+Com `01-health.httpgo` aprovado, `02-products.httpgo` recebendo 503 em vez de 200 e
+`03-profile.httpgo` não iniciado pelo fail-fast, a CLI retorna **1**, deixa stdout
 vazio e informa em stderr, após gravar e fechar:
 
 ```text
@@ -21,10 +21,10 @@ somente claro, inspirado no Markdown do GitHub, com texto escuro sobre fundo
 branco, títulos, tabelas discretas e diagnósticos monoespaçados. Estados sempre
 possuem rótulos textuais, não apenas cores.
 
-A demonstração versionada está em [testdata/scenarios/html_suite/](../testdata/scenarios/html_suite/):
+A demonstração versionada está em [testdata/examples/html_suite/](../testdata/examples/html_suite/):
 
 ```bash
-httpgo test testdata/scenarios/html_suite/ --var base_url=http://localhost:8080 --fail-fast --output html --output-file target/report.html
+httpgo test testdata/examples/html_suite/ --var base_url=http://localhost:8080 --fail-fast --output html --output-file target/report.html
 ```
 
 Requer um servidor com `/health` e `/profile` retornando 200 e `/products`
@@ -34,7 +34,7 @@ O exemplo não fornece esses endpoints nem presume que qualquer API local os ten
 Arquivo único também é suportado:
 
 ```bash
-httpgo test testdata/scenarios/html_suite/01-health.hurl --var base_url=http://localhost:8080 --output html --output-file target/report.html
+httpgo test testdata/examples/html_suite/01-health.httpgo --var base_url=http://localhost:8080 --output html --output-file target/report.html
 ```
 
 ## Destino e nomeação

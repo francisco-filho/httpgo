@@ -22,7 +22,7 @@ func TestScenarioExtensionsDemo(t *testing.T) {
 	}))
 	defer server.Close()
 	dir := t.TempDir()
-	text := "GET " + server.URL + "/health\nHTTP 200"
+	text := strings.ReplaceAll(readmeBlock(t, "### Extensões de arquivo e compatibilidade", "hurl"), "http://localhost:8080", server.URL)
 	a := configFile(t, dir, "01-health.httpgo", text)
 	b := configFile(t, dir, "02-health.hurl", text)
 	for _, tc := range []struct {

@@ -29,7 +29,7 @@ func TestCountCaptureDocumentation(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{"Captura de contagem — US-33", `orders_before: jsonpath "$.items" count`, "número JSON inteiro não negativo", "sem baseline zero fictício", "esperado dinâmico exige", "Sem parâmetros, pipelines, aritmética", "--secret orders_before", "scenario_count_unchanged.hurl"} {
+		for _, term := range []string{"Captura de contagem — US-33", `orders_before: jsonpath "$.items" count`, "número JSON inteiro não negativo", "sem baseline zero fictício", "esperado dinâmico exige", "Sem parâmetros, pipelines, aritmética", "--secret orders_before", "scenario_count_unchanged.httpgo"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}
@@ -59,7 +59,7 @@ func TestCountCaptureDocumentation(t *testing.T) {
 			t.Fatalf("%s: code=%d hits=%d out=%s err=%s", name, code, hits.Load(), out, stderr)
 		}
 	}
-	for _, name := range []string{"scenario_count_unchanged.hurl", "capture_count.hurl"} {
+	for _, name := range []string{"scenario_count_unchanged.httpgo", "capture_count.httpgo"} {
 		code, out, stderr := run(t, "test", "../../testdata/scenarios/"+name, "--render-asserts", "--var", "base_url="+server.URL)
 		if code != 0 {
 			t.Fatalf("%s: code=%d out=%s err=%s", name, code, out, stderr)

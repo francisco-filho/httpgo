@@ -175,7 +175,7 @@ func TestHelpAndBuildMetadata(t *testing.T) {
 			if !strings.Contains(out, "httpgo e2e commit=testcommit date=2026-11-14") {
 				t.Fatalf("metadata=%q", out)
 			}
-		} else if !strings.Contains(out, "httpgo test health.hurl") || !strings.Contains(out, "não coloque segredos") {
+		} else if !strings.Contains(out, "httpgo test health.httpgo") || !strings.Contains(out, "não coloque segredos") {
 			t.Fatalf("help=%q", out)
 		}
 	}

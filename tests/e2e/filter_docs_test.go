@@ -18,13 +18,13 @@ func TestFilterHelpAndPublishedExample(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{`pizza_id: jsonpath "$[?(@.slug=='pizza')].id"`, `jsonpath "$[?(@.slug=='pizza')].active" == true`, "Filtro [?(@.caminho == literal escalar)] estático", "Ausente não corresponde nem a null", "Operandos dinâmicos exigem --render-asserts (US-31)", "Consulta apresentada oculta sempre os literais", "scenario_filter.hurl"} {
+		for _, term := range []string{`pizza_id: jsonpath "$[?(@.slug=='pizza')].id"`, `jsonpath "$[?(@.slug=='pizza')].active" == true`, "Filtro [?(@.caminho == literal escalar)] estático", "Ausente não corresponde nem a null", "Operandos dinâmicos exigem --render-asserts (US-31)", "Consulta apresentada oculta sempre os literais", "scenario_filter.httpgo"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("missing help term %q", term)
 			}
 		}
 	}
-	input, err := os.ReadFile("../../testdata/scenarios/scenario_filter.hurl")
+	input, err := os.ReadFile("../../testdata/scenarios/scenario_filter.httpgo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestFilterPublishedEscapes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	marker := "Exemplos de consultas na sintaxe `.hurl`:"
+	marker := "Exemplos de consultas na sintaxe `.httpgo`:"
 	_, tail, ok := strings.Cut(string(data), marker)
 	if !ok {
 		t.Fatal("missing escapes example")

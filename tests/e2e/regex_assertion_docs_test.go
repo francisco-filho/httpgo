@@ -39,7 +39,7 @@ func TestRegexAssertionPublishedContract(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
 		}
-		for _, term := range []string{`regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"`, "scenario_regex_assertion_signup.hurl", "Extração permanece estática", "sem expansão recursiva", "--secret signup_code", "Sem query variable, body matches"} {
+		for _, term := range []string{`regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"`, "scenario_regex_assertion_signup.httpgo", "Extração permanece estática", "sem expansão recursiva", "--secret signup_code", "Sem query variable, body matches"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}

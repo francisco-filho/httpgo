@@ -31,8 +31,8 @@ func TestReadmeFirstRunAndRequestData(t *testing.T) {
 	}{
 		{name: "first success", marker: "conteúdo completo:", method: "GET", path: "/health", status: 200},
 		{name: "first divergence", marker: "conteúdo completo:", method: "GET", path: "/health", status: 200, code: 1},
-		{name: "JSON and headers", marker: "Salve `json.hurl`:", method: "POST", path: "/products", body: `{"name":"Pizza","price":4500}`, status: 201},
-		{name: "typed variables", marker: "Salve `products.hurl`:", method: "POST", path: "/products", body: `{"name":"Pizza","price":4500,"active":true,"code":"001"}`, status: 201, variables: true},
+		{name: "JSON and headers", marker: "Salve `json.httpgo`:", method: "POST", path: "/products", body: `{"name":"Pizza","price":4500}`, status: 201},
+		{name: "typed variables", marker: "Salve `products.httpgo`:", method: "POST", path: "/products", body: `{"name":"Pizza","price":4500,"active":true,"code":"001"}`, status: 201, variables: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls atomic.Int32
@@ -105,10 +105,10 @@ func TestReadmeExternalBodyAndMultipart(t *testing.T) {
 			}))
 			defer server.Close()
 			dir := t.TempDir()
-			marker, name, address := "`tests/arquivo.hurl` com:", "tests/arquivo.hurl", "http://localhost:8080"
+			marker, name, address := "`tests/arquivo.httpgo` com:", "tests/arquivo.httpgo", "http://localhost:8080"
 			writeReadmeFile(t, dir, "payloads/product.json", "{\"name\":\"Pizza\",\"price\":4500}\n")
 			if multipart {
-				marker, name, address = "salve `tests/upload.hurl`:", "tests/upload.hurl", "http://localhost:8081"
+				marker, name, address = "salve `tests/upload.httpgo`:", "tests/upload.httpgo", "http://localhost:8081"
 				writeReadmeFile(t, dir, "fixtures/document.txt", "Documento fictício\n")
 			}
 			file := writeReadmeFile(t, dir, name, strings.ReplaceAll(readmeBlock(t, marker, "hurl"), address, server.URL))
@@ -140,13 +140,13 @@ func TestReadmeConfigCredentialsSuiteAndReports(t *testing.T) {
 		return strings.ReplaceAll(s, "http://127.0.0.1:8080", server.URL)
 	}
 	first := readmeBlock(t, "conteúdo completo:", "hurl")
-	file := writeReadmeFile(t, dir, "exemplo.hurl", first)
+	file := writeReadmeFile(t, dir, "exemplo.httpgo", first)
 	config := writeReadmeFile(t, dir, "guia.yaml", replaceAddress(readmeBlock(t, "salve `guia.yaml`:", "yaml")))
 	writeReadmeFile(t, dir, "environments/local.yaml", replaceAddress(readmeBlock(t, "Crie `environments/local.yaml`:", "yaml")))
 	credentials := writeReadmeFile(t, dir, "credenciais.yaml", replaceAddress(readmeBlock(t, "Salve `credenciais.yaml`:", "yaml")))
-	credentialFile := writeReadmeFile(t, dir, "credenciais.hurl", readmeBlock(t, "Salve `credenciais.hurl`:", "hurl"))
-	writeReadmeFile(t, dir, "suite/01-health.hurl", first)
-	writeReadmeFile(t, dir, "suite/02-produto.hurl", readmeBlock(t, "Salve `suite/02-produto.hurl` com:", "hurl"))
+	credentialFile := writeReadmeFile(t, dir, "credenciais.httpgo", readmeBlock(t, "Salve `credenciais.httpgo`:", "hurl"))
+	writeReadmeFile(t, dir, "suite/01-health.httpgo", first)
+	writeReadmeFile(t, dir, "suite/02-produto.httpgo", readmeBlock(t, "Salve `suite/02-produto.httpgo` com:", "hurl"))
 	for _, extra := range [][]string{nil, {"--env", "local"}, {"--env", "local", "--var", "base_url=" + server.URL}} {
 		args := append([]string{"test", file, "--config", config}, extra...)
 		code, out, stderr := run(t, args...)
@@ -192,7 +192,7 @@ func TestReadmeConfigCredentialsSuiteAndReports(t *testing.T) {
 			}
 			if format == "html" {
 				_, html := htmlArtifact(t, destination)
-				if !strings.Contains(stderr, "gerado em") || !strings.Contains(html, "01-health.hurl") || !strings.Contains(html, "02-produto.hurl") {
+				if !strings.Contains(stderr, "gerado em") || !strings.Contains(html, "01-health.httpgo") || !strings.Contains(html, "02-produto.httpgo") {
 					t.Fatalf("stderr=%q HTML=%s", stderr, html)
 				}
 			}

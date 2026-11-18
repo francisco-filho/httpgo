@@ -397,20 +397,22 @@ func (c *Command) fail(message string) int {
 func help() string {
 	return `httpgo — executa requisições HTTP e valida status, headers, JSON e body
 
+Extensão padrão recomendada para novos cenários: .httpgo.
+
 Uso:
   httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--output junit|html --output-file caminho] [--render-files] [--render-asserts] [--var nome=valor] [--secret nome]
   httpgo --help
   httpgo test --help
   httpgo --version
 
-Exemplo: salve health.hurl e execute httpgo test health.hurl
+Exemplo: salve health.httpgo e execute httpgo test health.httpgo
   GET http://localhost:8080/health
   HTTP 200
 
   GET http://localhost:8080/inexistente
   HTTP 404
 
-Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
+Exemplo JSON: salve products.httpgo e execute httpgo test products.httpgo
   POST http://localhost:8080/products
   Content-Type: application/json
   {"name":"Pizza","price":4500}
@@ -419,7 +421,7 @@ Exemplo JSON: salve products.hurl e execute httpgo test products.hurl
 
 Métodos: GET, POST, PUT, PATCH e DELETE. GET não aceita body.
 
-Polling por entrada: salve processing.hurl e execute httpgo test processing.hurl
+Polling por entrada: salve processing.httpgo e execute httpgo test processing.httpgo
   GET http://localhost:8080/jobs/123
   [Options]
   retry: 3
@@ -445,14 +447,14 @@ Headers e um body são opcionais: JSON inline, file,<caminho>; ou multipart (exc
 JSON inline estático preserva seus bytes. Sem --render-files, arquivo externo
 preserva todos os bytes, inclusive vazio, binário e {{placeholder}} literal,
 sem validar JSON nem renderizar.
-Exemplo: salve tests/products.hurl e execute httpgo test tests/products.hurl
+Exemplo: salve tests/products.httpgo e execute httpgo test tests/products.httpgo
   POST http://localhost:8080/products
   Content-Type: application/json
   file,../payloads/product.json;
   HTTP 201
 Caminho literal entre file, e ; final, incluindo espaços, sem aspas/escapes especiais
 nem interpolação. Vírgula/ponto e vírgula no nome não são aceitos.
-Relativos partem do diretório do .hurl, não do diretório corrente; absolutos aceitos.
+Relativos partem do diretório do cenário, não do diretório corrente; absolutos aceitos.
 Sem sandbox: .. e absolutos podem ler fora do projeto, com permissões do usuário.
 Leitura completa e fechamento só na vez da entrada, antes do envio; falha localizada
 retorna 2 sem enviar a entrada nem as seguintes. As anteriores não são desfeitas.
@@ -461,7 +463,7 @@ No body externo completo, Content-Type não é inferido. Sem --render-files, byt
 com as mesmas variáveis/tipos do JSON inline. Não renderiza arquivos multipart.
 Independe de extensão/Content-Type; JSON estático preserva inclusive whitespace externo.
 No payload: {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}}}
-Exemplo: httpgo test tests/products.hurl --render-files --var product.name=Pizza --var product.price=45 --var product.active=true
+Exemplo: httpgo test tests/products.httpgo --render-files --var product.name=Pizza --var product.price=45 --var product.active=true
 Flag sem valor, antes/depois do arquivo após test, somente na execução atual.
 Conteúdo validado somente na vez da requisição: vazio/não JSON, template malformado,
 variável ausente, tipo incompatível ou JSON final inválido retornam 2 antes do envio.
@@ -470,8 +472,8 @@ sem conteúdo bruto. Anteriores permanecem; afetada e seguintes não são enviad
 Não promete renderização equivalente pelo Hurl.
 O prazo do transporte não interrompe uma leitura local bloqueada pelo sistema.
 
-Upload multipart: salve tests/documents.hurl, crie fixtures/document.pdf e execute
-  httpgo test tests/documents.hurl --var base_url=http://localhost:8080 --var category=reports --var token=ficticio --secret token
+Upload multipart: salve tests/documents.httpgo, crie fixtures/document.pdf e execute
+  httpgo test tests/documents.httpgo --var base_url=http://localhost:8080 --var category=reports --var token=ficticio --secret token
   POST {{base_url}}/documents
   Authorization: Bearer {{token}}
   [MultipartFormData]
@@ -495,16 +497,35 @@ do resultado, inclusive em falha/cancelamento. Não imprime arquivo ou campos br
 campos repetidos, filename customizado, headers de parte ou multipart aninhado.
 Diferenças Hurl 8.0.0 (caminhos/filename/restrições): docs/compatibility.md.
 
+Compatibilidade de extensões:
+.httpgo é o padrão recomendado; .hurl continua aceito sem renomeação, conversão
+ou flag adicional. Mesma linguagem e execução, sem modo por extensão nem ampliação
+do subconjunto Hurl documentado; não significa compatibilidade integral com Hurl.
+Demonstração: API local em 8080 com GET /health retornando 200. Em uma pasta tests
+separada, salve 01-health.httpgo e 02-health.hurl com o mesmo conteúdo:
+  GET http://localhost:8080/health
+  HTTP 200
+  httpgo test tests/01-health.httpgo
+  httpgo test tests/02-health.hurl
+  httpgo test tests/
+Individuais: uma requisição aprovada e código 0 cada. Diretório: ambos nessa ordem,
+dois arquivos aprovados e código 0. Descoberta inclui .httpgo e .hurl recursivamente,
+sem preferência por extensão; conteúdo idêntico em caminhos distintos não deduplica.
+Outras extensões ficam fora da descoberta, mas arquivos explícitos continuam aceitos.
+Não há migração obrigatória.
+Fim da compatibilidade de extensões.
+
 Suítes: um ou mais arquivos/diretórios, inclusive misturados e sobrepostos.
   httpgo test tests/ --env local
   httpgo test tests/ --env local --fail-fast
-Diretórios descobrem .hurl recursivamente; arquivo explícito independe da extensão.
+Diretórios descobrem cenários recursivamente; arquivo explícito independe da extensão.
+Extensões elegíveis e suíte mista: veja Compatibilidade de extensões abaixo.
 Normaliza absolutos/relativos, . e ..; elimina duplicações pela identidade do filesystem,
 sem forçar minúsculas. Ordem lexicográfica pelo caminho relativo ao cwd, com /;
 externos podem ter ../. Entre unidades sem relativo, usa absoluto normalizado com /.
 Não segue links simbólicos: ignora descobertos e rejeita explícitos, inclusive ancestrais.
 Descoberta completa antes de HTTP; entrada inválida/inacessível, falha de acesso ou
-cada diretório explícito sem .hurl elegível retorna 2 e impede todos os envios.
+cada diretório explícito sem cenário elegível retorna 2 e impede todos os envios.
 Configuração global única; parsing integral de cada arquivo antes de iniciá-lo.
 Arquivos e requisições sequenciais; primeira falha definitiva para as entradas do arquivo.
 Sem --fail-fast continua os outros, inclusive após erro de parsing/transporte;
@@ -555,7 +576,7 @@ Bodies e coleções de headers não são impressos, nem em erros de entrada.
 Valores comuns sanitizados podem aparecer no diagnóstico de assertion.
 
 Esperados dinâmicos (evolução explícita HTTPGo, opt-in por invocação):
-  httpgo test order.hurl --render-asserts --var base_url=http://localhost:8080
+  httpgo test order.httpgo --render-asserts --var base_url=http://localhost:8080
   POST {{base_url}}/orders
   HTTP 200
   [Captures]
@@ -589,7 +610,7 @@ Ordem: status → capturas provisórias → assertions na ordem escrita → conf
 Perfis e diferenças Hurl 8.0.0: docs/subset.md e docs/compatibility.md.
 
 Desigualdade JSON — US-32 (somente valor presente):
-  httpgo test rotation.hurl --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8080
+  httpgo test rotation.httpgo --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8080
   POST {{base_url}}/session/login
   HTTP 200
   [Captures]
@@ -608,10 +629,10 @@ Segredo provisório oculta ambos os operandos antes da confirmação do lote.
 count !=, header/body != e negação genérica continuam não suportados.
 Diferença não garante revogação do token antigo, validade do novo ou outros efeitos;
 verifique essas propriedades com requisições independentes. Exemplo completo:
-testdata/scenarios/scenario_json_inequality_rotation.hurl (inclui uso de new_token).
+testdata/scenarios/scenario_json_inequality_rotation.httpgo (inclui uso de new_token).
 
 Renovar capturas — US-34 (mudança explícita de contrato, sem nova flag):
-  httpgo test jobs.hurl --render-asserts --var base_url=http://localhost:8080 --var job_id=inicial
+  httpgo test jobs.httpgo --render-asserts --var base_url=http://localhost:8080 --var job_id=inicial
   GET {{base_url}}/jobs/current
   HTTP 200
   [Captures]
@@ -628,10 +649,10 @@ Polling reenvia com valores confirmados antes da entrada; somente sucesso confir
 Marcas e valores secretos antigos, novos e derivados continuam protegidos após descarte.
 Sem --render-asserts, esperados continuam literais e consultas dinâmicas são rejeitadas.
 Não habilita query variable, encadeamento de capturas nem nova política de retry.
-Exemplo completo: testdata/scenarios/scenario_capture_renewal.hurl e docs/subset.md.
+Exemplo completo: testdata/scenarios/scenario_capture_renewal.httpgo e docs/subset.md.
 
 Captura de contagem — US-33:
-  httpgo test unchanged.hurl --render-asserts --var base_url=http://localhost:8080
+  httpgo test unchanged.httpgo --render-asserts --var base_url=http://localhost:8080
   GET {{base_url}}/orders
   HTTP 200
   [Captures]
@@ -655,10 +676,10 @@ Ordem status → capturas provisórias → assertions → confirmação atômica
 Sobrescrita exata e captura própria são permitidas; duplicações no lote não.
 --secret orders_before protege quantidade e ambos os operandos na comparação posterior.
 Diagnóstico mostra consulta/count/causa/localização, não coleção ou quantidade protegida.
-Exemplos: testdata/scenarios/scenario_count_unchanged.hurl e capture_count.hurl.
+Exemplos: testdata/scenarios/scenario_count_unchanged.httpgo e testdata/scenarios/capture_count.httpgo.
 
 Validar textos extraídos por regex — US-36:
-  httpgo test testdata/scenarios/scenario_regex_assertion_signup.hurl --var mailbox_url=http://localhost:8025 --var base_url=http://localhost:8080 --secret signup_code
+  httpgo test testdata/scenarios/scenario_regex_assertion_signup.httpgo --var mailbox_url=http://localhost:8025 --var base_url=http://localhost:8080 --secret signup_code
   GET {{mailbox_url}}/message/123
   HTTP 200
   [Captures]
@@ -681,8 +702,8 @@ Diagnósticos distinguem ausência, divergência e erro, nunca body/grupo seleci
 Marque capturas secretas: padrões/esperados protegidos ficam ocultos inclusive após descarte.
 Sem query variable, body matches, regex dinâmica de extração, pipelines ou escolha de grupo.
 
-Assertions de body: salve privacy.hurl e execute
-  httpgo test privacy.hurl --var base_url=http://localhost:8080
+Assertions de body: salve privacy.httpgo e execute
+  httpgo test privacy.httpgo --var base_url=http://localhost:8080
   GET {{base_url}}/export
   HTTP 200
   [Asserts]
@@ -705,7 +726,7 @@ Diagnóstico identifica operador/arquivo/linha/coluna, nunca body ou fragmentos 
 Esperado secreto é protegido; captura secreta provisória oculta esperado sem confirmar o lote.
 Busca literal não garante detectar codificações alternativas de dados sensíveis.
 
-Assertions de headers: salve health.hurl e execute httpgo test health.hurl
+Assertions de headers: salve health.httpgo e execute httpgo test health.httpgo
 (requer resposta com Content-Type application/json e X-Request-Id req-123):
   GET http://localhost:8080/health
   HTTP 200
@@ -720,8 +741,8 @@ header "Set-Cookie" not contains "Domain" aprova ausência ou primeira ocorrênc
 Header presente com not contains "" falha, inclusive vazio.
 contains "" passa para qualquer valor presente, inclusive vazio.
 Sem --render-asserts, esperados são strings literais: {{nome}} não interpola, mesmo se definido.
-Regex de headers: salve session.hurl e execute
-  httpgo test session.hurl --var base_url=http://localhost:8080
+Regex de headers: salve session.httpgo e execute
+  httpgo test session.httpgo --var base_url=http://localhost:8080
 (requer um cookie no formato de sessão abaixo):
   GET {{base_url}}/session
   HTTP 200
@@ -744,8 +765,8 @@ Segredos conhecidos também são removidos de headers comuns.
 Diferenças Hurl 8.0.0: repetidos usam primeira ocorrência, não lista;
 esperados são literais sem --render-asserts. Capturas antecedem assertions desde a US-34. Veja docs/compatibility.md.
 
-Assertions JSON: salve product.hurl e execute
-  httpgo test product.hurl --var base_url=http://localhost:8080
+Assertions JSON: salve product.httpgo e execute
+  httpgo test product.httpgo --var base_url=http://localhost:8080
 (requer resposta {"name":"Pizza","price":4500,"active":true}):
   GET {{base_url}}/products/1
   HTTP 200
@@ -770,8 +791,8 @@ Diagnóstico: consulta, arquivo/linha/coluna, esperado/real tipados e sanitizado
 Captura secreta pendente na mesma resposta oculta integralmente os dois valores
 em falhas de headers/JSON/body, sem confirmar a captura antecipadamente.
 Proteção não detecta segredos arbitrários não marcados. Sem dumps de body/documento.
-Inclusão e ausência JSON/header: salve validation.hurl e execute
-  httpgo test validation.hurl --var base_url=http://localhost:8080
+Inclusão e ausência JSON/header: salve validation.httpgo e execute
+  httpgo test validation.httpgo --var base_url=http://localhost:8080
   GET {{base_url}}/validation
   HTTP 200
   [Asserts]
@@ -802,7 +823,7 @@ Tipos e valores vazios — US-29:
   jsonpath "$.active" isBoolean
   jsonpath "$.issues" isEmpty
 Resposta: {"token":"abc","attempts":3,"active":false,"issues":[]}; saída 0.
-Exemplo: httpgo test testdata/scenarios/json_types.hurl --var base_url=http://localhost:8080
+Exemplo: httpgo test testdata/scenarios/json_types.httpgo --var base_url=http://localhost:8080
 Unários sem esperado: isString aceita string inclusive vazia; isBoolean aceita true/false.
 isInteger exige notação inteira JSON, inclusive negativo e -0, sem limite de máquina;
 3.0, 3e0 e string "3" falham. Igualdade numérica continua aceitando 3 == 3.0 == 3e0;
@@ -855,12 +876,12 @@ Capturas usam a mesma seleção tipada e publicação atômica; zero resultados 
 Arrays/objetos capturados exigem valor JSON completo, sem escolher o primeiro elemento.
 Precisão preservada além de int64, decimais próximos e expoentes extremos, sem coerção.
 US-27b: Sem nova sintaxe ou opção de avaliador na adoção do adapter;
-exemplo: testdata/scenarios/scenario_projection_precision.hurl. Filtros são a US-28 abaixo.
+exemplo: testdata/scenarios/scenario_projection_precision.httpgo. Filtros são a US-28 abaixo.
 Ramo incompatível invalida toda consulta expansiva com 2, mesmo com ramos válidos.
 Diagnóstico resume presença/tipo/contagem sem coleção ou esperado composto;
 resumos protegidos ficam ocultos, inclusive com captura secreta pendente.
 Sem .*, slices, unions, descida recursiva ou JSONPath completo.
-Exemplo executável com captura/reuso: testdata/scenarios/scenario_projection.hurl.
+Exemplo executável com captura/reuso: testdata/scenarios/scenario_projection.httpgo.
 
 Selecionar entidades por igualdade — US-28:
   GET {{base_url}}/products
@@ -884,10 +905,10 @@ Sem outros operadores, existência, lógica, regex ou funções no filtro.
 Operandos dinâmicos exigem --render-asserts (US-31); sem a flag, placeholders na
 consulta são rejeitados, inclusive em literal. Consulta inválida tardia impede todo HTTP.
 Consulta apresentada oculta sempre os literais do filtro; planos não entram no resultado.
-Exemplo executável: testdata/scenarios/scenario_filter.hurl; diferenças: docs/compatibility.md.
+Exemplo executável: testdata/scenarios/scenario_filter.httpgo; diferenças: docs/compatibility.md.
 
 Selecionar com valores anteriores — US-31 (evolução explícita HTTPGo):
-  httpgo test testdata/scenarios/dynamic_filter.hurl --render-asserts --var base_url=http://localhost:8080
+  httpgo test testdata/scenarios/dynamic_filter.httpgo --render-asserts --var base_url=http://localhost:8080
   GET {{base_url}}/first
   HTTP 200
   [Captures]
@@ -917,14 +938,14 @@ Hurl interpola por padrão e admite formas estruturais excluídas aqui; tipos,
 escapes e publicação podem divergir. Veja docs/compatibility.md e docs/subset.md.
 
 Variáveis tipadas (flags repetíveis; extensão de tipagem HTTPGo):
-  httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
+  httpgo test products.httpgo --var api.baseUrl=http://localhost:8080 --var token=ficticio --secret token
   GET {{ api.baseUrl }}/products
   Authorization: Bearer {{token}}
   HTTP 200
 --var nome=valor: literal JSON válido preserva tipo; caso contrário é texto,
 inclusive vazio. Sinais = após o primeiro são preservados. Para forçar string:
   --var 'product.code="001"'
-  httpgo test products.hurl --var api.baseUrl=http://localhost:8080 --var product.name=Pizza --var product.price=4500 --var product.active=true --var 'product.code="001"'
+  httpgo test products.httpgo --var api.baseUrl=http://localhost:8080 --var product.name=Pizza --var product.price=4500 --var product.active=true --var 'product.code="001"'
   POST {{api.baseUrl}}/products
   Content-Type: application/json
   {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}},"code":{{product.code}}}
@@ -935,7 +956,7 @@ CLI substitui o mesmo nome YAML, preservando irmãos; objetos CLI continuam opac
 Valores JSON completos (inclusive raiz) aceitam qualquer tipo. Dentro de strings
 JSON, URL e headers, somente escalares; strings JSON são escapadas corretamente.
 Chaves JSON e nomes de headers são estáticos. Sem recursão ou encoding de URL automático.
-Capturas literais de headers — salve cache.hurl:
+Capturas literais de headers — salve cache.httpgo:
   GET {{base_url}}/catalog
   HTTP 200
   [Captures]
@@ -943,7 +964,7 @@ Capturas literais de headers — salve cache.hurl:
   GET {{base_url}}/catalog
   If-None-Match: {{catalog_etag}}
   HTTP 304
-  httpgo test cache.hurl --var base_url=http://localhost:8080
+  httpgo test cache.httpgo --var base_url=http://localhost:8080
 Nome literal sem distinguir caixa; primeira ocorrência, sem juntar ou dividir vírgulas.
 Preserva string e aspas, mesmo com números/JSON/placeholders; vazio é string vazia.
 Ausente: erro de captura 2. Somente resposta final completa, após status aceito.
@@ -953,7 +974,7 @@ na sessão, inclusive em composição posterior; --secret continua acumulando pr
 Somente sufixo regex estático (US-25), sem outros filtros/seletores.
 Não há cookie jar: capturar Set-Cookie não cria Cookie
 nem extrai atributos; essa extração pertence à US-25. Diferenças Hurl em docs/compatibility.md.
-Extração regex — salve otp.hurl e marque --secret otp_code:
+Extração regex — salve otp.httpgo e marque --secret otp_code:
 GET {{mailbox_url}}/message/123
 HTTP 200
 [Captures]
@@ -982,7 +1003,7 @@ Capturas tipadas para entradas seguintes (URL, headers, JSON inline e externo co
   GET {{base_url}}/products
   Authorization: Bearer {{accessToken}}
   HTTP 200
-  httpgo test products.hurl --var base_url=http://localhost:8080 --var username=demo --var password=senha-ficticia --secret password --secret accessToken
+  httpgo test products.httpgo --var base_url=http://localhost:8080 --var username=demo --var password=senha-ficticia --secret password --secret accessToken
 JSONPath limitado: raiz $, propriedades por ponto, índices não negativos, [*]
 de arrays e filtros estáticos por igualdade (US-28), como $[?(@.slug=='pizza')].id. Aceita string, número, booleano, null, array ou objeto,
 inclusive raiz e vazios. Números mantêm precisão, também nas estruturas.
@@ -998,7 +1019,7 @@ inclusive raiz e vazios. Números mantêm precisão, também nas estruturas.
   Content-Type: application/json
   {"productId":{{productId}}}
   HTTP 200
-  httpgo test products.hurl --var base_url=http://localhost:8080
+  httpgo test products.httpgo --var base_url=http://localhost:8080
 Um id recebido como 9007199254740993 chega exato ao path e como número no JSON.
 Strings como "null" ou "{{literal}}" permanecem strings, sem reinterpretação.
 Array/objeto exige valor JSON completo: URL, header ou string JSON gera erro antes do envio.
@@ -1011,8 +1032,8 @@ duplicações no lote e conflitos hierárquicos são erro 2. Cada arquivo começ
 Proibido fornecer credenciais reais em argumentos, inclusive --var: use apenas
 valores não sigilosos ou fictícios. A proteção não cobre histórico/processos.
 Configuração do projeto — extensão HTTPGo (US-11):
-  httpgo test products.hurl --config testdata/config/project.yaml
-  httpgo test products.hurl --config testdata/config/project.yaml --var api.baseUrl=http://localhost:9090
+  httpgo test products.httpgo --config testdata/config/project.yaml
+  httpgo test products.httpgo --config testdata/config/project.yaml --var api.baseUrl=http://localhost:9090
 Sem --config: somente .httpgo.yaml do diretório corrente, sem buscar ancestrais.
 --config seleciona somente o arquivo indicado; inexistente/ilegível é erro.
 Ausência do opcional e arquivo vazio/só comentários conservam os defaults internos.
@@ -1040,11 +1061,11 @@ aliases e tags explícitas, sem mostrar entrada bruta.
 Referências ${NOME} seguem o contrato da extensão US-13 abaixo.
 secrets acumula marcações da base, ambiente e --secret, inclusive para capturas
 futuras e overrides; lista vazia nunca remove proteção de valores anteriores.
-Payloads permanecem relativos ao .hurl, nunca à configuração.
+Payloads permanecem relativos ao cenário, nunca à configuração.
 Erro de configuração: código 2, antes de qualquer HTTP.
 Ambientes nomeados — extensão HTTPGo (US-12):
-  httpgo test tests/products.hurl --env local
-  httpgo test tests/products.hurl --config projeto/base.yaml --env staging
+  httpgo test tests/products.httpgo --env local
+  httpgo test tests/products.httpgo --config projeto/base.yaml --env staging
 --env <nome> (ou --env=nome): seleção única; repetir, mesmo nome, é erro 2.
 Nome não vazio: somente letras ASCII, números, _ e -; sem pontos ou separadores.
 Carrega somente environments/<nome>.yaml, relativo ao diretório da base selecionada,
@@ -1055,7 +1076,7 @@ tipos, timeout, limite de 1 MiB e proteções YAML da base. Vazio/comentários n
 Mapas combinam profundamente por caminho; escalares, listas e null substituem folhas,
 sem concatenar listas ou remover null. Trocar mapa de caminhos por valor ou vice-versa
 é erro, inclusive com mapa vazio. Cada fonte é validada antes de aplicar overrides.
-Contexto, timeout e capturas são novos por execução; payloads seguem relativos ao .hurl.
+Contexto, timeout e capturas são novos por execução; payloads seguem relativos ao cenário.
 Ambiente nomeado NÃO é ambiente do processo. Referências explícitas: US-13 abaixo.
 Sem overrides automáticos HTTPGO_* nem entrada de segredos por stdin.
 
@@ -1064,11 +1085,11 @@ Em environments/local.yaml (ou em variables da base com version: 1):
   variables:
     auth:
       token: ${OWNER_TOKEN}
-Em tests/profile.hurl:
+Em tests/profile.httpgo:
   GET http://localhost:8080/profile
   Authorization: Bearer {{auth.token}}
   HTTP 200
-Com OWNER_TOKEN fornecido externamente: httpgo test tests/profile.hurl --env local
+Com OWNER_TOKEN fornecido externamente: httpgo test tests/profile.httpgo --env local
 ${NOME} ocupa o valor string completo; nome segue [A-Za-z_][A-Za-z0-9_]*.
 Somente folhas de variables: mapas são caminhos; listas/objetos dentro delas
 não aceitam referências. Composição parcial (Bearer ${OWNER_TOKEN}), nomes

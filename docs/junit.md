@@ -50,7 +50,7 @@ YAML e interpolação externa continuam extensões HTTPGo, não sintaxe Hurl.
    validada separadamente, não adicionada a esses totais.
 
 O consumidor apresenta `failure` e `error` como **failed**; a distinção permanece
-no XML. Diagnósticos `.hurl` localizados são texto, sem prometer links de source
+no XML. Diagnósticos de cenários localizados são texto, sem prometer links de source
 Java para arquivos Hurl. Os negativos são deliberados: `fail-on-error: false`
 permite apresentar o relatório de demonstração, mas os testes e as assertions de
 contagem continuam obrigatórios. Isso não desabilita os gates do projeto nem é
@@ -82,11 +82,11 @@ O golden `testdata/report/junit.xml` é gerado por `TestJUnitResults`; para uma
 mudança intencional, `go test ./internal/report -run '^TestJUnitResults$' -update`
 e revisão do diff. Não é uma observação de compatibilidade Hurl.
 
-Exemplo mínimo executável: [scenario_junit.hurl](../testdata/scenarios/scenario_junit.hurl).
+Exemplo mínimo executável: [scenario_junit.httpgo](../testdata/scenarios/scenario_junit.httpgo).
 Com um servidor local retornando 200 em `/health`:
 
 ```bash
-httpgo test testdata/scenarios/scenario_junit.hurl --var base_url=http://localhost:8080 --output junit --output-file target/test-results.xml
+httpgo test testdata/scenarios/scenario_junit.httpgo --var base_url=http://localhost:8080 --output junit --output-file target/test-results.xml
 ```
 
 Não há dashboard próprio, histórico persistente, JSON/JUnit em stdout, formatos

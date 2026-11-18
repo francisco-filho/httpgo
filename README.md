@@ -1,6 +1,6 @@
 # HTTPGo
 
-HTTPGo é uma CLI independente em Go para testar APIs HTTP usando arquivos `.hurl`.
+HTTPGo é uma CLI independente em Go para testar APIs HTTP usando arquivos `.httpgo`.
 É inspirada no [Hurl](https://hurl.dev/), mas implementada sem reutilizar seu
 código-fonte. A compatibilidade é **básica e restrita ao subconjunto documentado**:
 não há promessa de suportar toda a linguagem nem de equivalência entre as CLIs.
@@ -60,7 +60,7 @@ manual, sem persistência, TLS ou autenticação; nunca envie credenciais reais.
 Veja os [endpoints e limites do servidor](docs/dev-server.md).
 
 Em outro terminal, crie uma pasta de trabalho vazia **fora do clone**, entre nela
-e salve o arquivo `exemplo.hurl` com o conteúdo completo:
+e salve o arquivo `exemplo.httpgo` com o conteúdo completo:
 
 ```hurl
 GET {{base_url}}/health
@@ -74,7 +74,7 @@ Os comandos de shell do guia usam sintaxe POSIX (sh/bash); adapte caminhos e a
 leitura do código de saída ao PowerShell (`$LASTEXITCODE`) ou cmd (`%ERRORLEVEL%`).
 
 ```sh
-httpgo test exemplo.hurl --var base_url=http://localhost:8080
+httpgo test exemplo.httpgo --var base_url=http://localhost:8080
 echo $?
 ```
 
@@ -103,7 +103,7 @@ stdout e diagnósticos a stderr. Consulte os [contratos da CLI](docs/subset.md#c
 
 Após o GET inicial, envie dados com POST. O servidor local aceita `POST /products`
 e responde **201** com `{"id":1}`. Headers ficam após a linha da requisição;
-o body JSON vem depois deles. Salve `json.hurl`:
+o body JSON vem depois deles. Salve `json.httpgo`:
 
 ```hurl
 POST http://localhost:8080/products
@@ -114,7 +114,7 @@ HTTP 201
 ```
 
 ```sh
-httpgo test json.hurl
+httpgo test json.httpgo
 ```
 
 Resultado: código **0**, um POST com status 201 validado. Também há PUT, PATCH e
@@ -126,7 +126,7 @@ sequenciais. Declare `Content-Type` explicitamente: HTTPGo não infere
 
 Crie as pastas `tests` e `payloads` na pasta de trabalho. Salve
 `payloads/product.json` com `{"name":"Pizza","price":4500}` e
-`tests/arquivo.hurl` com:
+`tests/arquivo.httpgo` com:
 
 ```hurl
 POST http://localhost:8080/products
@@ -136,11 +136,11 @@ HTTP 201
 ```
 
 ```sh
-httpgo test tests/arquivo.hurl
+httpgo test tests/arquivo.httpgo
 ```
 
 O dummy recebe os bytes do JSON e retorna 201: código **0**. `file,...;` substitui
-o body inteiro. O caminho é literal e relativo ao **arquivo `.hurl`**, não ao
+o body inteiro. O caminho é literal e relativo ao **arquivo de cenário**, não ao
 terminal; não aceita interpolação. Sem `--render-files`, os bytes são preservados,
 inclusive `{{placeholder}}`, arquivos vazios e binários. Para enviar um binário,
 use uma API que o aceite e declare seu Content-Type e status esperado.
@@ -156,7 +156,7 @@ exemplo é necessária **outra API**, em `http://localhost:8081`, com
 Use apenas um servidor de testes que cumpra esse contrato, sem credenciais reais.
 
 Crie a pasta `fixtures`, salve `fixtures/document.txt` com o texto
-`Documento fictício` e salve `tests/upload.hurl`:
+`Documento fictício` e salve `tests/upload.httpgo`:
 
 ```hurl
 POST http://localhost:8081/documents
@@ -168,7 +168,7 @@ HTTP 201
 ```
 
 ```sh
-httpgo test tests/upload.hurl
+httpgo test tests/upload.httpgo
 ```
 
 Com a API indicada, o resultado é **0**, um POST validado; a API recebe os dois
@@ -185,7 +185,7 @@ Use `{{nome}}` em URLs, valores de headers e JSON para reutilizar um cenário.
 não sigilosos. Literal JSON preserva tipo, o restante é texto. Nomes pontuados
 são exatos: `product.name` não é acesso à propriedade de um objeto `product`.
 
-Salve `products.hurl`:
+Salve `products.httpgo`:
 
 ```hurl
 POST {{api.baseUrl}}/products
@@ -195,7 +195,7 @@ HTTP 201
 ```
 
 ```sh
-httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+httpgo test products.httpgo --var api.baseUrl=http://localhost:8080 \
   --var product.name=Pizza --var product.price=4500 \
   --var product.active=true --var 'product.code="001"'
 ```
@@ -226,7 +226,7 @@ necessárias ao comportamento que você quer testar.
 
 O dummy retorna em `GET /products/1` o JSON
 `{"id":1,"name":"Pizza","price":4500}` e Content-Type `application/json`.
-Salve `validacoes.hurl`:
+Salve `validacoes.httpgo`:
 
 ```hurl
 GET {{base_url}}/products/1
@@ -240,7 +240,7 @@ body not contains "passwordHash"
 ```
 
 ```sh
-httpgo test validacoes.hurl --var base_url=http://localhost:8080
+httpgo test validacoes.httpgo --var base_url=http://localhost:8080
 ```
 
 Resultado: **0**, com status e assertions aprovados. `header` consulta o primeiro
@@ -257,7 +257,7 @@ de avaliação **2**, não sucesso por negação.
 
 ### Capturar um ID e encadear requisições
 
-Salve `encadeamento.hurl`. O POST do dummy sempre retorna `{"id":1}` com 201;
+Salve `encadeamento.httpgo`. O POST do dummy sempre retorna `{"id":1}` com 201;
 o GET desse ID retorna o produto acima. São fixtures fixas, não persistência.
 
 ```hurl
@@ -277,7 +277,7 @@ jsonpath "$.name" == "Pizza"
 ```
 
 ```sh
-httpgo test encadeamento.hurl --var base_url=http://localhost:8080
+httpgo test encadeamento.httpgo --var base_url=http://localhost:8080
 ```
 
 Resultado: **0**, dois envios aprovados, sendo o segundo `GET /products/1`.
@@ -286,7 +286,7 @@ pelo GET com a captura, acrescente `jsonpath "$.id" == {{product_id}}` ao segund
 `[Asserts]` e use:
 
 ```sh
-httpgo test encadeamento.hurl --render-asserts --var base_url=http://localhost:8080
+httpgo test encadeamento.httpgo --render-asserts --var base_url=http://localhost:8080
 ```
 
 Com essa alteração, continua **0**. `--render-asserts` é um opt-in HTTPGo:
@@ -350,12 +350,12 @@ variables:
   base_url: http://127.0.0.1:8080
 ```
 
-Reutilize `exemplo.hurl` com `HTTP 200` da primeira execução:
+Reutilize `exemplo.httpgo` com `HTTP 200` da primeira execução:
 
 ```sh
-httpgo test exemplo.hurl --config guia.yaml
-httpgo test exemplo.hurl --config guia.yaml --env local
-httpgo test exemplo.hurl --config guia.yaml --env local --var base_url=http://localhost:8080
+httpgo test exemplo.httpgo --config guia.yaml
+httpgo test exemplo.httpgo --config guia.yaml --env local
+httpgo test exemplo.httpgo --config guia.yaml --env local --var base_url=http://localhost:8080
 ```
 
 Os três comandos validam `/health` e retornam **0**. No segundo, o endereço vem
@@ -388,7 +388,7 @@ variables:
     token: ${OWNER_TOKEN}
 ```
 
-Salve `credenciais.hurl`:
+Salve `credenciais.httpgo`:
 
 ```hurl
 GET {{base_url}}/health
@@ -397,13 +397,13 @@ HTTP 200
 ```
 
 ```sh
-httpgo test credenciais.hurl --config credenciais.yaml
+httpgo test credenciais.httpgo --config credenciais.yaml
 ```
 
 Com `OWNER_TOKEN` presente, o comando retorna **0** e envia o header sem mostrar
 seu valor. O dummy ignora o header: isso exercita a injeção, **não testa uma
 política de autenticação**. Sem a variável, retorna **2 antes de HTTP**.
-`${OWNER_TOKEN}` ocupa o valor YAML completo; `Bearer` fica no `.hurl`.
+`${OWNER_TOKEN}` ocupa o valor YAML completo; `Bearer` fica no cenário.
 O valor recebido é string literal e ganha proteção automática. Resolve apenas
 referências efetivas após overrides, não importa todo o ambiente do sistema.
 
@@ -417,8 +417,8 @@ POSIX. Veja [fontes seguras e limites](docs/subset.md#extensão-httpgo-referênc
 ### Executar uma suíte e gerar relatórios
 
 Crie uma pasta separada `suite` (não use o clone ou a pasta com todos os exercícios).
-Copie `exemplo.hurl`, restaurado com `HTTP 200`, para `suite/01-health.hurl`.
-Salve `suite/02-produto.hurl` com:
+Copie `exemplo.httpgo`, restaurado com `HTTP 200`, para `suite/01-health.httpgo`.
+Salve `suite/02-produto.httpgo` com:
 
 ```hurl
 GET {{base_url}}/products/1
@@ -432,7 +432,7 @@ httpgo test suite/ --var base_url=http://localhost:8080 --fail-fast --output htm
 ```
 
 Os três comandos retornam **0**: dois arquivos, duas requisições aprovadas.
-Diretórios descobrem `.hurl` recursivamente, em ordem lexicográfica; arquivos e
+Diretórios descobrem cenários recursivamente, em ordem lexicográfica; arquivos e
 requisições executam sequencialmente. Capturas não passam de um arquivo para outro.
 Sem `--fail-fast`, a falha de um arquivo não impede os demais; com a flag, os
 restantes ficam **não executados**. Erros de descoberta impedem todo HTTP.
@@ -456,6 +456,37 @@ segredos. Consulte [suítes](docs/subset.md#suítes),
 
 ## Extensões e limites de compatibilidade
 
+### Extensões de arquivo e compatibilidade
+
+`.httpgo` é a extensão padrão recomendada para novos cenários. Arquivos `.hurl`
+continuam aceitos, sem renomeação, conversão de conteúdo ou flag adicional.
+Ambas usam a mesma linguagem e execução: a extensão não seleciona modo de
+compatibilidade nem amplia o subconjunto Hurl suportado. Aceitação da extensão
+não significa compatibilidade integral com Hurl.
+
+Para reproduzir uma suíte mista, com o dummy do guia ativo em 8080, crie uma
+pasta separada `tests` contendo `01-health.httpgo` e `02-health.hurl`, ambos com:
+
+```hurl
+GET http://localhost:8080/health
+HTTP 200
+```
+
+```sh
+httpgo test tests/01-health.httpgo
+httpgo test tests/02-health.hurl
+httpgo test tests/
+```
+
+Cada chamada individual aprova uma requisição e retorna **0**. O diretório
+executa ambos nessa ordem e resume dois arquivos aprovados, também com **0**.
+A descoberta recursiva inclui `.httpgo` e `.hurl` sem preferência por extensão;
+caminhos distintos com conteúdo idêntico continuam cenários distintos. Caminhos
+equivalentes e hard links são deduplicados por identidade do filesystem. Outras
+extensões não entram na descoberta, mas arquivos explícitos, inclusive sem
+extensão, continuam aceitos e validados pelo conteúdo. Não há migração obrigatória.
+Veja o [contrato de compatibilidade das extensões](docs/compatibility.md#extensões-de-arquivo).
+
 ### Recursos próprios do HTTPGo
 
 **Extensão própria não significa recurso ausente no Hurl por princípio.** Hurl
@@ -468,8 +499,8 @@ abaixo, não essas capacidades genéricas:
   Serve para compartilhar destinos, timeouts e nomes de variáveis sem editar
   cenários. Os arquivos `guia.yaml` e `environments/local.yaml` da seção
   [Configuração](#configuração-suítes-e-relatórios) já estão completos; ative com
-  `httpgo test exemplo.hurl --config guia.yaml --env local`: status 200 e código
-  **0**, com o destino do ambiente. Não é sintaxe `.hurl` nem um formato de
+  `httpgo test exemplo.httpgo --config guia.yaml --env local`: status 200 e código
+  **0**, com o destino do ambiente. Não é sintaxe de cenário nem um formato de
   configuração intercambiável com Hurl.
 - **Renderização opt-in de JSON externo**: `--render-files` aplica templates aos
   arquivos usados como body completo, preservando tipos como no JSON inline.
@@ -483,7 +514,7 @@ este **template** (antes da substituição, não é um JSON válido):
 {"name":"{{product.name}}","price":{{product.price}}}
 ```
 
-Salve `tests/renderizado.hurl`:
+Salve `tests/renderizado.httpgo`:
 
 ```hurl
 POST http://localhost:8080/products
@@ -493,7 +524,7 @@ HTTP 201
 ```
 
 ```sh
-httpgo test tests/renderizado.hurl --render-files --var product.name=Pizza --var product.price=4500
+httpgo test tests/renderizado.httpgo --render-files --var product.name=Pizza --var product.price=4500
 ```
 
 O dummy recebe `{"name":"Pizza","price":4500}` e retorna 201; resultado **0**.
@@ -542,7 +573,7 @@ intencionalmente inválidos e não suportados.
 <summary>Cache condicional e formato de cookie</summary>
 
 A API de cache responde a `GET /catalog` com 200 e `ETag: "v1"`; com
-`If-None-Match: "v1"`, retorna 304. Salve como `cache.hurl` ou use a fixture:
+`If-None-Match: "v1"`, retorna 304. Salve como `cache.httpgo` ou use a fixture:
 
 ```hurl
 GET {{base_url}}/catalog
@@ -556,7 +587,7 @@ HTTP 304
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_capture_cache.hurl --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_capture_cache.httpgo --var base_url=http://localhost:8081
 ```
 
 Resultado **0**, dois envios; ausência de ETag é captura **2**, sem segundo envio.
@@ -575,7 +606,7 @@ header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_assert_header_matches.hurl --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_assert_header_matches.httpgo --var base_url=http://localhost:8081
 ```
 
 Resultado **0**; retirar `Secure` falha com **1**. Regex usa sintaxe Go, não
@@ -603,7 +634,7 @@ HTTP 200
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_capture_otp.hurl --var mailbox_url=http://localhost:8081 --var base_url=http://localhost:8081 --secret otp_code
+httpgo test testdata/scenarios/scenario_capture_otp.httpgo --var mailbox_url=http://localhost:8081 --var base_url=http://localhost:8081 --secret otp_code
 ```
 
 Resultado **0**, dois envios sem revelar o código. Sem correspondência, captura
@@ -624,7 +655,7 @@ HTTP 200
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_regex_assertion_signup.hurl --var mailbox_url=http://localhost:8081 --var base_url=http://localhost:8081 --secret signup_code
+httpgo test testdata/scenarios/scenario_regex_assertion_signup.httpgo --var mailbox_url=http://localhost:8081 --var base_url=http://localhost:8081 --secret signup_code
 ```
 
 Resultado **0**; exigir sete dígitos só no esperado retorna **1**, sem POST e sem
@@ -646,7 +677,7 @@ HTTP 200
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_capture_refresh.hurl --var base_url=http://localhost:8081 --secret refresh_token
+httpgo test testdata/scenarios/scenario_capture_refresh.httpgo --var base_url=http://localhost:8081 --secret refresh_token
 ```
 
 Resultado **0**. Envie só o cookie extraído, não os atributos de `Set-Cookie`.
@@ -670,7 +701,7 @@ header "Set-Cookie" not contains "Domain"
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_assert_membership.hurl --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_assert_membership.httpgo --var base_url=http://localhost:8081
 ```
 
 Resultado **0**; acrescentar `OTHER_TENANT` aos códigos falha com **1**.
@@ -690,7 +721,7 @@ jsonpath "$.issues" isEmpty
 ```
 
 ```sh
-httpgo test testdata/scenarios/json_types.hurl --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/json_types.httpgo --var base_url=http://localhost:8081
 ```
 
 Resultado **0**; `attempts: 3.0` falha com **1**: `isInteger` exige notação inteira,
@@ -714,7 +745,7 @@ HTTP 204
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_projection.hurl --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_projection.httpgo --var base_url=http://localhost:8081
 ```
 
 Resultado **0**, dois envios. `[*]` projeta arrays; zero resultados é ausência,
@@ -742,7 +773,7 @@ HTTP 200
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_filter.hurl --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_filter.httpgo --var base_url=http://localhost:8081
 ```
 
 Resultado **0**; sem pizza, captura **2**, sem GET final. O filtro suporta igualdade
@@ -766,7 +797,7 @@ jsonpath "$.name" == "{{order_name}}"
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_render_asserts.hurl --render-asserts --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_render_asserts.httpgo --render-asserts --var base_url=http://localhost:8081
 ```
 
 Resultado **0**, preservando precisão. Mudar o número só no GET falha com **1**.
@@ -793,7 +824,7 @@ HTTP 200
 ```
 
 ```sh
-httpgo test testdata/scenarios/dynamic_filter.hurl --render-asserts --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/dynamic_filter.httpgo --render-asserts --var base_url=http://localhost:8081
 ```
 
 Resultado **0**, três envios. Operandos são dados, não nova gramática; a flag não
@@ -829,7 +860,7 @@ jsonpath "$.items" count == {{orders_before}}
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_count_unchanged.hurl --render-asserts --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_count_unchanged.httpgo --render-asserts --var base_url=http://localhost:8081
 ```
 
 Resultado **0**; quatro itens depois falham com **1**. `count` conta o array final,
@@ -858,7 +889,7 @@ HTTP 200
 ```
 
 ```sh
-httpgo test testdata/scenarios/scenario_json_inequality_rotation.hurl --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8081
+httpgo test testdata/scenarios/scenario_json_inequality_rotation.httpgo --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8081
 ```
 
 Resultado **0**; repetição ou ausência do token novo falha com **1**, sem GET.

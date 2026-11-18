@@ -35,7 +35,7 @@ func readmeBlock(t *testing.T, marker, language string) string {
 
 func TestReadmeExternalRendering(t *testing.T) {
 	template := readmeBlock(t, "salve `payloads/product-template.json`", "text")
-	input := readmeBlock(t, "Salve `tests/renderizado.hurl`:", "hurl")
+	input := readmeBlock(t, "Salve `tests/renderizado.httpgo`:", "hurl")
 	for _, render := range []bool{false, true} {
 		t.Run(map[bool]string{false: "literal bytes", true: "rendered JSON"}[render], func(t *testing.T) {
 			var calls atomic.Int32
@@ -65,7 +65,7 @@ func TestReadmeExternalRendering(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "payloads", "product-template.json"), []byte(template), 0600); err != nil {
 				t.Fatal(err)
 			}
-			file := filepath.Join(dir, "tests", "renderizado.hurl")
+			file := filepath.Join(dir, "tests", "renderizado.httpgo")
 			if err := os.WriteFile(file, []byte(strings.ReplaceAll(input, "http://localhost:8080", server.URL)), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -89,13 +89,13 @@ func TestReadmeAssertionsAndCaptures(t *testing.T) {
 		code, calls                      int
 		dynamic                          bool
 	}{
-		{name: "headers JSON and text", marker: "Salve `validacoes.hurl`:", calls: 1},
-		{name: "JSON divergence", marker: "Salve `validacoes.hurl`:", from: `== "Pizza"`, to: `== "Suco"`, code: 1, calls: 1},
-		{name: "invalid JSON", marker: "Salve `validacoes.hurl`:", response: `not JSON`, code: 2, calls: 1},
-		{name: "capture and reuse", marker: "Salve `encadeamento.hurl`.", calls: 2},
-		{name: "dynamic comparison", marker: "Salve `encadeamento.hurl`.", calls: 2, dynamic: true},
-		{name: "discard on divergence", marker: "Salve `encadeamento.hurl`.", from: `jsonpath "$.id" == 1`, to: `jsonpath "$.id" == 2`, code: 1, calls: 1},
-		{name: "capture absent", marker: "Salve `encadeamento.hurl`.", response: `{}`, code: 2, calls: 1},
+		{name: "headers JSON and text", marker: "Salve `validacoes.httpgo`:", calls: 1},
+		{name: "JSON divergence", marker: "Salve `validacoes.httpgo`:", from: `== "Pizza"`, to: `== "Suco"`, code: 1, calls: 1},
+		{name: "invalid JSON", marker: "Salve `validacoes.httpgo`:", response: `not JSON`, code: 2, calls: 1},
+		{name: "capture and reuse", marker: "Salve `encadeamento.httpgo`.", calls: 2},
+		{name: "dynamic comparison", marker: "Salve `encadeamento.httpgo`.", calls: 2, dynamic: true},
+		{name: "discard on divergence", marker: "Salve `encadeamento.httpgo`.", from: `jsonpath "$.id" == 1`, to: `jsonpath "$.id" == 2`, code: 1, calls: 1},
+		{name: "capture absent", marker: "Salve `encadeamento.httpgo`.", response: `{}`, code: 2, calls: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls atomic.Int32

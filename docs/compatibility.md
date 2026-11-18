@@ -1,4 +1,48 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38
+
+<a id="extensões-de-arquivo"></a>
+
+## Extensões de arquivo — US-38 / issue #79
+
+`.httpgo` é a extensão padrão recomendada para novos cenários. Arquivos `.hurl`
+continuam aceitos sem renomeação, conversão de conteúdo ou flag adicional. Ambas
+usam a mesma linguagem e execução HTTPGo: a extensão não escolhe modo de
+compatibilidade nem amplia o subconjunto Hurl documentado. Aceitar a extensão
+não significa compatibilidade integral com Hurl ou equivalência entre CLIs.
+Não há migração obrigatória nem conversão automática.
+
+Para reproduzir, tenha uma API local em `http://localhost:8080` cujo `GET /health`
+retorne **200** (por exemplo, o [dummy](dev-server.md)). Em uma pasta `tests`
+separada, crie `01-health.httpgo` e `02-health.hurl` com o mesmo conteúdo:
+
+```hurl
+GET http://localhost:8080/health
+HTTP 200
+```
+
+```sh
+httpgo test tests/01-health.httpgo
+httpgo test tests/02-health.hurl
+httpgo test tests/
+```
+
+As chamadas individuais aprovam uma requisição cada e retornam **0**. A chamada
+ao diretório executa ambos nessa ordem, resume dois arquivos aprovados e retorna
+**0**, apesar do conteúdo idêntico. Um diretório somente com `.httpgo` também é
+válido, inclusive com subdiretórios. Não existe preferência por extensão na ordem
+lexicográfica global. Arquivos auxiliares de outras extensões não são descobertos,
+mas cenários explicitamente indicados, com qualquer extensão ou sem ela, continuam
+validados pelo conteúdo. Sobreposições e hard links são deduplicados por identidade
+do filesystem, não por conteúdo ou nome sem extensão; cópias independentes executam
+separadamente. Links e falhas de acesso mantêm as barreiras da suíte.
+
+Conteúdo equivalente mantém requisições, validações e códigos: divergência de
+assertion é **1**; erro estrutural ou recurso não suportado é **2**, sem envios
+daquele arquivo por pré-validação integral. Não há novos recursos na linguagem,
+nem mudança em YAML, payloads relativos, isolamento ou sigilo. O corpus em
+`testdata/compatibility/` permanece inalterado; a aceitação de extensões é contrato
+da CLI HTTPGo, testado separadamente, não razão para regenerar observações Hurl.
+
 
 ## Assertions sobre extração regex — US-36 / issue #74
 
