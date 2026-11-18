@@ -947,6 +947,130 @@ não há inferência automática desse header.
 
 ## Configuração, suítes e relatórios
 
+### Configurar o destino e escolher um ambiente
+
+Para não repetir `--var`, use **configuração YAML, uma extensão HTTPGo**.
+Na pasta de trabalho do guia, salve `guia.yaml`:
+
+```yaml
+version: 1
+defaults:
+  timeout: 2.5
+variables:
+  base_url: http://localhost:8080
+```
+
+Crie `environments/local.yaml`:
+
+```yaml
+variables:
+  base_url: http://127.0.0.1:8080
+```
+
+Reutilize `exemplo.hurl` com `HTTP 200` da primeira execução:
+
+```sh
+httpgo test exemplo.hurl --config guia.yaml
+httpgo test exemplo.hurl --config guia.yaml --env local
+httpgo test exemplo.hurl --config guia.yaml --env local --var base_url=http://localhost:8080
+```
+
+Os três comandos validam `/health` e retornam **0**. No segundo, o endereço vem
+de `environments/local.yaml`; no terceiro, a CLI prevalece. O timeout é **2,5
+segundos por requisição**, incluindo redirects e consumo da resposta (default
+interno: 10 segundos). A precedência disponível é **CLI > ambiente YAML
+selecionado > YAML base > defaults internos**. Mapas combinam por caminho;
+escalares, listas e null substituem folhas. Não há overrides automáticos
+`HTTPGO_*` nesta versão.
+
+Sem `--config`, busca somente `.httpgo.yaml` do diretório corrente, não dos
+ancestrais. `--env local` busca `environments/local.yaml` ao lado da configuração
+base; sem base, no diretório corrente. Ambiente nomeado não é ambiente do processo.
+Arquivo explicitamente solicitado ausente ou configuração inválida retorna **2**,
+antes de HTTP. [Schema e limites do YAML](docs/subset.md#extensão-httpgo-configuração-yaml--us-11-issue-27)
+e [seleção de ambientes](docs/subset.md#extensão-httpgo-ambientes-nomeados--us-12-issue-29).
+
+### Usar credenciais sem colocá-las em argumentos
+
+Para uma API autenticada real, injete a credencial pelo **ambiente do processo**
+(por exemplo, pelo cofre de segredos do CI), nunca por `--var` ou outra flag.
+Para um exercício sem credenciais reais, configure externamente `OWNER_TOKEN`
+com o valor **fictício** `token-de-demonstracao`. Salve `credenciais.yaml`:
+
+```yaml
+version: 1
+variables:
+  base_url: http://localhost:8080
+  auth:
+    token: ${OWNER_TOKEN}
+```
+
+Salve `credenciais.hurl`:
+
+```hurl
+GET {{base_url}}/health
+Authorization: Bearer {{auth.token}}
+HTTP 200
+```
+
+```sh
+httpgo test credenciais.hurl --config credenciais.yaml
+```
+
+Com `OWNER_TOKEN` presente, o comando retorna **0** e envia o header sem mostrar
+seu valor. O dummy ignora o header: isso exercita a injeção, **não testa uma
+política de autenticação**. Sem a variável, retorna **2 antes de HTTP**.
+`${OWNER_TOKEN}` ocupa o valor YAML completo; `Bearer` fica no `.hurl`.
+O valor recebido é string literal e ganha proteção automática. Resolve apenas
+referências efetivas após overrides, não importa todo o ambiente do sistema.
+
+`--secret nome` e `secrets: [nome]` marcam também capturas futuras: **não fornecem
+valor**, nem tornam seguro passar segredos em argumentos. A proteção de saídas
+não cobre histórico do shell, acesso privilegiado ao ambiente, todo segredo
+arbitrário ou codificações desconhecidas. Não há stdin nem dotenv nesta versão.
+Proteja arquivos sensíveis com permissões `0600` e diretórios `0700` em sistemas
+POSIX. Veja [fontes seguras e limites](docs/subset.md#extensão-httpgo-referências-ao-ambiente-do-processo--us-13-issue-32).
+
+### Executar uma suíte e gerar relatórios
+
+Crie uma pasta separada `suite` (não use o clone ou a pasta com todos os exercícios).
+Copie `exemplo.hurl`, restaurado com `HTTP 200`, para `suite/01-health.hurl`.
+Salve `suite/02-produto.hurl` com:
+
+```hurl
+GET {{base_url}}/products/1
+HTTP 200
+```
+
+```sh
+httpgo test suite/ --var base_url=http://localhost:8080
+httpgo test suite/ --var base_url=http://localhost:8080 --output junit --output-file target/test-results.xml
+httpgo test suite/ --var base_url=http://localhost:8080 --fail-fast --output html --output-file target/report.html
+```
+
+Os três comandos retornam **0**: dois arquivos, duas requisições aprovadas.
+Diretórios descobrem `.hurl` recursivamente, em ordem lexicográfica; arquivos e
+requisições executam sequencialmente. Capturas não passam de um arquivo para outro.
+Sem `--fail-fast`, a falha de um arquivo não impede os demais; com a flag, os
+restantes ficam **não executados**. Erros de descoberta impedem todo HTTP.
+
+O primeiro comando mostra resultados e resumo em stdout. Nos outros, stdout fica
+vazio: JUnit grava `target/test-results.xml`, substituindo destino existente;
+HTML gera `target/report-YYYYMMDDTHHMMSSmmmZ.html` em UTC, sem sobrescrever
+anteriores (adiciona sufixo na colisão), e anuncia o caminho final em stderr.
+Ambos criam diretórios pais quando possível, exigem `--output-file` e reaproveitam
+a execução, **sem reenviar requisições para gerar o relatório**.
+
+JUnit tem um testcase por arquivo: divergência vira `failure`, demais erros
+viram `error`, não executados viram `skipped`. O HTML é um arquivo autossuficiente
+para abrir offline, com resumo e detalhes por requisição. Também são gerados com
+falhas ocorridas na execução; erro global anterior à execução não cria relatório.
+Erro de escrita/fechamento retorna **2**, podendo deixar arquivo parcial.
+Não há JSON, HTML/JUnit simultâneos nem publicação externa automática.
+Os relatórios não incluem bodies/headers integrais, mas ainda exigem marcação de
+segredos. Consulte [suítes](docs/subset.md#suítes--us-16-issue-38),
+[JUnit e CI](docs/junit.md) e [HTML e proteção de dados](docs/html.md).
+
 ### Reutilizar configuração do projeto — extensão HTTPGo
 
 No diretório corrente, salve `.httpgo.yaml`:
@@ -1292,42 +1416,93 @@ gramática, filename e restrições; não há promessa de compatibilidade comple
 
 ## Requisições e dados de entrada
 
-### Parametrizar URL e headers
+### Headers e body JSON
 
-Salve o exemplo abaixo como `products.hurl`:
+Após o GET inicial, envie dados com POST. O servidor local aceita `POST /products`
+e responde **201** com `{"id":1}`. Headers ficam após a linha da requisição;
+o body JSON vem depois deles. Salve `json.hurl`:
 
 ```hurl
-GET {{api.baseUrl}}/products
-Authorization: Bearer {{token}}
-
-HTTP 200
+POST http://localhost:8080/products
+Content-Type: application/json
+X-Client: guia-httpgo
+{"name":"Pizza","price":4500}
+HTTP 201
 ```
 
 ```sh
-bin/httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
-  --var token=valor-ficticio --secret token
-# Troque somente api.baseUrl para executar o mesmo arquivo em outro destino.
+httpgo test json.hurl
 ```
 
-O cenário também está em `testdata/scenarios/scenario_products_variables.hurl`;
-requer uma API com `GET /products` retornando 200 (o dummy manual não oferece esse
-GET). Os E2E demonstram dois destinos locais isolados sem editar o cenário.
+Resultado: código **0**, um POST com status 201 validado. `Content-Type` informa o
+tipo enviado; não é inferido para bodies externos. Também há PUT, PATCH e DELETE;
+GET não aceita body. Cada arquivo pode conter várias requisições sequenciais.
+Veja [métodos, headers e JSON inline](docs/subset.md#headers-e-json-inline).
 
-`--var nome=valor` é repetível. **Mudança de contrato na US-04:** um literal JSON
-válido preserva seu tipo; o restante permanece texto, inclusive vazio. Strings JSON
-perdem as aspas delimitadoras e interpretam escapes. O primeiro `=` separa nome/valor;
-os seguintes são preservados. Nomes ASCII pontuados, como `api.baseUrl`, resolvem por
-nome exato. Duplicações e conflitos ancestral/descendente, como `api`/`api.baseUrl`,
-são erros independentemente do tipo. Duplicações são rejeitadas na mesma fonte;
-entre YAML e CLI, somente o mesmo nome admite override explícito. Objetos são opacos:
-`--var 'product={"name":"Pizza"}'` **não** define `product.name`.
-URL e valores de headers aceitam `{{nome}}` e `{{ nome }}`, sem recursão. Nesses
-contextos só são aceitos escalares; arrays/objetos geram erro antes do envio.
-A URL final exige encoding explícito; nomes de headers permanecem estáticos.
+### Enviar um arquivo como body completo
+
+Crie as pastas `tests` e `payloads` na pasta de trabalho. Salve
+`payloads/product.json` com `{"name":"Pizza","price":4500}` e
+`tests/arquivo.hurl` com:
+
+```hurl
+POST http://localhost:8080/products
+Content-Type: application/json
+file,../payloads/product.json;
+HTTP 201
+```
+
+```sh
+httpgo test tests/arquivo.hurl
+```
+
+O dummy recebe os bytes do JSON e retorna 201: código **0**. `file,...;` substitui
+o body inteiro. O caminho é literal e relativo ao **arquivo `.hurl`**, não ao
+terminal; não aceita interpolação. Sem `--render-files`, os bytes são preservados,
+inclusive `{{placeholder}}`, arquivos vazios e binários. Para enviar um binário,
+use uma API que o aceite e declare seu Content-Type e status esperado.
+**Não há sandbox**: caminhos absolutos e `..` podem ler fora do projeto. Execute
+somente cenários confiáveis. Veja [arquivos externos](docs/subset.md#body-de-arquivo-externo--us-09-issue-22).
+
+### Enviar multipart
+
+Multipart envia campos textuais e **um arquivo**, em POST, PUT ou PATCH. Neste
+exemplo é necessária **outra API**, em `http://localhost:8081`, com
+`POST /documents` aceitando os campos `description`, `category` e o arquivo
+`document`, e respondendo **201**. O dummy em 8080 **não aceita multipart**.
+Use apenas um servidor de testes que cumpra esse contrato, sem credenciais reais.
+
+Crie `fixtures/document.txt` com o texto `Documento fictício` e salve
+`tests/upload.hurl`:
+
+```hurl
+POST http://localhost:8081/documents
+[MultipartFormData]
+description: Documento de teste
+category: reports
+document: file,../fixtures/document.txt; text/plain
+HTTP 201
+```
+
+```sh
+httpgo test tests/upload.hurl
+```
+
+Com a API indicada, o resultado é **0**, um POST validado; a API recebe os dois
+textos e o arquivo com filename `document.txt`. Boundary e Content-Type são
+automáticos: não forneça boundary manual. Só campos textuais interpolam; os bytes
+do arquivo nunca são renderizados, mesmo com `--render-files`. Não combine outro
+body na mesma entrada. Múltiplos arquivos e campos repetidos não são suportados.
+Veja [contrato multipart e MIME](docs/subset.md#upload-multipart-básico--us-20-issue-24).
 
 ## Variáveis e encadeamento
 
 ### Parametrizar JSON preservando tipos
+
+Use `{{nome}}` em URLs, valores de headers e JSON para reutilizar um cenário.
+`--var nome=valor` pode ser repetido para nomes diferentes; forneça somente dados
+não sigilosos. Literal JSON preserva tipo, o restante é texto. Nomes pontuados
+são exatos: `product.name` não é acesso à propriedade de um objeto `product`.
 
 Salve como `products.hurl`:
 
@@ -1340,13 +1515,17 @@ HTTP 201
 ```
 
 ```sh
-bin/httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
   --var product.name=Pizza --var product.price=4500 \
   --var product.active=true --var 'product.code="001"'
 ```
 
-A API recebe `name` e `code` como strings, `price` como número e `active` como
-booleano. O cenário versionado é `testdata/scenarios/scenario_products_typed.hurl`;
+O dummy responde 201 e o comando termina com **0**. A API recebe `name` e `code`
+como strings, `price` como número e `active` como booleano. Aspas internas em
+`'product.code="001"'` forçam string, em vez de número. Troque `api.baseUrl` para
+outro destino sem editar o cenário. Duplicar um nome na CLI ou misturar `api` e
+`api.baseUrl` é erro **2**. A URL não recebe percent-encoding automático.
+O cenário versionado é `testdata/scenarios/scenario_products_typed.hurl`;
 os E2E verificam os dados recebidos por HTTP local. O dummy pode ser usado
 manualmente, sem alterar seu código ou depender dele nos testes.
 
