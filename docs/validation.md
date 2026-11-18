@@ -1,4 +1,63 @@
-# Validação — US-01 a US-17, US-20 a US-38
+# Validação — US-01 a US-17, US-20 a US-39
+
+## US-39 — issue #81 / história 0039
+
+Plano da issue #81 executado sem planner, com três tasks backend registradas e
+autoaprovadas na fila `0039`. Task 1: `f36449c` (configuração de ambientes e
+overrides); task 2: `836d53c` (captures); task 3: esta alteração (assertions,
+integração das referências e validação final).
+
+Publicados `configuration.md`, `captures.md` e `assertions.md`, com links e
+introduções breves no README. Exemplos e receitas dos três temas saíram do
+README para os guias; os testes continuam lendo os conteúdos publicados, sem
+substituí-los por cópias independentes. Subset/arquitetura foram alinhados à ordem
+e renovação vigentes da US-34. A ajuda esclarece que ausência na comparação `!=`
+isolada é divergência 1, mas ausência na captura `new_token` do cenário completo
+é erro 2 anterior à assertion. Nenhuma funcionalidade, sintaxe, fonte de
+configuração ou contrato público foi ampliado. Sem frontend/estáticos, alterações
+de dependências, toolchain, CI/lint ou corpus `testdata/compatibility/`.
+
+### Evidência executada em Linux
+
+Go `go1.26.10-X:nodwarf5`, linux/amd64, ferramentas existentes no PATH.
+
+- Em cada task: `make fmt lint test`, `go vet ./...` e `make build` passaram;
+  lint com **0 issues**, testes com **-race -cover**.
+- Task 1: testes específicos `TestConfigurationGuidePrecedence`,
+  `TestGuideLinksAndOptions`, `TestReadme*` e `TestMarkdownAnchors`. Três servidores
+  `httptest` distintos comprovam destinos base/ambiente/CLI a partir dos YAML
+  publicados; conflitos e duplicação CLI retornam 2 sem novos envios.
+  O teste de credenciais lê o YAML/cenário do guia e comprova referência ausente
+  obrigatória antes de HTTP, sem vazar o token fictício.
+- Task 2: `TestCapturesGuideCount` lê o cenário do guia, comprova 0/1/2,
+  preservação da quantidade mesmo mudando conteúdo, array vazio, captura
+  ausente/null/escalar como 2, ausência na assertion como 1 e falta do opt-in
+  como rejeição antes de HTTP. Testes existentes de header, regex, projeção e
+  filtros estáticos/dinâmicos verificam conteúdo literal das fixtures no guia.
+- Task 3: `go test ./internal/cli -count=1` e testes específicos dos guias,
+  README, links, âncoras, exemplos publicados e documentação passaram.
+  `TestAssertionsGuideCatalog` extrai e executa **32 declarações das tabelas**
+  contra HTTP local real: 20 JSONPath, 5 header, 2 body e 5 extração regex.
+  `TestAssertionsGuideFailureDistinctions` cobre tipos, ausência/null, notação
+  inteira, percurso estrito, perfil literal/opt-in, regex e formas não suportadas.
+  `TestAssertionsGuideRotation` lê o cenário publicado e comprova aprovação,
+  repetição como 1 e captura ausente como 2, sem GET posterior nem tokens na saída.
+- Gate integrado: `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build` e `make e2e` passaram. `gofmt -l` nos arquivos Go alterados e
+  `git diff --check` sem problemas. Builds emitiram aviso não fatal de cache de
+  metadados do módulo em filesystem somente leitura; terminaram com sucesso.
+- Fuzzing, 20 segundos e dois workers por alvo, sem falhas:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**23.348** execuções),
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**20.750** execuções) e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**34.034** execuções).
+
+O diferencial Hurl não foi reexecutado nem regenerado nesta história de
+documentação. Não houve análise SonarQube pelo backdev. Evidência de binário real
+com servidores locais e portas dinâmicas em Linux; não de APIs externas nem
+execução nativa macOS/Windows. A validação de portabilidade permanece para release.
 
 ## US-38 — issue #79 / história 0038
 

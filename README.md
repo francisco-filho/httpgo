@@ -222,40 +222,10 @@ para uso posterior. Capturar `id` não prova que o produto tem o nome correto;
 exigir `HTTP 200` não prova que o JSON está correto. Combine as verificações
 necessárias ao comportamento que você quer testar.
 
-### Validar headers, JSON e texto
-
-O dummy retorna em `GET /products/1` o JSON
-`{"id":1,"name":"Pizza","price":4500}` e Content-Type `application/json`.
-Salve `validacoes.httpgo`:
-
-```hurl
-GET {{base_url}}/products/1
-HTTP 200
-[Asserts]
-header "Content-Type" contains "application/json"
-jsonpath "$.name" == "Pizza"
-jsonpath "$.price" >= 1
-body contains "Pizza"
-body not contains "passwordHash"
-```
-
-```sh
-httpgo test validacoes.httpgo --var base_url=http://localhost:8080
-```
-
-Resultado: **0**, com status e assertions aprovados. `header` consulta o primeiro
-valor do header (nome sem distinguir caixa); `jsonpath "$.name"` seleciona um
-campo; `body contains` busca substring no texto final decodificado, sem
-normalizar JSON, espaços ou caixa. A busca literal de `passwordHash` não prova
-a ausência de todas as codificações possíveis de um segredo.
-
-Troque `"Pizza"` por `"Suco"` **só no esperado da assertion JSON**: retorna **1**,
-com diagnóstico da consulta e localização da falha; não é erro de transporte.
-Restaure o esperado antes de seguir. Tipos importam: `4500` difere de `"4500"`.
-Campo ausente não é `null` presente. JSON inválido ou percurso incompatível é erro
-de avaliação **2**, não sucesso por negação.
-
-### Capturar e encadear requisições
+O [guia de assertions](docs/assertions.md) reúne o catálogo completo por status,
+JSONPath, header, body e extração regex, com sintaxe, exemplos e resultados.
+Explica tipos, ausência/vazio/`null`, contagem, perfil literal versus
+`--render-asserts` e a diferença entre divergência (**1**) e avaliação inválida (**2**).
 
 O [guia de captures](docs/captures.md) mostra como extrair valores JSON tipados,
 contagens, headers e grupos regex, e reutilizá-los no mesmo arquivo. Inclui
@@ -420,190 +390,19 @@ Essas páginas podem evoluir; não substituem a referência versionada da matriz
 
 ## Receitas adicionais
 
-Esta parte é opcional: combina conceitos já apresentados, sem listar todos os
-operadores. Os exemplos abaixo têm fixtures versionadas e testes HTTP locais,
-mas **não usam o dummy**: cada receita requer uma API de testes com o contrato
-indicado. Os contratos são independentes, não rotas a acrescentar à sua API de
-produção. Nos comandos, execute na raiz do clone e ajuste `base_url`/`mailbox_url`
-para essa API. Não rode toda `testdata/scenarios` como suíte: ela contém casos
-intencionalmente inválidos e não suportados.
+Os guias reúnem receitas completas, com pré-requisitos de API, entrada/resposta,
+comando e resultado esperado. Algumas requerem outra API de testes, não o dummy:
 
-<details>
-<summary>Cache condicional e formato de cookie</summary>
+- [Cache condicional com ETag](docs/captures.md#header-literal) e
+  [cookie explícito](docs/captures.md#extrair-cookie-explicitamente).
+- [Projeção e filtros JSONPath](docs/captures.md#jsonpath-tipos-e-seleção).
+- [Guardar e comparar uma contagem](docs/captures.md#capturar-contagem-e-reutilizar-em-assertion).
+- [Capturar e validar um código textual](docs/assertions.md#capturar-e-validar-o-código-na-mesma-resposta).
+- [Comparar valores anteriores](docs/assertions.md#comparar-com-valores-anteriores) e
+  [rotação de token](docs/assertions.md#desigualdade-e-rotação-de-token).
 
-Para cache condicional com ETag, veja a [receita de header literal](docs/captures.md#header-literal).
-
-Para outra API, `GET /session` deve responder 200 e
-`Set-Cookie: session=ficticio; Path=/; HttpOnly; Secure; SameSite=Lax`:
-
-```hurl
-GET {{base_url}}/session
-
-HTTP 200
-[Asserts]
-header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_assert_header_matches.httpgo --var base_url=http://localhost:8081
-```
-
-Resultado **0**; retirar `Secure` falha com **1**. Regex usa sintaxe Go, não
-lookaround/backreferences. [Regex de headers](docs/subset.md#regex-de-headers).
-
-</details>
-
-<details>
-<summary>Extrair código de texto e reutilizar cookie explicitamente</summary>
-
-O [guia de captures](docs/captures.md#regex-de-header-e-body) reúne extração de
-código textual e cookie. Para também **validar** o texto extraído, a API deve
-responder `GET /message/123` com 200 e `Seu código de verificação é: 123456`,
-e aceitar `POST /verify` com `{"code":"123456"}` retornando 200:
-
-```hurl
-GET {{mailbox_url}}/message/123
-HTTP 200
-[Captures]
-signup_code: regex "verificação é: ([0-9]{6})"
-[Asserts]
-regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"
-
-POST {{base_url}}/verify
-Content-Type: application/json
-{"code":"{{signup_code}}"}
-HTTP 200
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_regex_assertion_signup.httpgo --var mailbox_url=http://localhost:8081 --var base_url=http://localhost:8081 --secret signup_code
-```
-
-Resultado **0**; exigir sete dígitos só no esperado retorna **1**, sem POST e sem
-confirmar a captura. [Capturas regex](docs/subset.md#extração-regex-de-body-e-header)
-e [assertions regex](docs/subset.md#assertions-sobre-extração-regex).
-
-Para enviar somente o cookie extraído, sem atributos de resposta, veja
-[extração explícita de cookie](docs/captures.md#extrair-cookie-explicitamente).
-
-</details>
-
-<details>
-<summary>Inclusão, ausência, tipos e projeção de arrays</summary>
-
-Para inclusão e ausência, `GET /validation` responde 200 com
-`{"codes":["REQUIRED","INVALID"],"name":"Pizza"}` e cookie sem `Domain`:
-
-```hurl
-GET {{base_url}}/validation
-HTTP 200
-[Asserts]
-jsonpath "$.codes" contains "REQUIRED"
-jsonpath "$.codes" not contains "OTHER_TENANT"
-jsonpath "$.passwordHash" not exists
-header "Set-Cookie" not contains "Domain"
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_assert_membership.httpgo --var base_url=http://localhost:8081
-```
-
-Resultado **0**; acrescentar `OTHER_TENANT` aos códigos falha com **1**.
-[Inclusão e ausência](docs/subset.md#inclusão-e-ausência-jsonheader).
-
-Para tipos, `GET /session-info` responde 200 com
-`{"token":"abc","attempts":3,"active":false,"issues":[]}` (token fictício):
-
-```hurl
-GET {{base_url}}/session-info
-HTTP 200
-[Asserts]
-jsonpath "$.token" isString
-jsonpath "$.attempts" isInteger
-jsonpath "$.active" isBoolean
-jsonpath "$.issues" isEmpty
-```
-
-```sh
-httpgo test testdata/scenarios/json_types.httpgo --var base_url=http://localhost:8081
-```
-
-Resultado **0**; `attempts: 3.0` falha com **1**: `isInteger` exige notação inteira,
-ao contrário da igualdade numérica. [Tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json).
-
-A [receita de projeção](docs/captures.md#cardinalidade-e-percurso-estrito) mostra
-como capturar e validar o valor reduzido de wildcards de arrays.
-
-</details>
-
-<details>
-<summary>Selecionar entidades e comparar com valores anteriores</summary>
-
-Para selecionar uma entidade, veja [filtro estático](docs/captures.md#filtro-estático)
-e [operandos dinâmicos com opt-in](docs/captures.md#operandos-dinâmicos-opt-in).
-
-Para esperados dinâmicos, `POST /orders` e `GET /orders/9007199254740993` respondem
-200 com `{"number":9007199254740993,"name":"Pizza"}`:
-
-```hurl
-POST {{base_url}}/orders
-HTTP 200
-[Captures]
-order_number: jsonpath "$.number"
-order_name: jsonpath "$.name"
-
-GET {{base_url}}/orders/{{order_number}}
-HTTP 200
-[Asserts]
-jsonpath "$.number" == {{order_number}}
-jsonpath "$.name" == "{{order_name}}"
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_render_asserts.httpgo --render-asserts --var base_url=http://localhost:8081
-```
-
-Resultado **0**, preservando precisão. Mudar o número só no GET falha com **1**.
-
-</details>
-
-<details>
-<summary>Comparar quantidade e verificar rotação de token</summary>
-
-Para guardar e comparar a quantidade de itens, veja
-[captura de contagem](docs/captures.md#capturar-contagem-e-reutilizar-em-assertion).
-
-Para rotação, `POST /session/login` responde 200 com
-`{"accessToken":"antigo-ficticio"}`; `POST /session/renew`, 200 com
-`{"accessToken":"novo-ficticio"}`; `GET /next` aceita o novo Bearer e retorna 200:
-
-```hurl
-POST {{base_url}}/session/login
-HTTP 200
-[Captures]
-old_token: jsonpath "$.accessToken"
-
-POST {{base_url}}/session/renew
-HTTP 200
-[Asserts]
-jsonpath "$.accessToken" != "{{old_token}}"
-[Captures]
-new_token: jsonpath "$.accessToken"
-
-GET {{base_url}}/next
-Authorization: Bearer {{new_token}}
-HTTP 200
-```
-
-```sh
-httpgo test testdata/scenarios/scenario_json_inequality_rotation.httpgo --render-asserts --secret old_token --secret new_token --var base_url=http://localhost:8081
-```
-
-Resultado **0**; repetição ou ausência do token novo falha com **1**, sem GET.
-Isso prova diferença, **não** revogação do antigo nem validade do novo para outras
-operações. [Desigualdade JSON](docs/subset.md#desigualdade-json).
-
-</details>
+Não rode toda `testdata/scenarios` como suíte: ela contém casos intencionalmente
+inválidos e não suportados.
 
 ## Documentação e desenvolvimento
 

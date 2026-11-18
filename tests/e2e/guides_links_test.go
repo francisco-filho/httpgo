@@ -17,7 +17,7 @@ func TestGuideLinksAndOptions(t *testing.T) {
 	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
 	blocks := regexp.MustCompile("(?s)```sh\\n(.*?)\\n```")
 	options := regexp.MustCompile(`--[a-z][a-z-]*`)
-	for _, name := range []string{"configuration", "captures"} {
+	for _, name := range []string{"configuration", "captures", "assertions"} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join("../../docs", name+".md")
 			data, err := os.ReadFile(path)

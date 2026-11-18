@@ -88,7 +88,7 @@ func TestReadmeExternalRendering(t *testing.T) {
 	}
 }
 
-func TestReadmeAssertionsAndCaptures(t *testing.T) {
+func TestGuideAssertionsAndCaptures(t *testing.T) {
 	for _, tc := range []struct {
 		name, marker, from, to, response string
 		code, calls                      int
@@ -126,7 +126,7 @@ func TestReadmeAssertionsAndCaptures(t *testing.T) {
 				_, _ = io.WriteString(w, body)
 			}))
 			defer server.Close()
-			source := "README.md"
+			source := "docs/assertions.md"
 			if tc.marker == "Salve `encadeamento.httpgo`." {
 				source = "docs/captures.md"
 			}

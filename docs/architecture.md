@@ -213,10 +213,11 @@ Cardinalidade US-27/28 é preservada: zero ausente, um conserva tipo, vários
 formam array; não há achatamento nem contagem das correspondências intermediárias.
 
 O lote serializa o `json.Number` via `json.Marshal` e reutiliza `ProtectCapture`
-antes de passar à próxima declaração. `Session.Publish` mantém validação/colisão
-exata e hierárquica e publicação atômica; seu contrato não muda. Ordem continua
-status → assertions → capturas → callback → próximo envio. Esperado US-30 usa
-somente iniciais/capturas anteriores e mantém o opt-in `--render-asserts`.
+antes de passar à próxima declaração. A transação vigente (US-34) valida o lote,
+permite renovação exata e rejeita duplicações no lote/conflitos hierárquicos.
+Ordem: status → capturas provisórias → assertions → confirmação → callback →
+próximo envio. Esperado dinâmico usa também capturas provisórias válidas, mantendo
+o opt-in `--render-asserts`.
 
 `CaptureError` acrescenta `Query` e `Count`; `captureFailure` sanitiza consulta
 (com literais de filtro redigidos), detalhe e arquivo antes do resultado. A CLI
@@ -247,8 +248,9 @@ ordem. Ausência/igualdade são divergência 1; decode/percurso são avaliação
 
 `runner.checkAssertions` prepara o esperado alcançado US-30 antes de vincular a
 consulta/decode. A declaração resolvida é cópia local: cenário/planos originais
-não mudam. Status → assertions na ordem escrita → publicação atômica de capturas
-→ callback continua inalterado. Captura própria/futura não é esperado disponível.
+não mudam. Ordem vigente (US-34): status → capturas provisórias → assertions na
+ordem escrita → confirmação atômica → callback. Captura própria válida é esperado
+disponível com opt-in; captura futura/ausente continua indisponível.
 
 Para `!=`, `projectionFailure` também atende caminhos singulares: escalares seguros
 conservam JSON tipado; estruturas são resumo de tipo (array inclui contagem),
@@ -336,8 +338,9 @@ Ampliação concreta, sem nova engine/interface/pacote/dependência:
    e callbacks; indicação de ausência permanece via `Present`. `safeEntry` remove
    planos/operandos/capturas operacionais. Não antecipa capturas nem muda o cenário.
 
-Preservados status → assertions na ordem escrita → capturas atômicas, primeira
-falha e interrupção do arquivo, inclusive sob `HTTP *` (dispensa só status).
+Ordem vigente (US-34): status → capturas provisórias → assertions na ordem
+escrita → confirmação atômica. Primeira falha interrompe o arquivo, inclusive sob
+`HTTP *` (dispensa só status).
 Ausência/tipo/condição falsa é divergência 1; JSON inválido/percurso incompatível
 é avaliação 2. Transporte/sessão/renderização não ganham capacidades: somente
 resposta final consumida/fechada pode aprovar; cancelamento, prazo, leitura/close
@@ -381,8 +384,9 @@ Erros de esperado JSON usam `JSONError`/`JSONFailed`; body usa
 para distinguir avaliação de divergência. São erros controlados de categoria 2,
 sem regex/causa bruta. Suíte preserva categorias no roteamento seguro e CLI
 localiza nome/consulta/operador; não os classifica como renderização pré-envio
-nem falha de comparação. Erro 2 não é elegível para polling. Capturas só publicam
-após todas as assertions e nunca são antecipadas para resolver um esperado.
+nem falha de comparação. Erro 2 não é elegível para polling. Capturas são
+extraídas provisoriamente antes das assertions e podem resolver seus esperados;
+a confirmação só ocorre após aprovação do lote inteiro (US-34).
 
 Proveniência secreta (`IsSecret` nas referências) e headers sensíveis protegem o
 valor resolvido completo com `ProtectValue` antes de compilar/comparar/reportar;
@@ -423,8 +427,9 @@ A comparação normaliza coeficientes e expoentes `big.Int` sem expandir potênc
 Query compara o atributo do filtro, mas a decisão de aprovação do predicado
 continua em assertion, aplicada ao valor reduzido e nunca por correspondência.
 
-Runner/sessão/transporte conservam status → assertions na ordem → capturas
-atômicas, precisão, contexto, retenção e recursos da resposta final. Filtro em
+Runner/sessão/transporte seguem status → capturas provisórias → assertions na
+ordem → confirmação atômica (US-34), com precisão, contexto, retenção e recursos
+da resposta final preservados. Filtro em
 não array ou percurso incompatível no atributo é erro `2` também em captura;
 JSON inválido não vira ausência. Coleções mantêm a restrição de uso em JSON
 completo, sem escolher primeiro ID nem convertê-las em texto. Não há novo I/O,
@@ -458,7 +463,8 @@ Erro estático tardio descarta todo o cenário antes da rede.
 arquivo, acumula proteção com `protectScenario` e chama `pollEntry` por entrada.
 `runAttempt`, em `runner.go`, prepara a requisição completa pelos preparadores
 existentes, chama `HTTPExecutor.Execute`, fecha fontes, protege headers sensíveis,
-compara status, avalia assertions e só então publica capturas atomicamente.
+compara status, prepara todas as capturas provisórias, avalia assertions e só
+então confirma o lote atomicamente (US-34).
 Retorna fatos privados da tentativa, sem callback ou alteração permanente do
 resultado lógico. A divergência transitória não contamina a tentativa seguinte.
 `pollEntry` só repete `Diverged` sem `Err` e com orçamento restante. Falha de
@@ -514,13 +520,13 @@ cmd/httpgo/main.go
       → internal/transport/http.go + multipart.go (via HTTPExecutor)
       → fechamento da fonte multipart antes da avaliação/apresentação
       → internal/assertion/status.go (somente expectativa numérica)
-      → internal/runner/assertions.go (headers/JSON/body na ordem escrita, antes de capturas)
+      → internal/runner/capture.go (selecionar/serializar todo o lote provisório, sem float64)
+        → internal/query (JSONPath, header e regex da resposta final)
+      → internal/runner/assertions.go (headers/JSON/body/regex na ordem escrita, com o lote válido)
         → internal/query/header.go + internal/assertion/header.go
         → internal/query/jsonpath.go + internal/assertion/json.go (sob demanda)
         → internal/query/body.go + internal/assertion/body.go (texto sob demanda)
-      → internal/query/jsonpath.go (selecionar JSON da resposta final)
-      → internal/runner/capture.go (serializar seleção JSON sem float64)
-      → internal/template/session.go (proteger e publicar JSON tipado atomicamente)
+      → internal/template/session.go (confirmar lote tipado atomicamente, com contexto ativo)
       → apresentação segura de cada resultado na CLI (callback síncrono)
     → resumo por arquivo na CLI antes do próximo arquivo
   → resumo agregado da suíte na CLI (texto padrão)
@@ -615,8 +621,9 @@ presença/tipo e comprimento de array, sem coleção nem esperado composto.
 Caminhos simples conservam os diagnósticos anteriores. `safeEntry` remove planos,
 operandos, capturas e documento operacional antes de resultados/callbacks.
 
-Decode sob demanda por resposta, status → assertions na ordem → capturas →
-callback, retenção/fechamento da resposta final, prazos, isolamento e prioridade
+Decode sob demanda por resposta, status → capturas provisórias → assertions na
+ordem → confirmação → callback (US-34), retenção/fechamento da resposta final,
+prazos, isolamento e prioridade
 de falha de escrita não mudam. Não há cache global, goroutine ou pacote novo.
 Somente valores capturados/proteções sobrevivem na sessão, não o documento.
 `.*`, slices, unions, descida recursiva e filtros além da igualdade estática US-28 continuam rejeitados antes da rede.
@@ -649,14 +656,15 @@ e CLI sem formato novo ou reavaliação. `pendingSecret` oculta operandos antes 
 callback/coleção; `safeEntry` remove esperado bruto e plano de consulta sem mutar
 o cenário. Documento/arrays são locais à avaliação, nunca cache entre sessões.
 
-Decode JSON continua uma vez por resposta, sob demanda. Status → assertions
-na ordem escrita → capturas → callback síncrono permanece inalterado. As novas
+Decode JSON é sob demanda por resposta. Ordem vigente (US-34): status →
+capturas provisórias → assertions na ordem escrita → confirmação → callback síncrono. As novas
 assertions JSON já acionam RetainBody; header isolado continua descartando body,
 mas somente após consumo/fechamento completo. Erro de decode/percurso é `2`,
 condição falsa é `1` e erro de apresentação tem prioridade `2`. Transporte,
 contexto/prazo único, redirects finais e ausência de retry não foram alterados.
-Sem cookie jar, `header not exists`, negação de igualdade/matches/count ou filtros.
-A US-27 acrescenta somente wildcard de arrays, descrito acima; não antecipa US-28. Corpus e diferenças observadas estão em
+Sem cookie jar, `header not exists` ou negação genérica de matches/count.
+Desigualdade JSON direta é US-32; wildcard de arrays é US-27 e filtro por igualdade
+é US-28, descritos acima. Corpus e diferenças observadas estão em
 [compatibility.md](compatibility.md#inclusão-e-ausência--us-23--issue-44).
 
 ## Texto do body — US-21
@@ -724,8 +732,9 @@ da base e de todos os substitutos, inclusive em erros anteriores à sessão.
 A CLI conecta essa proteção aos writers **antes** de reportar erros de argumentos,
 contexto, composição ou cenário. `template.Context.NewSession` copia as proteções
 iniciais e conserva o mecanismo dinâmico já existente para capturas/derivados.
-Nada vaza para o comando/executor ou execução seguinte; capturas não sobrescrevem
-valores iniciais. `Scenario.OriginDir` continua sendo o diretório do cenário.
+Nada vaza para o comando/executor ou invocação seguinte. Capturas podem renovar
+nome inicial exato dentro da sessão do arquivo, sem mutar o contexto inicial
+(US-34). `Scenario.OriginDir` continua sendo o diretório do cenário.
 
 `runner.Options.Timeout` é metadado por execução, copiado para `Request.Timeout`
 antes de Execute. Zero preserva o default existente de dez segundos. CLI fornece
@@ -1107,8 +1116,9 @@ Engine e semântica Go da US-15: busca parcial, âncoras/opções/Unicode, sem n
 Ausência sempre falha em matches, mesmo com padrão vazio. Não se serializa header
 ou body para a comparação.
 
-Fluxo inalterado: transporte retorna resposta **final consumida/fechada** → status
-→ assertions na ordem escrita → capturas → resultado/callback → próximo envio.
+Fluxo vigente (US-34): transporte retorna resposta **final consumida/fechada** →
+status → capturas provisórias → assertions na ordem escrita → confirmação →
+resultado/callback → próximo envio.
 `HTTP *` dispensa só comparação numérica. Header isolado não pede `RetainBody` nem
 decode JSON; resposta incompleta, read/close/timeout/cancel não chega à avaliação.
 Sem nova política de rede, prazo de regex, retenção, goroutine ou retry.
@@ -1156,8 +1166,8 @@ extraído passa imediatamente por `ProtectCapture`: proteger somente o header
 inteiro não cobre seus fragmentos. Body usa as marcações explícitas existentes.
 Uma captura posterior inválida ou colisão não desfaz essa proteção. `safeEntry`
 remove capturas por completo, inclusive regex compilada e padrão, sem acumular
-resposta nos resultados. Proteção da invocação continua entre arquivos; resolução
-de capturas e marcas dinâmicas não atravessam sessões. Transporte/interfaces,
+resposta nos resultados. Proteção da invocação, inclusive marcas/valores dinâmicos,
+continua entre arquivos (US-34); resolução de capturas não atravessa sessões. Transporte/interfaces,
 ordem, prazos, redirects, recursos e prioridade de escrita permanecem intactos.
 
 ## Headers e expectativa curinga — US-07
@@ -1177,13 +1187,14 @@ não concatena nem separa vírgulas. `Response.Headers` usa dados Go próprios d
 `query.HeaderValue`, sem expor `net/http.Header`. Assertions de headers isolados
 não ligam `RetainBody`.
 
-O fluxo é resposta completa → status numérico → assertions ordenadas
-(`query.Header`/`assertion.Header` ou JSON) → capturas → callback. `HTTP *` produz `Wildcard`, conta em `WithoutValidation`,
+O fluxo vigente (US-34) é resposta completa → status numérico → capturas
+provisórias → assertions ordenadas (`query.Header`/`assertion.Header` ou JSON) →
+confirmação → callback. `HTTP *` produz `Wildcard`, conta em `WithoutValidation`,
 não em `Validated`; continua distinto de `Unvalidated`. Falha de header produz
 `HeaderMismatch`, `Result.Diverged=true` e `HeaderFailure`, não `Result.Err` de
 transporte/captura. A CLI possui ramo próprio, sem acessar status esperado nulo.
-A comparação numérica aprovada continua contada se um header falhar. Nenhuma
-captura é avaliada/publicada após divergência; falha de escrita prevalece com 2.
+A comparação numérica aprovada continua contada se um header falhar. Divergência
+descarta capturas provisórias sem confirmar; falha de escrita prevalece com 2.
 
 Antes de renderizar a primeira entrada, a sessão registra os esperados sensíveis;
 antes do callback, registra valores sensíveis de headers enviados/recebidos via
@@ -1198,9 +1209,10 @@ CLI também protegem resumos, nomes de arquivo e diagnósticos. Ausência manté
 representação própria, distinta de string vazia; strings usam quoting seguro.
 Não se cria pacote report, interface, dependência ou mecanismo genérico de predicados.
 
-O diferencial Hurl 8.0.0 classifica três divergências deliberadas: primeira
-ocorrência em vez de lista para repetidos, esperado literal em vez de interpolado
-e headers antes de capturas. Veja os pares `headers_*` em `compatibility.md`.
+O diferencial Hurl 8.0.0 classifica primeira ocorrência em vez de lista para
+repetidos e esperado literal sem opt-in em vez de interpolado. Desde a US-34,
+ambos avaliam capturas antes de assertions nesses pares; transação/polling têm
+contratos próprios. Veja os pares `headers_*` em `compatibility.md`.
 
 ## Igualdade JSON e lista ordenada — US-08
 
@@ -1213,9 +1225,9 @@ renderer: `query.Decode` exige exatamente um literal com UseNumber e `query.Pars
 valida consultas integralmente antes de retornar cenário. Não há mecanismo genérico
 de predicados, novo pacote/interface de executor ou dependência.
 
-`runner.checkAssertions` valida headers/JSON na ordem escrita após o status.
-Decodifica a resposta **somente** ao alcançar a primeira assertion JSON, usando
-`query.Decode`, e reutiliza o documento nessa entrada. `Path.SelectValue` separa
+`runner.checkAssertions` valida headers/JSON na ordem escrita após status e
+preparação do lote provisório (US-34). Decodifica JSON sob demanda ao alcançar
+a primeira assertion JSON; capturas JSON podem exigir decode antes disso. `Path.SelectValue` separa
 presença (inclusive null), ausência (propriedade/índice) e percurso incompatível
 (erro seguro). O adapter `Path.Select` mantém o contrato anterior das capturas:
 incompatibilidade conta como ausência para aquela API. Não há leitores no runner,
@@ -1233,12 +1245,13 @@ e `Result.Diverged` (1). JSON inválido/adicional ou percurso incompatível prod
 `JSONFailed` e `*JSONError` controlado (2), com consulta/posição, sem causa bruta.
 A CLI apresenta esses ramos sem reavaliar igualdade nem acessar ExpectedStatus
 nulo em HTTP *. Completed e contagens de status continuam válidas mesmo se JSON
-falhar; falha impede capturas e próximos envios. ReportErr continua prioritário (2).
+falhar; falha impede confirmação e próximos envios. ReportErr continua prioritário (2).
 
 `Session.IsSecret` expõe **somente** a marcação de um nome: `pendingSecret` inspeciona
 as capturas da resposta sem resolver/consultar seus valores. Havendo uma marcada,
-falhas de headers/JSON ocultam integralmente ambos os operandos, sem antecipar
-qualquer erro de captura. `safeEntry` clona variantes, remove literais JSON,
+falhas de headers/JSON ocultam integralmente ambos os operandos, sem a inspeção
+de marcação antecipar seleção. A extração normal do lote precede assertions
+(US-34), inclusive seus erros. `safeEntry` clona variantes, remove literais JSON,
 consultas compiladas, capturas, headers, body e plano do callback/resultado;
 metadados exibíveis, posição, consulta e valores de falha são sanitizados antes
 da coleção. Headers esperados também ficam inteiramente ocultos nesse caso.

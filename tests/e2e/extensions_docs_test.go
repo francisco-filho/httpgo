@@ -36,7 +36,7 @@ func checkExtensionCompatibility(t *testing.T, section string) {
 
 func TestReadmeScenarioExtensionsAndPublishedPaths(t *testing.T) {
 	publishedPath := regexp.MustCompile(`testdata/(?:scenarios|examples)/[\w/-]+\.httpgo`)
-	for _, name := range []string{"README.md", "docs/subset.md", "docs/architecture.md", "docs/dev-server.md", "docs/junit.md", "docs/html.md", "docs/compatibility.md"} {
+	for _, name := range []string{"README.md", "docs/configuration.md", "docs/captures.md", "docs/assertions.md", "docs/subset.md", "docs/architecture.md", "docs/dev-server.md", "docs/junit.md", "docs/html.md", "docs/compatibility.md"} {
 		t.Run(name, func(t *testing.T) {
 			data, err := os.ReadFile(filepath.Join("../..", name))
 			if err != nil {

@@ -49,7 +49,7 @@ func TestRegexAssertionPublishedContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"../../README.md", "../../docs/subset.md"} {
+	for _, path := range []string{"../../docs/assertions.md", "../../docs/subset.md"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

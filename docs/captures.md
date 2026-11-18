@@ -2,7 +2,7 @@
 
 **Capture extrai; assertion valida.** `[Captures]` dá nomes a valores recebidos
 para reutilização; não prova por si só que esses valores atendem ao negócio.
-As assertions da mesma resposta podem usar o lote provisório com
+As [assertions](assertions.md) da mesma resposta podem usar o lote provisório com
 `--render-asserts`. O fluxo e a confirmação estão em [ordem e escopo](#ordem-escopo-e-renovação).
 A referência normativa é o [subconjunto suportado](subset.md#capturas-tipadas).
 
@@ -330,7 +330,7 @@ httpgo test testdata/scenarios/scenario_capture_otp.httpgo --var mailbox_url=htt
 Resultado **0**, dois envios; sem correspondência, **2**, sem POST. O código
 fictício é protegido pela marca explícita, não por detecção automática do body.
 Para validar também o grupo, consulte a query de extração regex no
-[catálogo de assertions](subset.md#assertions-sobre-extração-regex).
+[catálogo de assertions](assertions.md#catálogo-de-extração-regex-do-body).
 
 ### Extrair cookie explicitamente
 

@@ -3,7 +3,7 @@
 A configuração YAML hierárquica é uma **extensão HTTPGo**, não parte do formato
 Hurl. Este guia descreve somente as fontes disponíveis nesta revisão. Para
 extrair dados de respostas, veja o [guia de captures](captures.md);
-para validá-los, veja [assertions](subset.md#igualdade-json).
+para validá-los, veja o [guia de assertions](assertions.md).
 
 ## Exemplo completo: base, ambiente e CLI
 

@@ -3,7 +3,9 @@
 ## Extensão padrão dos cenários — US-38 / issue #79
 
 Use `.httpgo` para novos cenários. A linguagem é a mesma do subconjunto descrito
-neste documento; a extensão não habilita recursos. Para aceitação de cenários
+neste documento; a extensão não habilita recursos. Guias atuais:
+[configuração](configuration.md), [captures](captures.md) e [assertions](assertions.md).
+Para aceitação de cenários
 legados e exemplo de suíte mista, veja
 [compatibilidade das extensões](compatibility.md#extensões-de-arquivo--us-38--issue-79).
 
@@ -356,7 +358,9 @@ jsonpath "$.items[?(@.name=='Order {{suffix}}')].id" exists
 selected_id: jsonpath "$.items[?(@.number=={{order_number}})].id"
 ```
 
-`order_number`/`suffix` precisam ser iniciais ou capturas **anteriores publicadas**.
+Nas consultas de captura, `order_number`/`suffix` precisam ser iniciais ou
+capturas **confirmadas anteriores**. Nas assertions também podem vir do lote
+provisório válido da própria resposta (US-34).
 [Exemplo completo](../testdata/scenarios/dynamic_filter.httpgo), incluindo captura
 anterior e envio dependente, executado pelo E2E com HTTP real.
 
@@ -1350,8 +1354,8 @@ identificar universalmente segredos ainda desconhecidos ou recodificações arbi
 **Ampliação intencional do contrato:** `[Asserts]`, antes rejeitada globalmente,
 passou a aceitar as três formas de header abaixo; exige `HTTP <status>` ou `HTTP *` na mesma
 entrada. A seção não pode ser órfã, vazia ou duplicada. Pode aparecer antes/depois
-de `[Captures]`; a ordem de avaliação é status → assertions (headers/JSON na
-ordem escrita) → capturas.
+de `[Captures]`; a ordem vigente é status → todas as capturas provisórias →
+assertions na ordem escrita → confirmação atômica (US-34).
 
 ```hurl
 GET http://localhost:8080/health
@@ -1385,9 +1389,9 @@ de status; assertions e capturas continuam obrigatórias quando declaradas.
 - Ausência faz `==`, `contains` e `exists` falharem; aprova `not contains`.
   Presente vazio satisfaz `exists` e `== ""`; `contains ""` passa para qualquer
   valor presente, inclusive vazio; `not contains ""` falha.
-- A primeira falha interrompe a sequência com código 1, não avalia nem publica
-  capturas dessa resposta e mantém os resultados anteriores. Um status numérico
-  divergente impede ambas as etapas. Falha de transporte, consumo/fechamento do
+- A primeira assertion divergente interrompe a sequência com código 1, descarta
+  o lote provisório e mantém os resultados anteriores. Captura inválida é erro 2
+  antes de qualquer assertion. Um status numérico divergente impede ambas as etapas. Falha de transporte, consumo/fechamento do
   body ou escrita continua retornando 2, nunca aprovação parcial pelos headers.
 - O diagnóstico localiza a declaração, identifica header/operador e esperado/
   recebido. `ausente` difere de `""`. Strings comuns usam quoting seguro; valores
@@ -1476,7 +1480,8 @@ de engine/gramática. Corpus sintético não é homologação da suíte real.
 `--render-asserts` é um opt-in por invocação e uma evolução explícita do
 contrato HTTPGo. Sem a flag, permanece o perfil **literal** descrito abaixo.
 Com a flag, operandos JSON de igualdade, comparação, contagem e pertencimento
-podem usar variáveis iniciais ou capturas de entradas anteriores:
+podem usar variáveis iniciais, capturas confirmadas de entradas anteriores e
+capturas provisórias válidas da própria resposta (US-34):
 
 ```hurl
 POST {{base_url}}/orders
@@ -1597,9 +1602,9 @@ retorne `{"name":"Pizza","price":4500,"active":true}`. Exemplo versionado:
   são removidos de consulta, posição e operandos antes da coleção/formatação.
   Se houver **captura secreta pendente na mesma resposta**, esperado e real de
   falhas de headers **e** JSON ficam integralmente ocultos, inclusive nos metadados
-  do callback. A marcação é consultada sem avaliar/resolver/publicar a captura;
-  até uma consulta de captura que falharia não altera a primeira falha. A ausência
-  continua identificável junto à ocultação. Essa política não reconhece segredos
+  do callback. A inspeção de marcação não antecipa seleção nem confirmação;
+  a extração normal do lote, porém, precede todas as assertions (US-34).
+  A ausência continua identificável junto à ocultação. Essa política não reconhece segredos
   arbitrários não marcados e não substitui os limites de segurança documentados.
 
 ### Padrões textuais — US-15 / issue #36
@@ -1698,7 +1703,8 @@ de qualquer envio do arquivo, inclusive em declaração tardia.
 
 O predicado recebe uma única vez o valor reduzido da consulta: zero resultados
 é ausência, um preserva seu tipo, vários formam array sem aplicação por item.
-A primeira falha impede capturas e próxima requisição. Diagnósticos informam
+A primeira falha descarta o lote provisório e impede a próxima requisição.
+Diagnósticos informam
 consulta, predicado, presença/tipo e causa sem imprimir valores ou estruturas;
 metadados protegidos e captura secreta pendente seguem a ocultação existente.
 `isString` é um atalho para a verificação de tipo via `matches ""`; vazio de

@@ -15,7 +15,7 @@ func TestJSONInequalityDocumentation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"../../README.md", "../../docs/subset.md"} {
+	for _, path := range []string{"../../docs/assertions.md", "../../docs/subset.md"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -29,7 +29,7 @@ func TestJSONInequalityDocumentation(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{"Desigualdade JSON — US-32", `jsonpath "$.accessToken" != "{{old_token}}"`, "--secret old_token --secret new_token", "repetição ou ausência falha com 1", "count !=, header/body !=", "não garante revogação", "validade do novo", "scenario_json_inequality_rotation.httpgo"} {
+		for _, term := range []string{"Desigualdade JSON — US-32", `jsonpath "$.accessToken" != "{{old_token}}"`, "--secret old_token --secret new_token", "repetição ou ausência falha com 1", "captura new_token falhar com 2", "comparação isolada acima", "count !=, header/body !=", "não garante revogação", "validade do novo", "scenario_json_inequality_rotation.httpgo"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}

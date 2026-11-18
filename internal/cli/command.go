@@ -630,6 +630,8 @@ count !=, header/body != e negação genérica continuam não suportados.
 Diferença não garante revogação do token antigo, validade do novo ou outros efeitos;
 verifique essas propriedades com requisições independentes. Exemplo completo:
 testdata/scenarios/scenario_json_inequality_rotation.httpgo (inclui uso de new_token).
+Nesse arquivo, token ausente na renovação faz a captura new_token falhar com 2
+antes da assertion; a ausência falha com 1 somente na comparação isolada acima.
 
 Renovar capturas — US-34 (mudança explícita de contrato, sem nova flag):
   httpgo test jobs.httpgo --render-asserts --var base_url=http://localhost:8080 --var job_id=inicial
