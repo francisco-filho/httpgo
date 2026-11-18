@@ -211,7 +211,7 @@ func TestSuitePresentationFailureStopsAllFiles(t *testing.T) {
 
 func TestSuiteDiscoveryAndConfiguration(t *testing.T) {
 	dir := t.TempDir()
-	a := suiteFile(t, dir, "01.hurl", "GET {{base}}/a\nHTTP 200")
+	a := suiteFile(t, dir, "01.httpgo", "GET {{base}}/a\nHTTP 200")
 	b := suiteFile(t, dir, "nested/02.hurl", "GET {{base}}/b\nHTTP 200")
 	c := suiteFile(t, dir, "explicit", "GET {{base}}/c\nHTTP 200")
 	suiteFile(t, dir, "payload.txt", "ignored")
@@ -251,6 +251,9 @@ func TestSuiteDiscoveryAndConfiguration(t *testing.T) {
 				args = append(args, "--config", suiteFile(t, t.TempDir(), "base.yaml", "version: 1\nvariables: {known: '${HTTPGO_SUITE_PRESENT}', absent: '${HTTPGO_SUITE_ABSENT}'}"))
 			}
 			code, out, stderr := execute(t, context.Background(), fake, args...)
+			if mode == "empty" && !strings.Contains(stderr, "diretório sem arquivos .httpgo ou .hurl elegíveis") {
+				t.Fatalf("missing extension diagnostic: %q", stderr)
+			}
 			if code != 2 || out != "" || stderr == "" || len(fake.calls) != 0 || strings.Contains(stderr, "fictitious-known-secret") {
 				t.Fatalf("code=%d out=%q err=%q calls=%v", code, out, stderr, fake.calls)
 			}

@@ -135,7 +135,7 @@ func (s *Suite) Discover(ctx context.Context, paths []string) (plan []File, disc
 			return nil, err
 		}
 		if before == len(candidates) {
-			return nil, &Error{File: displayName(cwd, absolute), Detail: "diretório sem arquivos .hurl elegíveis"}
+			return nil, &Error{File: displayName(cwd, absolute), Detail: "diretório sem arquivos .httpgo ou .hurl elegíveis"}
 		}
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Name < candidates[j].Name })
@@ -186,7 +186,7 @@ func (s *Suite) discover(ctx context.Context, cwd, path string, explicit bool, f
 		}
 		return nil
 	}
-	if !explicit && filepath.Ext(path) != ".hurl" {
+	if ext := filepath.Ext(path); !explicit && ext != ".httpgo" && ext != ".hurl" {
 		return nil
 	}
 	if !info.Mode().IsRegular() {

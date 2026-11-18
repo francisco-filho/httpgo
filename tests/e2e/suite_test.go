@@ -124,7 +124,7 @@ func TestSuiteDiscoveryRealHTTP(t *testing.T) {
 	}))
 	defer server.Close()
 	dir := t.TempDir()
-	a := configFile(t, dir, "01.hurl", "GET "+server.URL+"/a\nHTTP 200")
+	a := configFile(t, dir, "01.httpgo", "GET "+server.URL+"/a\nHTTP 200")
 	nested := filepath.Join(dir, "nested")
 	if err := os.Mkdir(nested, 0700); err != nil {
 		t.Fatal(err)
