@@ -70,21 +70,43 @@ func newInstaller(t *testing.T) *installerHarness {
 set -eu
 [[ $1 == -q ]] || exit 90
 shift
-[[ $1 == --fail && $2 == --silent && $3 == --show-error && $4 == --location && $5 == --proto && $6 == '=https' && $7 == --proto-redir && $8 == '=https' ]] || exit 91
-shift 8
-[[ $1 == --output ]] || exit 92
-output=$2
-shift 2
-if [[ ${1:-} == --write-out ]]; then
-    [[ $2 == '%%{url_effective}' ]] || exit 93
+if [[ $1 == -fsSL ]]; then
+    # Published curl commands: preserve the same mandatory HTTPS restrictions.
+    [[ $2 == --proto && $3 == '=https' && $4 == --proto-redir && $5 == '=https' ]] || exit 91
+    shift 5
+    url=$1
+    shift
+    output=/dev/stdout
+    if [[ $# == 2 && $1 == -o ]]; then output=$2; shift 2; fi
+    [[ $# == 0 ]] || exit 92
+else
+    [[ $1 == --fail && $2 == --silent && $3 == --show-error && $4 == --location && $5 == --proto && $6 == '=https' && $7 == --proto-redir && $8 == '=https' ]] || exit 91
+    shift 8
+    [[ $1 == --output ]] || exit 92
+    output=$2
     shift 2
+    if [[ ${1:-} == --write-out ]]; then
+        [[ $2 == '%%{url_effective}' ]] || exit 93
+        shift 2
+    fi
+    [[ $# == 1 ]] || exit 94
+    url=$1
 fi
-[[ $# == 1 && $1 == https://github.com/capimgrosso/httpgo/releases/* ]] || exit 94
-url=$1
+[[ $url == https://github.com/capimgrosso/httpgo/releases/* ]] || exit 94
 printf '%%s\n' "$url" >> "$CURL_LOG"
 [[ -z ${FAIL_DOWNLOAD:-} || $url != *"$FAIL_DOWNLOAD"* ]] || { printf 'partial download' > "$output"; printf 'network/TLS failure\n' >&2; exit 22; }
 if [[ $url == */latest ]]; then
-    printf '%%s' "${LATEST_URL:-https://github.com/capimgrosso/httpgo/releases/tag/v1.2.3}"
+    resolved=${LATEST_URL:-https://github.com/capimgrosso/httpgo/releases/tag/v1.2.3}
+    if [[ -n ${LATEST_NEXT_URL:-} ]]; then
+        count=0
+        while IFS= read -r request; do
+            if [[ $request == "$url" ]]; then count=$((count + 1)); fi
+        done < "$CURL_LOG"
+        if [[ $count -gt 1 ]]; then resolved=$LATEST_NEXT_URL; fi
+    fi
+    printf '%%s' "$resolved"
+elif [[ $url == */latest/download/install.sh ]]; then
+    %q "$ASSETS/install.sh" "$output"
 else
     case $url in
         */download/"${EXPECTED_TAG:-v1.2.3}"/*|*/download/v1.2.4-rc.1/*) ;;
@@ -92,7 +114,7 @@ else
     esac
     %q "$ASSETS/${url##*/}" "$output"
 fi
-`, cp)
+`, cp, cp)
 	put(t, filepath.Join(h.tools, "curl"), []byte(fakeCurl), 0700)
 	h.env = []string{"HOME=" + h.home, "PATH=" + h.tools, "TMPDIR=" + h.tmp, "ASSETS=" + h.assets, "CURL_LOG=" + h.log}
 	h.archive("httpgo", tar.TypeReg, h.payload)

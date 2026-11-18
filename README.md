@@ -18,10 +18,82 @@ não há promessa de suportar toda a linguagem nem de equivalência entre as CLI
 
 ## Instalação
 
-A instalação descrita aqui é **a partir do código-fonte**; não pressupõe release
-publicada, gerenciador de pacotes ou script remoto de instalação. Tenha Git e
-**Go 1.26.10**, conforme [go.mod](go.mod). O executável é independente, sem Go ou
-outro runtime na máquina em que será usado.
+### Baixar e instalar uma release
+
+A distribuição pelo terminal tem como alvos **Linux e macOS (Darwin)**, nas
+arquiteturas **amd64** (`x86_64`) e **arm64** (`aarch64`/`arm64`). O instalador
+seleciona o pacote da máquina; Windows não faz parte desta distribuição.
+Pré-requisitos: **Bash 3.2 ou superior, curl, tar com suporte a gzip e um
+verificador SHA-256 (`sha256sum` ou `shasum`)**, além dos utilitários usuais do
+sistema (`uname`, `mktemp`, `mkdir`, `cp`, `chmod`, `mv` e `rm`). O executável é
+independente: não exige Go, CGO ou outro runtime na máquina de destino.
+
+Os comandos públicos abaixo dependem de uma release com os assets em
+[capimgrosso/httpgo](https://github.com/capimgrosso/httpgo/releases).
+**A publicação pública e a execução nativa nas quatro plataformas ainda não
+foram homologadas nesta revisão**; veja as [evidências e pendências](docs/validation.md).
+Enquanto não houver release disponível, use a compilação por fonte abaixo.
+
+Para baixar e instalar a última release estável, sem rascunhos ou pré-releases:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash
+"$HOME/.local/bin/httpgo" --version
+```
+
+O destino padrão é `~/.local/bin`. O instalador informa versão e caminho; se
+necessário, orienta a adicionar esse diretório ao `PATH`. Ele **não usa sudo nem
+altera configurações do shell**. Você pode usar o caminho completo do executável
+sem modificar o `PATH`.
+
+Para fixar uma versão, substitua `v1.0.0` por uma tag publicada. A seleção é exata,
+sem fallback; uma pré-release como `v1.0.0-rc.1` também pode ser escolhida:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash -s -- --version v1.0.0
+```
+
+Para escolher outro diretório, inclusive um caminho com espaços:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash -s -- --bin-dir "$HOME/meus binarios"
+"$HOME/meus binarios/httpgo" --version
+```
+
+**O comando com pipe executa código remoto na sua máquina.** Se preferir baixar e
+inspecionar o script antes de executá-lo, faça as etapas separadamente:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh -o install.sh
+# Abra install.sh em um editor e revise seu conteúdo antes de continuar.
+bash ./install.sh --version v1.0.0
+```
+
+Para obter também o script de uma tag específica, use
+`https://github.com/capimgrosso/httpgo/releases/download/v1.0.0/install.sh`.
+Os downloads exigem HTTPS com verificação de certificado. Após selecionar a tag,
+o instalador baixa o pacote e `checksums.txt` **da mesma release** e verifica
+SHA-256 antes de gravar o executável. O checksum verifica **integridade**, mas
+**não é uma assinatura de autenticidade**. Cada release reúne `install.sh`,
+`checksums.txt` e os pacotes `httpgo_linux_amd64.tar.gz`,
+`httpgo_linux_arm64.tar.gz`, `httpgo_darwin_amd64.tar.gz` e
+`httpgo_darwin_arm64.tar.gz`, cada um contendo apenas `httpgo`.
+
+Para reinstalar, repita o comando: um `httpgo` existente no destino é substituído
+sem confirmação, somente após download, validação e preparação completos. Falhas
+de rede, integridade, extração ou gravação retornam status diferente de zero sem
+truncar a instalação anterior. Plataforma não suportada, tag inexistente ou pacote
+ausente produzem erro, sem instalar outra versão. O instalador não realiza
+atualização automática, desinstalação nem integração com gerenciadores de pacotes.
+
+### Compilar a partir do código-fonte
+
+Como alternativa independente da publicação, tenha Git e **Go 1.26.10**, conforme
+[go.mod](go.mod):
 
 ```sh
 git clone https://github.com/francisco-filho/httpgo.git
