@@ -1,5 +1,7 @@
 # Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36
 
+<a id="assertions-sobre-extração-regex"></a>
+
 ## Assertions sobre extração regex — US-36 / issue #74
 
 Ampliação explícita: `[Asserts]` aceita a query `regex "padrão"` com `==`,
@@ -72,6 +74,8 @@ assertion, escolha de grupo, correspondência inteira implícita, extração din
 pipelines e novos predicados. YAML hierárquico/interpolação externa são extensões
 HTTPGo. [Diferenças Hurl 8.0.0](compatibility.md#assertions-sobre-extração-regex--us-36--issue-74)
 e [arquitetura](architecture.md#assertions-sobre-extração-regex--us-36--issue-74).
+
+<a id="renovação-transacional-de-capturas"></a>
 
 ## Renovação transacional de capturas — US-34 / issue #70
 
@@ -211,6 +215,8 @@ httpgo test tests/ --output junit --output-file target/test-results.xml
   [consumidor de referência/CI](junit.md). Sem dashboard, histórico persistente,
   formatos simultâneos ou envio para serviços externos.
 
+<a id="captura-de-contagem"></a>
+
 ## Captura de contagem — US-33 / issue #66
 
 Em `[Captures]`, `nome: jsonpath "consulta" count` é a única transformação de
@@ -283,6 +289,8 @@ somente a antiga proibição de `count` em captura JSONPath.
 separa códigos de captura, opt-in, colisões e ordem; não afirma equivalência de
 toda seleção ou de toda a linguagem. [Validação](validation.md#us-33--issue-66--história-0033).
 
+<a id="desigualdade-json"></a>
+
 ## Desigualdade JSON — US-32 / issue #64
 
 `jsonpath "consulta" != <literal JSON>` compara um valor **presente**, usando a
@@ -323,6 +331,8 @@ fornecem credenciais. Diagnósticos ocultam operandos secretos/derivados e captu
 secretas pendentes; coleções são resumos de tipo, não seu conteúdo.
 **Diferença de valor não garante revogação do token antigo, validade do novo nem
 ausência de outros efeitos**: verifique essas propriedades com outras requisições.
+
+<a id="operandos-dinâmicos"></a>
 
 ## Operandos dinâmicos — US-31 / issue #62
 
@@ -376,6 +386,8 @@ Este opt-in é evolução HTTPGo, não uma opção Hurl. Hurl 8.0.0 interpola se
 flag e aceita índice dinâmico; tipos, precisão, escapes e publicação têm
 [diferenças observadas](compatibility.md#operandos-dinâmicos--us-31--issue-62).
 Sem funções/scripts/lógica/novos operadores ou JSONPath completo.
+
+<a id="seleção-estática-por-igualdade"></a>
 
 ## Seleção estática por igualdade — US-28 (issue #56)
 
@@ -467,6 +479,8 @@ Arquivo vazio/com só comentários, URL inválida, status inválido, expectativa
 órfã/duplicada e instrução desconhecida são erros de entrada. Nada do arquivo é
 enviado nesses casos, mesmo quando o erro aparece depois de GETs válidos.
 
+<a id="inclusão-e-ausência-jsonheader"></a>
+
 ### Inclusão e ausência JSON/header — US-23 (issue #44)
 
 ```hurl
@@ -507,6 +521,8 @@ Exemplo versionado: `testdata/scenarios/scenario_assert_membership.hurl`.
 Os 37 pares `membership_*` e diferenças de headers repetidos, literais,
 expoentes e percurso estão em [compatibilidade](compatibility.md#inclusão-e-ausência--us-23--issue-44).
 
+<a id="busca-textual-no-body"></a>
+
 ### Busca textual no body — US-21 (issue #40)
 
 ```hurl
@@ -539,6 +555,8 @@ Os 19 pares `body_*` confrontados com Hurl 8.0.0 são publicados em
 ISO-8859-1 resolve para windows-1252 (incluindo byte 0x80 → €), conforme esse
 corpus. Rótulos não confrontados não têm equivalência geral anunciada.
 Aceitar sintaxe não implica equivalência integral ao Hurl.
+
+<a id="upload-multipart-básico"></a>
 
 ### Upload multipart básico — US-20 (issue #24)
 
@@ -660,6 +678,8 @@ não JSON, versões como `HTTP/1.1` na expectativa ou comentários após instru�
 O texto bruto não é ecoado. O corpus negativo está em
 `testdata/scenarios/unsupported_*.hurl` e `invalid_*.hurl`.
 
+<a id="body-de-arquivo-externo"></a>
+
 ### Body de arquivo externo — US-09 (issue #22)
 
 Alternativamente ao JSON inline, `POST`, `PUT`, `PATCH` e `DELETE` aceitam
@@ -691,6 +711,8 @@ antes/depois da leitura; o timeout do transporte não interrompe um I/O local
 bloqueado no sistema operacional. Multipart usa a variante incremental separada
 descrita acima; não converte o body externo completo em streaming.
 **Mudança de contrato:** a referência externa, antes rejeitada, passa a ser aceita.
+
+<a id="extensão-httpgo-json-externo-com---render-files"></a>
 
 ## Extensão HTTPGo: JSON externo com --render-files — US-10 (issue #25)
 
@@ -741,6 +763,8 @@ Segredos marcados, capturas secretas e derivados/escapes conhecidos permanecem
 protegidos em sucesso/falha, sem descobrir segredos arbitrários do arquivo.
 Permanecem os limites de memória, acesso local sem sandbox, contexto e I/O bloqueado
 já descritos; nenhuma nova goroutine/retry/limite de tamanho é introduzida.
+
+<a id="extensão-httpgo-configuração-yaml"></a>
 
 ## Extensão HTTPGo: configuração YAML — US-11 (issue #27)
 
@@ -839,6 +863,8 @@ cenário. Contexto, marcas e prazo são locais à invocação, sem vazamento na 
 Esta configuração é **extensão HTTPGo**, não parte do formato Hurl. Os testes YAML
 são separados do corpus diferencial Hurl; nenhuma flag própria é passada ao Hurl.
 
+<a id="extensão-httpgo-ambientes-nomeados"></a>
+
 ## Extensão HTTPGo: ambientes nomeados — US-12 (issue #29)
 
 ```sh
@@ -884,6 +910,8 @@ e `testdata/scenarios/scenario_environment_products.hurl`.
 Sem múltiplos ambientes, seleção automática, stdin ou mudanças nos caminhos de
 payloads. Referências de processo: US-13 abaixo. Não é uma capacidade Hurl;
 testes separados do corpus diferencial, sem fornecer `--env` à outra ferramenta.
+
+<a id="extensão-httpgo-referências-ao-ambiente-do-processo"></a>
 
 ## Extensão HTTPGo: referências ao ambiente do processo — US-13 (issue #32)
 
@@ -945,6 +973,8 @@ e antes do envio, sem novo timeout de resolução nem promessa de interromper I/
 local bloqueado. Falha de saída/short write continua prioritária (2), sem retry ou
 próximo envio. Não há stdin, cofres, composição parcial, referências em listas ou
 identificação garantida de segredos desconhecidos/transformações arbitrárias.
+
+<a id="variáveis-tipadas-e-templates"></a>
 
 ## Variáveis tipadas e templates — US-03/US-04
 
@@ -1055,6 +1085,8 @@ httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
 - Sem placeholders, bytes e validação permanecem os da US-02. A expectativa e a
   entrada seguinte começam em nova linha, inclusive depois de placeholder raiz.
 
+<a id="capturas-literais-de-headers"></a>
+
 ## Capturas literais de headers — US-22 (issue #42)
 
 ```hurl
@@ -1094,6 +1126,8 @@ com cache condicional; exemplo versionado em `testdata/scenarios/scenario_captur
 A [matriz diferencial](compatibility.md#capturas-literais-de-headers--us-22--issue-42)
 registra as diferenças observadas de repetição, interpolação JSON, ordem e colisões
 com Hurl 8.0.0; não há promessa de equivalência geral.
+
+<a id="extração-regex-de-body-e-header"></a>
 
 ## Extração regex de body e header — US-25 (issue #48)
 
@@ -1140,6 +1174,8 @@ mesmo se outra captura falhar; dados secretos do body exigem marcação explíci
 Resultados não conservam padrões, expressões compiladas ou texto da resposta.
 Escolha de grupo, substituição, regex dinâmica e pipelines arbitrários continuam
 fora do recorte. Assertions podem usar captura própria válida desde a US-34.
+
+<a id="capturas-tipadas"></a>
 
 ## Capturas tipadas — US-05/US-06
 
@@ -1298,6 +1334,8 @@ Bodies e valores capturados nunca entram no relatório/diagnóstico; valores
 selecionados para assertions podem aparecer somente sanitizados conforme abaixo. Nada permite
 identificar universalmente segredos ainda desconhecidos ou recodificações arbitrárias.
 
+<a id="assertions-de-headers"></a>
+
 ## Assertions de headers — US-07 / issue #18
 
 **Ampliação intencional do contrato:** `[Asserts]`, antes rejeitada globalmente,
@@ -1354,6 +1392,8 @@ Compatibilidade comprovada é limitada aos pares `headers_*` em `compatibility.m
 lista em headers repetidos; esperado literal sem `--render-asserts`. Desde a
 US-34 ambos avaliam capturas antes de assertions nesses pares; transação/polling
 HTTPGo têm diferenças próprias registradas na matriz US-34.
+
+<a id="regex-de-headers"></a>
 
 ## Regex de headers — US-24 / issue #46
 
@@ -1420,6 +1460,8 @@ Primeira ocorrência em vez de lista, esperado estático em vez de interpolado,
 validação antecipada e códigos são contratos próprios, não equivalência geral
 de engine/gramática. Corpus sintético não é homologação da suíte real.
 
+<a id="esperados-dinâmicos"></a>
+
 ## Esperados dinâmicos — US-30 / issue #60
 
 `--render-asserts` é um opt-in por invocação e uma evolução explícita do
@@ -1483,6 +1525,8 @@ Negação não aprova esperado inválido; headers sensíveis ocultam ambos os la
 A flag não habilita `body matches`, operadores novos, consultas inteiras/estrutura
 dinâmica ou interpolação de padrões de extração/captura. A query regex da US-36
 renderiza somente esperados. Operandos de filtros seguem US-31.
+
+<a id="igualdade-json"></a>
 
 ## Igualdade JSON — US-08 / issue #20
 
@@ -1567,6 +1611,8 @@ String divergente, consulta ausente ou valor selecionado não string falha como 
 O diferencial executado com Hurl 8.0.0 comprovou `^Pizza` e `Pizza` sem âncoras com código de sucesso em `matches_prefix` e `matches_substring`; `^Pizza$` não corresponde a `Mini Pizza` em ambos, mas usa códigos distintos (HTTPGo 1, Hurl 4). Esta evidência não implica equivalência geral de gramática, escapes ou diagnósticos. Outros padrões e recursos não testados não são anunciados como equivalentes. A US-24 acrescenta `matches` em headers; `matches` em body/variáveis continua fora; interpolação de esperados exige
 `--render-asserts` (US-30), sem modificar o perfil literal descrito aqui. Extração por regex de body/header tem o recorte separado da US-25.
 
+<a id="presença-quantidade-e-limites"></a>
+
 ### Presença, quantidade e limites — US-14 / issue #34
 
 Exemplo executável: `testdata/scenarios/scenario_assert_structure.hurl`:
@@ -1612,6 +1658,8 @@ na pré-validação aqui, mas chega à assertion no Hurl observado. Quantidade m
 que inteiro de máquina passa no par de ambos; não se deduz precisão numérica geral
 da referência. A semântica aprovada não é alterada para forçar equivalência.
 
+<a id="tipos-e-valores-vazios-json"></a>
+
 ## Tipos e valores vazios JSON — US-29 / issue #58
 
 ```hurl
@@ -1647,6 +1695,8 @@ metadados protegidos e captura secreta pendente seguem a ocultação existente.
 `isString` é um atalho para a verificação de tipo via `matches ""`; vazio de
 string/array também pode ser validado por `== ""`/`count == 0`. Não há schema,
 coerção, outros tipos ou negação genérica.
+
+<a id="polling-local-por-entrada"></a>
 
 ## Polling local por entrada — US-26 / issue #50
 
@@ -1733,6 +1783,8 @@ httpgo --help
 httpgo test --help
 httpgo --version
 ```
+
+<a id="suítes"></a>
 
 ### Suítes — US-16 / issue #38
 

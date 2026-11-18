@@ -11,8 +11,9 @@ import (
 	"unicode"
 )
 
-// GitHub-style heading IDs for the local Markdown reference links in this guide.
+// GitHub-style heading IDs and explicit anchors for local Markdown reference links.
 func markdownAnchors(document string) map[string]bool {
+	explicitAnchor := regexp.MustCompile(`^<a id="([^"]+)"></a>$`)
 	anchors := make(map[string]bool)
 	duplicates := make(map[string]int)
 	fenced := false
@@ -20,7 +21,13 @@ func markdownAnchors(document string) map[string]bool {
 		if strings.HasPrefix(line, "```") {
 			fenced = !fenced
 		}
-		if fenced || !strings.HasPrefix(line, "#") {
+		if fenced {
+			continue
+		}
+		if match := explicitAnchor.FindStringSubmatch(line); match != nil {
+			anchors[match[1]] = true
+		}
+		if !strings.HasPrefix(line, "#") {
 			continue
 		}
 		heading := strings.TrimSpace(strings.TrimLeft(line, "#"))
@@ -44,6 +51,29 @@ func markdownAnchors(document string) map[string]bool {
 	return anchors
 }
 
+func TestMarkdownAnchors(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name     string
+		document string
+		anchor   string
+		want     bool
+	}{
+		{"heading", "## Configuração YAML", "configuração-yaml", true},
+		{"duplicate heading", "## Guia\n## Guia", "guia-1", true},
+		{"explicit anchor", "<a id=\"configuração-yaml\"></a>", "configuração-yaml", true},
+		{"fenced heading", "```md\n## Guia\n```", "guia", false},
+		{"fenced explicit anchor", "```html\n<a id=\"guia\"></a>\n```", "guia", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := markdownAnchors(tt.document)[tt.anchor]; got != tt.want {
+				t.Errorf("markdownAnchors(%q)[%q] = %v, want %v", tt.document, tt.anchor, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReadmeLinksAndProgression(t *testing.T) {
 	root := filepath.Join("..", "..")
 	path := filepath.Join(root, "README.md")
@@ -52,6 +82,10 @@ func TestReadmeLinksAndProgression(t *testing.T) {
 		t.Fatal(err)
 	}
 	readme := string(data)
+	trackingReference := regexp.MustCompile(`(?i)\bus-\d+|\bissue\s*#?\s*\d+|\bhist[oó]rias?\b`)
+	if reference := trackingReference.FindString(readme); reference != "" {
+		t.Errorf("README must document features without story or issue references: %q", reference)
+	}
 	previous := -1
 	for _, heading := range []string{
 		"Instalação", "Primeira execução e resultado", "Requisições e dados de entrada",
@@ -85,7 +119,7 @@ func TestReadmeLinksAndProgression(t *testing.T) {
 			continue
 		}
 		if link.Fragment != "" && !markdownAnchors(string(content))[link.Fragment] {
-			t.Errorf("missing heading anchor %q in %s", link.Fragment, target)
+			t.Errorf("missing anchor %q in %s", link.Fragment, target)
 		}
 	}
 	code, help, stderr := run(t, "test", "--help")

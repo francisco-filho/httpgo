@@ -145,7 +145,7 @@ terminal; não aceita interpolação. Sem `--render-files`, os bytes são preser
 inclusive `{{placeholder}}`, arquivos vazios e binários. Para enviar um binário,
 use uma API que o aceite e declare seu Content-Type e status esperado.
 **Não há sandbox**: caminhos absolutos e `..` podem ler fora do projeto. Execute
-somente cenários confiáveis. Veja [arquivos externos](docs/subset.md#body-de-arquivo-externo--us-09-issue-22).
+somente cenários confiáveis. Veja [arquivos externos](docs/subset.md#body-de-arquivo-externo).
 
 ### Enviar multipart
 
@@ -176,7 +176,7 @@ textos e o arquivo com filename `document.txt`. Boundary e Content-Type são
 automáticos: não forneça boundary manual. Só campos textuais interpolam; os bytes
 do arquivo nunca são renderizados, mesmo com `--render-files`. Não combine outro
 body na mesma entrada. Múltiplos arquivos e campos repetidos não são suportados.
-Veja [contrato multipart e MIME](docs/subset.md#upload-multipart-básico--us-20-issue-24).
+Veja [contrato multipart e MIME](docs/subset.md#upload-multipart-básico).
 
 ## Variáveis e encadeamento
 
@@ -210,7 +210,7 @@ Em um valor JSON completo, placeholders sem aspas preservam tipo e precisão,
 inclusive arrays/objetos; dentro de strings JSON, URLs e headers, só escalares
 são aceitos. Strings JSON são escapadas corretamente. Não há expansão recursiva,
 navegação de propriedades de objetos CLI ou nomes de headers/chaves JSON
-dinâmicos. Consulte [variáveis e templates](docs/subset.md#variáveis-tipadas-e-templates--us-03us-04).
+dinâmicos. Consulte [variáveis e templates](docs/subset.md#variáveis-tipadas-e-templates).
 Para encadear valores **recebidos** da API, em vez de fornecidos inicialmente,
 use captures, explicadas a seguir. Credenciais reais vêm do
 [ambiente do processo](#usar-credenciais-sem-colocá-las-em-argumentos), nunca de flags.
@@ -311,19 +311,19 @@ consulta de captura não pode depender de outra captura do mesmo lote.
 - Captura pode renovar um nome exatamente igual, inclusive inicial, mas nomes
   duplicados no mesmo lote e conflitos como `item`/`item.id` são erro **2**.
 - Sem `[Options]` de retry, não há reenvio automático. O
-  [polling opt-in](docs/subset.md#polling-local-por-entrada--us-26--issue-50)
+  [polling opt-in](docs/subset.md#polling-local-por-entrada)
   repete a requisição completa só após divergência **1**, podendo repetir efeitos;
   somente a tentativa aprovada confirma capturas. Erro **2** não é retentado.
 
 Para aprofundar, consulte a [gramática](docs/subset.md#gramática),
-[assertions de headers](docs/subset.md#assertions-de-headers--us-07--issue-18),
-[igualdade JSON](docs/subset.md#igualdade-json--us-08--issue-20),
-[presença, quantidade e limites](docs/subset.md#presença-quantidade-e-limites--us-14--issue-34),
-[tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json--us-29--issue-58),
-[busca textual](docs/subset.md#busca-textual-no-body--us-21-issue-40),
-[capturas tipadas](docs/subset.md#capturas-tipadas--us-05us-06),
-[esperados dinâmicos](docs/subset.md#esperados-dinâmicos--us-30--issue-60) e
-[publicação transacional](docs/subset.md#renovação-transacional-de-capturas--us-34--issue-70).
+[assertions de headers](docs/subset.md#assertions-de-headers),
+[igualdade JSON](docs/subset.md#igualdade-json),
+[presença, quantidade e limites](docs/subset.md#presença-quantidade-e-limites),
+[tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json),
+[busca textual](docs/subset.md#busca-textual-no-body),
+[capturas tipadas](docs/subset.md#capturas-tipadas),
+[esperados dinâmicos](docs/subset.md#esperados-dinâmicos) e
+[publicação transacional](docs/subset.md#renovação-transacional-de-capturas).
 Essas referências contêm a sintaxe completa, consultas, predicados e restrições;
 as [receitas adicionais](#receitas-adicionais) mostram combinações opcionais,
 sem transformar o guia em catálogo de toda a linguagem.
@@ -370,8 +370,8 @@ Sem `--config`, busca somente `.httpgo.yaml` do diretório corrente, não dos
 ancestrais. `--env local` busca `environments/local.yaml` ao lado da configuração
 base; sem base, no diretório corrente. Ambiente nomeado não é ambiente do processo.
 Arquivo explicitamente solicitado ausente ou configuração inválida retorna **2**,
-antes de HTTP. [Schema e limites do YAML](docs/subset.md#extensão-httpgo-configuração-yaml--us-11-issue-27)
-e [seleção de ambientes](docs/subset.md#extensão-httpgo-ambientes-nomeados--us-12-issue-29).
+antes de HTTP. [Schema e limites do YAML](docs/subset.md#extensão-httpgo-configuração-yaml)
+e [seleção de ambientes](docs/subset.md#extensão-httpgo-ambientes-nomeados).
 
 ### Usar credenciais sem colocá-las em argumentos
 
@@ -412,7 +412,7 @@ valor**, nem tornam seguro passar segredos em argumentos. A proteção de saída
 não cobre histórico do shell, acesso privilegiado ao ambiente, todo segredo
 arbitrário ou codificações desconhecidas. Não há stdin nem dotenv nesta versão.
 Proteja arquivos sensíveis com permissões `0600` e diretórios `0700` em sistemas
-POSIX. Veja [fontes seguras e limites](docs/subset.md#extensão-httpgo-referências-ao-ambiente-do-processo--us-13-issue-32).
+POSIX. Veja [fontes seguras e limites](docs/subset.md#extensão-httpgo-referências-ao-ambiente-do-processo).
 
 ### Executar uma suíte e gerar relatórios
 
@@ -451,7 +451,7 @@ falhas ocorridas na execução; erro global anterior à execução não cria rel
 Erro de escrita/fechamento retorna **2**, podendo deixar arquivo parcial.
 Não há JSON, HTML/JUnit simultâneos nem publicação externa automática.
 Os relatórios não incluem bodies/headers integrais, mas ainda exigem marcação de
-segredos. Consulte [suítes](docs/subset.md#suítes--us-16--issue-38),
+segredos. Consulte [suítes](docs/subset.md#suítes),
 [JUnit e CI](docs/junit.md) e [HTML e proteção de dados](docs/html.md).
 
 ## Extensões e limites de compatibilidade
@@ -503,7 +503,7 @@ Não é a CLI validando JSON externo no modo bytes. Com a flag, variável ausent
 JSON inválido ou tipo incompatível é renderização **2**, antes do envio afetado.
 Anteriores não são desfeitas. A flag vale para todos os bodies externos completos
 da invocação, não depende da extensão do arquivo e **não renderiza multipart**.
-Veja o [contrato de renderização](docs/subset.md#extensão-httpgo-json-externo-com---render-files--us-10-issue-25).
+Veja o [contrato de renderização](docs/subset.md#extensão-httpgo-json-externo-com---render-files).
 
 ### Separar extensões, diferenças e ausência de suporte
 
@@ -561,7 +561,7 @@ httpgo test testdata/scenarios/scenario_capture_cache.hurl --var base_url=http:/
 
 Resultado **0**, dois envios; ausência de ETag é captura **2**, sem segundo envio.
 Capturar header conserva string, aspas e primeira ocorrência. Não cria cookie jar.
-[Referência de captura de header](docs/subset.md#capturas-literais-de-headers--us-22-issue-42).
+[Referência de captura de header](docs/subset.md#capturas-literais-de-headers).
 
 Para outra API, `GET /session` deve responder 200 e
 `Set-Cookie: session=ficticio; Path=/; HttpOnly; Secure; SameSite=Lax`:
@@ -579,7 +579,7 @@ httpgo test testdata/scenarios/scenario_assert_header_matches.hurl --var base_ur
 ```
 
 Resultado **0**; retirar `Secure` falha com **1**. Regex usa sintaxe Go, não
-lookaround/backreferences. [Regex de headers](docs/subset.md#regex-de-headers--us-24--issue-46).
+lookaround/backreferences. [Regex de headers](docs/subset.md#regex-de-headers).
 
 </details>
 
@@ -628,8 +628,8 @@ httpgo test testdata/scenarios/scenario_regex_assertion_signup.hurl --var mailbo
 ```
 
 Resultado **0**; exigir sete dígitos só no esperado retorna **1**, sem POST e sem
-confirmar a captura. [Capturas regex](docs/subset.md#extração-regex-de-body-e-header--us-25-issue-48)
-e [assertions regex](docs/subset.md#assertions-sobre-extração-regex--us-36--issue-74).
+confirmar a captura. [Capturas regex](docs/subset.md#extração-regex-de-body-e-header)
+e [assertions regex](docs/subset.md#assertions-sobre-extração-regex).
 
 Em outra API, `GET /session` responde 200 e `Set-Cookie: refresh=ficticio; Path=/`;
 `GET /next` aceita `Cookie: refresh=ficticio` e responde 200:
@@ -674,7 +674,7 @@ httpgo test testdata/scenarios/scenario_assert_membership.hurl --var base_url=ht
 ```
 
 Resultado **0**; acrescentar `OTHER_TENANT` aos códigos falha com **1**.
-[Inclusão e ausência](docs/subset.md#inclusão-e-ausência-jsonheader--us-23-issue-44).
+[Inclusão e ausência](docs/subset.md#inclusão-e-ausência-jsonheader).
 
 Para tipos, `GET /session-info` responde 200 com
 `{"token":"abc","attempts":3,"active":false,"issues":[]}` (token fictício):
@@ -694,7 +694,7 @@ httpgo test testdata/scenarios/json_types.hurl --var base_url=http://localhost:8
 ```
 
 Resultado **0**; `attempts: 3.0` falha com **1**: `isInteger` exige notação inteira,
-ao contrário da igualdade numérica. [Tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json--us-29--issue-58).
+ao contrário da igualdade numérica. [Tipos e vazios](docs/subset.md#tipos-e-valores-vazios-json).
 
 Para projetar arrays, **outro contrato** de `GET /validation` retorna
 `{"issues":[{"code":"INVALID"},{"code":"REQUIRED"}]}` com 200; `POST /echo` aceita o
@@ -719,7 +719,7 @@ httpgo test testdata/scenarios/scenario_projection.hurl --var base_url=http://lo
 
 Resultado **0**, dois envios. `[*]` projeta arrays; zero resultados é ausência,
 um conserva seu tipo, vários formam array, sem achatamento. Não serve para
-objetos nem implica JSONPath completo. [Seleção e limites](docs/subset.md#igualdade-json--us-08--issue-20).
+objetos nem implica JSONPath completo. [Seleção e limites](docs/subset.md#igualdade-json).
 
 </details>
 
@@ -746,7 +746,7 @@ httpgo test testdata/scenarios/scenario_filter.hurl --var base_url=http://localh
 ```
 
 Resultado **0**; sem pizza, captura **2**, sem GET final. O filtro suporta igualdade
-escalar, não lógica arbitrária. [Filtros estáticos](docs/subset.md#seleção-estática-por-igualdade--us-28-issue-56).
+escalar, não lógica arbitrária. [Filtros estáticos](docs/subset.md#seleção-estática-por-igualdade).
 
 Para esperados dinâmicos, `POST /orders` e `GET /orders/9007199254740993` respondem
 200 com `{"number":9007199254740993,"name":"Pizza"}`:
@@ -798,7 +798,7 @@ httpgo test testdata/scenarios/dynamic_filter.hurl --render-asserts --var base_u
 
 Resultado **0**, três envios. Operandos são dados, não nova gramática; a flag não
 habilita propriedades, operadores ou consultas inteiras dinâmicas.
-[Operandos dinâmicos e limites](docs/subset.md#operandos-dinâmicos--us-31--issue-62).
+[Operandos dinâmicos e limites](docs/subset.md#operandos-dinâmicos).
 
 </details>
 
@@ -833,7 +833,7 @@ httpgo test testdata/scenarios/scenario_count_unchanged.hurl --render-asserts --
 ```
 
 Resultado **0**; quatro itens depois falham com **1**. `count` conta o array final,
-não conteúdo igual nem tamanho de string. [Captura de contagem](docs/subset.md#captura-de-contagem--us-33--issue-66).
+não conteúdo igual nem tamanho de string. [Captura de contagem](docs/subset.md#captura-de-contagem).
 
 Para rotação, `POST /session/login` responde 200 com
 `{"accessToken":"antigo-ficticio"}`; `POST /session/renew`, 200 com
@@ -863,7 +863,7 @@ httpgo test testdata/scenarios/scenario_json_inequality_rotation.hurl --render-a
 
 Resultado **0**; repetição ou ausência do token novo falha com **1**, sem GET.
 Isso prova diferença, **não** revogação do antigo nem validade do novo para outras
-operações. [Desigualdade JSON](docs/subset.md#desigualdade-json--us-32--issue-64).
+operações. [Desigualdade JSON](docs/subset.md#desigualdade-json).
 
 </details>
 
