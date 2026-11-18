@@ -82,12 +82,12 @@ fi
 [[ $# == 1 && $1 == https://github.com/capimgrosso/httpgo/releases/* ]] || exit 94
 url=$1
 printf '%%s\n' "$url" >> "$CURL_LOG"
-[[ -z ${FAIL_DOWNLOAD:-} || $url != *"$FAIL_DOWNLOAD"* ]] || { printf 'network/TLS failure\n' >&2; exit 22; }
+[[ -z ${FAIL_DOWNLOAD:-} || $url != *"$FAIL_DOWNLOAD"* ]] || { printf 'partial download' > "$output"; printf 'network/TLS failure\n' >&2; exit 22; }
 if [[ $url == */latest ]]; then
     printf '%%s' "${LATEST_URL:-https://github.com/capimgrosso/httpgo/releases/tag/v1.2.3}"
 else
     case $url in
-        */download/v1.2.3/*|*/download/v1.2.4-rc.1/*) ;;
+        */download/"${EXPECTED_TAG:-v1.2.3}"/*|*/download/v1.2.4-rc.1/*) ;;
         *) printf 'release not found\n' >&2; exit 22 ;;
     esac
     %q "$ASSETS/${url##*/}" "$output"
@@ -308,6 +308,13 @@ func TestInstallerFailuresPreserveExecutable(t *testing.T) {
 		{"symlink", "regular file", nil, func(h *installerHarness) { h.archive("httpgo", tar.TypeSymlink, nil) }},
 		{"hardlink", "regular file", nil, func(h *installerHarness) { h.archive("httpgo", tar.TypeLink, nil) }},
 		{"empty executable", "empty", nil, func(h *installerHarness) { h.archive("httpgo", tar.TypeReg, nil) }},
+		{"extraction failure", "cannot extract", nil, func(h *installerHarness) {
+			if err := os.Remove(filepath.Join(h.tools, "tar")); err != nil {
+				h.t.Fatal(err)
+			}
+			script := fmt.Sprintf("#!/bin/bash\n[[ $1 != -xOzf ]] || { printf 'extraction failure\\n' >&2; exit 1; }\nexec %q \"$@\"\n", commandPath(h.t, "tar"))
+			put(h.t, filepath.Join(h.tools, "tar"), []byte(script), 0700)
+		}},
 		{"untrusted latest", "official release", nil, func(h *installerHarness) { h.env = append(h.env, "LATEST_URL=https://evil.invalid/tag/v1.2.3") }},
 		{"prerelease latest", "prerelease", nil, func(h *installerHarness) {
 			h.env = append(h.env, "LATEST_URL=https://github.com/capimgrosso/httpgo/releases/tag/v1.2.4-rc.1")
@@ -407,24 +414,42 @@ func TestInstallerPrerequisites(t *testing.T) {
 
 func TestInstallerNativePackage(t *testing.T) {
 	h := newInstaller(t)
-	binary := filepath.Join(t.TempDir(), "httpgo")
-	cmd := process(t, "go", "build", "-trimpath", "-ldflags", "-X main.version=v1.2.3", "-o", binary, "./cmd/httpgo")
-	cmd.Dir = rootDir(t)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build: %v %s", err, out)
+	tag := "v1.2.3"
+	if assets := os.Getenv("HTTPGO_RELEASE_ASSETS"); assets != "" {
+		// CI downloads the exact artifacts approved for publication. Do not
+		// rebuild or recompress them: validate and install those same bytes.
+		tag = os.Getenv("HTTPGO_RELEASE_TAG")
+		if tag == "" {
+			t.Fatal("HTTPGO_RELEASE_TAG is required with release assets")
+		}
+		for _, name := range []string{"checksums.txt", fmt.Sprintf("httpgo_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)} {
+			data, err := os.ReadFile(filepath.Join(assets, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			put(t, filepath.Join(h.assets, name), data, 0600)
+		}
+	} else {
+		binary := filepath.Join(t.TempDir(), "httpgo")
+		cmd := process(t, "go", "build", "-trimpath", "-ldflags", "-X main.version="+tag, "-o", binary, "./cmd/httpgo")
+		cmd.Dir = rootDir(t)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("build: %v %s", err, out)
+		}
+		payload, err := os.ReadFile(binary)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.archive("httpgo", tar.TypeReg, payload)
 	}
-	payload, err := os.ReadFile(binary)
-	if err != nil {
-		t.Fatal(err)
-	}
-	h.archive("httpgo", tar.TypeReg, payload)
-	// The fixture's platform aliases select assets; payload here is truly native.
-	out, stderr, err := h.run(true)
+	systems := map[string]string{"linux": "Linux", "darwin": "Darwin"}
+	h.env = append(h.env, "FAKE_SYSTEM="+systems[runtime.GOOS], "FAKE_MACHINE="+runtime.GOARCH, "EXPECTED_TAG="+tag)
+	out, stderr, err := h.run(true, "--version", tag)
 	if err != nil {
 		t.Fatalf("native install: %v %s %s", err, out, stderr)
 	}
 	version, err := process(t, filepath.Join(h.home, ".local/bin/httpgo"), "--version").CombinedOutput()
-	if err != nil || !strings.Contains(string(version), "v1.2.3") {
+	if err != nil || !strings.HasPrefix(string(version), "httpgo "+tag+" commit=") {
 		t.Fatalf("native version: %v %s", err, version)
 	}
 	h.assertClean()
