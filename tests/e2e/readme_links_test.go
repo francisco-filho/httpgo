@@ -1,0 +1,105 @@
+package e2e
+
+import (
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"testing"
+	"unicode"
+)
+
+// GitHub-style heading IDs for the local Markdown reference links in this guide.
+func markdownAnchors(document string) map[string]bool {
+	anchors := make(map[string]bool)
+	duplicates := make(map[string]int)
+	fenced := false
+	for line := range strings.SplitSeq(document, "\n") {
+		if strings.HasPrefix(line, "```") {
+			fenced = !fenced
+		}
+		if fenced || !strings.HasPrefix(line, "#") {
+			continue
+		}
+		heading := strings.TrimSpace(strings.TrimLeft(line, "#"))
+		var slug strings.Builder
+		for _, r := range strings.ToLower(heading) {
+			switch {
+			case r == ' ':
+				slug.WriteByte('-')
+			case unicode.IsLetter(r), unicode.IsNumber(r), r == '-', r == '_':
+				slug.WriteRune(r)
+			}
+		}
+		id := slug.String()
+		if n := duplicates[id]; n > 0 {
+			anchors[id+"-"+strconv.Itoa(n)] = true
+		} else {
+			anchors[id] = true
+		}
+		duplicates[id]++
+	}
+	return anchors
+}
+
+func TestReadmeLinksAndProgression(t *testing.T) {
+	root := filepath.Join("..", "..")
+	path := filepath.Join(root, "README.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme := string(data)
+	previous := -1
+	for _, heading := range []string{
+		"Instalação", "Primeira execução e resultado", "Requisições e dados de entrada",
+		"Variáveis e encadeamento", "Assertions e captures", "Configuração, suítes e relatórios",
+		"Extensões e limites de compatibilidade", "Receitas adicionais", "Documentação e desenvolvimento",
+	} {
+		marker := "\n## " + heading + "\n"
+		position := strings.Index(readme, marker)
+		if strings.Count(readme, marker) != 1 || position <= previous {
+			t.Errorf("section %q must occur once in progressive order", heading)
+		}
+		previous = position
+	}
+	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
+	for _, match := range links.FindAllStringSubmatch(readme, -1) {
+		link, err := url.Parse(match[1])
+		if err != nil {
+			t.Errorf("invalid README link %q: %v", match[1], err)
+			continue
+		}
+		if link.IsAbs() {
+			continue // Public documentation is checked manually, never by network-dependent tests.
+		}
+		target := path
+		if link.Path != "" {
+			target = filepath.Join(root, filepath.FromSlash(link.Path))
+		}
+		content, err := os.ReadFile(target)
+		if err != nil {
+			t.Errorf("broken README link %q: %v", match[1], err)
+			continue
+		}
+		if link.Fragment != "" && !markdownAnchors(string(content))[link.Fragment] {
+			t.Errorf("missing heading anchor %q in %s", link.Fragment, target)
+		}
+	}
+	code, help, stderr := run(t, "test", "--help")
+	if code != 0 || stderr != "" {
+		t.Fatalf("help code=%d stderr=%q", code, stderr)
+	}
+	// Every long option used in a published shell command must exist in current help.
+	blocks := regexp.MustCompile("(?s)```sh\\n(.*?)\\n```")
+	options := regexp.MustCompile(`--[a-z][a-z-]*`)
+	for _, block := range blocks.FindAllStringSubmatch(readme, -1) {
+		for _, option := range options.FindAllString(block[1], -1) {
+			if !strings.Contains(help, option) {
+				t.Errorf("published option not in help: %s", option)
+			}
+		}
+	}
+}

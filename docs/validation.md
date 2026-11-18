@@ -1,4 +1,81 @@
-# Validação — US-01 a US-17, US-20 a US-36
+# Validação — US-01 a US-17, US-20 a US-37
+
+## US-37 — issue #77 / história 0037b
+
+Plano da issue #77 executado sem planner, com cinco tasks registradas e
+aprovadas na fila `0037b`. Task 1: `c3ba921` (instalação e primeira execução);
+task 2: `3e5fe31` (requisições, dados, configuração, credenciais e relatórios);
+task 3: `cccd7fb` (guia de assertions/captures e testes dos blocos publicados);
+task 4: `a4ff2fb` (extensões e limites frente ao Hurl); task 5: esta alteração
+(consolidação progressiva, links e reprodução dos exemplos).
+
+Escopo somente documentação e testes E2E do backend. Sem alteração de produção,
+contrato da CLI, linguagem, corpus `testdata/compatibility`, frontend/estáticos,
+dependências, toolchain, lint ou CI. O README deixa de ser um histórico por
+história; as receitas avançadas preservadas ficam opcionais e recolhíveis.
+
+### Evidência executada em Linux
+
+Go `go1.26.10-X:nodwarf5`, `goimports` e golangci-lint `2.15.0` já disponíveis
+em `/home/ff/go/bin` (adicionado ao PATH, sem instalar ferramentas).
+
+- Em cada task: `make fmt lint test` e `go vet ./...` passaram. Lint com
+  **0 issues**, testes com **-race -cover**, sem relaxar verificações.
+- Gate final: `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build` e `make e2e` passaram. `gofmt -l` nos três arquivos Go novos e
+  `git diff --check` sem diferenças de formatação/whitespace.
+- `go test ./tests/e2e -run '^TestReadme' -count=1`: extrai os blocos do README,
+  executa o binário real e usa servidores `httptest` com portas dinâmicas.
+  Confere requests, dados tipados, headers, arquivos relativos, partes MIME,
+  continuidade, capturas, códigos de saída, stdout/stderr e artefatos.
+- Reprodução manual separada na porta 8080 com
+  `go run ./tools/dummy/main.go`: conteúdo copiado dos blocos do README para uma
+  pasta temporária fora do clone. Primeiro cenário e alteração do esperado
+  retornaram **0/1**; JSON/header, body externo, variáveis tipadas, assertions de
+  header/JSON/texto e encadeamento simples/dinâmico retornaram **0**. Divergência
+  JSON e reprovação antes de publicar captura retornaram **1**. Configuração,
+  ambiente e override retornaram **0**. Credencial fictícia injetada no ambiente
+  retornou **0** sem revelar valor; referência ausente retornou **2**. Nenhum
+  segredo real foi usado e o processo dummy foi encerrado após a verificação.
+- Na mesma reprodução, suíte com dois arquivos retornou **0** em texto/JUnit/HTML;
+  XML com dois testcases aprovados e HTML timestampado encontrados em `target`,
+  com stdout vazio nos formatos de arquivo. Renderização externa opt-in
+  retornou **0**. O modo literal sem flag é coberto por
+  `TestReadmeExternalRendering`, que confere bytes enviados e divergência **1**
+  contra a fixture que rejeita o template não resolvido com 400.
+- Upload multipart do guia não usa o dummy: `TestReadmeExternalBodyAndMultipart`
+  fornece a API com o contrato explicitado e confere nomes, textos, bytes,
+  filename, MIME e status 201. Receitas opcionais usam as fixtures e testes
+  existentes de cache, regex/cookies, inclusão/ausência, tipos, projeção,
+  filtros, esperados dinâmicos, contagem e desigualdade. Os testes que exigem
+  correspondência exata entre essas fontes e README continuam passando,
+  sem alterar nem remover verificações anteriores.
+- `TestReadmeLinksAndProgression` confere ordem das seções, caminhos/âncoras locais
+  e opções dos comandos contra a ajuda atual. Links públicos Hurl
+  (`/`, `docs/templates.html`, `docs/manual.html` e sua seção `configuration`)
+  acessados via HTTPS com sucesso. A documentação pública foi consultada para
+  distinguir contratos próprios de capacidades também existentes no Hurl;
+  nenhum código-fonte Hurl foi consultado/copiado/adaptado.
+- Fuzzing, 20s e dois workers por alvo, sem falha:
+  `FuzzParse` (**104.082** execuções), `FuzzRender` (**17.534**) e
+  `FuzzRenderJSON` (**39.277**), em `internal/parser` e `internal/template`.
+- Compilação Windows amd64 com `CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build`
+  para destino temporário passou; **não** é evidência de execução nativa.
+
+### Critérios de aceite e limites
+
+CA-01: `TestReadmeFirstRunAndRequestData` e reprodução manual de sucesso/falha.
+CA-02: testes de dados, multipart, configuração, credenciais, suíte e relatórios.
+CA-03: `TestReadmeAssertionsAndCaptures` cobre 0/1/2, esperado dinâmico, captura
+inválida e descarte sem GET seguinte. CA-04: seção separa extensão, diferença e
+não suportado, com exemplo `--render-files` executado. CA-05: teste de links,
+ajuda, códigos, credenciais fictícias protegidas e referências vigentes.
+
+O gate diferencial Hurl não foi reexecutado nesta história de documentação;
+a matriz existente continua sendo a evidência versionada de compatibilidade,
+sem ampliar anúncios ou alterar goldens. Não houve homologação de APIs reais,
+CI remoto, navegador, execução nativa macOS/Windows ou análise SonarQube.
+Esta última continua exclusiva do agente QA.
 
 ## US-36 — issue #74 / história 0036
 
