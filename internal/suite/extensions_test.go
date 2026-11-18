@@ -8,7 +8,7 @@ import (
 )
 
 func TestDiscoverScenarioExtensions(t *testing.T) {
-	for _, names := range [][]string{{"01.httpgo", "nested/02.httpgo"}, {"same.httpgo", "same.hurl"}} {
+	for _, names := range [][]string{{"01.httpgo", "nested/02.httpgo"}, {"01.hurl", "nested/02.httpgo"}, {"same.httpgo", "same.hurl"}} {
 		t.Run(names[0], func(t *testing.T) {
 			dir := t.TempDir()
 			var want []string

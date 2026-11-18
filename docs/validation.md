@@ -1,4 +1,86 @@
-# Validação — US-01 a US-17, US-20 a US-37
+# Validação — US-01 a US-17, US-20 a US-38
+
+## US-38 — issue #79 / história 0038
+
+Plano backend da issue #79 executado sem planner, com três tasks registradas e
+autoaprovadas na fila `0038`. Task 1: `97c695a` (descoberta e execução das duas
+extensões); task 2: `89fb3de` (ajuda, documentação e exemplos publicados);
+task 3: esta alteração (revisão da integração e evidência dos gates).
+
+A alteração de produção está restrita à seleção e ao diagnóstico de elegibilidade
+em `internal/suite/discovery.go`, além da ajuda da CLI. Parser, runner, transporte
+e relatórios usam o mesmo fluxo, sem modo por extensão. Corpus diferencial,
+budgets, Go, dependências, CI e lint permanecem inalterados. Não houve trabalho
+em frontend/estáticos nem análise SonarQube pelo backdev.
+
+### Evidência executada em Linux
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`. `goimports` e `golangci-lint` existentes
+em `/home/ff/go/bin`, acrescentado ao PATH, sem instalação dessas ferramentas.
+O Hurl padrão era **8.0.1**, incompatível com o gate fixado. Após autorização
+explícita, foi baixado o binário oficial **8.0.0**, sem consultar código-fonte:
+[arquivo da release](https://github.com/Orange-OpenSource/hurl/releases/download/8.0.0/hurl-8.0.0-x86_64-unknown-linux-gnu.tar.gz).
+SHA-256 conferido contra o digest publicado na API da release:
+`6ab1d6703b94086ece6d2f994d73f8d215926997b292ba29b894799425afbf67`.
+Extração temporária em `/tmp/httpgo-0038-hurl`, usada somente via PATH; nenhuma
+substituição da instalação do usuário. `hurl --version` confirmou **8.0.0** com
+libcurl **8.18.0**. O aviso de metadados libcurl não impediu a execução.
+
+Passaram efetivamente:
+
+- Task 1: `go test ./internal/suite ./internal/cli -count=1` e
+  `go test ./tests/e2e -count=1`.
+- Task 2: `go test ./internal/cli -count=1`,
+  `go test ./tests/e2e -run '^(TestReadme|TestMarkdownAnchors)' -count=1` e
+  `go test ./tests/e2e -count=1`. Expectativas antigas da ajuda e marcadores dos
+  exemplos foram ajustados sem remover verificações de conteúdo/execução.
+- Em cada task de implementação: `make fmt lint test`, `go vet ./...` e
+  `go build ./...`, com lint **0 issues** e testes **-race -cover**.
+- Gate integrado: `make fmt lint test`, `go vet ./...`, `go build ./...`,
+  `make build`, `make e2e` e `make compatibility`. `gofmt -l` em todos os
+  arquivos Go alterados e `git diff --check` não apontaram problemas. O
+  diferencial executou os **476 pares**
+  existentes com Hurl **8.0.0**, sem skip, atualização ou regeneração de goldens.
+- Fuzzing separado, 20 segundos e dois workers por alvo, sem falhas:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**131.057** execuções);
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s -parallel=2`
+  (**24.459** execuções);
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRenderJSON$' -fuzztime=20s -parallel=2`
+  (**7.845** execuções).
+
+Cobertura observada no gate: `suite` **95,1%**, `cli` **98,4%**, `parser`
+**97,1%**, `runner` **95,3%**. Cobertura não foi usada para reduzir verificações.
+
+### Rastreabilidade dos cenários
+
+| Cenário | Evidência automatizada executada |
+|---|---|
+| GO-501 | `TestScenarioExtensionsDemo`: binário real e `httptest.Server`, conteúdo extraído da seção de compatibilidade do README, arquivos individuais e diretório misto, ordem, resumos, stdout/stderr e código 0; conteúdo idêntico não elimina caminhos distintos |
+| GO-502 | `TestDiscoverScenarioExtensions` e `TestScenarioOnlyHTTPGoRecursiveAndExplicitExtensions`: diretório somente com extensão recomendada, inclusive subdiretório |
+| GO-503 | `TestDiscoverNormalizedUniqueOrder`, `TestDiscoverEquivalenceUsesFilesystem`, `TestDiscoverScenarioExtensions` e `TestSuiteDiscoveryRealHTTP`: sobreposições/argumentos invertidos, hard links entre extensões, mesmo nome-base em cópias independentes e ordem global; caso com legado antes da extensão recomendada impede preferência por extensão |
+| GO-504 | `TestScenarioExtensionEquivalentValidation`: mesmos conteúdos sob ambas as extensões; sucesso 0, header divergente 1, erro estrutural tardio e HEAD não suportado 2, nenhum envio do arquivo rejeitado e resumo de pré-validação |
+| GO-505 | `TestSuiteDiscoveryAndConfiguration`, `TestSuiteDiscoveryRealHTTP` e `TestScenarioOnlyHTTPGoRecursiveAndExplicitExtensions`: auxiliares ignorados e cenários explícitos com outra extensão ou sem extensão executados |
+| GO-506 | `TestReadmeScenarioExtensionsAndPublishedPaths`, `TestReadmePublishedScenarioCopies`, `TestReadmeLinksAndProgression`, `TestMarkdownAnchors`, testes existentes de exemplos e ajuda: exemplos padrão, restrição dos legados à compatibilidade, limites explícitos, caminhos reais e preservação dos conteúdos exercitados |
+| GO-507 | `TestDiscoverErrorsDiscardWholePlan` e `TestSuiteDiscoveryAndConfiguration`: diretórios sem elegíveis, inclusive só auxiliares, rejeitam todo o plano; diagnóstico cita ambas as extensões e executor não é chamado |
+| GO-508 | `TestDiscoverLinks`, `TestDiscoverErrorsDiscardWholePlan`, `TestSuiteDiscoveryAndConfiguration` e `TestSuiteDeniedAccessUnprivilegedProcess`: links com extensão nova ignorados/rejeitados conforme origem; falhas injetadas e acesso real negado por processo não privilegiado, sem HTTP |
+| GO-509 | `TestSuiteRealIsolationProtectionAndPayloadOrigins`: suíte mista com cenário da extensão nova, cwd independente e configuração externa; servidor confere bytes JSON e multipart relativos ao cenário, valores iniciais, ausência de cookie implícito e captura não resolvível no arquivo seguinte |
+
+Regressões GO-217/GO-219 da US-16 foram reutilizadas na suíte mista, não
+substituídas por um catálogo paralelo. O teste E2E de isolamento confere também
+proteção de captura secreta, cookie, derivados, nomes de arquivo, assertion e
+erro estrutural posteriores, sem alterar dados operacionais enviados. As demais
+regressões de continuação, cancelamento e falhas de escrita permanecem no gate.
+
+Os exemplos recomendados foram acrescentados sem renomear cenários antigos;
+`TestReadmePublishedScenarioCopies` verifica que seus bytes permanecem iguais
+às fixtures legadas exercitadas. Os exemplos de suíte em `testdata/examples/`
+evitaram duplicar cenários nos diretórios legados já usados pelos testes.
+
+Esta evidência é de testes HTTP locais e binário real em Linux, não homologação
+de APIs externas ou execução nativa macOS/Windows. A demonstração usa porta
+dinâmica em `httptest`, não depende de serviço externo ou porta 8080 livre.
+Validação nativa de portabilidade permanece para release conforme o plano v4.
 
 ## US-37 — issue #77 / história 0037b
 
