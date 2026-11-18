@@ -42,7 +42,7 @@ func TestHTMLDocumentedSuiteAndHelp(t *testing.T) {
 			}))
 			defer server.Close()
 			base := filepath.Join(t.TempDir(), "report.html")
-			args := []string{"test", "../../testdata/scenarios/html_suite/", "--var", "base_url=" + server.URL, "--output=html", "--output-file", base}
+			args := []string{"test", "../../testdata/examples/html_suite/", "--var", "base_url=" + server.URL, "--output=html", "--output-file", base}
 			if fast {
 				args = append(args, "--fail-fast")
 			}

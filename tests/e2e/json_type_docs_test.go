@@ -17,13 +17,13 @@ func TestJSONTypeHelpAndPublishedExample(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{`jsonpath "$.token" isString`, `jsonpath "$.attempts" isInteger`, `jsonpath "$.active" isBoolean`, `jsonpath "$.issues" isEmpty`, "notação inteira JSON", "sem limite de máquina", "sem valores ou estruturas", "json_types.hurl", "sem esperado", "Sem schema, outros tipos ou negação genérica"} {
+		for _, term := range []string{`jsonpath "$.token" isString`, `jsonpath "$.attempts" isInteger`, `jsonpath "$.active" isBoolean`, `jsonpath "$.issues" isEmpty`, "notação inteira JSON", "sem limite de máquina", "sem valores ou estruturas", "json_types.httpgo", "sem esperado", "Sem schema, outros tipos ou negação genérica"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("missing help term %q", term)
 			}
 		}
 	}
-	input, err := os.ReadFile("../../testdata/scenarios/json_types.hurl")
+	input, err := os.ReadFile("../../testdata/scenarios/json_types.httpgo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestJSONTypeHelpAndPublishedExample(t *testing.T) {
 		_, _ = io.WriteString(w, `{"token":"abc","attempts":3,"active":false,"issues":[]}`)
 	}))
 	defer server.Close()
-	code, out, stderr := run(t, "test", "../../testdata/scenarios/json_types.hurl", "--var", "base_url="+server.URL)
+	code, out, stderr := run(t, "test", "../../testdata/scenarios/json_types.httpgo", "--var", "base_url="+server.URL)
 	if code != 0 || stderr != "" || hits.Load() != 1 {
 		t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
 	}

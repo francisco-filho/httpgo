@@ -55,7 +55,7 @@ func TestHelpVersionAndInvalidUsage(t *testing.T) {
 		code int
 		want string
 	}{
-		{"help", []string{"--help"}, 0, "httpgo test health.hurl"},
+		{"help", []string{"--help"}, 0, "httpgo test health.httpgo"},
 		{"test help", []string{"test", "--help"}, 0, "HTTP 404"},
 		{"version", []string{"--version"}, 0, "httpgo 1.0-test commit=abc123 date=2026-11-14"},
 		{"no args", nil, 2, "uso inválido"},

@@ -31,7 +31,7 @@ func TestSuiteDeniedAccessUnprivilegedProcess(t *testing.T) {
 	if err := os.Chmod(good, 0644); err != nil {
 		t.Fatal(err)
 	}
-	denied := configFile(t, dir, "denied.hurl", "GET "+server.URL)
+	denied := configFile(t, dir, "denied.httpgo", "GET "+server.URL)
 	if err := os.Chmod(denied, 0000); err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestSuiteDeniedAccessUnprivilegedProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(blockedDir, 0700) })
-	fifo := filepath.Join(dir, "pipe.hurl")
+	fifo := filepath.Join(dir, "pipe.httpgo")
 	if err := syscall.Mkfifo(fifo, 0600); err != nil {
 		t.Fatal(err)
 	}

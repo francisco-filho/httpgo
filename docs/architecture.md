@@ -1,4 +1,23 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-36
+# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38
+
+## Extensão padrão de cenários — US-38 / issue #79
+
+`Suite.Discover`, em `internal/suite/discovery.go`, amplia somente a seleção de
+extensões e o diagnóstico de diretório sem elegíveis. O contrato de extensões
+aceitas e o exemplo misto estão na
+[seção de compatibilidade](compatibility.md#extensões-de-arquivo--us-38--issue-79).
+Novos exemplos usam `.httpgo`; não há conversão de conteúdo nem modo de linguagem.
+O percurso, as verificações de acesso, a ordenação global e `os.SameFile` continuam
+iguais: cópias independentes executam separadamente, caminhos equivalentes e hard
+links não duplicam envios. Arquivos explícitos não são filtrados por extensão.
+
+`Suite.load` continua chamando `parser.ParseWithOptions`, fechando o arquivo antes
+do runner e definindo `Scenario.OriginDir`. Parser, runner, transporte, relatórios,
+contexto/cancelamento e proteção acumulada da invocação não mudam. Nenhum pacote,
+interface, flag, dependência ou goroutine foi acrescentado. Configuração e corpus
+diferencial permanecem inalterados. Os exemplos publicados têm arquivos de apoio
+com a extensão recomendada, sem renomear o corpus legado.
+
 
 Referência de aceite: issues GitHub #4 (US-01), #6 (US-02), #11 (US-03), #13 (US-04), #14 (US-05), #16 (US-06), #18 (US-07), #20 (US-08), #22 (US-09), #24 (US-20) e #25 (US-10), #27 (US-11) e #29 (US-12) e #32 (US-13) e #34 (US-14) e #36 (US-15) e #38 (US-16),
 #40 (US-21), #42 (US-22), #44 (US-23), #46 (US-24), #48 (US-25),
@@ -381,7 +400,7 @@ mudaram. Evidência em [validação](validation.md#us-30--issue-60--história-00
 `Path`. `Parse` reconhece somente `[?(@.caminho == literal escalar)]`, valida o
 caminho relativo por propriedades/índices e decodifica o literal separadamente.
 `filterString` separa aspas simples/duplas e escapes internos dos escapes da
-string `.hurl`, já decodificada no parser. Números entram via `Decode`/`UseNumber`;
+string do cenário, já decodificada no parser. Números entram via `Decode`/`UseNumber`;
 nem a consulta completa filtrada nem seu literal passam por `jp.ParseString`.
 Não há `oj.Parse`, avaliação de código ou coerção para float/string. A US-31
 acima permite vinculação tipada de operandos, nunca interpolação de expressão.
@@ -706,7 +725,7 @@ A CLI conecta essa proteção aos writers **antes** de reportar erros de argumen
 contexto, composição ou cenário. `template.Context.NewSession` copia as proteções
 iniciais e conserva o mecanismo dinâmico já existente para capturas/derivados.
 Nada vaza para o comando/executor ou execução seguinte; capturas não sobrescrevem
-valores iniciais. `Scenario.OriginDir` continua sendo o diretório do `.hurl`.
+valores iniciais. `Scenario.OriginDir` continua sendo o diretório do cenário.
 
 `runner.Options.Timeout` é metadado por execução, copiado para `Request.Timeout`
 antes de Execute. Zero preserva o default existente de dez segundos. CLI fornece
@@ -804,7 +823,7 @@ nulo continua representando JSON inline; ambos nulos **e Entry.Multipart nulo**
 significam ausência de body. O parser reconhece `file,` antes de headers e da rejeição genérica, inclusive
 caminhos com `:`. Valida estrutura inteira/exclusividade/GET, sem I/O do payload.
 
-`cli.Command` calcula a origem absoluta antes de abrir o `.hurl`, associa
+`cli.Command` calcula a origem absoluta antes de abrir o cenário, associa
 `Scenario.OriginDir` e preserva `Scenario.File` nos diagnósticos. Na entrada
 corrente, runner renderiza URL/headers e resolve o arquivo com `filepath.IsAbs`
 e `filepath.Join`. `readPayload` abre, verifica diretório, lê integralmente e
@@ -855,7 +874,7 @@ Conteúdo inválido, inclusive vazio/template malformado, produz `RenderFailed` 
 `RenderError`, separado de `FileFailed`/`FileError` para I/O. `RenderError.Position`
 parte de 1:1 do payload e mapeia offsets sobre os bytes originais LF/CRLF; sem
 offset confiável (inclusive defesa do JSON final), permanece 1:1. O campo opcional
-`RenderError.Reference` identifica a declaração no `.hurl`. Nomes são sanitizados
+`RenderError.Reference` identifica a declaração no cenário. Nomes são sanitizados
 pela sessão antes de entrar em resultado/callback; a CLI aplica quoting e proteção
 nos writers. Nunca se usa o caminho absoluto operacional calculado ou posição do
 resultado expandido. Causas brutas e payload não entram no texto de diagnóstico.
@@ -1104,7 +1123,7 @@ Cenário/renderer reutilizáveis não compartilham proteção dinâmica entre se
 Falha de escrita/short write continua prioritária, sem próximo envio/reimpressão
 ou resumo no writer que falhou; contagens/resultados anteriores são preservados.
 
-Ajuda e exemplo `scenario_assert_header_matches.hurl` são exercitados pelo binário.
+Ajuda e exemplo `testdata/scenarios/scenario_assert_header_matches.httpgo` são exercitados pelo binário.
 O harness diferencial existente usa `response_headers`, Hurl 8.0.0 obrigatório e
 30 pares novos, sem modificar observações anteriores. Ver
 [matriz](compatibility.md#regex-de-headers--us-24--issue-46) e

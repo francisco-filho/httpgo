@@ -66,10 +66,10 @@ Com o servidor aberto em um terminal, use outro:
 
 ```sh
 make build
-bin/httpgo test testdata/scenarios/scenario_get_status.hurl
-bin/httpgo test testdata/scenarios/scenario_unvalidated_status.hurl
-bin/httpgo test testdata/scenarios/scenario_json_inline.hurl
-bin/httpgo test testdata/scenarios/scenario_dummy_methods.hurl
+bin/httpgo test testdata/scenarios/scenario_get_status.httpgo
+bin/httpgo test testdata/scenarios/scenario_unvalidated_status.httpgo
+bin/httpgo test testdata/scenarios/scenario_json_inline.httpgo
+bin/httpgo test testdata/scenarios/scenario_dummy_methods.httpgo
 ```
 
 O primeiro cenário valida 200 e 404; o segundo recebe 500, aceita a resposta e

@@ -11,7 +11,7 @@ import (
 
 // GO-426: help and published examples describe only proven value inequality.
 func TestJSONInequalityDocumentation(t *testing.T) {
-	input, err := os.ReadFile("../../testdata/scenarios/scenario_json_inequality_rotation.hurl")
+	input, err := os.ReadFile("../../testdata/scenarios/scenario_json_inequality_rotation.httpgo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestJSONInequalityDocumentation(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, term := range []string{"Desigualdade JSON — US-32", `jsonpath "$.accessToken" != "{{old_token}}"`, "--secret old_token --secret new_token", "repetição ou ausência falha com 1", "count !=, header/body !=", "não garante revogação", "validade do novo", "scenario_json_inequality_rotation.hurl"} {
+		for _, term := range []string{"Desigualdade JSON — US-32", `jsonpath "$.accessToken" != "{{old_token}}"`, "--secret old_token --secret new_token", "repetição ou ausência falha com 1", "count !=, header/body !=", "não garante revogação", "validade do novo", "scenario_json_inequality_rotation.httpgo"} {
 			if !strings.Contains(out, term) {
 				t.Errorf("help missing %q", term)
 			}

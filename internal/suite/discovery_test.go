@@ -28,7 +28,7 @@ func fixture(t *testing.T, dir, name, text string) string {
 
 func TestDiscoverNormalizedUniqueOrder(t *testing.T) {
 	dir := t.TempDir()
-	a := fixture(t, dir, "01.hurl", "GET http://example.test/a")
+	a := fixture(t, dir, "01.httpgo", "GET http://example.test/a")
 	b := fixture(t, dir, "nested/02.hurl", "GET http://example.test/b")
 	c := fixture(t, dir, "explicit", "GET http://example.test/c")
 	fixture(t, dir, "ignore.txt", "not a scenario")
@@ -40,7 +40,7 @@ func TestDiscoverNormalizedUniqueOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, paths := range [][]string{{dir, b, a, c, relative, dir + string(filepath.Separator) + "nested" + string(filepath.Separator) + ".." + string(filepath.Separator) + "01.hurl"}, {c, a, filepath.Join(dir, "nested"), dir}} {
+	for _, paths := range [][]string{{dir, b, a, c, relative, dir + string(filepath.Separator) + "nested" + string(filepath.Separator) + ".." + string(filepath.Separator) + "01.httpgo"}, {c, a, filepath.Join(dir, "nested"), dir}} {
 		files, err := New(nil).Discover(context.Background(), paths)
 		if err != nil {
 			t.Fatal(err)
@@ -57,7 +57,7 @@ func TestDiscoverEquivalenceUsesFilesystem(t *testing.T) {
 	dir := t.TempDir()
 	lower := fixture(t, dir, "a.hurl", "GET http://example.test")
 	upper := fixture(t, dir, "A.hurl", "GET http://example.test")
-	link := filepath.Join(dir, "hard.hurl")
+	link := filepath.Join(dir, "hard.httpgo")
 	if err := os.Link(lower, link); err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +84,8 @@ func TestDiscoverEquivalenceUsesFilesystem(t *testing.T) {
 
 func TestDiscoverLinks(t *testing.T) {
 	dir := t.TempDir()
-	good := fixture(t, dir, "good.hurl", "GET http://example.test")
-	for name, target := range map[string]string{"link.hurl": good, "loop": dir, "broken.hurl": filepath.Join(dir, "absent")} {
+	good := fixture(t, dir, "good.httpgo", "GET http://example.test")
+	for name, target := range map[string]string{"link.httpgo": good, "loop": dir, "broken.httpgo": filepath.Join(dir, "absent")} {
 		if err := os.Symlink(target, filepath.Join(dir, name)); err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +94,7 @@ func TestDiscoverLinks(t *testing.T) {
 	if err != nil || len(files) != 1 || files[0].Path != good {
 		t.Fatalf("files=%v err=%v", files, err)
 	}
-	for _, name := range []string{"link.hurl", "loop/good.hurl", "loop/../good.hurl", "broken.hurl"} {
+	for _, name := range []string{"link.httpgo", "loop/good.httpgo", "loop/../good.httpgo", "broken.httpgo"} {
 		files, err := New(nil).Discover(context.Background(), []string{good, dir + string(filepath.Separator) + name})
 		if err == nil || files != nil {
 			t.Fatalf("path=%s files=%v err=%v", name, files, err)
@@ -104,7 +104,7 @@ func TestDiscoverLinks(t *testing.T) {
 
 func TestDiscoverErrorsDiscardWholePlan(t *testing.T) {
 	dir := t.TempDir()
-	good := fixture(t, dir, "good.hurl", "GET http://example.test")
+	good := fixture(t, dir, "good.httpgo", "GET http://example.test")
 	empty := t.TempDir()
 	fixture(t, empty, "readme.txt", "ignored")
 	for _, bad := range []string{filepath.Join(dir, "missing"), empty, good + string(filepath.Separator) + "child", good + string(filepath.Separator), good + string(filepath.Separator) + "."} {

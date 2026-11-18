@@ -71,7 +71,7 @@ func TestPlainOutputOnRealTTY(t *testing.T) {
 			if readErr != nil && !errors.Is(readErr, syscall.EIO) {
 				t.Fatal(readErr)
 			}
-			if stderr.Len() != 0 || !strings.Contains(string(output), "httpgo test health.hurl") || bytes.Contains(output, []byte("\x1b")) {
+			if stderr.Len() != 0 || !strings.Contains(string(output), "httpgo test health.httpgo") || bytes.Contains(output, []byte("\x1b")) {
 				t.Fatalf("stdout=%q,stderr=%q", output, stderr.String())
 			}
 		})

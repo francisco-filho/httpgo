@@ -89,19 +89,20 @@ func TestSuiteRealIsolationProtectionAndPayloadOrigins(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	configFile(t, a, "01.hurl", "POST {{base}}/login\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/json/a\nAuthorization: Bearer {{token}}\nfile,payload.json;\nHTTP 200\nPOST {{base}}/multipart\n[MultipartFormData]\ntext: prefix-{{token}}\ndocument: file,document.bin;\nHTTP 200")
+	configFile(t, a, "01.httpgo", "POST {{base}}/login\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\nPOST {{base}}/json/a\nAuthorization: Bearer {{token}}\nfile,payload.json;\nHTTP 200\nPOST {{base}}/multipart\n[MultipartFormData]\ntext: prefix-{{token}}\ndocument: file,document.bin;\nHTTP 200")
 	configFile(t, a, "payload.json", `{"from":"a","initial":"{{initial}}","token":"{{token}}"}`)
 	configFile(t, a, "document.bin", "literal {{token}}\x00")
 	configFile(t, b, "02.hurl", "POST {{base}}/json/b\nfile,payload.json;\nHTTP 200")
 	configFile(t, b, "payload.json", `{"from":"b","initial":"{{initial}}"}`)
-	configFile(t, b, "03.hurl", "GET {{base}}/{{token}}")
+	configFile(t, b, "03.httpgo", "GET {{base}}/{{token}}")
 	configFile(t, b, "04-"+token+".hurl", "GET {{base}}/echo\nHTTP 200\n[Asserts]\nheader \"X-Echo\" == \"different\"")
-	configFile(t, b, "05-"+cookie+".hurl", "GET {{base}}/never\nHEAD {{base}}/invalid")
+	configFile(t, b, "05-"+cookie+".httpgo", "GET {{base}}/never\nHEAD {{base}}/invalid")
 	configDir := t.TempDir()
 	config := configFile(t, configDir, "base.yaml", "version: 1\nvariables:\n  base: "+server.URL+"\n  initial: ${HTTPGO_SUITE_INITIAL}\nsecrets: [token]")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	command := exec.CommandContext(ctx, binary(t), "test", root, "--config", config, "--render-files")
+	command.Dir = t.TempDir()
 	secret := initial
 	command.Env = childEnvironment(map[string]*string{"HTTPGO_SUITE_INITIAL": &secret})
 	var out, stderr bytes.Buffer
