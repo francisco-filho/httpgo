@@ -1,7 +1,102 @@
-# httpgo
+# HTTPGo
 
-CLI independente em Go para executar um **subconjunto documentado** de arquivos
-`.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
+HTTPGo é uma CLI independente em Go para testar APIs HTTP usando arquivos `.hurl`.
+É inspirada no [Hurl](https://hurl.dev/), mas implementada sem reutilizar seu
+código-fonte. A compatibilidade é **básica e restrita ao subconjunto documentado**:
+não há promessa de suportar toda a linguagem nem de equivalência entre as CLIs.
+
+## Por onde começar
+
+1. [Instalação](#instalação)
+2. [Primeira execução e resultado](#primeira-execução-e-resultado)
+3. [Requisições e dados de entrada](#requisições-e-dados-de-entrada)
+4. [Variáveis e encadeamento](#variáveis-e-encadeamento)
+5. [Assertions e captures](#assertions-e-captures)
+6. [Configuração, suítes e relatórios](#configuração-suítes-e-relatórios)
+7. [Extensões e limites de compatibilidade](#extensões-e-limites-de-compatibilidade)
+8. [Documentação e desenvolvimento](#documentação-e-desenvolvimento)
+
+## Instalação
+
+A instalação descrita aqui é **a partir do código-fonte**; não pressupõe release
+publicada, gerenciador de pacotes ou script remoto de instalação. Tenha Git e
+**Go 1.26.10**, conforme [go.mod](go.mod). O executável é independente, sem Go ou
+outro runtime na máquina em que será usado.
+
+```sh
+git clone https://github.com/francisco-filho/httpgo.git
+cd httpgo
+go build -trimpath -o bin/httpgo ./cmd/httpgo
+```
+
+No Windows, use `go build -trimpath -o bin/httpgo.exe ./cmd/httpgo`. Adicione o
+diretório `bin` ao `PATH` ou substitua `httpgo` nos comandos abaixo por
+`./bin/httpgo` (Windows: `.\bin\httpgo.exe`). Se já clonou o projeto, basta compilar
+na raiz. Não é necessário instalar Hurl para usar HTTPGo.
+
+```sh
+httpgo --version
+httpgo --help
+httpgo test --help
+```
+
+Sem metadados de release, a versão desta compilação é
+`httpgo dev commit=unknown date=unknown`; isso não é uma versão publicada.
+A [referência do subconjunto](docs/subset.md) define as capacidades desta revisão.
+
+## Primeira execução e resultado
+
+Vamos usar uma API local fornecida pelo próprio repositório, sem depender de um
+serviço público. Na raiz do clone, em um primeiro terminal:
+
+```sh
+go run ./tools/dummy/main.go
+```
+
+Mantenha-o aberto: o servidor escuta apenas em `127.0.0.1:8080`, cuja porta precisa
+estar livre. `GET /health` responde **200**, `Content-Type: application/json` e
+`{"status":"ok"}`. Encerre com **Ctrl+C** ao terminar o guia. Ele é uma fixture
+manual, sem persistência, TLS ou autenticação; nunca envie credenciais reais.
+Veja os [endpoints e limites do servidor](docs/dev-server.md).
+
+Em outro terminal, crie uma pasta de trabalho vazia **fora do clone**, entre nela
+e salve o arquivo `exemplo.hurl` com o conteúdo completo:
+
+```hurl
+GET {{base_url}}/health
+HTTP 200
+```
+
+A primeira linha define método e URL; `HTTP 200` exige o status da resposta.
+`{{base_url}}` é uma variável: `--var nome=valor` fornece seu valor não sigiloso.
+Os exemplos seguintes usam essa mesma pasta e o mesmo servidor, salvo indicação.
+Os comandos de shell do guia usam sintaxe POSIX (sh/bash); adapte caminhos e a
+leitura do código de saída ao PowerShell (`$LASTEXITCODE`) ou cmd (`%ERRORLEVEL%`).
+
+```sh
+httpgo test exemplo.hurl --var base_url=http://localhost:8080
+echo $?
+```
+
+A saída em stdout informa o GET, status 200 e resumo com uma requisição validada;
+o código é **0**, sem diagnóstico de erro em stderr. A CLI não imprime o body.
+Agora troque **somente** `HTTP 200` por `HTTP 201` no arquivo e repita o comando:
+o servidor continua respondendo 200, aparece **status divergente**, e `echo $?`
+mostra **1**. Restaure `HTTP 200` antes de prosseguir. Você já reproduziu sucesso
+e falha de assertion sem alterar a API.
+
+| Código | Significado |
+|---|---|
+| `0` | Execução aprovada pelas validações declaradas |
+| `1` | Falha de assertion, incluindo status divergente |
+| `2` | Demais erros: uso, sintaxe, configuração, captura, avaliação, renderização, transporte, cancelamento ou escrita de relatório |
+
+Em suítes, **2 prevalece sobre 1**. Sem uma linha `HTTP`, qualquer status é aceito
+e informado como **sem validação de status**; `HTTP *` também aceita qualquer
+status, não equivale a exigir 200. Dentro de um arquivo, uma falha definitiva
+interrompe as próximas requisições; não desfaz efeitos que já ocorreram na API.
+A saída é texto sem cores, inclusive em TTY e com `NO_COLOR`; resultados vão a
+stdout e diagnósticos a stderr. Consulte os [contratos da CLI](docs/subset.md#cli-e-saída).
 
 ## Validar textos extraídos por regex (US-36 / issue #74)
 
@@ -850,7 +945,9 @@ iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e o
 JSON estático são preservados, sem serialização. Declare Content-Type quando necessário;
 não há inferência automática desse header.
 
-## Reutilizar configuração do projeto — extensão HTTPGo (US-11 / issue #27)
+## Configuração, suítes e relatórios
+
+### Reutilizar configuração do projeto — extensão HTTPGo
 
 No diretório corrente, salve `.httpgo.yaml`:
 
@@ -1089,7 +1186,9 @@ não descobre segredos arbitrários no payload; use somente cenários confiávei
 negativos específicos mantêm as restrições. Esse modo bytes continua sendo o
 padrão. Veja [subconjunto](docs/subset.md) e [evidência diferencial](docs/compatibility.md).
 
-## Parametrizar JSON externo — extensão HTTPGo (US-10 / issue #25)
+## Extensões e limites de compatibilidade
+
+### Parametrizar JSON externo — extensão HTTPGo
 
 Em `payloads/product.json`:
 
@@ -1191,7 +1290,9 @@ parte, partes JSON tipadas, multipart aninhado ou renderização do arquivo mult
 O [diferencial Hurl 8.0.0](docs/compatibility.md) registra diferenças reais de
 gramática, filename e restrições; não há promessa de compatibilidade completa.
 
-## Parametrizar URL e headers (US-03 / issue #11)
+## Requisições e dados de entrada
+
+### Parametrizar URL e headers
 
 Salve o exemplo abaixo como `products.hurl`:
 
@@ -1224,7 +1325,9 @@ URL e valores de headers aceitam `{{nome}}` e `{{ nome }}`, sem recursão. Nesse
 contextos só são aceitos escalares; arrays/objetos geram erro antes do envio.
 A URL final exige encoding explícito; nomes de headers permanecem estáticos.
 
-## Parametrizar JSON preservando tipos (US-04 / issue #13)
+## Variáveis e encadeamento
+
+### Parametrizar JSON preservando tipos
 
 Salve como `products.hurl`:
 
@@ -1481,7 +1584,9 @@ com indicação explícita de **sem validação de status**.
   decodificadas e escapes conhecidos (JSON, quoting de diagnóstico e URL), inclusive
   em falhas anteriores à construção do contexto. Não há payload de diagnóstico.
 
-## Validar headers da resposta (US-07 / issue #18)
+## Assertions e captures
+
+### Validar headers da resposta
 
 Salve como `health.hurl` e execute `bin/httpgo test health.hurl` contra uma API
 que devolva `Content-Type: application/json; charset=utf-8` e `X-Request-Id: req-123`:
