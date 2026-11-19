@@ -47,7 +47,7 @@ func TestReadmeInstallContract(t *testing.T) {
 		"~/.local/bin", "--bin-dir", "--version v1.0.0", "pré-release", "sem fallback", "PATH",
 		"não usa sudo nem", "altera configurações do shell", "executa código remoto", "revise seu conteúdo",
 		"integridade", "não é uma assinatura de autenticidade", "da mesma release", "sem confirmação",
-		"truncar a instalação anterior", "status diferente de zero", "https://github.com/capimgrosso/httpgo/releases",
+		"truncar a instalação anterior", "status diferente de zero", "https://github.com/francisco-filho/httpgo/releases",
 		"httpgo_linux_amd64.tar.gz", "httpgo_linux_arm64.tar.gz", "httpgo_darwin_amd64.tar.gz", "httpgo_darwin_arm64.tar.gz",
 		"checksums.txt", "ainda não\nforam homologadas", "docs/validation.md", "### Compilar a partir do código-fonte",
 		"Go 1.26.10", "go build -trimpath -o bin/httpgo ./cmd/httpgo", "bin/httpgo.exe", "dev commit=unknown date=unknown",
@@ -96,7 +96,7 @@ func TestReadmeInstallCommands(t *testing.T) {
 				t.Fatal(err)
 			}
 			systems := map[string]string{"linux": "Linux", "darwin": "Darwin"}
-			h.env = append(h.env, "EXPECTED_TAG=v1.0.0", "LATEST_URL=https://github.com/capimgrosso/httpgo/releases/tag/v1.0.0",
+			h.env = append(h.env, "EXPECTED_TAG=v1.0.0", "LATEST_URL=https://github.com/francisco-filho/httpgo/releases/tag/v1.0.0",
 				"FAKE_SYSTEM="+systems[runtime.GOOS], "FAKE_MACHINE="+runtime.GOARCH)
 			block := readmeInstallBlock(t, tc.marker)
 			cmd := process(t, "/bin/bash", "-e", "-o", "pipefail", "-c", block)
@@ -142,7 +142,7 @@ func TestReadmeInstallCommands(t *testing.T) {
 
 func TestInstallerLatestPinnedWhenReleaseChanges(t *testing.T) {
 	h := newInstaller(t)
-	const next = "https://github.com/capimgrosso/httpgo/releases/tag/v1.2.4"
+	const next = "https://github.com/francisco-filho/httpgo/releases/tag/v1.2.4"
 	h.env = append(h.env, "LATEST_NEXT_URL="+next)
 	out, stderr, err := h.run(true)
 	if err != nil || stderr != "" || !strings.Contains(out, "Installed httpgo v1.2.3") {
@@ -160,7 +160,7 @@ func TestInstallerLatestPinnedWhenReleaseChanges(t *testing.T) {
 	// Confirm that another resolution really would select the new release.
 	cmd := process(t, filepath.Join(h.tools, "curl"), "-q", "--fail", "--silent", "--show-error", "--location",
 		"--proto", "=https", "--proto-redir", "=https", "--output", "/dev/null", "--write-out", "%{url_effective}",
-		"https://github.com/capimgrosso/httpgo/releases/latest")
+		"https://github.com/francisco-filho/httpgo/releases/latest")
 	cmd.Env = h.env
 	changed, err := cmd.CombinedOutput()
 	if err != nil || string(changed) != next {

@@ -1,5 +1,34 @@
 # Validação — US-01 a US-17, US-20 a US-40
 
+## US-40 — correção da origem de distribuição (v0.1.2)
+
+A origem pública correta é `francisco-filho/httpgo`. Instalador, comandos do
+README, condição de publicação e smoke HTTPS do workflow foram alinhados a esse
+repositório. Os testes de instalação e documentação exigem a mesma origem, e o
+teste do workflow verifica tanto a restrição de publicação quanto a URL do smoke.
+O módulo Go `capimgrosso.com/httpgo` permanece inalterado: ele não define a URL
+dos downloads.
+
+Antes da correção, a API pública de releases de `francisco-filho/httpgo` retornou
+uma lista vazia, e o download de `latest/download/install.sh` retornou 404. Na
+execução [44515147598](https://github.com/francisco-filho/httpgo/actions/runs/44515147598),
+`package` e os dois testes nativos Linux passaram, mas `publish` e `public-smoke`
+foram ignorados. A condição anterior exigia `capimgrosso/httpgo`, impedindo a
+publicação no repositório real.
+
+Validação local da correção: `make fmt lint test` passou (lint sem issues e testes
+com `-race -cover`), assim como `go vet ./...`, `make build e2e` e
+`bash -n install.sh scripts/package-release.sh`. A tag `v0.1.2` foi classificada
+como estável por `scripts/package-release.sh --validate-tag`. Os downloads dos
+testes permanecem simulados; esses resultados não comprovam publicação pública.
+
+A correção local não publica assets: é necessário enviar a tag `v0.1.2` e aguardar
+o workflow concluir antes de usar as URLs públicas. A matriz atual mantém apenas
+Linux; os pacotes Darwin continuam sendo produzidos, mas sem validação nativa
+macOS. O registro abaixo descreve a entrega original e suas pendências históricas,
+incluindo a origem incorreta então preservada; não é evidência de publicação da
+`v0.1.2`.
+
 ## US-40 — issue #82 / história 040
 
 Plano backend da issue #82 executado sem planner. As quatro tasks foram

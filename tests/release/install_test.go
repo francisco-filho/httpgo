@@ -92,11 +92,11 @@ else
     [[ $# == 1 ]] || exit 94
     url=$1
 fi
-[[ $url == https://github.com/capimgrosso/httpgo/releases/* ]] || exit 94
+[[ $url == https://github.com/francisco-filho/httpgo/releases/* ]] || exit 94
 printf '%%s\n' "$url" >> "$CURL_LOG"
 [[ -z ${FAIL_DOWNLOAD:-} || $url != *"$FAIL_DOWNLOAD"* ]] || { printf 'partial download' > "$output"; printf 'network/TLS failure\n' >&2; exit 22; }
 if [[ $url == */latest ]]; then
-    resolved=${LATEST_URL:-https://github.com/capimgrosso/httpgo/releases/tag/v1.2.3}
+    resolved=${LATEST_URL:-https://github.com/francisco-filho/httpgo/releases/tag/v1.2.3}
     if [[ -n ${LATEST_NEXT_URL:-} ]]; then
         count=0
         while IFS= read -r request; do
@@ -339,7 +339,7 @@ func TestInstallerFailuresPreserveExecutable(t *testing.T) {
 		}},
 		{"untrusted latest", "official release", nil, func(h *installerHarness) { h.env = append(h.env, "LATEST_URL=https://evil.invalid/tag/v1.2.3") }},
 		{"prerelease latest", "prerelease", nil, func(h *installerHarness) {
-			h.env = append(h.env, "LATEST_URL=https://github.com/capimgrosso/httpgo/releases/tag/v1.2.4-rc.1")
+			h.env = append(h.env, "LATEST_URL=https://github.com/francisco-filho/httpgo/releases/tag/v1.2.4-rc.1")
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

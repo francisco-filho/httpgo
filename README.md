@@ -29,7 +29,7 @@ sistema (`uname`, `mktemp`, `mkdir`, `cp`, `chmod`, `mv` e `rm`). O executável 
 independente: não exige Go, CGO ou outro runtime na máquina de destino.
 
 Os comandos públicos abaixo dependem de uma release com os assets em
-[capimgrosso/httpgo](https://github.com/capimgrosso/httpgo/releases).
+[francisco-filho/httpgo](https://github.com/francisco-filho/httpgo/releases).
 **A publicação pública e a execução nativa nas quatro plataformas ainda não
 foram homologadas nesta revisão**; veja as [evidências e pendências](docs/validation.md).
 Enquanto não houver release disponível, use a compilação por fonte abaixo.
@@ -38,7 +38,7 @@ Para baixar e instalar a última release estável, sem rascunhos ou pré-release
 
 ```sh
 curl -q -fsSL --proto '=https' --proto-redir '=https' \
-  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash
+  https://github.com/francisco-filho/httpgo/releases/latest/download/install.sh | bash
 "$HOME/.local/bin/httpgo" --version
 ```
 
@@ -52,14 +52,14 @@ sem fallback; uma pré-release como `v1.0.0-rc.1` também pode ser escolhida:
 
 ```sh
 curl -q -fsSL --proto '=https' --proto-redir '=https' \
-  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash -s -- --version v1.0.0
+  https://github.com/francisco-filho/httpgo/releases/latest/download/install.sh | bash -s -- --version v1.0.0
 ```
 
 Para escolher outro diretório, inclusive um caminho com espaços:
 
 ```sh
 curl -q -fsSL --proto '=https' --proto-redir '=https' \
-  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash -s -- --bin-dir "$HOME/meus binarios"
+  https://github.com/francisco-filho/httpgo/releases/latest/download/install.sh | bash -s -- --bin-dir "$HOME/meus binarios"
 "$HOME/meus binarios/httpgo" --version
 ```
 
@@ -68,13 +68,13 @@ inspecionar o script antes de executá-lo, faça as etapas separadamente:
 
 ```sh
 curl -q -fsSL --proto '=https' --proto-redir '=https' \
-  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh -o install.sh
+  https://github.com/francisco-filho/httpgo/releases/latest/download/install.sh -o install.sh
 # Abra install.sh em um editor e revise seu conteúdo antes de continuar.
 bash ./install.sh --version v1.0.0
 ```
 
 Para obter também o script de uma tag específica, use
-`https://github.com/capimgrosso/httpgo/releases/download/v1.0.0/install.sh`.
+`https://github.com/francisco-filho/httpgo/releases/download/v1.0.0/install.sh`.
 Os downloads exigem HTTPS com verificação de certificado. Após selecionar a tag,
 o instalador baixa o pacote e `checksums.txt` **da mesma release** e verifica
 SHA-256 antes de gravar o executável. O checksum verifica **integridade**, mas

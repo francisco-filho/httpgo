@@ -97,7 +97,7 @@ jobs:
           printf 'Native package: %s %s %s — passed\n' "$HTTPGO_RELEASE_TAG" "$EXPECTED_SYSTEM" "$EXPECTED_MACHINE" >> "$GITHUB_STEP_SUMMARY"
 
   publish:
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'capimgrosso/httpgo'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'francisco-filho/httpgo'
     needs: [package, native]
     runs-on: ubuntu-24.04
     permissions:
@@ -177,7 +177,7 @@ jobs:
           export HOME
           HOME=$(mktemp -d)
           trap 'rm -rf "$HOME"' EXIT
-          base=https://github.com/capimgrosso/httpgo/releases
+          base=https://github.com/francisco-filho/httpgo/releases
           curl -q -fsSL --proto '=https' --proto-redir '=https' \
             "$base/download/$TAG/install.sh" -o "$HOME/install.sh"
           /bin/bash "$HOME/install.sh" --version "$TAG" --bin-dir "$HOME/tag/bin"

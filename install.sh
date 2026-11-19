@@ -50,7 +50,7 @@ case $machine in
     aarch64|arm64) arch=arm64 ;;
     *) fail "unsupported architecture: $machine" ;;
 esac
-base=https://github.com/capimgrosso/httpgo/releases
+base=https://github.com/francisco-filho/httpgo/releases
 # -q must be first: user curlrc must not disable TLS verification or add outputs.
 fetch() { curl -q --fail --silent --show-error --location --proto '=https' --proto-redir '=https' "$@"; }
 if [[ -z $tag ]]; then
