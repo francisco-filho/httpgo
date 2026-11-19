@@ -1,0 +1,13 @@
+{
+  "response_json": "not JSON",
+  "response_headers": [{"name":"X-Test","value":"private"}],
+  "classification": "intentional grammar difference: HTTPGo requires one JSON string; Hurl accepts /private/ delimiters and matches",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": ["/health", "/capture", "/health"]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain"
+    }
+  ],
+  "response_body": "Y3VzdG9tZXI=",
+  "classification": "shared: literal body search and absence in final response",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

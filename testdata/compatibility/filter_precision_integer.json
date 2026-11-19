@@ -1,0 +1,39 @@
+{
+  "response_json": "[{\"v\":9007199254740992,\"id\":\"a\"},{\"v\":9007199254740993,\"id\":\"b\"}]",
+  "classification": "diferença de precisão: HTTPGo distingue IDs acima de 2^53; Hurl selecionou ambos e divergiu",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

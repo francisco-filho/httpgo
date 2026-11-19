@@ -38,9 +38,9 @@ func TestInvalidHeaderAssertions(t *testing.T) {
 		{"HTTP 200\n[Asserts]\nheader \"Authorization\" == secret-value", "sintaxe inválida"},
 		{"HTTP 200\n[Asserts]\nheader \"X\" == \"secret-value\" extra", "sintaxe inválida"},
 		{"HTTP 200\n[Asserts]\nheader \"X\" exists \"secret-value\"", "sintaxe inválida"},
-		{"HTTP 200\n[Asserts]\nheader \"X\" matches \"secret-value\"", "construção não suportada"},
+		{"HTTP 200\n[Asserts]\nheader \"X\" startsWith \"secret-value\"", "construção não suportada"},
 		{"HTTP 200\n[Asserts]\nheader \"X\" count == 1", "construção não suportada"},
-		{"HTTP 200\n[Asserts]\njsonpath \"$[*]\" == \"x\"", "construção não suportada"},
+		{"HTTP 200\n[Asserts]\njsonpath \"$.*\" == \"x\"", "construção não suportada"},
 	} {
 		input := "GET http://example.test/first\nHTTP 200\nGET http://example.test/late\n" + tc.suffix
 		got, err := Parse("late.hurl", strings.NewReader(input))

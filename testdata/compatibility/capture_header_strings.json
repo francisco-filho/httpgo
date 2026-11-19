@@ -1,0 +1,54 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Number",
+      "value": "123"
+    },
+    {
+      "name": "X-Boolean",
+      "value": "true"
+    },
+    {
+      "name": "X-JSON",
+      "value": "{\"n\":1}"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "diferença contextual JSON: HTTPGo preserva strings numéricas, booleanas e semelhantes a objeto; Hurl termina com 3 antes do POST neste par",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"number\":\"123\",\"boolean\":\"true\",\"json\":\"{\\\"n\\\":1}\"}",
+        "content_type": "application/json",
+        "probe": "true",
+        "etag": "123"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

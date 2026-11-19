@@ -1,0 +1,41 @@
+{
+  "variables": [
+    "category=reports"
+  ],
+  "classification": "diferença de gramática: HTTPGo aceita caminho literal com espaço e Unicode; Hurl rejeita este cenário antes da rede",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "description",
+            "data": "RG9jdW1lbnRvIGRlIHRlc3Rl"
+          },
+          {
+            "name": "category",
+            "data": "cmVwb3J0cw=="
+          },
+          {
+            "name": "document",
+            "filename": "olá mundo.pdf",
+            "mime": "application/pdf",
+            "data": "bm90IGEgcmVhbCBQREY6IHt7bWlzc2luZ319Cg=="
+          }
+        ],
+        "uri": "/documents",
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

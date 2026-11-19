@@ -1,0 +1,22 @@
+{
+  "response_json": "not JSON",
+  "classification": "shared mismatch; assertion exit codes differ (1/4)",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "Set-Cookie",
+      "value": "session=opaque-123; Path=/; HttpOnly; SameSite=Lax"
+    }
+  ]
+}

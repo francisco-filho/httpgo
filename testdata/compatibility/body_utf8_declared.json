@@ -1,0 +1,24 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain; charset=UTF-8"
+    }
+  ],
+  "response_body": "YcOnw6NvIOmbqg==",
+  "classification": "shared: declared UTF-8",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

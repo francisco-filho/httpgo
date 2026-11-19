@@ -1,0 +1,16 @@
+{
+  "response_json": "{}",
+  "classification": "unsupported: header not exists deliberately outside the HTTPGo subset",
+  "httpgo": {
+    "exit": 2,
+    "paths": []
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health",
+      "/capture",
+      "/health"
+    ]
+  }
+}

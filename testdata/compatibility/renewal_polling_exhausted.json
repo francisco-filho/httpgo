@@ -1,0 +1,79 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"rejected-a\",\"status\":\"PENDING\"}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"rejected-b\",\"status\":\"PENDING\"}"
+    }
+  ],
+  "variables": [
+    "id=old"
+  ],
+  "classification": "US-34: esgotamento HTTPGo 1 conserva id old em todos os reenvios; Hurl 4 usa rejected-a/rejected-b; nenhum avança",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/poll"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/poll"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"old\"}",
+        "content_type": "application/json",
+        "probe": "old"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"rejected-a\"}",
+        "content_type": "application/json",
+        "probe": "rejected-a"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"rejected-b\"}",
+        "content_type": "application/json",
+        "probe": "rejected-b"
+      }
+    ]
+  }
+}

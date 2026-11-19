@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -24,11 +25,26 @@ type Position struct {
 
 type Header struct{ Name, Value string }
 
+type CaptureKind int
+
+const (
+	JSONPathCapture CaptureKind = iota
+	HeaderCapture
+	RegexCapture
+)
+
 type Capture struct {
-	Name          string
-	Path          query.Path
-	Position      Position
-	QueryPosition Position
+	Count           bool // Only the optional JSONPath array transformation.
+	Query           string
+	Kind            CaptureKind
+	Header          string
+	Name            string
+	Path            query.Path
+	Position        Position
+	QueryPosition   Position
+	Pattern         string
+	Compiled        *regexp.Regexp
+	PatternPosition Position
 }
 
 // FileBody is a literal local file reference, not a template.
@@ -38,6 +54,8 @@ type FileBody struct {
 }
 
 type Entry struct {
+	Options          EntryOptions
+	Multipart        *MultipartForm
 	ExternalBody     *FileBody
 	Assertions       []Assertion
 	Captures         []Capture
@@ -74,13 +92,26 @@ func (e *Error) Error() string {
 }
 func (e *Error) Unwrap() error { return e.cause }
 
+// ParseOptions selects an invocation-local assertion profile. Zero preserves literals.
+type ParseOptions struct {
+	RenderAsserts bool
+}
+
 func Parse(file string, input io.Reader) (Scenario, error) {
+	return ParseWithOptions(file, input, ParseOptions{})
+}
+
+func ParseWithOptions(file string, input io.Reader, options ParseOptions) (Scenario, error) {
 	data, err := io.ReadAll(input)
 	if err != nil {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "erro de leitura", Detail: "não foi possível ler o arquivo", cause: err}
 	}
 	scenario := Scenario{File: file}
 	captures, asserts := false, false
+	multipartActive := false
+	optionsActive, optionsSeen := false, false
+	var optionsPosition Position
+	var optionNames map[string]bool
 	capturesSeen, assertsSeen := false, false
 	var capturesPosition, assertsPosition Position
 	for offset := 0; offset < len(data); {
@@ -113,6 +144,13 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			entry = &scenario.Entries[len(scenario.Entries)-1]
 		}
 		boundary := fields[0] == "GET" || fields[0] == "POST" || fields[0] == "PUT" || fields[0] == "PATCH" || fields[0] == "DELETE" || strings.HasPrefix(fields[0], "[")
+		if boundary || fields[0] == "HTTP" {
+			if optionsActive && len(optionNames) == 0 {
+				pos = optionsPosition
+				return fail("sintaxe inválida", "seção de opções vazia")
+			}
+			optionsActive = false
+		}
 		if boundary {
 			if captures && len(entry.Captures) == 0 {
 				pos = capturesPosition
@@ -124,7 +162,51 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			}
 			captures, asserts = false, false
 		}
+		if boundary || fields[0] == "HTTP" {
+			multipartActive = false
+		}
+		if multipartActive {
+			if strings.HasPrefix(text, "file,") || isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
+				return fail("sintaxe inválida", "multipart não pode coexistir com outro body")
+			}
+			part, err := parseMultipartPart(text, pos)
+			if err != nil {
+				return Scenario{}, err
+			}
+			entry.Multipart.Parts = append(entry.Multipart.Parts, part)
+			offset = end + 1
+			continue
+		}
+		if optionsActive && (strings.HasPrefix(text, "file,") || isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"')) {
+			if len(optionNames) == 0 {
+				pos = optionsPosition
+				return fail("sintaxe inválida", "seção de opções vazia")
+			}
+			optionsActive = false
+		}
+		if optionsActive {
+			if err := parseOption(text, pos, &entry.Options, optionNames); err != nil {
+				return Scenario{}, err
+			}
+			offset = end + 1
+			continue
+		}
 		switch fields[0] {
+		case "[Options]":
+			if entry == nil || len(fields) != 1 || optionsSeen || entry.ExpectedStatus != nil || entry.AnyStatus || capturesSeen || assertsSeen {
+				return fail("sintaxe inválida", "seção de opções exige requisição e não pode ser duplicada ou seguir a resposta")
+			}
+			optionsActive, optionsSeen, optionsPosition = true, true, pos
+			optionNames = make(map[string]bool)
+		case "[MultipartFormData]":
+			if entry == nil || len(fields) != 1 || entry.Multipart != nil || entry.Body != nil || entry.ExternalBody != nil || entry.ExpectedStatus != nil || entry.AnyStatus || capturesSeen || assertsSeen {
+				return fail("sintaxe inválida", "seção multipart fora da requisição ou body duplicado")
+			}
+			if entry.Method != "POST" && entry.Method != "PUT" && entry.Method != "PATCH" {
+				return fail("construção não suportada", "multipart exige POST, PUT ou PATCH")
+			}
+			entry.Multipart = &MultipartForm{Position: pos}
+			multipartActive = true
 		case "[Asserts]":
 			if entry == nil || assertsSeen || len(fields) != 1 || (entry.ExpectedStatus == nil && !entry.AnyStatus) {
 				return fail("sintaxe inválida", "seção de assertions exige resposta HTTP e não pode ser duplicada")
@@ -136,7 +218,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			}
 			captures, capturesSeen, capturesPosition = true, true, pos
 		case "GET", "POST", "PUT", "PATCH", "DELETE":
-			capturesSeen, assertsSeen = false, false
+			capturesSeen, assertsSeen, optionsSeen = false, false, false
 			token := strings.TrimLeft(text[len(fields[0]):], " \t")
 			urlPos := pos
 			urlPos.Column += len(text) - len(token)
@@ -182,7 +264,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 			entry.ExpectedStatus, entry.ExpectedPosition = &status, pos
 		default:
 			if strings.HasPrefix(text, "file,") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures || asserts || capturesSeen || entry.Body != nil || entry.ExternalBody != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || captures || asserts || capturesSeen || entry.Body != nil || entry.ExternalBody != nil || entry.Multipart != nil {
 					return fail("sintaxe inválida", "body externo sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -202,7 +284,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				return fail("construção não suportada", construction)
 			}
 			if asserts {
-				declaration, err := parseAssertion(text, pos)
+				declaration, err := parseAssertion(text, pos, options)
 				if err != nil {
 					return Scenario{}, err
 				}
@@ -210,7 +292,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				break
 			}
 			if captures {
-				capture, err := parseCapture(text, pos)
+				capture, err := parseCapture(text, pos, options)
 				if err != nil {
 					return Scenario{}, err
 				}
@@ -218,7 +300,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				break
 			}
 			if isJSONStart(text[0]) && (!strings.Contains(text, ":") || text[0] == '{' || text[0] == '[' || text[0] == '"') {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil || entry.Multipart != nil {
 					return fail("sintaxe inválida", "body JSON sem requisição disponível ou body duplicado")
 				}
 				if entry.Method == "GET" {
@@ -256,7 +338,7 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 				continue
 			}
 			if strings.Contains(text, ":") {
-				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil {
+				if entry == nil || entry.ExpectedStatus != nil || entry.AnyStatus || entry.Body != nil || entry.ExternalBody != nil || entry.Multipart != nil {
 					return fail("sintaxe inválida", "header fora da requisição ou após body")
 				}
 				name, value, _ := strings.Cut(text, ":")
@@ -298,6 +380,9 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 		}
 		offset = end + 1
 	}
+	if optionsActive && len(optionNames) == 0 {
+		return Scenario{}, &Error{Position: optionsPosition, Category: "sintaxe inválida", Detail: "seção de opções vazia"}
+	}
 	if asserts && len(scenario.Entries[len(scenario.Entries)-1].Assertions) == 0 {
 		return Scenario{}, &Error{Position: assertsPosition, Category: "sintaxe inválida", Detail: "seção de assertions vazia"}
 	}
@@ -306,6 +391,11 @@ func Parse(file string, input io.Reader) (Scenario, error) {
 	}
 	if len(scenario.Entries) == 0 {
 		return Scenario{}, &Error{Position: Position{file, 1, 1}, Category: "sintaxe inválida", Detail: "o arquivo precisa conter ao menos uma requisição"}
+	}
+	for _, entry := range scenario.Entries {
+		if err := validateMultipart(entry); err != nil {
+			return Scenario{}, err
+		}
 	}
 	return scenario, nil
 }
@@ -355,7 +445,7 @@ func unsupported(token string) string {
 	switch token {
 	case "HEAD", "OPTIONS", "CONNECT", "TRACE":
 		return "método " + token
-	case "[Options]", "[QueryStringParams]", "[FormParams]", "[MultipartFormData]", "[Cookies]", "[BasicAuth]":
+	case "[QueryStringParams]", "[FormParams]", "[Cookies]", "[BasicAuth]":
 		return "seção " + token
 	default:
 		switch {

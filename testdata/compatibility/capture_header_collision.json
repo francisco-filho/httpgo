@@ -1,0 +1,58 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "new"
+    }
+  ],
+  "variables": [
+    "x=original"
+  ],
+  "classification": "US-34: ambos substituem variável inicial pela string do header, enviando X-Probe new",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "new"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "new"
+      }
+    ]
+  }
+}

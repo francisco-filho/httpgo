@@ -54,6 +54,28 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	// US-36: expected strings, including provisional values and nonrecursive regex.
+	for _, value := range []string{`"123456"`, `"{{missing}}"`, `"(a)?b"`, `"["`, `"雪\\\""`, `null`, `[]`} {
+		f.Add("^otp-{{captured}}-{{x}}$", value)
+	}
+	for _, value := range []string{`"replacement"`, `"{{literal}}"`, `null`, `9007199254740993`, `{"child":[]}`} {
+		f.Add("renewed={{x}}/previous={{captured}}", value)
+	}
+	for _, value := range []string{`"x')].id[?(@.n=='other"`, `"a\"\\[]雪"`, `"{{missing}}"`, `1e99999999999999999999`, `1.00000000000000000000002`, `null`, `[]`, `{}`} {
+		f.Add("Order {{x}}", value)
+	}
+	for _, value := range []string{`"a[0-9]+"`, `"(?=private)"`, `"{{missing}}"`, `""`, `null`, `[]`, `{}`} {
+		f.Add("^prefix-{{x}}-suffix$", value)
+	}
+	for _, value := range []string{`[[],[1],[[2]]]`, `[9007199254740993,1.2300e+99]`, `[null,"{{literal}}",{"x":[]}]`} {
+		f.Add("prefix-{{typed}}-{{x}}", value)
+	}
+	for _, value := range []string{`"catalog-v1"`, `session=private; Path=/; HttpOnly`, "first,whole", "", `{{missing}}`} {
+		f.Add("If-None-Match: {{captured}}", value)
+	}
+	for _, value := range []string{"", "{{missing}}", "雪\r\ntext", "application/pdf", "multipart/form-data; boundary=manual", "[]", "{}"} {
+		f.Add("description-prefix-{{x}}-suffix", value)
+	}
 	for _, seed := range []string{"{{ x }}", "{{x}}{{x}}", "{{", "}}", "{{invalid-name}}", "plain"} {
 		f.Add(seed, "{{notRecursive}}")
 	}
@@ -66,6 +88,7 @@ func FuzzRender(f *testing.F) {
 			t.Fatal(err)
 		}
 		s := c.NewSession()
+		s.MarkSecret("captured")
 		if err := s.Publish([]Capture{{"captured", captureString(value)}}); err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +106,8 @@ func FuzzRender(f *testing.F) {
 				t.Fatal("invalid typed capture", err)
 			}
 		}
-		_, err = c.Render(source)
+		fuzzCaptureOverlay(t, s, value)
+		_, err = s.Render(source)
 		if err != nil && strings.Contains(err.Error(), "notRecursive") {
 			t.Fatal("unsafe error")
 		}

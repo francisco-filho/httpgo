@@ -1,0 +1,16 @@
+{
+  "response_json": "[]",
+  "classification": "zero correspondências não publica baseline zero em ambos; códigos próprios de captura",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

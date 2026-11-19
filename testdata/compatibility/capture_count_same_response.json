@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[1,2,3]",
+  "classification": "US-34: captura da própria resposta disponível à assertion; confirmação HTTPGo somente após aprovação",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 {
   "response_json":"invalid JSON",
   "response_headers":[{"name":"X-Test","value":"different"}],
-  "classification":"intentional precedence: httpgo evaluates header assertions before captures; Hurl capture failure takes priority",
-  "httpgo":{"exit":1,"paths":["/capture"]},
+  "classification":"US-34: captura inválida precede assertion de header; códigos próprios HTTPGo 2 e Hurl 3",
+  "httpgo":{"exit":2,"paths":["/capture"]},
   "hurl":{"exit":3,"paths":["/capture"]}
 }

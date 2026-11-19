@@ -1,0 +1,24 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain; charset=ISO-8859-1"
+    }
+  ],
+  "response_body": "YefjbyCA",
+  "classification": "shared: ISO-8859-1 web label resolves to windows-1252",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

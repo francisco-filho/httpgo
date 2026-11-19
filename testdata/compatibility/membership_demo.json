@@ -1,0 +1,24 @@
+{
+  "response_json": "{\"codes\":[\"REQUIRED\",\"INVALID\"],\"name\":\"Pizza\"}",
+  "classification": "shared behavior; HTTPGo failure codes are 1/2, Hurl assertion failure is 4",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "Set-Cookie",
+      "value": "sid=fictitious; Secure"
+    }
+  ]
+}

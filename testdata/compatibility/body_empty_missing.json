@@ -1,0 +1,22 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain"
+    }
+  ],
+  "response_body": "",
+  "classification": "shared: empty body does not contain nonempty substring; own exit codes",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

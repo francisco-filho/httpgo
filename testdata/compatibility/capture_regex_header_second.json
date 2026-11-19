@@ -1,0 +1,42 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "first"
+    },
+    {
+      "name": "X-Test",
+      "value": "second"
+    }
+  ],
+  "response_body": "bm90IEpTT04=",
+  "classification": "segunda ocorrência não corrige ausência de correspondência na primeira",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

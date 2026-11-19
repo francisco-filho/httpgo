@@ -1,0 +1,7 @@
+{
+  "response_json": "{}",
+  "response_headers": [{"name":"X","value":"Domain=first"},{"name":"x","value":"safe"}],
+  "classification": "shared failure for this pair: HTTPGo finds substring in first value; Hurl finds the exact element in its header list",
+  "httpgo": {"exit":1,"paths":["/capture"]},
+  "hurl": {"exit":4,"paths":["/capture"]}
+}

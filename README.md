@@ -1,87 +1,204 @@
-# httpgo
+# HTTPGo
 
-CLI independente em Go para executar um **subconjunto documentado** de arquivos
-`.hurl`. Implementação própria, sem reutilizar código-fonte do Hurl.
+HTTPGo é uma CLI independente em Go para testar APIs HTTP usando arquivos `.httpgo`.
+É inspirada no [Hurl](https://hurl.dev/), mas implementada sem reutilizar seu
+código-fonte. A compatibilidade é **básica e restrita ao subconjunto documentado**:
+não há promessa de suportar toda a linguagem nem de equivalência entre as CLIs.
 
-## Executar
+## Por onde começar
 
-Com Go na versão de `go.mod`:
+1. [Instalação](#instalação)
+2. [Primeira execução e resultado](#primeira-execução-e-resultado)
+3. [Requisições e dados de entrada](#requisições-e-dados-de-entrada)
+4. [Variáveis e encadeamento](#variáveis-e-encadeamento)
+5. [Assertions e captures](#assertions-e-captures)
+6. [Configuração, suítes e relatórios](#configuração-suítes-e-relatórios)
+7. [Extensões e limites de compatibilidade](#extensões-e-limites-de-compatibilidade)
+8. [Receitas adicionais](#receitas-adicionais) e [desenvolvimento](#documentação-e-desenvolvimento)
 
-```sh
-CGO_ENABLED=0 make build
-bin/httpgo --help
-bin/httpgo test testdata/scenarios/scenario_get_status.hurl
-```
+## Instalação
 
-Para usar o servidor dummy do projeto, execute em outro terminal:
+### Baixar e instalar uma release
 
-```sh
-make serve
-# Alias equivalente: make dummy
-```
+A distribuição pelo terminal tem como alvos **Linux e macOS (Darwin)**, nas
+arquiteturas **amd64** (`x86_64`) e **arm64** (`aarch64`/`arm64`). O instalador
+seleciona o pacote da máquina; Windows não faz parte desta distribuição.
+Pré-requisitos: **Bash 3.2 ou superior, curl, tar com suporte a gzip e um
+verificador SHA-256 (`sha256sum` ou `shasum`)**, além dos utilitários usuais do
+sistema (`uname`, `mktemp`, `mkdir`, `cp`, `chmod`, `mv` e `rm`). O executável é
+independente: não exige Go, CGO ou outro runtime na máquina de destino.
 
-Ele escuta somente em `http://127.0.0.1:8080` (também acessível via localhost),
-em primeiro plano. Ctrl+C encerra o servidor. A porta precisa estar livre.
+Os comandos públicos abaixo dependem de uma release com os assets em
+[capimgrosso/httpgo](https://github.com/capimgrosso/httpgo/releases).
+**A publicação pública e a execução nativa nas quatro plataformas ainda não
+foram homologadas nesta revisão**; veja as [evidências e pendências](docs/validation.md).
+Enquanto não houver release disponível, use a compilação por fonte abaixo.
 
-| Método | Caminho | Status |
-|---|---|---|
-| GET | `/health` | 200 |
-| GET | `/inexistente` | 404 |
-| GET | `/error` | 500 |
-| POST | `/products` | 201 |
-| GET / PUT / PATCH | `/products/1` | 200 |
-| DELETE | `/products/1` | 204 |
-| GET / POST / PUT / PATCH / DELETE | `/echo` | 200 |
-
-Os produtos são demonstrativos, **sem persistência**. `/echo` devolve os bytes do
-JSON e os headers de resposta `X-Dummy-Method` e `X-Dummy-Body-Bytes`, sem ecoar
-headers de autenticação/cookies. Use apenas dados fictícios.
-
-O cenário `scenario_get_status.hurl` executa `/health`, `/inexistente` e repete
-`/health`, validando três respostas em sequência. Também é possível executar:
+Para baixar e instalar a última release estável, sem rascunhos ou pré-releases:
 
 ```sh
-bin/httpgo test testdata/scenarios/scenario_unvalidated_status.hurl
-# POST de demonstração e sequência de métodos da US-02:
-bin/httpgo test testdata/scenarios/scenario_json_inline.hurl
-bin/httpgo test testdata/scenarios/scenario_dummy_methods.hurl
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash
+"$HOME/.local/bin/httpgo" --version
 ```
 
-Esse cenário recebe 500 e informa explicitamente que não validou status.
-O dummy em `tools/dummy/main.go` é um utilitário **exclusivamente manual** de
-desenvolvimento, sem dependências novas. Não integra o binário httpgo nem os
-pacotes do build, lint ou testes automáticos. Os testes continuam usando seus
-próprios servidores isolados em portas dinâmicas: **não precisam de `make serve`**.
-Veja [servidor dummy](docs/dev-server.md) para os detalhes.
+O destino padrão é `~/.local/bin`. O instalador informa versão e caminho; se
+necessário, orienta a adicionar esse diretório ao `PATH`. Ele **não usa sudo nem
+altera configurações do shell**. Você pode usar o caminho completo do executável
+sem modificar o `PATH`.
+
+Para fixar uma versão, substitua `v1.0.0` por uma tag publicada. A seleção é exata,
+sem fallback; uma pré-release como `v1.0.0-rc.1` também pode ser escolhida:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash -s -- --version v1.0.0
+```
+
+Para escolher outro diretório, inclusive um caminho com espaços:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh | bash -s -- --bin-dir "$HOME/meus binarios"
+"$HOME/meus binarios/httpgo" --version
+```
+
+**O comando com pipe executa código remoto na sua máquina.** Se preferir baixar e
+inspecionar o script antes de executá-lo, faça as etapas separadamente:
+
+```sh
+curl -q -fsSL --proto '=https' --proto-redir '=https' \
+  https://github.com/capimgrosso/httpgo/releases/latest/download/install.sh -o install.sh
+# Abra install.sh em um editor e revise seu conteúdo antes de continuar.
+bash ./install.sh --version v1.0.0
+```
+
+Para obter também o script de uma tag específica, use
+`https://github.com/capimgrosso/httpgo/releases/download/v1.0.0/install.sh`.
+Os downloads exigem HTTPS com verificação de certificado. Após selecionar a tag,
+o instalador baixa o pacote e `checksums.txt` **da mesma release** e verifica
+SHA-256 antes de gravar o executável. O checksum verifica **integridade**, mas
+**não é uma assinatura de autenticidade**. Cada release reúne `install.sh`,
+`checksums.txt` e os pacotes `httpgo_linux_amd64.tar.gz`,
+`httpgo_linux_arm64.tar.gz`, `httpgo_darwin_amd64.tar.gz` e
+`httpgo_darwin_arm64.tar.gz`, cada um contendo apenas `httpgo`.
+
+Para reinstalar, repita o comando: um `httpgo` existente no destino é substituído
+sem confirmação, somente após download, validação e preparação completos. Falhas
+de rede, integridade, extração ou gravação retornam status diferente de zero sem
+truncar a instalação anterior. Plataforma não suportada, tag inexistente ou pacote
+ausente produzem erro, sem instalar outra versão. O instalador não realiza
+atualização automática, desinstalação nem integração com gerenciadores de pacotes.
+
+### Compilar a partir do código-fonte
+
+Como alternativa independente da publicação, tenha Git e **Go 1.26.10**, conforme
+[go.mod](go.mod):
+
+```sh
+git clone https://github.com/francisco-filho/httpgo.git
+cd httpgo
+go build -trimpath -o bin/httpgo ./cmd/httpgo
+```
+
+No Windows, use `go build -trimpath -o bin/httpgo.exe ./cmd/httpgo`. Adicione o
+diretório `bin` ao `PATH` ou substitua `httpgo` nos comandos abaixo por
+`./bin/httpgo` (Windows: `.\bin\httpgo.exe`). Se já clonou o projeto, basta compilar
+na raiz. Não é necessário instalar Hurl para usar HTTPGo.
+
+```sh
+httpgo --version
+httpgo --help
+httpgo test --help
+```
+
+Sem metadados de release, a versão desta compilação é
+`httpgo dev commit=unknown date=unknown`; isso não é uma versão publicada.
+A [referência do subconjunto](docs/subset.md) define as capacidades desta revisão.
+
+## Primeira execução e resultado
+
+Vamos usar uma API local fornecida pelo próprio repositório, sem depender de um
+serviço público. Na raiz do clone, em um primeiro terminal:
+
+```sh
+go run ./tools/dummy/main.go
+```
+
+Mantenha-o aberto: o servidor escuta apenas em `127.0.0.1:8080`, cuja porta precisa
+estar livre. `GET /health` responde **200**, `Content-Type: application/json` e
+`{"status":"ok"}`. Encerre com **Ctrl+C** ao terminar o guia. Ele é uma fixture
+manual, sem persistência, TLS ou autenticação; nunca envie credenciais reais.
+Veja os [endpoints e limites do servidor](docs/dev-server.md).
+
+Em outro terminal, crie uma pasta de trabalho vazia **fora do clone**, entre nela
+e salve o arquivo `exemplo.httpgo` com o conteúdo completo:
 
 ```hurl
-GET http://localhost:8080/health
+GET {{base_url}}/health
 HTTP 200
-
-GET http://localhost:8080/inexistente
-HTTP 404
 ```
 
-Também são suportados `POST`, `PUT`, `PATCH` e `DELETE`, com headers e um valor
-JSON inline opcional (objeto, array ou escalar; inclusive multilinha). GET aceita
-headers, mas permanece sem body. Exemplo contra uma API local com `/products`:
+A primeira linha define método e URL; `HTTP 200` exige o status da resposta.
+`{{base_url}}` é uma variável: `--var nome=valor` fornece seu valor não sigiloso.
+Os exemplos seguintes usam essa mesma pasta e o mesmo servidor, salvo indicação.
+Os comandos de shell do guia usam sintaxe POSIX (sh/bash); adapte caminhos e a
+leitura do código de saída ao PowerShell (`$LASTEXITCODE`) ou cmd (`%ERRORLEVEL%`).
+
+```sh
+httpgo test exemplo.httpgo --var base_url=http://localhost:8080
+echo $?
+```
+
+A saída em stdout informa o GET, status 200 e resumo com uma requisição validada;
+o código é **0**, sem diagnóstico de erro em stderr. A CLI não imprime o body.
+Agora troque **somente** `HTTP 200` por `HTTP 201` no arquivo e repita o comando:
+o servidor continua respondendo 200, aparece **status divergente**, e `echo $?`
+mostra **1**. Restaure `HTTP 200` antes de prosseguir.
+
+| Código | Significado |
+|---|---|
+| `0` | Execução aprovada pelas validações declaradas |
+| `1` | Falha de assertion, incluindo status divergente |
+| `2` | Demais erros: uso, sintaxe, configuração, captura, avaliação, renderização, transporte, cancelamento ou escrita de relatório |
+
+Em suítes, **2 prevalece sobre 1**. Sem uma linha `HTTP`, qualquer status é aceito
+e informado como **sem validação de status**; `HTTP *` também aceita qualquer
+status, não equivale a exigir 200. Dentro de um arquivo, uma falha definitiva
+interrompe as próximas requisições; não desfaz efeitos que já ocorreram na API.
+A saída é texto sem cores, inclusive em TTY e com `NO_COLOR`; resultados vão a
+stdout e diagnósticos a stderr. Consulte os [contratos da CLI](docs/subset.md#cli-e-saída).
+
+## Requisições e dados de entrada
+
+### Headers e body JSON
+
+Após o GET inicial, envie dados com POST. O servidor local aceita `POST /products`
+e responde **201** com `{"id":1}`. Headers ficam após a linha da requisição;
+o body JSON vem depois deles. Salve `json.httpgo`:
 
 ```hurl
 POST http://localhost:8080/products
 Content-Type: application/json
+X-Client: guia-httpgo
 {"name":"Pizza","price":4500}
-
 HTTP 201
 ```
 
-Salve como `products.hurl` e execute `bin/httpgo test products.hurl`. O mesmo
-exemplo está em `testdata/scenarios/scenario_json_inline.hurl` e é exercitado
-pelo binário nos E2E. O dummy manual também implementa essa demonstração: basta
-iniciar `make serve`. Headers e JSON são validados antes de qualquer envio, e os bytes do valor
-JSON estático são preservados, sem serialização. Declare Content-Type quando necessário;
-não há inferência automática desse header.
+```sh
+httpgo test json.httpgo
+```
 
-## Payload de arquivo externo (US-09 / issue #22)
+Resultado: código **0**, um POST com status 201 validado. Também há PUT, PATCH e
+DELETE; GET não aceita body. Cada arquivo pode conter várias requisições
+sequenciais. Declare `Content-Type` explicitamente: HTTPGo não infere
+`application/json` para o body completo. Veja [métodos, headers e JSON inline](docs/subset.md#headers-e-json-inline).
+
+### Enviar um arquivo como body completo
+
+Crie as pastas `tests` e `payloads` na pasta de trabalho. Salve
+`payloads/product.json` com `{"name":"Pizza","price":4500}` e
+`tests/arquivo.httpgo` com:
 
 ```hurl
 POST http://localhost:8080/products
@@ -90,358 +207,297 @@ file,../payloads/product.json;
 HTTP 201
 ```
 
-Salve em `tests/products.hurl`, crie `payloads/product.json` e execute
-`bin/httpgo test tests/products.hurl`. Exemplo pronto contra o dummy:
-`bin/httpgo test testdata/scenarios/scenario_external_body.hurl`.
+```sh
+httpgo test tests/arquivo.httpgo
+```
 
-`file,<caminho>;` substitui o body inline inteiro, não pode ser combinado com
-outro body e não é aceito em GET. O caminho é literal, incluindo espaços entre
-`file,` e o `;` final; não há sintaxe especial de aspas/escapes nem interpolação.
-Nomes com vírgula/ponto e vírgula ficam fora deste recorte. Caminhos relativos
-partem do diretório do `.hurl`, independentemente do diretório corrente;
-absolutos são aceitos. **Sem sandbox:** `..` e caminhos absolutos podem alcançar
-arquivos fora da raiz do projeto, com as permissões do usuário da CLI.
+O dummy recebe os bytes do JSON e retorna 201: código **0**. `file,...;` substitui
+o body inteiro. O caminho é literal e relativo ao **arquivo de cenário**, não ao
+terminal; não aceita interpolação. Sem `--render-files`, os bytes são preservados,
+inclusive `{{placeholder}}`, arquivos vazios e binários. Para enviar um binário,
+use uma API que o aceite e declare seu Content-Type e status esperado.
+**Não há sandbox**: caminhos absolutos e `..` podem ler fora do projeto. Execute
+somente cenários confiáveis. Veja [arquivos externos](docs/subset.md#body-de-arquivo-externo).
 
-Todos os bytes são enviados sem normalização, validação JSON ou renderização:
-vazio, não JSON, binário e `{{placeholder}}` literal, definido ou não. Content-Type
-não é inferido. O arquivo é lido integralmente e fechado somente na vez da
-requisição, antes do envio. Falha de abertura/leitura/fechamento retorna 2 com
-posição da referência e causa segura; aquela requisição e as seguintes não são
-enviadas. As anteriores permanecem executadas, sem rollback. O prazo de 10s é do
-transporte e não promete interromper leitura local bloqueada pelo sistema.
-Não há limite de tamanho: a memória acompanha o arquivo corrente.
-Não se imprimem conteúdo nem caminho operacional nos diagnósticos. A proteção
-não descobre segredos arbitrários no payload; use somente cenários confiáveis.
+### Enviar multipart
 
-**Mudança de contrato:** a antiga rejeição global de `file,...;` foi removida;
-negativos específicos mantêm as restrições. Multipart e `--render-files` continuam
-não suportados. Renderização externa futura será extensão explícita HTTPGo,
-não uma capacidade anunciada nesta entrega. Veja [subconjunto](docs/subset.md)
-e [evidência diferencial](docs/compatibility.md).
+Multipart envia campos textuais e **um arquivo**, em POST, PUT ou PATCH. Neste
+exemplo é necessária **outra API**, em `http://localhost:8081`, com
+`POST /documents` aceitando os campos `description`, `category` e o arquivo
+`document`, e respondendo **201**. O dummy em 8080 **não aceita multipart**.
+Use apenas um servidor de testes que cumpra esse contrato, sem credenciais reais.
 
-## Parametrizar URL e headers (US-03 / issue #11)
-
-Salve o exemplo abaixo como `products.hurl`:
+Crie a pasta `fixtures`, salve `fixtures/document.txt` com o texto
+`Documento fictício` e salve `tests/upload.httpgo`:
 
 ```hurl
-GET {{api.baseUrl}}/products
-Authorization: Bearer {{token}}
-
-HTTP 200
+POST http://localhost:8081/documents
+[MultipartFormData]
+description: Documento de teste
+category: reports
+document: file,../fixtures/document.txt; text/plain
+HTTP 201
 ```
 
 ```sh
-bin/httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
-  --var token=valor-ficticio --secret token
-# Troque somente api.baseUrl para executar o mesmo arquivo em outro destino.
+httpgo test tests/upload.httpgo
 ```
 
-O cenário também está em `testdata/scenarios/scenario_products_variables.hurl`;
-requer uma API com `GET /products` retornando 200 (o dummy manual não oferece esse
-GET). Os E2E demonstram dois destinos locais isolados sem editar o cenário.
+Com a API indicada, o resultado é **0**, um POST validado; a API recebe os dois
+textos e o arquivo com filename `document.txt`. Boundary e Content-Type são
+automáticos: não forneça boundary manual. Só campos textuais interpolam; os bytes
+do arquivo nunca são renderizados, mesmo com `--render-files`. Não combine outro
+body na mesma entrada. Múltiplos arquivos e campos repetidos não são suportados.
+Veja [contrato multipart e MIME](docs/subset.md#upload-multipart-básico).
 
-`--var nome=valor` é repetível. **Mudança de contrato na US-04:** um literal JSON
-válido preserva seu tipo; o restante permanece texto, inclusive vazio. Strings JSON
-perdem as aspas delimitadoras e interpretam escapes. O primeiro `=` separa nome/valor;
-os seguintes são preservados. Nomes ASCII pontuados, como `api.baseUrl`, resolvem por
-nome exato. Duplicações e conflitos ancestral/descendente, como `api`/`api.baseUrl`,
-são erros independentemente do tipo, sem merge nem sobrescrita. Objetos são opacos:
-`--var 'product={"name":"Pizza"}'` **não** define `product.name`.
-URL e valores de headers aceitam `{{nome}}` e `{{ nome }}`, sem recursão. Nesses
-contextos só são aceitos escalares; arrays/objetos geram erro antes do envio.
-A URL final exige encoding explícito; nomes de headers permanecem estáticos.
+## Variáveis e encadeamento
 
-## Parametrizar JSON preservando tipos (US-04 / issue #13)
+Use `{{nome}}` em URLs, valores de headers e JSON para reutilizar um cenário.
+`--var nome=valor` pode ser repetido para nomes diferentes; forneça somente dados
+não sigilosos. Literal JSON preserva tipo, o restante é texto. Nomes pontuados
+são exatos: `product.name` não é acesso à propriedade de um objeto `product`.
 
-Salve como `products.hurl`:
+Salve `products.httpgo`:
 
 ```hurl
 POST {{api.baseUrl}}/products
 Content-Type: application/json
 {"name":"{{product.name}}","price":{{product.price}},"active":{{product.active}},"code":{{product.code}}}
-
 HTTP 201
 ```
 
 ```sh
-bin/httpgo test products.hurl --var api.baseUrl=http://localhost:8080 \
+httpgo test products.httpgo --var api.baseUrl=http://localhost:8080 \
   --var product.name=Pizza --var product.price=4500 \
   --var product.active=true --var 'product.code="001"'
 ```
 
-A API recebe `name` e `code` como strings, `price` como número e `active` como
-booleano. O cenário versionado é `testdata/scenarios/scenario_products_typed.hurl`;
-os E2E verificam os dados recebidos por HTTP local. O dummy pode ser usado
-manualmente, sem alterar seu código ou depender dele nos testes.
+O dummy responde 201: resultado **0**. A API recebe nome e código como strings,
+preço como número e `active` como booleano. As aspas internas em
+`'product.code="001"'` forçam string. Troque `api.baseUrl` para outro destino sem
+editar o cenário. Duplicar um nome na CLI ou misturar `api` e `api.baseUrl` é erro
+**2**. A URL não recebe percent-encoding automático.
 
-Placeholder sem aspas em posição de valor JSON completo preserva qualquer tipo,
-inclusive `null`, array e objeto, também na raiz (`{{body}}`). Dentro de strings
-JSON, aceita apenas escalares e composição textual, com escape correto de aspas,
-barras invertidas e controles, preservando Unicode. Números conservam sua
-representação JSON sem arredondamento, inclusive dentro de estruturas. Conteúdo
-inserido semelhante a placeholder permanece literal. Chaves JSON são estáticas;
-renderização de arquivos externos, expressões e acesso a propriedades não são suportados.
+Em um valor JSON completo, placeholders sem aspas preservam tipo e precisão,
+inclusive arrays/objetos; dentro de strings JSON, URLs e headers, só escalares
+são aceitos. Strings JSON são escapadas corretamente. Não há expansão recursiva,
+navegação de propriedades de objetos CLI ou nomes de headers/chaves JSON
+dinâmicos. Consulte [variáveis e templates](docs/subset.md#variáveis-tipadas-e-templates).
+Para encadear valores **recebidos** da API, em vez de fornecidos inicialmente,
+use captures, explicadas a seguir. Credenciais reais vêm do
+[ambiente do processo](docs/configuration.md#referências-ao-ambiente-do-processo-e-segredos), nunca de flags.
 
-A interpretação tipada de `--var` é uma **extensão própria HTTPGo**, não promessa
-de equivalência com a CLI do Hurl. A sintaxe contextual compartilhada e as diferenças
-observadas contra Hurl 8.0.0 estão em [compatibilidade](docs/compatibility.md).
+## Assertions e captures
 
-**É proibido fornecer credenciais reais em argumentos, inclusive `--var`.** Use
-somente valores não sigilosos ou fictícios. `--secret nome` apenas marca proteção
-nas saídas; não fornece valor nem protege histórico de shell/listagem de processos.
-Marcar um nome ainda ausente é permitido, mas não resolve sua referência. A fonte
-segura para credenciais iniciais pelo ambiente do processo chega na US-13;
-stdin não está implementado. Capturas de respostas estão disponíveis desde a US-05,
-ampliadas para qualquer tipo JSON na US-06.
+**Assertion valida** uma propriedade da resposta; **capture extrai** um valor
+para uso posterior. Capturar `id` não prova que o produto tem o nome correto;
+exigir `HTTP 200` não prova que o JSON está correto. Combine as verificações
+necessárias ao comportamento que você quer testar.
 
-## Autenticar e reutilizar token (US-05 / issue #14)
+O [guia de assertions](docs/assertions.md) reúne o catálogo completo por status,
+JSONPath, header, body e extração regex, com sintaxe, exemplos e resultados.
+Explica tipos, ausência/vazio/`null`, contagem, perfil literal versus
+`--render-asserts` e a diferença entre divergência (**1**) e avaliação inválida (**2**).
 
-Salve como `products.hurl` (também em
-`testdata/scenarios/scenario_auth_capture.hurl`):
+O [guia de captures](docs/captures.md) mostra como extrair valores JSON tipados,
+contagens, headers e grupos regex, e reutilizá-los no mesmo arquivo. Inclui
+exemplos completos, ausência versus vazio/`null`, operandos dinâmicos com opt-in,
+renovação exata, confirmação do lote e sigilo. Capturas não passam entre arquivos;
+falha de captura é **2**, diferente de divergência de assertion (**1**).
+
+## Configuração, suítes e relatórios
+
+### Configurar o destino e escolher um ambiente
+
+Reutilize destinos e variáveis com **configuração YAML hierárquica, uma extensão
+HTTPGo**. O [guia de configuração](docs/configuration.md) reúne os arquivos
+completos, a precedência base → ambiente → CLI, schema, limites e overrides.
+Ele demonstra `httpgo test exemplo.httpgo --env local --var base_url=http://localhost:9090`
+e distingue ambientes nomeados de referências explícitas `${NOME}` ao processo.
+Credenciais reais vêm do ambiente do processo, **nunca de argumentos**; consulte
+no guia as fontes disponíveis, proteção preservada após override e seus limites.
+
+### Executar uma suíte e gerar relatórios
+
+Crie uma pasta separada `suite` (não use o clone ou a pasta com todos os exercícios).
+Copie `exemplo.httpgo`, restaurado com `HTTP 200`, para `suite/01-health.httpgo`.
+Salve `suite/02-produto.httpgo` com:
 
 ```hurl
-POST {{base_url}}/auth/login
-Content-Type: application/json
-{"username":"{{username}}","password":"{{password}}"}
-
-HTTP 200
-[Captures]
-accessToken: jsonpath "$.accessToken"
-
-GET {{base_url}}/products
-Authorization: Bearer {{accessToken}}
+GET {{base_url}}/products/1
 HTTP 200
 ```
 
 ```sh
-bin/httpgo test products.hurl --var base_url=http://localhost:8080 \
-  --var username=demo --var password=senha-ficticia \
-  --secret password --secret accessToken
+httpgo test suite/ --var base_url=http://localhost:8080
+httpgo test suite/ --var base_url=http://localhost:8080 --output junit --output-file target/test-results.xml
+httpgo test suite/ --var base_url=http://localhost:8080 --fail-fast --output html --output-file target/report.html
 ```
 
-Requer API que devolva `{"accessToken":"token-ficticio"}` no login e aceite esse
-Bearer em `/products`; o dummy manual não implementa autenticação. Os E2E usam
-servidor HTTP isolado e verificam o token efetivamente recebido. Todas as
-credenciais do exemplo são **fictícias**; credenciais reais em argumentos continuam
-proibidas.
+Os três comandos retornam **0**: dois arquivos, duas requisições aprovadas.
+Diretórios descobrem cenários recursivamente, em ordem lexicográfica; arquivos e
+requisições executam sequencialmente. Capturas não passam de um arquivo para outro.
+Sem `--fail-fast`, a falha de um arquivo não impede os demais; com a flag, os
+restantes ficam **não executados**. Erros de descoberta impedem todo HTTP.
 
-`[Captures]` associa-se à resposta anterior, depois de `HTTP` quando declarado.
-JSONPath aceita somente raiz `$`, propriedades por ponto (`$.product.id`) e
-índices de array não negativos (`$.items[0]`). Desde a US-06, o resultado aceita
-qualquer tipo JSON, inclusive raiz, `null`, string vazia, arrays/objetos vazios.
-JSON inválido, caminho ausente ou índice fora do array é erro de captura (código 2).
-Consultas não suportadas em qualquer entrada impedem todos os envios.
+O primeiro comando mostra resultados e resumo em stdout. Nos outros, stdout fica
+vazio: JUnit grava `target/test-results.xml`, substituindo destino existente;
+HTML gera `target/report-YYYYMMDDTHHMMSSmmmZ.html` em UTC, sem sobrescrever
+anteriores (adiciona sufixo na colisão), e anuncia o caminho final em stderr.
+Ambos criam diretórios pais quando possível, exigem `--output-file` e reaproveitam
+a execução, **sem reenviar requisições para gerar o relatório**.
 
-Capturas ficam disponíveis após consumir/fechar a resposta e aprovar o status,
-quando esperado, e todas as assertions de headers/JSON declaradas, para URLs, valores de
-headers e JSON inline seguintes. Strings
-como `"123"`, `"null"` ou `"{{literal}}"` continuam strings, sem reinterpretação.
-Nomes pontuados resolvem por nome exato; duplicações e conflitos hierárquicos com
-variáveis iniciais ou capturas anteriores falham sem sobrescrever. Cada execução
-começa sem capturas, e continua aceitando exatamente um arquivo. `--secret` pode
-marcar uma captura futura sem criá-la; valores descobertos ficam ocultos nos
-streams e diagnósticos, inclusive variantes de escape conhecidas. Não há garantia
-de reconhecer segredos arbitrários antes de descobri-los ou codificações desconhecidas.
+JUnit tem um testcase por arquivo: divergência vira `failure`, demais erros
+viram `error`, não executados viram `skipped`. O HTML é um arquivo autossuficiente
+para abrir offline, com resumo e detalhes por requisição. Também são gerados com
+falhas ocorridas na execução; erro global anterior à execução não cria relatório.
+Erro de escrita/fechamento retorna **2**, podendo deixar arquivo parcial.
+Não há JSON, HTML/JUnit simultâneos nem publicação externa automática.
+Os relatórios não incluem bodies/headers integrais, mas ainda exigem marcação de
+segredos. Consulte [suítes](docs/subset.md#suítes),
+[JUnit e CI](docs/junit.md) e [HTML e proteção de dados](docs/html.md).
 
-## Encadear operações com capturas tipadas (US-06 / issue #16)
+## Extensões e limites de compatibilidade
 
-Salve como `products.hurl` (também em
-`testdata/scenarios/scenario_capture_products.hurl`):
+### Extensões de arquivo e compatibilidade
 
-```hurl
-POST {{base_url}}/products
-Content-Type: application/json
-{"name":"Pizza"}
+`.httpgo` é a extensão padrão recomendada para novos cenários. Arquivos `.hurl`
+continuam aceitos, sem renomeação, conversão de conteúdo ou flag adicional.
+Ambas usam a mesma linguagem e execução: a extensão não seleciona modo de
+compatibilidade nem amplia o subconjunto Hurl suportado. Aceitação da extensão
+não significa compatibilidade integral com Hurl.
 
-HTTP 201
-[Captures]
-productId: jsonpath "$.id"
-
-GET {{base_url}}/products/{{productId}}
-HTTP 200
-
-POST {{base_url}}/echo
-Content-Type: application/json
-{"productId":{{productId}}}
-HTTP 200
-```
-
-```sh
-bin/httpgo test products.hurl --var base_url=http://localhost:8080
-```
-
-Uma API que retorna `{"id":9007199254740993}` recebe o caminho
-`/products/9007199254740993` e o último body com esse mesmo ID **numérico**, sem
-arredondamento. Os três status são validados. Os E2E verificam esses bytes por
-HTTP real e também o fluxo login → token → criação → ID → consulta → echo de
-`testdata/scenarios/scenario_capture_auth_products.hurl`. O dummy manual não
-implementa esse contrato dinâmico de ID/autenticação.
-
-**Ampliação intencional do contrato US-05:** capturas agora preservam string,
-número, booleano, `null`, array e objeto em posição de valor JSON completo,
-inclusive na raiz. Números mantêm precisão também dentro de estruturas; strings
-semelhantes a JSON ou placeholders não são reinterpretadas. Em URL, header ou
-string JSON, escalares usam sua representação textual (string decodificada,
-número JSON, `true`/`false`, `null`); arrays/objetos falham antes do envio dependente.
-Não há percent-encoding automático; escape JSON e restrições de headers continuam.
-Capturar `product` como objeto não cria `product.id`: declare outra captura com
-nome não conflitante, por exemplo `productId: jsonpath "$.id"`. Colisões seguem
-proibidas em qualquer tipo; publicação do lote é atômica. `--secret` acompanha
-capturas escalares e compostas e protege também seus constituintes e escapes
-conhecidos sem mudar os dados enviados nem criar variáveis para as propriedades.
-
-A estrutura do arquivo inteiro é validada antes da rede. Variáveis ausentes e
-valores finais inválidos falham imediatamente antes da requisição dependente,
-sem contá-la como iniciada e sem enviar as seguintes. As requisições são
-sequenciais e a primeira falha de status, header, JSON, captura, renderização ou transporte
-interrompe a execução. Uma falha de captura preserva a resposta concluída e o
-status aprovado nas contagens, mas impede o próximo envio. Sem `HTTP`, qualquer status recebido é aceito,
-com indicação explícita de **sem validação de status**.
-
-- `0`: sucesso; `1`: status ou assertion de header/JSON divergente; `2`: demais erros,
-  inclusive avaliação de JSON inválido ou percurso incompatível.
-- Timeout total de 10 segundos por requisição, incluindo redirects e leitura do body.
-- TLS verificado; até 10 redirects, apenas na mesma origem; nenhum retry.
-- Cada resultado é emitido em stdout assim que a requisição termina, antes da próxima;
-  resumo ao final e diagnósticos em stderr. Sempre texto sem cores.
-- 301/302/303 convertem POST/PUT/PATCH/DELETE em GET sem body; 307/308 preservam ambos.
-- Bodies e coleções de headers não são impressos. Apenas valores comuns sanitizados
-  podem aparecer no diagnóstico de assertion; valores sensíveis nunca são expostos.
-- Credenciais, query inteira e fragmento da URL não são exibidos.
-  Valores marcados com `--secret` também são ocultos em paths e headers comuns,
-  antes de escapes/normalização de URL. O restante do path permanece visível:
-  não coloque segredos arbitrários nele. A CLI não detecta toda credencial ou
-  codificação desconhecida automaticamente. A proteção cobre formas brutas,
-  decodificadas e escapes conhecidos (JSON, quoting de diagnóstico e URL), inclusive
-  em falhas anteriores à construção do contexto. Não há payload de diagnóstico.
-
-## Validar headers da resposta (US-07 / issue #18)
-
-Salve como `health.hurl` e execute `bin/httpgo test health.hurl` contra uma API
-que devolva `Content-Type: application/json; charset=utf-8` e `X-Request-Id: req-123`:
+Para reproduzir uma suíte mista, com o dummy do guia ativo em 8080, crie uma
+pasta separada `tests` contendo `01-health.httpgo` e `02-health.hurl`, ambos com:
 
 ```hurl
 GET http://localhost:8080/health
 HTTP 200
-[Asserts]
-header "Content-Type" contains "application/json"
-header "X-Request-Id" exists
-header "X-Request-Id" == "req-123"
 ```
 
-O cenário também está em `testdata/scenarios/scenario_assert_headers.hurl` e é
-verificado por HTTP real nos E2E. O dummy manual não promete esses headers.
-Esta é uma **ampliação intencional**: `[Asserts]`, antes rejeitada globalmente,
-passou a aceitar essas três formas, com strings literais entre aspas duplas.
-A US-08 acrescenta igualdade JSON na mesma lista ordenada (abaixo).
-Nomes são case-insensitive; igualdade e substring distinguem caixa dos valores.
-`{{nome}}` no esperado permanece literal, sem interpolação. Regex, filtros,
-captura de headers e outros operadores de header continuam não suportados.
+```sh
+httpgo test tests/01-health.httpgo
+httpgo test tests/02-health.hurl
+httpgo test tests/
+```
 
-Só a primeira ocorrência de cada header participa da comparação, sem concatenar
-ou separar vírgulas. Ausência faz todos os operadores falharem; presente vazio
-satisfaz `exists` e `== ""`. `contains ""` passa em qualquer valor presente.
+Cada chamada individual aprova uma requisição e retorna **0**. O diretório
+executa ambos nessa ordem e resume dois arquivos aprovados, também com **0**.
+A descoberta recursiva inclui `.httpgo` e `.hurl` sem preferência por extensão;
+caminhos distintos com conteúdo idêntico continuam cenários distintos. Caminhos
+equivalentes e hard links são deduplicados por identidade do filesystem. Outras
+extensões não entram na descoberta, mas arquivos explícitos, inclusive sem
+extensão, continuam aceitos e validados pelo conteúdo. Não há migração obrigatória.
+Veja o [contrato de compatibilidade das extensões](docs/compatibility.md#extensões-de-arquivo).
 
-`[Asserts]` exige declaração `HTTP` na entrada. `HTTP *` é aceito com ou sem
-assertions/capturas e permite qualquer status, inclusive 404/503. Sua linha mostra
-`status aceito por HTTP *`; o resumo conta em `sem_validação`, não em `validadas`.
-Isso dispensa **só a comparação numérica**, não headers nem capturas declarados.
+### Recursos próprios do HTTPGo
 
-Após consumo/fechamento da resposta final, a ordem é status numérico → assertions
-(headers/JSON na ordem escrita) → capturas, independentemente da ordem das seções. Uma falha de header retorna 1,
-localiza a assertion e esperado/recebido (ausência difere de `""`), não publica
-capturas nem envia a próxima requisição. Erro estrutural tardio retorna 2 sem
-qualquer envio. Escrita, consumo incompleto, timeout e cancelamento continuam 2.
-Valores sensíveis de Authorization/Proxy-Authorization/Cookie/Set-Cookie são
-ocultos nos dois lados, inclusive esperados literais; headers comuns usam a
-proteção de segredos conhecidos. Havendo captura secreta pendente na mesma
-resposta, ambos os operandos são ocultos integralmente, sem antecipar a captura.
-Nenhum body ou coleção de headers é exibido.
+**Extensão própria não significa recurso ausente no Hurl por princípio.** Hurl
+também tem variáveis, captures, assertions, envio de arquivos, multipart,
+configuração e relatórios. O que é próprio aqui são os **contratos concretos**
+abaixo, não essas capacidades genéricas:
 
-Equivalência com Hurl 8.0.0 é limitada aos pares observados: **repetidos são listas
-no Hurl**, que também interpola esperados e avalia capturas antes das assertions.
-Essas divergências são deliberadas, preservando as regras da história; veja
-[matriz de compatibilidade](docs/compatibility.md).
+- **Configuração YAML hierárquica**: `.httpgo.yaml`, `--config`, ambientes em
+  `environments/<nome>.yaml`, merge tipado e referências completas `${NOME}`.
+  Serve para compartilhar destinos, timeouts e nomes de variáveis sem editar
+  cenários. O [guia de configuração](docs/configuration.md) traz base, ambiente,
+  cenário, comando e resultado completos. Não é sintaxe de cenário nem um formato
+  de configuração intercambiável com Hurl.
+- **Renderização opt-in de JSON externo**: `--render-files` aplica templates aos
+  arquivos usados como body completo, preservando tipos como no JSON inline.
+  Permite reutilizar payloads entre cenários sem prometer que Hurl renderize os
+  mesmos arquivos. Sem flag, o envio externo continua sendo bytes literais.
 
-## Validar dados JSON da resposta (US-08 / issue #20)
+Para experimentar a segunda extensão, salve `payloads/product-template.json` com
+este **template** (antes da substituição, não é um JSON válido):
 
-Salve como `product.hurl` e execute
-`bin/httpgo test product.hurl --var base_url=http://localhost:8080` contra uma API
-que devolva `{"name":"Pizza","price":4500,"active":true}`:
+```text
+{"name":"{{product.name}}","price":{{product.price}}}
+```
+
+Salve `tests/renderizado.httpgo`:
 
 ```hurl
-GET {{base_url}}/products/1
-
-HTTP 200
-[Asserts]
-jsonpath "$.name" == "Pizza"
-jsonpath "$.price" == 4500
-jsonpath "$.active" == true
+POST http://localhost:8080/products
+Content-Type: application/json
+file,../payloads/product-template.json;
+HTTP 201
 ```
 
-O cenário é `testdata/scenarios/scenario_assert_json.hurl`. O fluxo autenticado
-com headers, ID de alta precisão, consulta e reutilização tipada está em
-`testdata/scenarios/scenario_assert_json_auth_products.hurl`; ambos são executados
-contra HTTP real pelos E2E. O dummy manual não promete esse contrato JSON.
+```sh
+httpgo test tests/renderizado.httpgo --render-files --var product.name=Pizza --var product.price=4500
+```
 
-**Ampliação intencional:** `jsonpath "consulta" == <literal JSON>` aceita string,
-número, booleano, null, array ou objeto, inclusive vazios. JSONPath mantém somente
-raiz `$`, propriedades por ponto e índices não negativos combináveis. Consultas
-são estáticas; os esperados são literais JSON completos na mesma linha, nunca
-templates: `"{{nome}}"` permanece texto mesmo com a variável definida.
+O dummy recebe `{"name":"Pizza","price":4500}` e retorna 201; resultado **0**.
+Sem `--render-files`, o mesmo arquivo é enviado literalmente: neste exemplo o
+dummy rejeita o template não resolvido com 400, causando divergência **1**.
+Não é a CLI validando JSON externo no modo bytes. Com a flag, variável ausente,
+JSON inválido ou tipo incompatível é renderização **2**, antes do envio afetado.
+Anteriores não são desfeitas. A flag vale para todos os bodies externos completos
+da invocação, não depende da extensão do arquivo e **não renderiza multipart**.
+Veja o [contrato de renderização](docs/subset.md#extensão-httpgo-json-externo-com---render-files).
 
-A igualdade preserva tipos: `"4500"` difere de `4500`. Números são comparados
-exatamente por valor (`1`, `1.0`, `1e0` são iguais), inclusive aninhados e com
-expoentes grandes, sem float64 ou expansão de potências. Arrays exigem a mesma
-ordem; objetos ignoram somente a ordem das chaves. Valor diferente, propriedade
-ausente ou índice fora do array retorna **1**; ausência difere de null presente.
-JSON vazio/inválido/adicional ou percurso por tipo incompatível retorna **2**,
-como erro de avaliação JSON, não de transporte/captura. Sintaxe ou construção
-não suportada em qualquer entrada rejeita o arquivo inteiro antes da rede.
+### Separar extensões, diferenças e ausência de suporte
 
-A avaliação é status numérico → headers e JSON **na ordem escrita** → capturas.
-A primeira falha impede capturas e próximos envios; `HTTP *` dispensa só a
-comparação numérica. O JSON da resposta é decodificado sob demanda, portanto um
-header divergente anterior prevalece sobre JSON inválido, não o inverso.
+| Classificação | Exemplo e consequência |
+|---|---|
+| Subconjunto compartilhado | Request-line, `HTTP 200`, `[Asserts]`, `[Captures]` e multipart básico, nos recortes com evidência diferencial |
+| Extensão HTTPGo | YAML hierárquico e `--render-files`, testados separadamente; não passe essas opções ao Hurl |
+| Diferença de comportamento | Esperados são literais por padrão; `--render-asserts` opta por esperados dinâmicos. Headers repetidos usam a primeira ocorrência; códigos e relatórios têm contrato próprio |
+| Não suportado | XPath, query `variable`, JSONPath completo, `body matches`, multipart com múltiplos arquivos, execução paralela e `httpgo check` |
 
-Diagnósticos mostram consulta, arquivo/linha/coluna e valores tipados sanitizados,
-com ausência distinguível de null. Segredos conhecidos/derivados são protegidos.
-Com captura marcada secreta pendente **na mesma resposta**, ambos os operandos de
-falhas de headers e JSON ficam integralmente ocultos, inclusive nos metadados do
-callback, sem avaliar nem publicar a captura antes da hora. Isso não detecta
-segredos arbitrários não marcados. Body, documento e coleções de headers não
-são despejados nem acumulados no resultado.
+Construções reconhecidas fora do subconjunto não são ignoradas: retornam erro
+explícito **2**, com localização, e impedem execução parcial do arquivo por erro
+estático. A [referência do subconjunto](docs/subset.md), as
+[diferenças em relação ao Hurl](docs/subset.md#diferenças-em-relação-ao-hurl) e a
+[matriz de compatibilidade](docs/compatibility.md) são a fonte dos limites.
+A matriz fixa **Hurl 8.0.0** e classifica evidências por cenário; aceitar o parsing
+não comprova equivalência de execução, transporte, segredos ou CLI.
 
-Não há `count`, `exists` JSON, comparações ordenadas, regex, filtros, ampliação de
-JSONPath nem interpolação de consultas/esperados. Hurl 8.0.0 rejeita os literais
-esperados compostos e o literal com expoente testados; a gramática e os códigos
-próprios estão classificados em [compatibilidade](docs/compatibility.md), sem
-promessa de equivalência geral.
+Para comparar os conceitos com a documentação pública do Hurl, consulte
+[templates e fontes de variáveis](https://hurl.dev/docs/templates.html),
+[arquivos de configuração](https://hurl.dev/docs/manual.html#configuration) e
+[opções da CLI e relatórios](https://hurl.dev/docs/manual.html).
+Essas páginas podem evoluir; não substituem a referência versionada da matriz.
+
+## Receitas adicionais
+
+Os guias reúnem receitas completas, com pré-requisitos de API, entrada/resposta,
+comando e resultado esperado. Algumas requerem outra API de testes, não o dummy:
+
+- [Cache condicional com ETag](docs/captures.md#header-literal) e
+  [cookie explícito](docs/captures.md#extrair-cookie-explicitamente).
+- [Projeção e filtros JSONPath](docs/captures.md#jsonpath-tipos-e-seleção).
+- [Guardar e comparar uma contagem](docs/captures.md#capturar-contagem-e-reutilizar-em-assertion).
+- [Capturar e validar um código textual](docs/assertions.md#capturar-e-validar-o-código-na-mesma-resposta).
+- [Comparar valores anteriores](docs/assertions.md#comparar-com-valores-anteriores) e
+  [rotação de token](docs/assertions.md#desigualdade-e-rotação-de-token).
+
+Não rode toda `testdata/scenarios` como suíte: ela contém casos intencionalmente
+inválidos e não suportados.
 
 ## Documentação e desenvolvimento
 
-- [Subconjunto e contratos da CLI](docs/subset.md)
+- [Subconjunto, sintaxe, execução e segurança](docs/subset.md)
+- [Compatibilidade diferencial com Hurl 8.0.0](docs/compatibility.md)
 - [Arquitetura e ciclo de vida](docs/architecture.md)
 - [Servidor dummy para desenvolvimento](docs/dev-server.md)
-- [Compatibilidade diferencial com Hurl 8.0.0](docs/compatibility.md)
-- [Comandos, evidências e bloqueios de validação](docs/validation.md)
-- [Regras do repositório](AGENTS.md)
+- [Relatório JUnit e CI](docs/junit.md) e [HTML offline](docs/html.md)
+- [Comandos e evidências de validação](docs/validation.md)
+- [Regras do repositório](AGENTS.md) e [targets disponíveis](Makefile)
+
+Para desenvolver, tenha também `goimports` e `golangci-lint` no `PATH`.
+Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
+**desenvolvimento**, não no binário entregue. Na raiz do clone:
 
 ```sh
 make fmt lint test
-# Explicitamente, além do lint:
 go vet ./...
 make build
-make compatibility
-# Opcional durante as histórias; build cruzado não comprova execução nativa:
-make portable
 ```
 
-Os testes com `-race` exigem CGO e compilador/headers C no ambiente de
-**desenvolvimento**, não no binário entregue. O gate local com race já passou;
-a evidência Linux por história está registrada em `docs/validation.md`, separada dos
-históricos anteriores. Conforme o plano v4, seção 7, cross-build e testes nativos
-macOS/Windows são opcionais nesta história e ficam para a validação final de
-portabilidade/release, sem bloquear a entrega. Não foi executado runtime nessas
-plataformas nesta história; cross-build não o comprovaria. A aprovação da história
-passa pelo gate de revisão; não há alegação de compatibilidade Hurl completa.
+A suíte padrão usa servidores locais `httptest`, não depende do dummy nem de APIs
+externas. O diferencial Hurl é um gate separado com versão fixada, descrito na
+[matriz e seus pré-requisitos](docs/compatibility.md#escopo-da-evidência).
+Build cruzado não comprova execução nativa; esta documentação não anuncia
+artefatos de release nem homologação em todas as plataformas.

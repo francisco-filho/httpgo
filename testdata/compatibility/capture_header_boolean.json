@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "true"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "diferença contextual JSON: HTTPGo envia string true; Hurl envia booleano true neste par",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":\"true\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "{\"value\":true}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

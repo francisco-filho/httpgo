@@ -1,0 +1,13 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[]",
+  "classification": "consulta/template inválido tardio: validação HTTPGo impede todo HTTP do arquivo",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

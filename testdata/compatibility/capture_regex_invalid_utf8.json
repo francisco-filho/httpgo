@@ -1,0 +1,38 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain"
+    }
+  ],
+  "response_body": "/w==",
+  "classification": "UTF-8 inválido rejeitado pelos dois executáveis; categorias de erro próprias, sem equivalência geral de decoder",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

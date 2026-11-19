@@ -1,0 +1,32 @@
+{
+  "response_body": "Y29kZQ==",
+  "classification": "US-34: extração regex falha antes da assertion em ambos; códigos HTTPGo 2 e Hurl 3",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

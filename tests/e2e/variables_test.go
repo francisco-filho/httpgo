@@ -93,7 +93,7 @@ func TestVariablesInvalidInputBeforeNetwork(t *testing.T) {
 			args := []string{"test", scenario(t, text), "--var", "base=" + server.URL, "--var", "token=fictitious", "--secret", "token"}
 			args = append(args, tc.flags...)
 			code, out, stderr := run(t, args...)
-			if code != 2 || out != "" || stderr == "" || hits.Load() != 0 || strings.Contains(stderr, "fictitious") {
+			if code != 2 || (tc.suffix != "" && !prevalidationSummary(out) || tc.suffix == "" && out != "") || stderr == "" || hits.Load() != 0 || strings.Contains(stderr, "fictitious") {
 				t.Fatalf("code=%d out=%q err=%q hits=%d", code, out, stderr, hits.Load())
 			}
 		})

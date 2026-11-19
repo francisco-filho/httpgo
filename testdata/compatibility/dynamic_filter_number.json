@@ -1,0 +1,21 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":9007199254740993,\"id\":1},{\"v\":9007199254740992,\"id\":2}]",
+  "variables": [
+    "v=9007199254740993"
+  ],
+  "classification": "diferença numérica observada: operando 9007199254740993 mantém igualdade exata aqui; Hurl reprova este filtro (4), sem inferir precisão Hurl geral",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

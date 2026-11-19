@@ -55,12 +55,12 @@ func TestHelpVersionAndInvalidUsage(t *testing.T) {
 		code int
 		want string
 	}{
-		{"help", []string{"--help"}, 0, "httpgo test health.hurl"},
+		{"help", []string{"--help"}, 0, "httpgo test health.httpgo"},
 		{"test help", []string{"test", "--help"}, 0, "HTTP 404"},
 		{"version", []string{"--version"}, 0, "httpgo 1.0-test commit=abc123 date=2026-11-14"},
 		{"no args", nil, 2, "uso inválido"},
 		{"no file", []string{"test"}, 2, "uso inválido"},
-		{"two files", []string{"test", "a", "b"}, 2, "uso inválido"},
+		{"missing files", []string{"test", "a", "b"}, 2, "caminho inválido"},
 		{"unknown command", []string{"check", "a"}, 2, "uso inválido"},
 		{"root flag", []string{"--token=flag-secret"}, 2, "flag não suportada"},
 		{"test flag", []string{"test", "--token=flag-secret"}, 2, "flag não suportada"},
@@ -107,7 +107,7 @@ func TestResultsAndSecretRedaction(t *testing.T) {
 				}
 				prefix := "GET "
 				if tc.code != 0 {
-					prefix = fmt.Sprintf("%q:1:1: GET ", file)
+					prefix = fmt.Sprintf("%q:1:1: GET ", shownPath(t, file))
 				}
 				if !strings.HasPrefix(line, prefix) {
 					t.Errorf("result line = %q; want prefix %q", line, prefix)
@@ -141,7 +141,7 @@ func TestInvalidInputNeverCallsExecutor(t *testing.T) {
 			fake := &fakeExecutor{}
 			file := writeScenario(t, text)
 			code, out, err := execute(t, context.Background(), fake, "test", file)
-			if code != 2 || out != "" || !strings.Contains(err, file) || len(fake.calls) != 0 {
+			if code != 2 || !prevalidationSummary(out) || !strings.Contains(err, file) || len(fake.calls) != 0 {
 				t.Fatalf("code=%d,out=%q,err=%q,calls=%v", code, out, err, fake.calls)
 			}
 			for _, secret := range []string{"url-user", "url-password", "bad%zz", "query-secret"} {
@@ -165,7 +165,7 @@ func TestAlreadyCanceled(t *testing.T) {
 	cancel()
 	fake := &fakeExecutor{}
 	code, out, err := execute(t, ctx, fake, "test", writeScenario(t, "GET http://example.test/health"))
-	if code != 2 || len(fake.calls) != 0 || !strings.Contains(err, "cancelada") || !strings.Contains(out, "iniciadas=0") {
+	if code != 2 || len(fake.calls) != 0 || !strings.Contains(err, "cancelada") || out != "" {
 		t.Fatalf("code=%d,out=%q,err=%q", code, out, err)
 	}
 }

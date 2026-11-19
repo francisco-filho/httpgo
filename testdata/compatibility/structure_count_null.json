@@ -1,0 +1,16 @@
+{
+  "response_json": "null",
+  "classification": "null não é array; falha de assertion",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

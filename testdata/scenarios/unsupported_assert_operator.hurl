@@ -1,4 +1,4 @@
 GET http://localhost:8080/health
 HTTP *
 [Asserts]
-header "X-Test" matches "secret"
+header "X-Test" startsWith "secret"

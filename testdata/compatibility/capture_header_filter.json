@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "literal"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "ampliação intencional US-25: filtro regex de header agora suportado; primeiro grupo string em ambos",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "literal"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "literal"
+      }
+    ]
+  }
+}

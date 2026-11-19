@@ -1,0 +1,22 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain"
+    }
+  ],
+  "response_body": "ZcyB",
+  "classification": "shared: Unicode is not normalized; own exit codes",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

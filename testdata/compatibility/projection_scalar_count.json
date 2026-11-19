@@ -1,0 +1,16 @@
+{
+  "response_json": "[1]",
+  "classification": "shared failure: wildcard singleton number is not an array for count; exit codes differ",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

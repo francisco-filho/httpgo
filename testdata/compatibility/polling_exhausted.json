@@ -1,0 +1,79 @@
+{
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"status\":\"PENDING\"}"
+    }
+  ],
+  "classification": "equivalente no orçamento: inicial mais três retries, sem próxima entrada; códigos de assertion 1/4",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/poll",
+      "/poll"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/poll",
+      "/poll"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

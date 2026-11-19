@@ -1,0 +1,23 @@
+{
+  "response_json": "[{\"v\":\"{{static}}\",\"id\":\"selected\"}]",
+  "classification": "mudança explícita US-31: placeholder em literal da consulta exige opt-in; sem flag HTTPGo rejeita antes da rede; Hurl tenta interpolar variável ausente",
+  "httpgo": {
+    "exit": 2,
+    "paths": [],
+    "requests": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

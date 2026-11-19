@@ -29,6 +29,45 @@ func TestJSONAssertions(t *testing.T) {
 	}
 }
 
+func TestJSONMatchesPatterns(t *testing.T) {
+	for _, tc := range []struct {
+		pattern string
+		want    string
+	}{
+		{`"^Pizza\\s"`, "^Pizza\\s"},
+		{`"(?i)^pizza$"`, "(?i)^pizza$"},
+		{`"{{literal}}"`, "{{literal}}"},
+		{`""`, ""},
+	} {
+		scenario, err := Parse("matches.hurl", strings.NewReader("GET http://example.test\nHTTP 200\n[Asserts]\njsonpath \"$.name\" matches "+tc.pattern))
+		if err != nil {
+			t.Fatalf("pattern %s: %v", tc.pattern, err)
+		}
+		declaration := scenario.Entries[0].Assertions[0].JSON
+		if declaration == nil || declaration.Operator != "matches" || declaration.Pattern != tc.want || declaration.Compiled == nil {
+			t.Fatalf("declaration=%+v", declaration)
+		}
+	}
+}
+
+func TestInvalidJSONMatches(t *testing.T) {
+	for _, tc := range []struct{ pattern, category string }{
+		{`"["`, "sintaxe inválida"},
+		{`"(?=x)"`, "construção não suportada"},
+		{`"\x41"`, "sintaxe inválida"},
+		{`/x/`, "sintaxe inválida"},
+		{`"x" "extra"`, "sintaxe inválida"},
+	} {
+		t.Run(tc.pattern, func(t *testing.T) {
+			_, err := Parse("late.hurl", strings.NewReader("GET http://example.test\nHTTP 200\nGET http://example.test/late\nHTTP *\n[Asserts]\njsonpath \"$\" matches "+tc.pattern))
+			var located *Error
+			if !errors.As(err, &located) || located.Category != tc.category || located.Position.Line != 6 || strings.Contains(err.Error(), tc.pattern) {
+				t.Fatalf("err=%v", err)
+			}
+		})
+	}
+}
+
 func TestInvalidJSONAssertions(t *testing.T) {
 	for _, tc := range []struct{ line, category string }{
 		{`jsonpath "$" == {`, "sintaxe inválida"},
@@ -37,12 +76,22 @@ func TestInvalidJSONAssertions(t *testing.T) {
 		{`jsonpath "$" == "\x41"`, "sintaxe inválida"},
 		{`jsonpath "$." == 1`, "sintaxe inválida"},
 		{`jsonpath "$.{{name}}" == 1`, "construção não suportada"},
-		{`jsonpath "$[*]" == []`, "construção não suportada"},
+		{`jsonpath "$[0:1]" == []`, "construção não suportada"},
 		{`jsonpath "$[-1]" == 0`, "construção não suportada"},
 		{`jsonpath "$..name" == 0`, "construção não suportada"},
-		{`jsonpath "$" exists`, "construção não suportada"},
-		{`jsonpath "$" count == 1`, "construção não suportada"},
-		{`jsonpath "$" > 1`, "construção não suportada"},
+		{`jsonpath "$" exists true`, "sintaxe inválida"},
+		{`jsonpath "$" count == -1`, "sintaxe inválida"},
+		{`jsonpath "$" count == 1.5`, "sintaxe inválida"},
+		{`jsonpath "$" count == "3"`, "sintaxe inválida"},
+		{`jsonpath "$" count`, "sintaxe inválida"},
+		{`jsonpath "$" count exists`, "construção não suportada"},
+		{`jsonpath "$" count != 1`, "construção não suportada"},
+		{`jsonpath "$" > "1"`, "sintaxe inválida"},
+		{`jsonpath "$" >= true`, "sintaxe inválida"},
+		{`jsonpath "$" < null`, "sintaxe inválida"},
+		{`jsonpath "$" <= []`, "sintaxe inválida"},
+		{`jsonpath "$" > {}`, "sintaxe inválida"},
+		{`jsonpath "$" > 1 2`, "sintaxe inválida"},
 		{`jsonpath "$"== 1`, "sintaxe inválida"},
 	} {
 		t.Run(tc.line, func(t *testing.T) {

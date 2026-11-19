@@ -1,0 +1,21 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_body": "aWQ9MTIzNDU2",
+  "variables": [
+    "id=123456"
+  ],
+  "classification": "diferença deliberada: extração sempre estática HTTPGo inclusive com opt-in (1); Hurl interpola (0)",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

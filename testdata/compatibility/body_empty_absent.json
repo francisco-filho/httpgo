@@ -1,0 +1,24 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain"
+    }
+  ],
+  "response_body": "",
+  "classification": "shared: empty body excludes nonempty substring",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

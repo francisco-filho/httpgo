@@ -1,0 +1,28 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "a123"
+    }
+  ],
+  "response_json": "null",
+  "variables": [
+    "pattern=a[0-9]+"
+  ],
+  "classification": "metacaracteres interpolados participam da expressão, sem QuoteMeta",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

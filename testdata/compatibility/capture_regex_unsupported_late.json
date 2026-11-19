@@ -1,0 +1,29 @@
+{
+  "response_body": "cHJpdmF0ZQ==",
+  "classification": "lookahead rejeitado pelos dois: HTTPGo antes da rede, Hurl depois de /health e /capture; diferença de pré-validação",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/health",
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

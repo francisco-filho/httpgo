@@ -1,0 +1,39 @@
+{
+  "response_json": "[{\"x\":{\"y\":1}}, {\"x\":null}]",
+  "classification": "diferença deliberada: propriedade em null dentro do atributo invalida filtro inteiro aqui (2); Hurl descarta o ramo e aprova exists",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

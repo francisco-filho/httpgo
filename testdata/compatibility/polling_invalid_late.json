@@ -1,0 +1,11 @@
+{
+  "classification": "equivalente: retry fracionário tardio impede todo HTTP do arquivo",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

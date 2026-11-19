@@ -1,0 +1,5 @@
+version: 1
+variables:
+  product:
+    price: 4500
+  product.price: 100

@@ -38,6 +38,31 @@ func TestJSONDemonstrationByBinary(t *testing.T) {
 	}
 }
 
+func TestJSONMatchesByBinary(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, pattern string
+		code, requests      int32
+	}{
+		{"match", `{"name":"Pizza Margherita"}`, `"^Pizza"`, 0, 2},
+		{"mismatch stops", `{"name":"Calzone"}`, `"^Pizza"`, 1, 1},
+		{"late invalid zero contacts", `{"name":"Pizza"}`, `"(?=Pizza)"`, 2, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits.Add(1)
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer server.Close()
+			source := "GET {{base}}/first\nHTTP 200\n[Asserts]\njsonpath \"$.name\" matches " + tc.pattern + "\nGET {{base}}/next"
+			code, _, stderr := run(t, "test", scenario(t, source), "--var", "base="+server.URL)
+			if int32(code) != tc.code || hits.Load() != tc.requests {
+				t.Fatalf("code=%d requests=%d stderr=%s", code, hits.Load(), stderr)
+			}
+		})
+	}
+}
+
 func TestJSONAuthenticatedProductsByBinary(t *testing.T) {
 	data, err := os.ReadFile("../../testdata/scenarios/scenario_assert_json_auth_products.hurl")
 	if err != nil {
@@ -138,9 +163,9 @@ func TestJSONPrecedenceByBinary(t *testing.T) {
 		status, code                              int
 	}{
 		{"HTTP 200", `jsonpath "$" == null`, `invalid`, "status divergente", 503, 1},
-		{"HTTP *", "header \"X\" exists\njsonpath \"$\" == null", `invalid`, "assertion header", 200, 1},
-		{"HTTP *", "jsonpath \"$\" == null\nheader \"X\" exists", `invalid`, "erro de avaliação JSON", 200, 2},
-		{"HTTP *", "jsonpath \"$\" == 2\njsonpath \"$.bad\" == null", `1`, "assertion jsonpath", 200, 1},
+		{"HTTP *", "header \"X\" exists\njsonpath \"$\" == null", `invalid`, "erro de captura", 200, 2},
+		{"HTTP *", "jsonpath \"$\" == null\nheader \"X\" exists", `invalid`, "erro de captura", 200, 2},
+		{"HTTP *", "jsonpath \"$\" == 2\njsonpath \"$.bad\" == null", `1`, "erro de captura", 200, 2},
 		{"HTTP *", `jsonpath "$" == 1`, `1`, "erro de captura", 200, 2},
 	} {
 		var hits atomic.Int32
@@ -164,17 +189,17 @@ func TestJSONInvalidLateNeverSendsByBinary(t *testing.T) {
 	defer server.Close()
 	for _, suffix := range []string{"[Asserts]\njsonpath \"$\" == null", "HTTP *\n[Asserts]\njsonpath \"$\" == {{value}}", "HTTP *\n[Asserts]\njsonpath \"$\" == 1 2"} {
 		code, out, stderr := run(t, "test", scenario(t, "GET "+server.URL+"/first\nHTTP 200\nGET "+server.URL+"/late\n"+suffix))
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
 		}
 	}
-	for _, name := range []string{"invalid_assert_json_literal.hurl", "unsupported_assert_json_operator.hurl", "unsupported_assert_json_filter.hurl", "unsupported_assert_query.hurl", "unsupported_assert_json_dynamic_query.hurl"} {
+	for _, name := range []string{"invalid_assert_json_literal.hurl", "unsupported_assert_json_operator.hurl", "unsupported_assert_json_filter.hurl", "unsupported_assert_query.hurl", "unsupported_assert_json_dynamic_query.hurl", "invalid_structure_count_negative.hurl", "invalid_structure_count_fractional.hurl", "invalid_structure_exists_operand.hurl", "invalid_structure_numeric_expected.hurl", "unsupported_capture_count_pipeline.hurl", "unsupported_capture_header_count.hurl"} {
 		data, err := os.ReadFile("../../testdata/scenarios/" + name)
 		if err != nil {
 			t.Fatal(err)
 		}
 		code, out, stderr := run(t, "test", scenario(t, strings.ReplaceAll(string(data), "http://localhost:8080", server.URL)))
-		if code != 2 || out != "" || stderr == "" || hits.Load() != 0 {
+		if code != 2 || !prevalidationSummary(out) || stderr == "" || hits.Load() != 0 {
 			t.Fatalf("%s code=%d hits=%d out=%s err=%s", name, code, hits.Load(), out, stderr)
 		}
 	}
@@ -182,7 +207,7 @@ func TestJSONInvalidLateNeverSendsByBinary(t *testing.T) {
 
 func TestJSONSecretsByBinary(t *testing.T) {
 	for _, pending := range []bool{false, true} {
-		for _, expression := range []string{`jsonpath "$.value" == {"part":"expected-private"}`, `header "X" == "expected-private"`} {
+		for _, expression := range []string{`jsonpath "$.value" == {"part":"expected-private"}`, `jsonpath "$.value" matches "expected-private"`, `header "X" == "expected-private"`} {
 			var hits atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if hits.Add(1) == 1 && !pending {
@@ -194,7 +219,7 @@ func TestJSONSecretsByBinary(t *testing.T) {
 			}))
 			source := "GET {{base}}/assert\nHTTP *\n[Asserts]\n" + expression + "\nGET {{base}}/next"
 			if pending {
-				source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\n[Asserts]", 1)
+				source = strings.Replace(source, "\n[Asserts]", "\n[Captures]\ntoken: jsonpath \"$\"\n[Asserts]", 1)
 			} else {
 				source = "GET {{base}}/login\nHTTP 200\n[Captures]\ntoken: jsonpath \"$.token\"\n" + source
 			}

@@ -81,8 +81,8 @@ func TestHeaderCapturePrecedenceByBinary(t *testing.T) {
 		diagnostic                      string
 	}{
 		{"status first", "HTTP 200", "invalid", "bad", 503, 1, 1, "status divergente"},
-		{"header before body", "HTTP 200", "invalid", "bad", 200, 1, 1, "assertion header"},
-		{"wildcard header before body", "HTTP *", "invalid", "bad", 503, 1, 1, "assertion header"},
+		{"header before body", "HTTP 200", `{"id":9007199254740993}`, "bad", 200, 1, 1, "assertion header"},
+		{"wildcard header before body", "HTTP *", `{"id":9007199254740993}`, "bad", 503, 1, 1, "assertion header"},
 		{"capture after headers", "HTTP 200", "invalid", "ok", 200, 2, 1, "erro de captura"},
 		{"capture success", "HTTP 200", `{"id":9007199254740993}`, "ok", 200, 0, 2, ""},
 		{"wildcard capture 200", "HTTP *", `{"id":9007199254740993}`, "ok", 200, 0, 2, ""},
@@ -137,10 +137,10 @@ func TestInvalidHeaderAssertionsNeverSendByBinary(t *testing.T) {
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1) }))
 	defer server.Close()
-	for _, suffix := range []string{"[Asserts]", "HTTP *\n[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private-value", "HTTP *\n[Asserts]\njsonpath \"$.private-value\" == \"x\"", "HTTP 200\n[Asserts]\nheader \"X\" matches \"private-value\"", "HTTP *\n[Asserts]\nheader \"X\" count == 1"} {
+	for _, suffix := range []string{"[Asserts]", "HTTP *\n[Asserts]", "HTTP 200\n[Asserts]\nheader \"Authorization\" == private-value", "HTTP *\n[Asserts]\njsonpath \"$.private-value\" == \"x\"", "HTTP 200\n[Asserts]\nheader \"X\" startsWith \"private-value\"", "HTTP *\n[Asserts]\nheader \"X\" count == 1"} {
 		source := "GET " + server.URL + "/prior\nHTTP 200\nGET " + server.URL + "/late\n" + suffix
 		code, out, stderr := run(t, "test", scenario(t, source))
-		if code != 2 || out != "" || hits.Load() != 0 || stderr == "" || strings.Contains(stderr, "private-value") {
+		if code != 2 || !prevalidationSummary(out) || hits.Load() != 0 || stderr == "" || strings.Contains(stderr, "private-value") {
 			t.Fatalf("code=%d out=%q err=%q hits=%d", code, out, stderr, hits.Load())
 		}
 	}

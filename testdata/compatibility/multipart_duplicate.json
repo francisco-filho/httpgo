@@ -1,0 +1,37 @@
+{
+  "classification": "restrição HTTPGo: nomes de partes não podem se repetir; Hurl aceita repetição",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "name",
+            "data": "Zmlyc3Q="
+          },
+          {
+            "name": "name",
+            "data": "c2Vjb25k"
+          },
+          {
+            "name": "document",
+            "filename": "payloads/raw.txt",
+            "mime": "text/plain",
+            "data": "IHJhdyBieXRlcyAKe3twbGFjZWhvbGRlcn19Cg=="
+          }
+        ],
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  }
+}

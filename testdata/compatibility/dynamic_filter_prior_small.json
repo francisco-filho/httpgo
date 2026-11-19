@@ -1,0 +1,7 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"number\":42,\"items\":[{\"number\":41,\"status\":\"CANCELLED\"},{\"number\":42,\"status\":\"PLACED\"}]}",
+  "classification": "compatível neste exemplo: número anterior escalar seleciona a entidade; HTTPGo exige opt-in, Hurl interpola por padrão",
+  "httpgo": {"exit": 0, "paths": ["/capture", "/capture", "/health"]},
+  "hurl": {"exit": 0, "paths": ["/capture", "/capture", "/health"]}
+}

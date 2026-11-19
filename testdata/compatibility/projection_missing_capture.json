@@ -1,0 +1,16 @@
+{
+  "response_json": "[]",
+  "classification": "zero matches cannot be reused: HTTPGo capture fails with 2; Hurl exits 3 after /capture in this pair",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

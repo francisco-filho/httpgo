@@ -1,0 +1,22 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain; charset=utf-8"
+    }
+  ],
+  "response_body": "/w==",
+  "classification": "controlled text evaluation error; invalid bytes cannot prove absence; own exit codes",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

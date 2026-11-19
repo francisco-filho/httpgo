@@ -1,0 +1,39 @@
+{
+  "response_json": "[9007199254740993,1.2300e+99]",
+  "classification": "intentional typed reuse difference: HTTPGo sends plural captures with exact precision and numeric spelling; Hurl exits 3 before reusing the compound capture",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "POST",
+        "body": "[9007199254740993,1.2300e+99]",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

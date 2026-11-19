@@ -1,0 +1,29 @@
+{
+  "response_body": "Y29kZQ==",
+  "classification": "padrão malformado tardio rejeita arquivo inteiro, zero envios",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/health",
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

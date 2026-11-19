@@ -1,0 +1,38 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "actual"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "US-34: ambos avaliam captura ausente antes da assertion; códigos HTTPGo 2 e Hurl 3",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

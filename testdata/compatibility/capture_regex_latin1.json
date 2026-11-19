@@ -1,0 +1,52 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain; charset=iso-8859-1"
+    }
+  ],
+  "response_body": "Y/NkaWdvOiBh5+Nv",
+  "classification": "decoder textual declarado preserva acentos, sem normalização",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "preaçãopost"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "preaçãopost"
+      }
+    ]
+  }
+}

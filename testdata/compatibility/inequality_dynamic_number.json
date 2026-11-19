@@ -1,0 +1,8 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "1.0",
+  "variables": ["v=1"],
+  "classification": "dynamic complete expected preserves numeric type; equivalent numbers fail inequality in both runners",
+  "httpgo": {"exit": 1, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

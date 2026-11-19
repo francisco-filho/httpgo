@@ -1,0 +1,47 @@
+{
+  "classification": "multipart vazio: text/plain inferido em ambos; filename Hurl inclui payloads/",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "document",
+            "filename": "empty.txt",
+            "mime": "text/plain",
+            "data": ""
+          }
+        ],
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "document",
+            "filename": "payloads/empty.txt",
+            "mime": "text/plain",
+            "data": ""
+          }
+        ],
+        "method": "POST",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "response_json": "[10e9999999999999999999998]",
+  "classification": "intentional difference: HTTPGo exact exponent syntax exceeds Hurl numeric grammar",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": []
+  }
+}

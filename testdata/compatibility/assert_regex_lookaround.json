@@ -1,0 +1,14 @@
+{
+  "response_body": "aWQ9MTIzNDU2",
+  "classification": "não suportado: lookaround rejeitado antes da rede aqui (2); Hurl falha após envio (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

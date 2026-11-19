@@ -1,0 +1,13 @@
+{
+  "response_json": "not JSON",
+  "response_headers": [{"name":"X-Test","value":"private"}],
+  "classification": "intentional static validation: HTTPGo rejects malformed pattern before all HTTP; Hurl evaluates after sending",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": ["/health", "/capture"]
+  }
+}

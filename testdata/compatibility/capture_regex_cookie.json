@@ -1,0 +1,58 @@
+{
+  "response_headers": [
+    {
+      "name": "Set-Cookie",
+      "value": "refresh=fiction-token; Path=/; HttpOnly"
+    },
+    {
+      "name": "Content-Type",
+      "value": "text/plain; charset=unknown"
+    }
+  ],
+  "response_body": "/w==",
+  "classification": "cookie explícito sem atributos; consulta de header dispensa decoder do body",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "",
+        "cookie": "refresh=fiction-token"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "",
+        "cookie": "refresh=fiction-token"
+      }
+    ]
+  }
+}

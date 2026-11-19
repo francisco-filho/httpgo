@@ -1,0 +1,18 @@
+{
+  "response_json": "{\"id\":null,\"s\":\"\",\"a\":[],\"o\":{},\"b\":false,\"n\":0}",
+  "classification": "presença de null, vazios, false e zero confirmada em ambos neste par",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

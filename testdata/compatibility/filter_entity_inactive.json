@@ -1,0 +1,32 @@
+{
+  "response_json": "[{\"slug\":\"juice\",\"id\":\"p2\",\"active\":true},{\"slug\":\"pizza\",\"id\":\"p1\",\"active\":false}]",
+  "classification": "divergência compartilhada: outro item ativo não aprova pizza; códigos 1/4",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

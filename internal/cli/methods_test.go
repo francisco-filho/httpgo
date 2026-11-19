@@ -46,7 +46,7 @@ func TestNewMethodsPresentationAndSecretSafety(t *testing.T) {
 				if wantCalls > 0 && (!strings.Contains(out, method+" http://example.test/products:") || !strings.Contains(out, "resumo")) {
 					t.Fatalf("unhelpful output=%q", out)
 				}
-				if wantCalls == 0 && (out != "" || !strings.Contains(stderr, ":") || !strings.Contains(stderr, "sintaxe inválida")) {
+				if wantCalls == 0 && (!prevalidationSummary(out) || !strings.Contains(stderr, ":") || !strings.Contains(stderr, "sintaxe inválida")) {
 					t.Fatalf("out=%q,err=%q", out, stderr)
 				}
 				if mode == "unvalidated" && !strings.Contains(out, "sem validação de status (recebido 500)") {
@@ -59,7 +59,7 @@ func TestNewMethodsPresentationAndSecretSafety(t *testing.T) {
 		}
 	}
 	code, out, stderr := execute(t, context.Background(), &fakeExecutor{}, "test", "--help")
-	if code != 0 || stderr != "" || !strings.Contains(out, "httpgo test products.hurl") || !strings.Contains(out, `{"name":"Pizza","price":4500}`) {
+	if code != 0 || stderr != "" || !strings.Contains(out, "httpgo test products.httpgo") || !strings.Contains(out, `{"name":"Pizza","price":4500}`) {
 		t.Fatalf("help=%q,err=%q", out, stderr)
 	}
 }

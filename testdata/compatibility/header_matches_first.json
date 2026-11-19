@@ -1,0 +1,27 @@
+{
+  "response_json": "not JSON",
+  "classification": "intentional first-occurrence policy: later value does not invalidate HTTPGo; Hurl sees a list",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "ok"
+    },
+    {
+      "name": "x-test",
+      "value": "bad"
+    }
+  ]
+}

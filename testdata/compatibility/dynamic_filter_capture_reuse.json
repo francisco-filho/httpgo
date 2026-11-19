@@ -1,0 +1,25 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"number\":42,\"items\":[{\"number\":41,\"status\":\"PLACED\",\"id\":\"wrong\"},{\"number\":42,\"status\":\"PLACED\",\"id\":\"selected\"}]}",
+  "classification": "diferença de redução/reutilização: HTTPGo captura ID escalar; Hurl conserva coleção e não a renderiza como body (3)",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {"method":"GET","body":"","content_type":"","probe":""},
+      {"method":"GET","body":"","content_type":"","probe":""},
+      {"method":"POST","body":"\"selected\"","content_type":"","probe":""}
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture",
+      "/capture"
+    ]
+  }
+}

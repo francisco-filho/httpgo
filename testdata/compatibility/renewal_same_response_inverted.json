@@ -1,0 +1,60 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_headers": [
+    {
+      "name": "X-Id",
+      "value": "new"
+    }
+  ],
+  "response_json": "{\"id\":\"new\"}",
+  "variables": [
+    "id=old"
+  ],
+  "classification": "US-34: assertions veem renovação da própria resposta, mesmo com seção Asserts antes de Captures",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "new"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "new"
+      }
+    ]
+  }
+}

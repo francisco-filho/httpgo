@@ -1,0 +1,24 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "response_body": "eyJ4IjogIlx1MDA2MSJ9",
+  "classification": "shared: search uses received JSON text, not decoded JSON",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

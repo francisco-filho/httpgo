@@ -1,0 +1,22 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[9007199254740993,\"x\"]",
+  "variables": [
+    "n=9007199254740993"
+  ],
+  "classification": "perfil dinâmico HTTPGo opt-in; comportamento observado, códigos próprios",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

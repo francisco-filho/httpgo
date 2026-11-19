@@ -1,0 +1,76 @@
+name: JUnit contract
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  junit:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate serializer and generate real CLI artifacts
+        run: |
+          go test ./internal/report -count=1
+          go test ./tests/e2e -run '^TestJUnit' -count=1 -junit-artifact-dir="$GITHUB_WORKSPACE/target/junit"
+      - name: Checkout reference consumer (v2.6.0)
+        uses: actions/checkout@v4
+        with:
+          repository: dorny/test-reporter
+          ref: 3d76b34a4535afbd0600d347b09a6ee5deb3ed7f
+          path: .ci-consumer
+          persist-credentials: false
+      - name: Build unmodified reference parser
+        working-directory: .ci-consumer
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+      - name: Assert ingestion and classification with reference parser
+        run: |
+          node tests/ci/junit-consumer.mjs .ci-consumer testdata/report/junit.xml
+          node tests/ci/junit-execution.mjs .ci-consumer target/junit
+      - name: Retain JUnit artifacts (including expected failures)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: httpgo-junit
+          path: target/junit/*.xml
+          if-no-files-found: error
+          retention-days: 7
+      # Fork tokens cannot create check runs. Parser validation above still runs
+      # for forks; never use pull_request_target to execute untrusted code.
+      - name: Publish reference report
+        id: report
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: dorny/test-reporter@3d76b34a4535afbd0600d347b09a6ee5deb3ed7f # v2.6.0
+        with:
+          name: HTTPGo JUnit (intentional negative scenarios)
+          path: target/junit/*.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+          fail-on-empty: 'true'
+          list-suites: all
+          list-tests: all
+      - name: Check published counts
+        if: steps.report.outcome == 'success'
+        env:
+          PASSED: ${{ steps.report.outputs.passed }}
+          FAILED: ${{ steps.report.outputs.failed }}
+          SKIPPED: ${{ steps.report.outputs.skipped }}
+        run: |
+          test "$PASSED" = 9
+          test "$FAILED" = 4
+          test "$SKIPPED" = 3

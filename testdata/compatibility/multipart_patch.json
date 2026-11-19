@@ -1,0 +1,63 @@
+{
+  "classification": "multipart PATCH: ordem/bytes/MIME compartilhados; filename Hurl inclui payloads/",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "before",
+            "data": "Zmlyc3Q="
+          },
+          {
+            "name": "document",
+            "filename": "raw.txt",
+            "mime": "text/plain",
+            "data": "IHJhdyBieXRlcyAKe3twbGFjZWhvbGRlcn19Cg=="
+          },
+          {
+            "name": "after",
+            "data": "bGFzdA=="
+          }
+        ],
+        "method": "PATCH",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/documents"
+    ],
+    "requests": [
+      {
+        "multipart": [
+          {
+            "name": "before",
+            "data": "Zmlyc3Q="
+          },
+          {
+            "name": "document",
+            "filename": "payloads/raw.txt",
+            "mime": "text/plain",
+            "data": "IHJhdyBieXRlcyAKe3twbGFjZWhvbGRlcn19Cg=="
+          },
+          {
+            "name": "after",
+            "data": "bGFzdA=="
+          }
+        ],
+        "method": "PATCH",
+        "body": "",
+        "content_type": "multipart/form-data",
+        "probe": ""
+      }
+    ]
+  }
+}

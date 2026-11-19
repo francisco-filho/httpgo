@@ -1,0 +1,24 @@
+{
+  "response_json": "not JSON",
+  "classification": "shared inline case option for this pattern",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "Pizza"
+    }
+  ]
+}

@@ -88,10 +88,39 @@ func TestJSONErrorsSafeAndLocated(t *testing.T) {
 }
 
 func FuzzRenderJSON(f *testing.F) {
-	for _, seed := range []string{`{{x}}`, `{"a":{{x}}}`, `"prefix{{x}}"`, `{"a":{}}`, `{"a":"\\{{x}}"}`, `{"{{x}}":1}`, "[\r\n{{x}}\r\n]", `"bad\{{x}}"`} {
+	// US-36: extracted OTP is reusable in JSON, without recursive expansion.
+	for _, value := range []string{`"001234"`, `"{{missing}}"`, `"a\\n雪"`, `null`, `[]`} {
+		f.Add(`{"code":"{{x}}","previous":"{{captured}}"}`, value)
+	}
+	for _, value := range []string{`"replacement"`, `"{{literal}}"`, `null`, `9007199254740993`, `{"child":[]}`} {
+		f.Add(`{"renewed":{{x}},"previous":{{captured}}}`, value)
+	}
+	// US-32: expected operands reuse this renderer, including exact extremes.
+	for _, value := range []string{`-0e999999999999999999`, `1e-999999999999999999`, `{"old":[9007199254740993,"{{not_recursive}}"]}`, `"rotation\"\\\n雪"`} {
+		f.Add(`{{x}}`, value)
+		f.Add(`{"token":"prefix-{{captured}}","baseline":{{x}}}`, value)
+	}
+	for _, value := range []string{`"x')].id[?(@.n=='other"`, `"a\"\\[]雪"`, `"{{missing}}"`, `1e99999999999999999999`, `1.00000000000000000000002`, `null`, `[]`, `{}`} {
+		f.Add(`{{x}}`, value)
+		f.Add(`"Order {{x}}"`, value)
+	}
+	for _, value := range []string{`-0`, `3`, `3.0`, `3e0`, `999999999999999999999999999999999999`, `false`, `""`, `[]`, `{}`, `[[],[]]`} {
+		f.Add(`{"selected":{{x}}}`, value)
+	}
+	for _, value := range []string{`9007199254740993`, `"9007199254740993"`, `"{{missing}}"`, `"a\"\\雪"`, `null`, `[true,null]`, `{"n":9007199254740993}`} {
+		f.Add(`{"expected":{{x}},"text":"prefix-{{x}}"}`, value)
+		f.Add(`{{x}}`, value)
+	}
+	for _, value := range []string{`[[],[1],[[2]]]`, `[9007199254740993,1.2300e+99]`, `[null,"{{literal}}",{"x":[]}]`} {
+		f.Add(`{"projected":{{typed}},"value":{{x}}}`, value)
+	}
+	for _, value := range []string{`"catalog-v1"`, `session=private; Path=/; HttpOnly`, "first,whole", "", `{{missing}}`, "123", "true", "null"} {
+		f.Add(`{"full":{{captured}},"text":"prefix{{captured}}"}`, value)
+	}
+	for _, seed := range []string{`{{x}}`, `{"a":{{x}}}`, `"prefix{{x}}"`, `{"a":{}}`, `{"a":"\\{{x}}"}`, `{"{{x}}":1}`, "[\r\n{{x}}\r\n]", `"bad\{{x}}"`, "", " \t\r\n", "\"\xff\"", " \r\n{\r\n \"value\":{{x}}\r\n}\t\r\n", "{}\nHTTP 200", "{} []", "{\n \"escaped\":\"{{x}}\",\n \"next\":{{missing}}\n}"} {
 		f.Add(seed, `"\"\\\n雪{{literal}}"`)
 	}
-	for _, value := range []string{`null`, `true`, `9007199254740993`, `1.2300e+99`, `[]`, `{"n":[9007199254740993,"{{literal}}"]}`} {
+	for _, value := range []string{`null`, `true`, `9007199254740993`, `1.2300e+99`, `"001"`, `[1.2500,{"name":"Pizza","nested":[false,null]}]`, `"${NOT_RESOLVED}"`, `[]`, `{"n":[9007199254740993,"{{literal}}"]}`} {
 		f.Add(`{"value":{{x}}}`, value)
 	}
 	f.Fuzz(func(t *testing.T, source, value string) {
@@ -100,6 +129,7 @@ func FuzzRenderJSON(f *testing.F) {
 			t.Fatal(err)
 		}
 		s := c.NewSession()
+		s.MarkSecret("captured")
 		captureValue := strings.ToValidUTF8(value, "\ufffd")
 		if err := s.Publish([]Capture{{"captured", captureString(captureValue)}}); err != nil {
 			t.Fatal(err)
@@ -118,9 +148,10 @@ func FuzzRenderJSON(f *testing.F) {
 				t.Fatal("invalid typed capture", err)
 			}
 		}
+		fuzzCaptureOverlay(t, s, value)
 		original := []byte(source)
 		saved := bytes.Clone(original)
-		got, err := c.RenderJSON(original)
+		got, err := s.RenderJSON(original)
 		if !bytes.Equal(original, saved) {
 			t.Fatal("mutated source")
 		}

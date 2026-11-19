@@ -1,0 +1,69 @@
+{
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"status\":\"PENDING\"}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"status\":\"READY\"}"
+    }
+  ],
+  "classification": "equivalente: POST explícito reenvia body e headers antes de prosseguir; sem promessa de idempotência",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"job\":\"123\"}",
+        "content_type": "application/json",
+        "probe": "same-input"
+      },
+      {
+        "method": "POST",
+        "body": "{\"job\":\"123\"}",
+        "content_type": "application/json",
+        "probe": "same-input"
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"job\":\"123\"}",
+        "content_type": "application/json",
+        "probe": "same-input"
+      },
+      {
+        "method": "POST",
+        "body": "{\"job\":\"123\"}",
+        "content_type": "application/json",
+        "probe": "same-input"
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

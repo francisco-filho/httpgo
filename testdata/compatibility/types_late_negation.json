@@ -1,0 +1,29 @@
+{
+  "response_json": "\"x\"",
+  "classification": "não suportado: not isString rejeitado antes de toda rede aqui (2); Hurl aceita a negação e falha na assertion (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/health",
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

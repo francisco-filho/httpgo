@@ -1,0 +1,32 @@
+{
+  "response_json": "[[],{}]",
+  "classification": "diferença deliberada: índice em objeto é erro de percurso aqui (2); Hurl reduz a ausência e falha no predicado (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

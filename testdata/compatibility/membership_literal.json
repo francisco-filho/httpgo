@@ -1,0 +1,7 @@
+{
+  "response_json": "[\"{{name}}\"]",
+  "variables": ["name=resolved"],
+  "classification": "intentional difference: HTTPGo keeps expected string literal; Hurl interpolates the defined variable",
+  "httpgo": {"exit":0,"paths":["/capture","/health"]},
+  "hurl": {"exit":4,"paths":["/capture"]}
+}

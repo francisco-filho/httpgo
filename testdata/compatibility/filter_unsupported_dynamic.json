@@ -1,0 +1,29 @@
+{
+  "response_json": "[{\"x\":2,\"y\":2}]",
+  "classification": "fora do recorte: operando dinâmico rejeitado antes da rede aqui; Hurl tenta interpolar variável ausente após enviar",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/health",
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

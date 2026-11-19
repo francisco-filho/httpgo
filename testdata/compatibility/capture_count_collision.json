@@ -1,0 +1,53 @@
+{
+  "response_json": "[1,2,3]",
+  "variables": [
+    "baseline=7"
+  ],
+  "classification": "US-34: ambos substituem baseline inicial por captura numérica 3; HTTPGo confirma após assertions",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"count\":3}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"count\":3}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

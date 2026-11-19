@@ -1,0 +1,20 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "null",
+  "variables": [
+    "pattern=["
+  ],
+  "classification": "padrão final inválido é avaliação HTTPGo 2 após resposta, não erro estático",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

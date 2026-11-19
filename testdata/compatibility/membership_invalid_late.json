@@ -1,0 +1,12 @@
+{
+  "response_json": "{}",
+  "classification": "shared static rejection: operand forbidden for not exists, zero sends",
+  "httpgo": {
+    "exit": 2,
+    "paths": []
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": []
+  }
+}

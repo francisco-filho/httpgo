@@ -1,0 +1,22 @@
+{
+  "response_headers": [
+    {
+      "name": "Content-Type",
+      "value": "text/plain; charset=unknown"
+    }
+  ],
+  "response_body": "aWQ9MTIzNDU2",
+  "classification": "diferença de avaliação: charset desconhecido não é negável HTTPGo (2); Hurl falha na assertion (4)",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

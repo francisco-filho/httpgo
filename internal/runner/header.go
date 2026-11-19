@@ -30,7 +30,13 @@ func sensitiveHeader(name string) bool {
 
 func checkHeader(session template.Session, declaration parser.HeaderAssertion, headers []query.HeaderValue, conceal bool) *HeaderFailure {
 	actual, present := query.Header(headers, declaration.Name)
-	if assertion.Header(declaration.Operator, declaration.Expected, actual, present) {
+	matched := false
+	if declaration.Operator == assertion.HeaderMatches {
+		matched = assertion.MatchString(declaration.Compiled, actual, present)
+	} else {
+		matched = assertion.Header(declaration.Operator, declaration.Expected, actual, present)
+	}
+	if matched {
 		return nil
 	}
 	expected := declaration.Expected
@@ -44,7 +50,7 @@ func checkHeader(session template.Session, declaration parser.HeaderAssertion, h
 
 func pendingSecret(session template.Session, entry parser.Entry) bool {
 	for _, capture := range entry.Captures {
-		if session.IsSecret(capture.Name) {
+		if session.IsSecret(capture.Name) || capture.Path.HasProtectedReference(session.IsSecret) {
 			return true
 		}
 	}
@@ -53,6 +59,12 @@ func pendingSecret(session template.Session, entry parser.Entry) bool {
 
 func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	// Reports need metadata, not request bodies or raw response/header collections.
+	entry.Options.Position.File = session.Sanitize(entry.Options.Position.File)
+	if entry.Options.RetryInterval != nil {
+		interval := *entry.Options.RetryInterval
+		entry.Options.RetryInterval = &interval
+	}
+	entry.Multipart = nil
 	entry.ExternalBody = nil
 	entry.Body = nil
 	entry.BodyPlan = template.JSONPlan{}
@@ -64,11 +76,32 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 	entry.Captures = nil // Compiled queries are not report metadata.
 	entry.Assertions = slices.Clone(entry.Assertions)
 	for i := range entry.Assertions {
+		if entry.Assertions[i].Regex != nil {
+			declaration := *entry.Assertions[i].Regex
+			declaration.Pattern, declaration.Expected = "", ""
+			declaration.Extraction, declaration.Compiled = nil, nil
+			declaration.ExpectedTemplate = nil
+			declaration.Position.File = session.Sanitize(declaration.Position.File)
+			declaration.QueryPosition.File = session.Sanitize(declaration.QueryPosition.File)
+			entry.Assertions[i].Regex = &declaration
+			continue
+		}
+		if entry.Assertions[i].Body != nil {
+			declaration := *entry.Assertions[i].Body
+			declaration.ExpectedTemplate = nil
+			declaration.Expected = "" // Raw substring literals are not report metadata.
+			declaration.Position.File = session.Sanitize(declaration.Position.File)
+			entry.Assertions[i].Body = &declaration
+			continue
+		}
 		if entry.Assertions[i].JSON != nil {
 			declaration := *entry.Assertions[i].JSON
+			declaration.ExpectedTemplate = nil
 			declaration.Expected = nil // Never deliver the raw literal to reports.
+			declaration.Pattern = ""
+			declaration.Compiled = nil // Compiled regexps retain their source pattern.
+			declaration.Query = session.Sanitize(declaration.Path.RedactLiterals(declaration.Query))
 			declaration.Path = query.Path{}
-			declaration.Query = session.Sanitize(declaration.Query)
 			declaration.Position.File = session.Sanitize(declaration.Position.File)
 			declaration.QueryPosition.File = session.Sanitize(declaration.QueryPosition.File)
 			entry.Assertions[i].JSON = &declaration
@@ -80,6 +113,11 @@ func safeEntry(session template.Session, entry parser.Entry) parser.Entry {
 		copy := *entry.Assertions[i].Header
 		entry.Assertions[i].Header = &copy
 		declaration := &copy
+		declaration.Compiled = nil // Compiled regexps retain their source pattern.
+		if declaration.ExpectedTemplate != nil {
+			declaration.Expected = ""
+		}
+		declaration.ExpectedTemplate = nil
 		if conceal || sensitiveHeader(declaration.Name) {
 			declaration.Expected = "[oculto]"
 		} else {

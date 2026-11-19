@@ -1,0 +1,39 @@
+{
+  "response_json": "[{\"v\":1.0000000000000000000001,\"id\":\"a\"},{\"v\":1.0000000000000000000002,\"id\":\"b\"}]",
+  "classification": "diferença de precisão: HTTPGo distingue decimais próximos; Hurl selecionou ambos e divergiu",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

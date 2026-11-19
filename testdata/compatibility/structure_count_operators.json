@@ -1,0 +1,18 @@
+{
+  "response_json": "{\"empty\":[],\"items\":[null,false,0]}",
+  "classification": "cinco comparadores de count, vazio e elementos null",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

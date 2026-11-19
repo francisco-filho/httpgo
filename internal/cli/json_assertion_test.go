@@ -18,7 +18,7 @@ func TestJSONAssertionHelp(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, want := range []string{`jsonpath "$.name" == "Pizza"`, `jsonpath "$.price" == 4500`, `jsonpath "$.active" == true`, "precisão exata", "sem float64", "ordem escrita", "erro de avaliação JSON (2)", "Captura secreta pendente", "sem avaliar/publicar", "Sem count, exists JSON", "não marcados"} {
+		for _, want := range []string{`jsonpath "$.name" == "Pizza"`, `jsonpath "$.price" == 4500`, `jsonpath "$.active" == true`, "precisão exata", "sem float64", "ordem escrita", "erro de avaliação JSON (2)", "Captura secreta pendente", "sem confirmar a captura antecipadamente", "count aceita ==, >, >=, < e <=", "não marcados", `jsonpath "$.items" count == 3`, `jsonpath "$.total" >= 1`, `jsonpath "$.items[0].id" exists`, `jsonpath "$.name" matches "^Pizza"`, "Sem count em strings/objetos ou JSONPath completo", "Captura JSONPath count: US-33 acima", "propriedades por ponto, índices não negativos e [*] de arrays", "Sem .*, slices, unions"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("help lacks %q", want)
 			}
@@ -71,8 +71,8 @@ func TestJSONAssertionCLI(t *testing.T) {
 }
 
 func TestJSONAndHeaderPendingSecretCLI(t *testing.T) {
-	for _, line := range []string{`header "X" == "expected-private"`, `jsonpath "$.value" == "expected-private"`} {
-		file := writeScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$.missing.bad\"\nGET http://example.test/next")
+	for _, line := range []string{`header "X" == "expected-private"`, `header "X" matches "expected-private"`, `jsonpath "$.value" == "expected-private"`} {
+		file := writeScenario(t, "GET http://example.test\nHTTP 200\n[Asserts]\n"+line+"\n[Captures]\ntoken: jsonpath \"$\"\nGET http://example.test/next")
 		code, out, stderr := execute(t, context.Background(), executorFunc(func(context.Context, runner.Request) (runner.Response, error) {
 			return runner.Response{Status: 200, Body: []byte(`{"value":"actual-private","unused":"body-private"}`), Headers: []query.HeaderValue{{Name: "X", Value: "actual-private"}}}, nil
 		}), "test", file, "--secret", "token")

@@ -1,0 +1,12 @@
+{
+  "response_json": "null",
+  "classification": "compartilhado: operando extra em unário tardio rejeita o arquivo inteiro antes de HTTP (2)",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

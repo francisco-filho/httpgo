@@ -18,7 +18,7 @@ import (
 func TestJSONAssertionRequiresSuccessfulReadAndClose(t *testing.T) {
 	for _, mode := range []string{"success", "read", "close"} {
 		t.Run(mode, func(t *testing.T) {
-			body := &captureBody{Reader: strings.NewReader(`{"x":1}`)}
+			body := &captureBody{Reader: strings.NewReader(`{"x":1,"items":[null]}`)}
 			if mode == "read" {
 				body.Reader = io.MultiReader(body.Reader, errorReader{})
 			}
@@ -31,7 +31,7 @@ func TestJSONAssertionRequiresSuccessfulReadAndClose(t *testing.T) {
 				calls++
 				return &http.Response{StatusCode: 200, Body: body, Header: make(http.Header)}, nil
 			}))
-			s, err := parser.Parse("json.hurl", strings.NewReader("GET http://example.test\nHTTP *\n[Asserts]\njsonpath \"$.x\" == 1"))
+			s, err := parser.Parse("json.hurl", strings.NewReader("GET http://example.test\nHTTP *\n[Asserts]\njsonpath \"$.x\" == 1\njsonpath \"$.x\" exists\njsonpath \"$.x\" >= 1\njsonpath \"$.items\" count == 1"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -69,7 +69,7 @@ func TestJSONAssertionFinalBodyDeadlineAndCancellation(t *testing.T) {
 				if mode != "success" {
 					w.Header().Set("Content-Length", "100")
 				}
-				_, _ = io.WriteString(w, `{"x":1}`)
+				_, _ = io.WriteString(w, `{"x":1,"items":[null]}`)
 				if mode == "timeout" || mode == "cancel" {
 					w.(http.Flusher).Flush()
 					close(ready)
@@ -77,7 +77,7 @@ func TestJSONAssertionFinalBodyDeadlineAndCancellation(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			s, err := parser.Parse("json.hurl", strings.NewReader("GET "+server.URL+"/start\nHTTP *\n[Asserts]\njsonpath \"$.x\" == 1\nGET "+server.URL+"/next"))
+			s, err := parser.Parse("json.hurl", strings.NewReader("GET "+server.URL+"/start\nHTTP *\n[Asserts]\njsonpath \"$.x\" == 1\njsonpath \"$.x\" exists\njsonpath \"$.x\" >= 1\njsonpath \"$.items\" count == 1\nGET "+server.URL+"/next"))
 			if err != nil {
 				t.Fatal(err)
 			}

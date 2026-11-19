@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="httpgo" tests="4" failures="1" errors="1" skipped="1" time="4.000000000">
+  <testcase name="tests/01-ação &amp; &#34;aspas&#34; &lt;ok&gt;.hurl" classname="httpgo" time="1.250000000"></testcase>
+  <testcase name="tests/02-failure.hurl" classname="httpgo" time="2.000000000">
+    <failure message="falha de assertion">&#34;tests/02-failure.hurl&#34;:4:1: assertion: esperado &#34;ação &amp; &lt;x&gt;&#34;, recebido &#34;outro&#34;</failure>
+  </testcase>
+  <testcase name="tests/03-error.hurl" classname="httpgo" time="0.003000000">
+    <error message="erro">&#34;tests/03-error.hurl&#34;:1:1: falha de transporte</error>
+  </testcase>
+  <testcase name="tests/04-skipped.hurl" classname="httpgo" time="0.000000000">
+    <skipped message="não executado"></skipped>
+  </testcase>
+</testsuite>

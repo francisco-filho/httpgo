@@ -1,0 +1,21 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"number\":9007199254740993,\"name\":\"Pizza\"}",
+  "classification": "perfil dinâmico HTTPGo opt-in; comportamento observado, códigos próprios",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/capture",
+      "/health"
+    ]
+  }
+}

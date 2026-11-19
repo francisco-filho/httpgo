@@ -1,0 +1,6 @@
+{
+  "response_headers": [{"name": "X-Probe", "value": "present"}],
+  "classification": "intentional header != restriction remains unchanged",
+  "httpgo": {"exit": 2, "paths": null},
+  "hurl": {"exit": 0, "paths": ["/health", "/health"]}
+}

@@ -1,0 +1,54 @@
+{
+  "response_headers": [
+    {
+      "name": "ETag",
+      "value": "\"catalog-v1\""
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "compartilhado: nome sem caixa, ETag string com aspas e If-None-Match exato; cache condicional 304",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/catalog",
+      "/catalog"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "",
+        "if_none_match": "\"catalog-v1\""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/catalog",
+      "/catalog"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "",
+        "if_none_match": "\"catalog-v1\""
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "response_json": "[7]",
+  "classification": "um escalar selecionado por wildcard não aceita count em ambos; códigos próprios de captura",
+  "httpgo": {
+    "exit": 2,
+    "paths": [
+      "/capture"
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

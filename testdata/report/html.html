@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTPGo — resultados dos testes</title>
+<style>
+:root { color-scheme: light; }
+body { background: #fff; color: #1f2328; font: 16px/1.6 system-ui, sans-serif; margin: 0 auto; max-width: 1100px; padding: 32px; overflow-wrap: anywhere; }
+h1, h2, h3 { line-height: 1.25; margin-top: 24px; }
+h1, h2 { border-bottom: 1px solid #d1d9e0; padding-bottom: 8px; }
+table { border-collapse: collapse; display: block; overflow-x: auto; margin: 16px 0; }
+th, td { border: 1px solid #d1d9e0; padding: 6px 13px; text-align: left; vertical-align: top; }
+tr:nth-child(even) { background: #f6f8fa; }
+pre, code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+pre { background: #f6f8fa; border-radius: 6px; padding: 16px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>HTTPGo — resultados dos testes</h1>
+<h2>Resumo agregado</h2>
+<table>
+<thead><tr><th>Arquivos</th><th>Sucesso</th><th>Falha de assertion</th><th>Erro</th><th>Não executado</th><th>Duração</th></tr></thead>
+<tbody><tr><td>4</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1s</td></tr></tbody>
+</table>
+<p>Requisições conhecidas: 3; arquivos com contagem desconhecida: 2.</p>
+<p>Iniciadas: 2; concluídas: 2; não iniciadas conhecidas: 1; sucesso: 0; falhas de assertion: 0; erros: 0.</p>
+<p>Status validados: 1; sem validação de status: 0. Status validado não significa sucesso de todas as assertions; ausência de assertion não é validação.</p>
+<p>Tentativas iniciadas: 0; respostas completas: 0; status comparados: 0.</p>
+<h2>Resultados por arquivo</h2>
+
+<section>
+<h3>01-ação &#34;&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;.hurl</h3>
+<p>Resultado: <strong>sucesso</strong>; duração: 1ms.</p>
+<p>Requisições: total=1; iniciadas=1; concluídas=0; não iniciadas=0; status validados=0; sem validação de status=0.</p>
+
+
+<table>
+<thead><tr><th>Requisição</th><th>Método</th><th>URL protegida</th><th>Resultado</th><th>Duração lógica</th><th>Detalhes</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>GET</td><td><code>http://example.test/&lt;img&gt;?[oculta]</code></td><td>sem validação de status</td><td>1ms</td><td><pre>aspas &#34; &amp; Unicode: café &lt;script&gt;alert(1)&lt;/script&gt;</pre></td></tr>
+</tbody>
+</table>
+
+</section>
+
+<section>
+<h3>02.hurl</h3>
+<p>Resultado: <strong>falha de assertion</strong>; duração: 0s.</p>
+<p>Requisições: total=2; iniciadas=1; concluídas=0; não iniciadas=1; status validados=0; sem validação de status=0.</p>
+<pre>&#34;02.hurl&#34;:4:1: status divergente: esperado 200, recebido 503</pre>
+<p>Sem detalhes de requisições alcançadas.</p>
+</section>
+
+<section>
+<h3>03.hurl</h3>
+<p>Resultado: <strong>erro</strong>; duração: 0s.</p>
+<p>Requisições: total=desconhecido; iniciadas=0; concluídas=0; não iniciadas=desconhecido; status validados=0; sem validação de status=0.</p>
+<pre>sintaxe inválida</pre>
+<p>Sem detalhes de requisições alcançadas.</p>
+</section>
+
+<section>
+<h3>04.hurl</h3>
+<p>Resultado: <strong>não executado</strong>; duração: 0s.</p>
+<p>Requisições: total=desconhecido; iniciadas=0; concluídas=0; não iniciadas=desconhecido; status validados=0; sem validação de status=0.</p>
+
+<p>Sem detalhes de requisições alcançadas.</p>
+</section>
+
+</body>
+</html>

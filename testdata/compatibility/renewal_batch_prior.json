@@ -1,0 +1,54 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "{\"id\":\"new\",\"items\":[{\"id\":\"old\",\"values\":[1,2]},{\"id\":\"new\",\"values\":[1,2,3]}]}",
+  "variables": [
+    "id=old"
+  ],
+  "classification": "US-34: captura HTTPGo usa id old confirmado e envia count 2; Hurl encadeia id new do lote e envia count 3",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "2"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "3"
+      }
+    ]
+  }
+}

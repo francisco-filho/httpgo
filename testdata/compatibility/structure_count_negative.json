@@ -1,0 +1,14 @@
+{
+  "response_json": "[]",
+  "classification": "HTTPGo rejeita quantidade negativa antes de HTTP; Hurl observa assertion falsa",
+  "httpgo": {
+    "exit": 2,
+    "paths": []
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ]
+  }
+}

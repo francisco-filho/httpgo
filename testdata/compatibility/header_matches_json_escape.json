@@ -1,0 +1,12 @@
+{
+  "response_json": "not JSON",
+  "classification": "Go-only string escape rejected in JSON operand; Hurl grammar classified separately",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

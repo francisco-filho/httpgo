@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "render-asserts",
+  "response_json": "[{\"v\":1,\"id\":1}]",
+  "classification": "US-34: filtro da assertion resolve captura da própria resposta com opt-in HTTPGo; ambos aprovam",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

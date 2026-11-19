@@ -1,0 +1,49 @@
+{
+  "response_headers": [
+    {
+      "name": "X-Test",
+      "value": "first,whole"
+    },
+    {
+      "name": "x-test",
+      "value": "second"
+    }
+  ],
+  "response_json": "not JSON",
+  "classification": "diferença deliberada: HTTPGo captura primeira ocorrência literal sem dividir vírgula; Hurl tem seleção multivalorada",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      },
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "first,whole"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 3,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}

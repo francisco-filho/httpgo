@@ -1,0 +1,28 @@
+{
+  "response_json": "{}",
+  "classification": "intentional first-occurrence policy: later header occurrence is not consulted by HTTPGo",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "response_headers": [
+    {
+      "name": "X",
+      "value": "safe"
+    },
+    {
+      "name": "x",
+      "value": "Domain=second"
+    }
+  ]
+}

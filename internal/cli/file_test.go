@@ -29,7 +29,7 @@ func TestExternalFileHelp(t *testing.T) {
 		if code := cmd.ExecuteContext(context.Background()); code != 0 || stderr.Len() != 0 {
 			t.Fatalf("code=%d err=%q", code, stderr.String())
 		}
-		for _, text := range []string{"file,<caminho>;", "file,../payloads/product.json;", "diretório do .hurl", "Sem sandbox", "sem aspas/escapes especiais", "Sem --render-files", "binário", "falha localizada"} {
+		for _, text := range []string{"file,<caminho>;", "file,../payloads/product.json;", "diretório do cenário", "Sem sandbox", "sem aspas/escapes especiais", "Sem --render-files", "extensão HTTPGo", "Não renderiza arquivos multipart", "conteúdo bruto", "binário", "falha localizada"} {
 			if !strings.Contains(out.String(), text) {
 				t.Fatalf("help missing %q", text)
 			}
@@ -61,7 +61,7 @@ func TestFileDiagnostics(t *testing.T) {
 			cmd.SetOut(&out)
 			cmd.SetErr(&stderr)
 			code := cmd.ExecuteContext(context.Background())
-			if code != 2 || executor.calls != 1 || !strings.Contains(stderr.String(), want) || !strings.Contains(stderr.String(), fmt.Sprintf("%q:5:1:", file)) || !strings.Contains(out.String(), "iniciadas=1 concluídas=1 validadas=1 sem_validação=0 não_iniciadas=2") {
+			if code != 2 || executor.calls != 1 || !strings.Contains(stderr.String(), want) || !strings.Contains(stderr.String(), fmt.Sprintf("%q:5:1:", shownPath(t, file))) || !strings.Contains(out.String(), "iniciadas=1 concluídas=1 validadas=1 sem_validação=0 não_iniciadas=2") {
 				t.Fatalf("code=%d calls=%d out=%q err=%q", code, executor.calls, out.String(), stderr.String())
 			}
 			if strings.Contains(out.String()+stderr.String(), "credential-secret") || strings.Contains(stderr.String(), "transporte") {

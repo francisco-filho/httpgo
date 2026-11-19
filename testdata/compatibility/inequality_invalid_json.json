@@ -1,0 +1,6 @@
+{
+  "response_json": "invalid",
+  "classification": "malformed response never proves inequality; HTTPGo evaluation error 2",
+  "httpgo": {"exit": 2, "paths": ["/capture"]},
+  "hurl": {"exit": 4, "paths": ["/capture"]}
+}

@@ -1,0 +1,19 @@
+{
+  "httpgo_profile": "literal",
+  "response_json": "[{\"v\":\"selected\",\"id\":1}]",
+  "variables": [
+    "v=selected"
+  ],
+  "classification": "mudança explícita US-31: placeholder em literal da consulta exige opt-in e falha antes de HTTP",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

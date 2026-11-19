@@ -125,12 +125,12 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			for line := range lines {
 				remaining = append(remaining, line)
 			}
-			if len(remaining) != 2 || !strings.Contains(remaining[0], "/second: "+tc.outcome) || !strings.HasPrefix(remaining[1], "resumo ") || !strings.Contains(remaining[1], tc.completed) {
+			if len(remaining) != 3 || !strings.HasPrefix(remaining[2], "resumo suíte:") || !strings.Contains(remaining[0], "/second: "+tc.outcome) || !strings.HasPrefix(remaining[1], "resumo ") || !strings.Contains(remaining[1], tc.completed) {
 				t.Fatalf("remaining output = %q", remaining)
 			}
 			prefix := "POST "
 			if tc.code != 0 {
-				prefix = fmt.Sprintf("%q:7:1: POST ", file)
+				prefix = fmt.Sprintf("%q:7:1: POST ", suiteDisplayPath(t, file))
 			}
 			if !strings.HasPrefix(remaining[0], prefix) {
 				t.Fatalf("second result = %q; want prefix %q", remaining[0], prefix)

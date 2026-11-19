@@ -1,0 +1,18 @@
+{
+  "response_json": "[]",
+  "classification": "quantidade esperada além do inteiro de máquina aceita neste par por ambos",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/health"
+    ]
+  }
+}

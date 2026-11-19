@@ -1,0 +1,32 @@
+{
+  "response_json": "false",
+  "classification": "compartilhado: false não é vazio; divergência HTTPGo 1, Hurl 4",
+  "httpgo": {
+    "exit": 1,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 4,
+    "paths": [
+      "/capture"
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": ""
+      }
+    ]
+  }
+}
