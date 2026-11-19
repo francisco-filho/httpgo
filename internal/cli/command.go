@@ -94,7 +94,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	fileReporter := c.renderFile
 	var diagnostics []string
 	var htmlDetails []report.HTMLFile
-	options := suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}
+	options := suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout, DiagnosticBodies: args.verbosity == 2}, FailFast: args.failFast}
 	if args.verbosity > 0 {
 		// Explicit verbosity is static even on redirected streams. Colors retain
 		// the same both-TTY and NO_COLOR policy as compact presentation.

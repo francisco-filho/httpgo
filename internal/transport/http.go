@@ -63,7 +63,12 @@ func NewNetHTTPExecutor() *NetHTTPExecutor {
 	}
 }
 
-func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request) (runner.Response, error) {
+func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request) (result runner.Response, failure error) {
+	var diagnostics *runner.HTTPDiagnostics
+	if request.DiagnosticBodies {
+		diagnostics = &runner.HTTPDiagnostics{Request: runner.HTTPBody{State: runner.BodyUnavailable}, Response: runner.HTTPBody{State: runner.BodyUnavailable}}
+		defer func() { result.Diagnostics = diagnostics }()
+	}
 	timeout := request.Timeout
 	if timeout == 0 {
 		timeout = e.timeout
@@ -129,9 +134,12 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 			return runner.Response{}, classify(ctx, Network, err)
 		}
 		final := !isRedirect(response.StatusCode) || response.Header.Get("Location") == ""
+		if final && diagnostics != nil {
+			diagnostics.Request = diagnosticRequest(body, form, req.Header.Get("Content-Type"))
+		}
 		var retained []byte
 		var readErr error
-		if final && request.RetainBody {
+		if final && (request.RetainBody || request.DiagnosticBodies) {
 			retained, readErr = io.ReadAll(response.Body)
 		} else {
 			_, readErr = io.Copy(io.Discard, response.Body)
@@ -152,6 +160,13 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 			return runner.Response{}, classify(ctx, Network, ctx.Err())
 		}
 		if final {
+			if diagnostics != nil {
+				state := runner.BodyJSON
+				if len(retained) == 0 {
+					state = runner.BodyAbsent
+				}
+				diagnostics.Response = runner.HTTPBody{State: state, Bytes: retained, ContentType: response.Header.Get("Content-Type")}
+			}
 			// net/http canonicalizes wire names and appends occurrences in order.
 			// Sort distinct names only; never reorder values or split commas.
 			keys := make([]string, 0, len(response.Header))
@@ -182,6 +197,16 @@ func (e *NetHTTPExecutor) Execute(parent context.Context, request runner.Request
 		}
 		current = next
 	}
+}
+
+func diagnosticRequest(body []byte, form *runner.MultipartBody, contentType string) runner.HTTPBody {
+	if form != nil {
+		return runner.HTTPBody{State: runner.BodyOmitted}
+	}
+	if body == nil {
+		return runner.HTTPBody{State: runner.BodyAbsent}
+	}
+	return runner.HTTPBody{State: runner.BodyJSON, Bytes: body, ContentType: contentType}
 }
 
 func isRedirect(status int) bool {

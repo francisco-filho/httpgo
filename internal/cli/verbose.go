@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"capimgrosso.com/httpgo/internal/runner"
 	"capimgrosso.com/httpgo/internal/suite"
@@ -70,7 +71,28 @@ func (p *verboseProgress) entry(entry runner.EntryResult) error {
 	} else {
 		diagnostic, _ = p.command.progressDiagnostic(runner.Result{Entries: []runner.EntryResult{entry}, Diverged: true}, nil)
 	}
-	return p.command.writeProgressDiagnostic(diagnostic, p.done)
+	if err := p.command.writeProgressDiagnostic(diagnostic, p.done); err != nil {
+		return err
+	}
+	if entry.Bodies != nil {
+		if err := p.body("request", entry.Bodies.Request); err != nil {
+			return err
+		}
+		return p.body("response", entry.Bodies.Response)
+	}
+	return nil
+}
+
+func (p *verboseProgress) body(name string, preview runner.BodyPreview) error {
+	text := string(preview.State)
+	if preview.State == runner.BodyJSON {
+		text = strings.ReplaceAll(preview.Text, "\n", "\n  ")
+		if preview.Truncated {
+			text += "\n  [truncado: limite de 16384 bytes]"
+		}
+	}
+	_, err := fmt.Fprintf(p.command.err, "  [%s body]\n  %s\n", name, text)
+	return err
 }
 
 func (p *verboseProgress) finish(file suite.FileResult, run runner.Result, loadErr error) error {
