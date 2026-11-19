@@ -10,17 +10,7 @@ import (
 )
 
 func TestPollingHelpAndPublishedExample(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
-		}
-		for _, term := range []string{"[Options]", "retry: 3", "retry-interval: 500", "default 1000", "POST", "sem snapshot", "sem timeout global", "status_comparados"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "[Options]", "retry: 3", "retry-interval: 500", "default `1000`", "POST: efeitos podem se repetir", "sem snapshot", "não há timeout global", "status_comparados")
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/jobs/123" {

@@ -50,10 +50,7 @@ func TestExternalDemoAndHelpByBinary(t *testing.T) {
 	if code != 0 || stderr != "" || hits.Load() != 1 || !strings.Contains(out, "validadas=1") {
 		t.Fatalf("code=%d hits=%d out=%q err=%q", code, hits.Load(), out, stderr)
 	}
-	code, out, stderr = run(t, "test", "--help")
-	if code != 0 || stderr != "" || !strings.Contains(out, "file,../payloads/product.json;") || !strings.Contains(out, "Sem sandbox") {
-		t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
-	}
+	assertDocumentContains(t, "docs/subset.md", "file,../payloads/product.json;", "Não há sandbox", "diretório do cenário")
 }
 
 func TestExternalBodiesByBinary(t *testing.T) {

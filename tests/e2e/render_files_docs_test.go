@@ -64,12 +64,5 @@ func TestExternalRenderedDocumentedScenarios(t *testing.T) {
 			}
 		})
 	}
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		for _, text := range []string{"[--render-files]", "extensão HTTPGo", "Não renderiza arquivos multipart", "somente na vez da requisição", "payload/linha/coluna originais", "Não promete renderização equivalente pelo Hurl"} {
-			if code != 0 || stderr != "" || !strings.Contains(out, text) {
-				t.Fatalf("help missing %q code=%d out=%q err=%q", text, code, out, stderr)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "--render-files", "extensão é separada do subconjunto compatível com Hurl", "Arquivos multipart permanecem literais", "somente na vez da requisição", "linha/coluna em bytes do conteúdo original", "Não se promete renderização externa equivalente pelo Hurl")
 }

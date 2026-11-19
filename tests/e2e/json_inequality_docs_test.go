@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// GO-426: help and published examples describe only proven value inequality.
+// GO-426: documentation and published examples describe only proven value inequality.
 func TestJSONInequalityDocumentation(t *testing.T) {
 	input, err := os.ReadFile("../../testdata/scenarios/scenario_json_inequality_rotation.httpgo")
 	if err != nil {
@@ -24,17 +24,7 @@ func TestJSONInequalityDocumentation(t *testing.T) {
 			t.Fatalf("published example differs: %s", path)
 		}
 	}
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d err=%s", code, stderr)
-		}
-		for _, term := range []string{"Desigualdade JSON — US-32", `jsonpath "$.accessToken" != "{{old_token}}"`, "--secret old_token --secret new_token", "repetição ou ausência falha com 1", "captura new_token falhar com 2", "comparação isolada acima", "count !=, header/body !=", "não garante revogação", "validade do novo", "scenario_json_inequality_rotation.httpgo"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "Desigualdade JSON — US-32", `jsonpath "$.accessToken" != "{{old_token}}"`, "--secret old_token --secret new_token", "Ausência falha com", "count !=", "desigualdade de header/body", "não garante revogação", "validade do novo", "scenario_json_inequality_rotation.httpgo")
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
 	defer server.Close()

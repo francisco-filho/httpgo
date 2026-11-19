@@ -114,7 +114,9 @@ httpgo test --help
 
 Sem metadados de release, a versão desta compilação é
 `httpgo dev commit=unknown date=unknown`; isso não é uma versão publicada.
-A [referência do subconjunto](docs/subset.md) define as capacidades desta revisão.
+Os dois comandos de ajuda exibem o mesmo resumo de uso, opções e exemplos.
+Para tutoriais e detalhes, continue neste guia ou consulte a
+[referência do subconjunto](docs/subset.md#cli-e-saída), que define as capacidades desta revisão.
 
 ## Primeira execução e resultado
 

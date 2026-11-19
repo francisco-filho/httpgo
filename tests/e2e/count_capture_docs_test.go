@@ -24,17 +24,7 @@ func TestCountCaptureDocumentation(t *testing.T) {
 			t.Fatalf("example differs: %s", path)
 		}
 	}
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d err=%s", code, stderr)
-		}
-		for _, term := range []string{"Captura de contagem — US-33", `orders_before: jsonpath "$.items" count`, "número JSON inteiro não negativo", "sem baseline zero fictício", "esperado dinâmico exige", "Sem parâmetros, pipelines, aritmética", "--secret orders_before", "scenario_count_unchanged.httpgo"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "Captura de contagem — US-33", `orders_before: jsonpath "$.items" count`, "número JSON inteiro não negativo", "Ausência não é array vazio", "Esperado dinâmico", "exige `--render-asserts`", "Não há parâmetros em `count`, pipelines, aritmética", "--secret orders_before", "scenario_count_unchanged.httpgo")
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)

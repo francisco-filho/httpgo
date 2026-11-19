@@ -59,7 +59,7 @@ func TestNewMethodsPresentationAndSecretSafety(t *testing.T) {
 		}
 	}
 	code, out, stderr := execute(t, context.Background(), &fakeExecutor{}, "test", "--help")
-	if code != 0 || stderr != "" || !strings.Contains(out, "httpgo test products.httpgo") || !strings.Contains(out, `{"name":"Pizza","price":4500}`) {
+	if code != 0 || stderr != "" || !strings.Contains(out, "httpgo test health.httpgo") || !strings.Contains(out, "docs/subset.md") {
 		t.Fatalf("help=%q,err=%q", out, stderr)
 	}
 }

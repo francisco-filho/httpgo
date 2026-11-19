@@ -20,17 +20,7 @@ func TestHTMLDocumentedSuiteAndHelp(t *testing.T) {
 			t.Fatalf("%s omits HTML usage", path)
 		}
 	}
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
-		}
-		for _, text := range []string{"--output html --output-file target/report.html", "YYYYMMDDTHHMMSSmmmZ", "UTC", "offline", "arquivo parcial", "segredos", "Sem HTML e JUnit simultâneos"} {
-			if !strings.Contains(out, text) {
-				t.Fatalf("help missing %q", text)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "--output html --output-file target/report.html", "YYYYMMDDTHHMMSSmmmZ", "UTC", "offline", "arquivo parcial", "segredos", "Sem tema escuro", "HTML/JUnit simultâneos")
 	for _, fast := range []bool{false, true} {
 		t.Run(map[bool]string{false: "continue", true: "fail-fast"}[fast], func(t *testing.T) {
 			var hits atomic.Int32

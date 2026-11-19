@@ -69,7 +69,7 @@ func TestJUnitArgumentsAndHelp(t *testing.T) {
 	}
 	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
 		code, out, stderr := execute(t, context.Background(), &fakeExecutor{}, args...)
-		if code != 0 || stderr != "" || !strings.Contains(out, "--output junit --output-file target/test-results.xml") || !strings.Contains(out, "não executados=skipped") {
+		if code != 0 || stderr != "" || !strings.Contains(out, "--output junit --output-file target/results.xml") || !strings.Contains(out, "exige --output-file") {
 			t.Fatalf("help code=%d out=%q stderr=%q", code, out, stderr)
 		}
 	}

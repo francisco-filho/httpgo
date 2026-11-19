@@ -10,19 +10,9 @@ import (
 	"testing"
 )
 
-// GO-372: both help commands and the verbatim published example are executable.
+// GO-372: the documented contract and the verbatim published example are executable.
 func TestJSONTypeHelpAndPublishedExample(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d err=%s", code, stderr)
-		}
-		for _, term := range []string{`jsonpath "$.token" isString`, `jsonpath "$.attempts" isInteger`, `jsonpath "$.active" isBoolean`, `jsonpath "$.issues" isEmpty`, "notação inteira JSON", "sem limite de máquina", "sem valores ou estruturas", "json_types.httpgo", "sem esperado", "Sem schema, outros tipos ou negação genérica"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("missing help term %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `jsonpath "$.token" isString`, `jsonpath "$.attempts" isInteger`, `jsonpath "$.active" isBoolean`, `jsonpath "$.issues" isEmpty`, "notação inteira", "sem limite de inteiro de máquina", "sem imprimir valores ou estruturas", "sem esperado", "Não há schema", "outros tipos ou negação genérica")
 	input, err := os.ReadFile("../../testdata/scenarios/json_types.httpgo")
 	if err != nil {
 		t.Fatal(err)

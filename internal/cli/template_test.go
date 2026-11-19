@@ -156,7 +156,7 @@ func TestSecretDeclarationDoesNotDefineValue(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("help code=%d err=%q", code, stderr)
 	}
-	for _, want := range []string{"--var nome=valor", "--secret nome", "Proibido", "stdin", "fictício"} {
+	for _, want := range []string{"--var nome=valor", "--secret nome", "não sigilosa", "sem fornecer valor secreto"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("help lacks %q", want)
 		}

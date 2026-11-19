@@ -10,17 +10,7 @@ import (
 )
 
 func TestRegexCaptureHelpAndPublishedExamples(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
-		}
-		for _, term := range []string{`otp_code: regex "verificação é: ([0-9]{6})"`, `refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"`, "primeiro grupo da primeira correspondência", "--secret otp_code", "sem interpolação", "grupo não participante"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `otp_code: regex "verificação é: ([0-9]{6})"`, `refresh_token: header "Set-Cookie" regex "refresh=([^;]+)"`, "primeiro grupo da primeira correspondência", "--secret otp_code", "nunca interpolada", "grupo não participante")
 	for _, scenario := range []string{"scenario_capture_otp.hurl", "scenario_capture_refresh.hurl"} {
 		input, err := os.ReadFile("../../testdata/scenarios/" + scenario)
 		if err != nil {

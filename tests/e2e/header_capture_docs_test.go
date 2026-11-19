@@ -7,15 +7,7 @@ import (
 )
 
 func TestHeaderCaptureHelpAndPublishedExample(t *testing.T) {
-	code, out, stderr := run(t, "--help")
-	if code != 0 || stderr != "" {
-		t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
-	}
-	for _, term := range []string{`catalog_etag: header "ETag"`, `If-None-Match: {{catalog_etag}}`, "primeira ocorrência", "Ausente: erro de captura 2", "capturar Set-Cookie não cria Cookie"} {
-		if !strings.Contains(out, term) {
-			t.Errorf("help missing %q", term)
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `catalog_etag: header "ETag"`, `If-None-Match: {{catalog_etag}}`, "a primeira ocorrência", "Header ausente é erro de captura (2)", "não cria `Cookie`")
 	input, err := os.ReadFile("../../testdata/scenarios/scenario_capture_cache.hurl")
 	if err != nil {
 		t.Fatal(err)

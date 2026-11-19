@@ -11,17 +11,7 @@ import (
 )
 
 func TestRenderAssertsHelpAndPublishedExample(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
-		}
-		for _, term := range []string{"--render-asserts", "evolução explícita HTTPGo", "sem valor", "antes dos operandos da consulta", "sem escape automático", "nunca é recursiva", "Captura própria válida fica disponível", `jsonpath "$.number" == {{order_number}}`, `jsonpath "$.name" == "{{order_name}}"`} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "--render-asserts", "evolução explícita", "antes de decode/seleção", "sem escape automático", "A substituição não é recursiva", "capturas válidas da própria resposta estão disponíveis provisoriamente", `jsonpath "$.number" == {{order_number}}`, `jsonpath "$.name" == "{{order_name}}"`)
 	input, err := os.ReadFile("../../testdata/scenarios/scenario_render_asserts.hurl")
 	if err != nil {
 		t.Fatal(err)

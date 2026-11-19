@@ -1792,6 +1792,33 @@ diagnóstico seguro e retorna `1`; cancelamento na espera retorna `2`.
 
 ## CLI e saída
 
+`httpgo --help` e `httpgo test --help` exibem a mesma ajuda rápida em português:
+resumo da ferramenta, uso (`httpgo test <arquivo-ou-diretório>... [opções]`),
+opções com explicações curtas, indicação da documentação e exemplos ao final.
+A lista inclui `--help`, `--version`, `--config arquivo`, `--env nome`,
+`--fail-fast`, `--output junit|html`, `--output-file caminho`, `--render-files`,
+`--render-asserts`, `--var nome=valor` e `--secret nome`. Relatórios exigem destino;
+`--var` recebe apenas valores não sigilosos e `--secret` apenas marca nomes
+protegidos, sem fornecer valores secretos.
+
+A ajuda não contém tutoriais, cenários completos nem catálogos da linguagem.
+O aprofundamento permanece no [README](../README.md) e neste documento; a ajuda
+indica também o [repositório público](https://github.com/francisco-filho/httpgo),
+para quem instalou somente o binário. Seus exemplos finais são:
+
+```sh
+httpgo test health.httpgo
+httpgo test tests/ --env local
+httpgo test tests/ --output junit --output-file target/results.xml
+```
+
+Solicitar ajuda não carrega configuração, não exige cenários válidos nem faz
+requisições HTTP: retorna **0**, texto em stdout e stderr vazio. O texto estático
+permanece sem cores/animações em TTY, saída redirecionada e com `NO_COLOR`.
+Falha ou escrita curta do resultado mantém **2** e diagnóstico seguro em stderr
+quando disponível. Não há nova flag ou ajuda detalhada alternativa; execução,
+relatórios e códigos de saída conservam os contratos descritos abaixo.
+
 ```text
 httpgo test <caminho>... [--config arquivo] [--env nome] [--fail-fast] [--render-files] [--var nome=valor] [--secret nome]
 httpgo --help
