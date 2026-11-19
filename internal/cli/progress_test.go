@@ -129,6 +129,36 @@ func TestCompactProgressWriterFailures(t *testing.T) {
 	}
 }
 
+func TestCompactRenewalProtectionSurvivesFileChange(t *testing.T) {
+	t.Setenv("HTTPGO_PROGRESS_TOKEN", "old-private-progress")
+	config := writeConfig(t, "version: 1\nvariables:\n  token: ${HTTPGO_PROGRESS_TOKEN}\n")
+	dir := t.TempDir()
+	suiteFile(t, dir, "01.httpgo", "GET http://example.test/old-private-progress\n[Captures]\ntoken: jsonpath \"$.token\"\nGET http://example.test/{{token}}\n[Captures]\ntoken: jsonpath \"$.token\"")
+	suiteFile(t, dir, "02-old-private-progress-new-private-progress-renewed-private-progress.httpgo", "GET http://example.test/{{token}}\nHTTP 200\n[Asserts]\nheader \"X\" == \"prefix-{{token}}-suffix\"")
+	var requests []string
+	command := NewRootCommand(executorFunc(func(_ context.Context, request runner.Request) (runner.Response, error) {
+		requests = append(requests, request.URL)
+		token := "new-private-progress"
+		if len(requests) == 2 {
+			token = "renewed-private-progress"
+		}
+		return runner.Response{Status: 200, Body: []byte(`{"token":"` + token + `"}`)}, nil
+	}), BuildInfo{})
+	command.isTerminal = func(io.Writer) bool { return true }
+	command.SetArgs([]string{"test", dir, "--config", config, "--render-asserts"})
+	var out, stderr bytes.Buffer
+	command.SetOut(&out)
+	command.SetErr(&stderr)
+	if code := command.ExecuteContext(context.Background()); code != 1 || len(requests) != 3 || !strings.HasSuffix(requests[1], "/new-private-progress") || !strings.HasSuffix(requests[2], "/old-private-progress") {
+		t.Fatalf("code=%d requests=%v stderr=%q", code, requests, stderr.String())
+	}
+	for _, secret := range []string{"old-private-progress", "new-private-progress", "renewed-private-progress", "prefix-old-private-progress-suffix"} {
+		if strings.Contains(out.String()+stderr.String(), secret) {
+			t.Fatalf("secret %q in output: %q %q", secret, out.String(), stderr.String())
+		}
+	}
+}
+
 func TestCompactFourthStepAndProtection(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	const secret = "fiction-progress-token"

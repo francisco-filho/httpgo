@@ -1,4 +1,83 @@
-# Validação — US-01 a US-17, US-20 a US-40
+# Validação — US-01 a US-17, US-20 a US-41
+
+## US-41 — issue #88 / história 041
+
+Plano backend da issue #88 executado sem planner, em quatro tasks autoaprovadas
+na fila `041`. Ciclo síncrono de arquivo: `6faff9a`; apresentador protegido:
+`b479ab2`; seleção por TTY e resumo: `33fd7c5`; integração PTY e documentação:
+esta alteração. Escopo somente backend, sem frontend/estáticos, nova linguagem,
+mudança de execução, toolchain, CI/lint ou corpus de compatibilidade.
+
+**Mudança deliberada de contrato:** formato texto em stdout e stderr TTY passa
+a usar progresso compacto em stderr e resumo por arquivos tentados em stdout.
+Redirecionar qualquer stream preserva integralmente o texto anterior. JUnit,
+HTML, ajuda/versão e códigos 0/1/2 não mudam. `NO_COLOR` definido, mesmo vazio,
+retira cores sem retirar atualizações da linha. A dependência portátil
+`golang.org/x/term v0.48.0` (e `x/sys v0.50.0` indireta) foi adicionada só para
+identificação de TTY real; Go permanece `1.26.10`.
+
+### Evidência executada em Linux
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports` e golangci-lint existentes
+no PATH. O cache Go padrão estava somente leitura. Para baixar/verificar a nova
+dependência e executar os gates, foram usados `GOPATH=/tmp/httpgo-041-go` e
+`GOMODCACHE=/tmp/httpgo-041-modcache`, sem instalar ferramentas ou trocar o Go.
+Hurl **8.0.0**, já disponível em `/usr/local/bin/hurl`, foi usado sem instalação,
+consulta/cópia/adaptação de código-fonte ou atualização de goldens. Seu aviso de
+metadados libcurl não impediu o gate diferencial.
+
+Passaram efetivamente:
+
+- Em cada task: testes específicos, `make fmt lint test`, `go vet ./...` e
+  `go build ./...`. Lint: **0 issues**; `make test` usa **-race -cover**.
+- Task 1: `go test ./internal/suite ./internal/runner`; callbacks antes de envio,
+  parsing completo, propagação de falha e arquivos pulados não carregados.
+- Task 2: `go test ./internal/cli`; streams injetados e writers com erro/short
+  write nas fronteiras de carga, total, avanço, estado final e diagnóstico.
+- Task 3: `go mod tidy` e `go test ./internal/cli ./internal/report ./internal/suite`;
+  seleção sobre streams originais, presença/ausência de NO_COLOR, resumo com
+  duração/média determinísticas, zero tentados e regressões de relatórios.
+- Task 4: `go test ./tests/e2e -count=1`,
+  `go test ./internal/cli ./internal/suite ./internal/runner ./internal/report`,
+  `make fmt lint test`, `go vet ./...`, `go build ./...`, `make portable` e
+  `make compatibility`: **476 pares** com Hurl **8.0.0**, sem skip/atualização.
+- `go test ./tests/e2e -run '^TestCompactRealTTY' -race -count=10`: dez execuções
+  dos novos testes PTY, sem sleeps, falhas ou data races. Cada stream usa PTY ou
+  pipe independente; canais mantêm HTTP pendente enquanto o harness observa
+  nome, arquivo anterior finalizado e `0/N`, antes de liberar a resposta.
+- Fuzzers separados, 20 segundos e dois workers por alvo, sem falhas:
+  `FuzzParse` (**172.770** execuções), `FuzzRender` (**42.976**) e
+  `FuzzRenderJSON` (**21.565**). Comandos:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`,
+  e equivalentes em `./internal/template` para os outros dois alvos.
+
+### Rastreabilidade GO-524–GO-538
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-524 | `TestFileLifecycleNotifications`, `TestCompactProgressLifecycle` e `TestCompactRealTTYPendingAndOutcomes`: `0/N` antes do envio, requisição real pendente com barreira, arquivo anterior visível |
+| GO-525 | CLI de ciclo e PTY de desfechos: nomes-base iguais em diretórios distintos, sem expectativa e `HTTP *`, linhas finais próprias, sucesso e ordem preservados |
+| GO-526 | `TestCompactFourthStepAndProtection` e PTY `fourth failure`: erro no quarto step, ordinal/posição e nenhum step posterior; CLI de ciclo verifica diagnóstico antes do próximo envio |
+| GO-527 | suíte de notificações, CLI `retry` e PTY `retry pass`/`retry exhausted`: avanço único, tentativas/envios preservados |
+| GO-528 | `TestDiscoveryCancellationAndLateLoadFailure`, CLI `read`/`parse` e `TestCompactRealTTYLoadErrorsAndProtection`: carga/parsing com total desconhecido e contagem de tentados |
+| GO-529 | notificações e CLI com fail-fast; PTY de falha/esgotamento identifica não alcançados com `?`, sem carga nem envio |
+| GO-530 | `TestCompactSummaryCountsAndDuration`, ciclo CLI e suíte mista real em PTY: tentados versus envios, erros agrupados, média, duração e não executados condicionais |
+| GO-531 | `TestCompactSelectionAndColors` e `TestCompactRealTTYSelection`: oito combinações reais PTY/pipe e NO_COLOR, inclusive redirecionamentos parciais; texto/streams legados preservados |
+| GO-532 | testes CLI e `TestCompactRealTTYReportsAndStaticCommands`: sem compacto em JUnit/HTML mesmo com ambos TTY, XML lido e contagem verificada; serializadores e E2E JUnit/HTML existentes também passam |
+| GO-533 | seleção CLI/PTy com NO_COLOR ausente, vazio ou definido; ajuda/versão estáticas sem ANSI; rótulos mantidos com e sem cor |
+| GO-534 | `TestCompactFourthStepAndProtection`, `TestCompactRenewalProtectionSurvivesFileChange` e PTY de segredos: nomes/diagnósticos protegidos, renovação/derivação e valores operacionais intactos |
+| GO-535 | notificações, CLI `pre-send` e suíte mista real em PTY: erro pré-envio avança contador sem incrementar envio |
+| GO-536 | `TestCancelledBeforeLoadingDoesNotNotify`, testes existentes entre arquivos, CLI `cancel`, resumo determinístico com zero tentados e PTY com SIGINT durante HTTP: código 2, desfecho alcançado e demais não executados |
+| GO-537 | `TestCompactDoesNotAffectReportsHelpOrPreexecutionErrors`: uso/configuração/descoberta sem linhas ou resumo compacto; regressões globais existentes preservadas |
+| GO-538 | `TestFileLifecycleNotifications`, `TestCompactProgressWriterFailures`, `TestCompactSummaryWriterFailure`: erro/short write em cada fronteira, código 2, sem novos envios, resumo indevido ou repetição no writer falho |
+
+O workflow `.github/workflows/junit.yml` e scripts consumidores/contagens não
+foram alterados. Não houve disparo remoto do CI ou análise SonarQube pelo backdev.
+PTY e HTTP são evidência de execução **Linux** com binário real e servidor local,
+não de API externa, execução nativa macOS/Windows ou publicação de checks no
+GitHub. `make portable` comprovou somente cross-build Linux/Darwin/Windows amd64.
+Proteção incremental não apaga texto já exibido antes da descoberta de segredo,
+nem detecta todo segredo arbitrário não marcado ou transformação desconhecida.
 
 ## US-40 — correção da origem de distribuição (v0.1.2)
 

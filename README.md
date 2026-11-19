@@ -152,8 +152,11 @@ httpgo test exemplo.httpgo --var base_url=http://localhost:8080
 echo $?
 ```
 
-A saída em stdout informa o GET, status 200 e resumo com uma requisição validada;
-o código é **0**, sem diagnóstico de erro em stderr. A CLI não imprime o body.
+Com stdout e stderr em terminal interativo, o progresso em stderr termina em
+`- exemplo.httpgo  OK  1/1`, e stdout recebe o resumo da suíte. O código é **0**.
+Se qualquer um dos streams for redirecionado, preserva-se o texto detalhado:
+stdout informa o GET, status 200 e resumo com uma requisição validada, sem
+diagnóstico de erro em stderr. A CLI não imprime o body.
 Agora troque **somente** `HTTP 200` por `HTTP 201` no arquivo e repita o comando:
 o servidor continua respondendo 200, aparece **status divergente**, e `echo $?`
 mostra **1**. Restaure `HTTP 200` antes de prosseguir.
@@ -168,8 +171,10 @@ Em suítes, **2 prevalece sobre 1**. Sem uma linha `HTTP`, qualquer status é ac
 e informado como **sem validação de status**; `HTTP *` também aceita qualquer
 status, não equivale a exigir 200. Dentro de um arquivo, uma falha definitiva
 interrompe as próximas requisições; não desfaz efeitos que já ocorreram na API.
-A saída é texto sem cores, inclusive em TTY e com `NO_COLOR`; resultados vão a
-stdout e diagnósticos a stderr. Consulte os [contratos da CLI](docs/subset.md#cli-e-saída).
+O compacto usa cores quando `NO_COLOR` está ausente; definir a variável, mesmo
+vazia, remove cores sem remover a barra textual e suas atualizações. Ajuda e
+versão permanecem estáticas e sem cores. Consulte os
+[contratos da CLI](docs/subset.md#cli-e-saída).
 
 ## Requisições e dados de entrada
 
@@ -342,8 +347,46 @@ requisições executam sequencialmente. Capturas não passam de um arquivo para 
 Sem `--fail-fast`, a falha de um arquivo não impede os demais; com a flag, os
 restantes ficam **não executados**. Erros de descoberta impedem todo HTTP.
 
-O primeiro comando mostra resultados e resumo em stdout. Nos outros, stdout fica
-vazio: JUnit grava `target/test-results.xml`, substituindo destino existente;
+No primeiro comando, **somente quando stdout e stderr são TTY**, cada arquivo
+ocupa uma linha em stderr, apenas com nome-base e extensão. A linha atual começa
+em `0/N` após o parsing completo e avança por step definitivo (requisição com
+capturas/validações); polling não gera steps extras. Linhas finalizadas permanecem,
+sem repetição. Por exemplo, durante a execução:
+
+```text
+- 01-health.httpgo  OK  1/1
+- 02-produto.httpgo  |=====>       1/2
+```
+
+Ao finalizar, a barra vira `OK` ou `ERRO`. O diagnóstico seguro fica imediatamente
+abaixo do erro, com step e posição disponíveis. Falha de carga/parsing tem total
+`?`; arquivos não alcançados mostram `NÃO EXECUTADO 0/?`, sem parsing antecipado.
+Nomes iguais em diretórios diferentes continuam em linhas distintas.
+
+Somente o resumo final vai a stdout. Exemplo ilustrativo de uma suíte de dois
+arquivos concluídos em seis segundos:
+
+```text
+Testes executados: 2
+Tempo: 6s
+Tempo médio por teste: 3s
+Sucesso/erros: 2/0
+```
+
+“Testes executados” conta arquivos cuja carga foi tentada, inclusive erro de
+leitura/parsing ou erro pré-envio. “Sucesso/erros” agrupa arquivos aprovados e não
+aprovados. A média divide o tempo total pelos tentados, ou é `não aplicável` com
+zero tentados. `Não executados: N` aparece só quando positivo, fora dessa divisão.
+Erros globais anteriores à execução não produzem resumo.
+
+**Redirecionar stdout ou stderr preserva integralmente o texto anterior**, sem
+atualização de linha, cores ou resumo compacto: resultados e resumos detalhados
+vão a stdout, diagnósticos a stderr. Essa substituição da apresentação apenas no
+terminal é uma mudança deliberada de contrato; execução e exit codes não
+mudam. A proteção incremental de segredos conhecidos/derivados cobre nomes e
+diagnósticos, mas não apaga texto exibido antes de um segredo ser conhecido.
+
+Nos comandos de relatório, stdout fica vazio: JUnit grava `target/test-results.xml`, substituindo destino existente;
 HTML gera `target/report-YYYYMMDDTHHMMSSmmmZ.html` em UTC, sem sobrescrever
 anteriores (adiciona sufixo na colisão), e anuncia o caminho final em stderr.
 Ambos criam diretórios pais quando possível, exigem `--output-file` e reaproveitam

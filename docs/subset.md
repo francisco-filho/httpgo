@@ -1887,7 +1887,67 @@ compartilhamento implícito de login, cenário/segredos por stdin ou outras flag
 `--output junit --output-file <caminho>` seleciona o relatório US-17;
 `--output html --output-file <caminho>` seleciona HTML US-35, com nomeação própria
 por timestamp, ambos descritos acima. `check` e configurações futuras não estão implementados ou anunciados.
-As linhas e contagens a seguir descrevem o **modo texto padrão**.
+### Progresso interativo — US-41 / issue #88
+
+O modo texto padrão é **compacto somente quando stdout e stderr originais são
+TTY**. Writers sem terminal reconhecido ou redirecionamento de qualquer um dos
+dois preservam integralmente o modo detalhado anterior, inclusive streams e
+contagens. A seleção ocorre antes dos wrappers de proteção. Ajuda, versão,
+JUnit e HTML não usam progresso nem resumo compacto.
+
+Cada arquivo alcançado aparece em stderr antes de sua carga, com nome-base e
+extensão, barra e `0/?`. Após parsing completo e fechamento, mostra `0/N` antes
+de qualquer envio. Cada requisição, com suas capturas/validações, é um step;
+o contador avança uma vez por desfecho definitivo, inclusive erro pré-envio.
+Retentativas pendentes não avançam o contador nem aumentam o total. A barra
+representa avanço, não aprovação, e só muda por eventos, sem animação temporal.
+
+Só a linha corrente é atualizada. Linhas anteriores permanecem visíveis e não
+são repetidas ao final; nomes-base iguais não agrupam arquivos distintos.
+Finalização substitui a barra por `OK` ou `ERRO`. Qualquer divergência/erro recebe
+`ERRO`, e o diagnóstico seguro é emitido imediatamente abaixo, antes do próximo
+arquivo, com ordinal do step e posição quando disponíveis. Falha de leitura ou
+parsing não inventa step nem total: mostra `ERRO 0/?`. Arquivos não alcançados
+mostram `NÃO EXECUTADO 0/?`, sem carga só para contar suas entradas.
+
+```text
+- health.httpgo  OK  1/1
+- products.httpgo  ERRO  4/10
+  step 4, "products.httpgo":12:1: status divergente: esperado 200, recebido 503; execução interrompida
+```
+
+Progresso e diagnósticos vão a **stderr**, somente o resumo final a **stdout**:
+
+```text
+Testes executados: 3
+Tempo: 6s
+Tempo médio por teste: 2s
+Sucesso/erros: 2/1
+```
+
+- `Testes executados`: arquivos com carga tentada (`Processed`), inclusive falha
+  de leitura/parsing ou preparação sem envio; não equivale a `Executed`.
+- `Sucesso/erros`: aprovados (`Passed`) e não aprovados (`Failed + Errors`).
+- `Tempo`: duração já medida da suíte; média = duração / tentados, ou
+  `não aplicável` com zero tentados.
+- `Não executados: N`: somente quando `Skipped > 0`; excluídos dos tentados e da
+  média. Uso/configuração/descoberta inválidos continuam sem resumo.
+
+Cores são habilitadas na ausência de `NO_COLOR`; sua presença, mesmo vazia,
+desativa cores, mas mantém rótulos, barra textual e atualização da linha.
+Proteção incremental cobre cada atualização, nome e diagnóstico; não acrescenta
+bodies/credenciais nem promete apagar texto anterior à descoberta do segredo.
+Falha/short write em carga, total, avanço, finalização, diagnóstico ou resumo é
+apresentação global: código 2, sem próximos envios ou novas tentativas no writer
+falho. Interrupção, continuação, fail-fast e cancelamento permanecem inalterados.
+
+A apresentação interativa é uma **mudança deliberada de contrato**; os contadores
+estruturados, JUnit/HTML, texto redirecionado e códigos 0/1/2 não mudam.
+
+### Texto detalhado preservado por redirecionamento
+
+As linhas e contagens a seguir descrevem o **modo texto legado**, selecionado
+quando pelo menos um dos streams não é TTY.
 
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
 resultado com o método declarado, URL segura e uma
@@ -1984,9 +2044,9 @@ Na suíte, **2 prevalece sobre 1**. Erro ao escrever stdout/stderr também é
 categoria 2; não transforma divergência em sucesso. Falha/short write em resultado,
 resumo por arquivo, diagnóstico ou agregado encerra toda a suíte antes de novos
 envios, preserva o que já foi escrito e não tenta novamente o writer que falhou. O erro é diagnosticado de forma segura em stderr, sem ecoar a causa bruta.
-A apresentação usa sempre texto simples sem cores/animações,
-independentemente de TTY e NO_COLOR: não há detecção de terminal nem formato
-alternativo dependente do ambiente. O E2E comprova pipe e PTY Linux real.
+O modo legado usa texto simples sem cores/animações, independentemente de
+NO_COLOR. O compacto interativo segue a seleção e os streams descritos acima.
+O E2E comprova pipe, redirecionamentos parciais e dois PTYs Linux reais.
 
 `--version` mostra versão, commit e data. Para defini-los no build:
 

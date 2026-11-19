@@ -1395,6 +1395,44 @@ não executados sem novos envios. Proteção antecede coleção/callback, inclus
 erros de parsing e nomes posteriores; novas variantes também protegem os nomes
 retidos até o retorno. Invocação seguinte não herda opções, variantes ou resultados.
 
+## Progresso interativo — US-41
+
+`Suite.Run` recebe callbacks opcionais síncronos em `suite.Options`: `Loading`
+antes da abertura de um arquivo alcançado e `Loaded` após parsing completo e
+fechamento, com o total validado antes do runner. `RunFile` público mantém seu
+contrato sem notificações. Erros desses callbacks entram em `Result.ReportErr`,
+como os callbacks existentes: interrupção global e nenhuma repetição de escrita.
+Arquivos pulados não são carregados nem notificados para obter contagens.
+
+`cli.Command.ExecuteContext` detecta capacidades sobre os writers originais,
+antes de `protectedWriter`. `golang.org/x/term.IsTerminal` oferece detecção
+portátil real sobre `*os.File`, sem confundir dispositivo de caracteres com TTY.
+Somente formato texto com **ambos** stdout/stderr TTY seleciona `fileProgress`
+em `internal/cli/progress.go`; capacidades são injetáveis nos testes. Ajuda,
+versão e relatórios continuam nos caminhos anteriores. A presença de `NO_COLOR`
+desliga cores, não as atualizações da linha.
+
+O apresentador retém só nome-base, total conhecido/desconhecido e avanço do
+arquivo corrente. O callback terminal existente do runner incrementa o contador
+uma vez por entrada lógica, após polling, inclusive erro pré-envio; não infere
+avanço das métricas HTTP. Atualizações usam retorno de carro/limpeza da linha em
+stderr. O callback final classifica via `FileResult.State`, termina a linha e
+reutiliza `junitDiagnostic`/`renderDiagnostic` com prefixo ordinal, sem avaliar
+assertions ou reter cenários/respostas/sessões. Linhas finalizadas não são
+reimpressas; nomes-base iguais não mudam identidade ou ordem da suíte.
+
+`renderCompactSuite` escreve somente em stdout e usa `Summary.Processed`,
+`Passed`, `Failed + Errors`, `Skipped` e `Duration`. Média é duração / processados,
+ou `não aplicável` se zero; pulados só aparecem se positivos. Campos estruturados,
+texto redirecionado e serializadores permanecem inalterados. Não há resumo para
+erro global anterior à execução ou falha de progresso.
+
+`executionProtection`, `sessionRenderer` e `protectedWriter` continuam cobrindo
+cada atualização e diagnóstico com proteção incremental e memória da primeira
+falha/short write. Falha de apresentação interrompe antes de novos envios e não
+insiste no writer falho. Não há novas goroutines, ticker, filas ou paralelismo na
+produção; enquanto HTTP está pendente, a última atualização fica visível.
+
 ## Testes e evidência
 
 - `internal/parser`: readers em memória, fronteiras/bytes JSON, headers, URLs,
@@ -1432,7 +1470,7 @@ retidos até o retorno. Invocação seguinte não herda opções, variantes ou r
   `assert_json_*` e amplia intencionalmente `headers_query_unsupported`, mantendo
   os demais 78 antigos. Sem skip em versão ausente/errada.
 
-Saída é deliberadamente sempre plain-text: os testes usam streams, arquivo, pipe e
-PTY real para verificar o contrato, sem criar detector de TTY ou dependência
-apenas para um formato que não muda. Consulte `validation.md` para evidências e
-bloqueios; cross-build não é aceite nativo.
+O legado permanece plain-text quando qualquer stream é redirecionado. O compacto
+é comprovado por dois PTYs Linux reais independentes, com HTTP pendente,
+redirecionamentos parciais, cores, polling e cancelamento por SIGINT. Consulte
+`validation.md` para evidências e limites; cross-build não é aceite nativo.
