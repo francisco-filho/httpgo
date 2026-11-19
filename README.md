@@ -363,10 +363,12 @@ abaixo do erro, com step e posição disponíveis. Falha de carga/parsing tem to
 `?`; arquivos não alcançados mostram `NÃO EXECUTADO 0/?`, sem parsing antecipado.
 Nomes iguais em diretórios diferentes continuam em linhas distintas.
 
-Somente o resumo final vai a stdout. Exemplo ilustrativo de uma suíte de dois
+Somente o resumo final vai a stdout, precedido por uma linha separadora de
+hífens entre os testes e o resumo. Exemplo ilustrativo de uma suíte de dois
 arquivos concluídos em seis segundos:
 
 ```text
+-----------------------------------------------
 Testes executados: 2
 Tempo: 6s
 Tempo médio por teste: 3s

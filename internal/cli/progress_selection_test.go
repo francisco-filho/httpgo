@@ -85,8 +85,9 @@ func TestCompactSummaryCountsAndDuration(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var out bytes.Buffer
 			c := &Command{out: &out}
-			if err := c.renderCompactSuite(test.summary); err != nil || out.String() != test.want {
-				t.Fatalf("out=%q want=%q err=%v", out.String(), test.want, err)
+			want := "-----------------------------------------------\n" + test.want
+			if err := c.renderCompactSuite(test.summary); err != nil || out.String() != want {
+				t.Fatalf("out=%q want=%q err=%v", out.String(), want, err)
 			}
 		})
 	}

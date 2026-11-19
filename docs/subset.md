@@ -1916,9 +1916,11 @@ mostram `NÃO EXECUTADO 0/?`, sem carga só para contar suas entradas.
   step 4, "products.httpgo":12:1: status divergente: esperado 200, recebido 503; execução interrompida
 ```
 
-Progresso e diagnósticos vão a **stderr**, somente o resumo final a **stdout**:
+Progresso e diagnósticos vão a **stderr**, somente o resumo final a **stdout**,
+precedido por uma linha separadora de 47 hífens:
 
 ```text
+-----------------------------------------------
 Testes executados: 3
 Tempo: 6s
 Tempo médio por teste: 2s

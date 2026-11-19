@@ -373,10 +373,10 @@ func TestCompactRealTTYSelection(t *testing.T) {
 					}
 					out, diagnostic := p.out.text(), p.stderr.text()
 					if outTTY && errTTY {
-						if !strings.Contains(out, "Testes executados: 1\n") || !strings.Contains(diagnostic, "\x1b[2K") || strings.Contains(diagnostic, "\x1b[32m") == noColor {
+						if !strings.HasPrefix(out, "-----------------------------------------------\nTestes executados: 1\n") || strings.Count(out, "-----------------------------------------------\n") != 1 || !strings.Contains(diagnostic, "\x1b[2K") || strings.Contains(diagnostic, "\x1b[32m") == noColor {
 							t.Fatalf("out=%q err=%q", out, diagnostic)
 						}
-					} else if !strings.Contains(out, "GET ") || !strings.Contains(out, "resumo suíte:") || diagnostic != "" || strings.Contains(out, "\x1b") {
+					} else if !strings.Contains(out, "GET ") || !strings.Contains(out, "resumo suíte:") || diagnostic != "" || strings.Contains(out, "\x1b") || strings.Contains(out, "-----------------------------------------------") {
 						t.Fatalf("legacy out=%q err=%q", out, diagnostic)
 					}
 				})
