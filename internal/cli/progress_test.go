@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestCompactProgressLifecycle(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	for _, mode := range []string{"pass", "mismatch", "pre-send", "parse", "retry", "cancel", "read"} {
 		t.Run(mode, func(t *testing.T) {
 			dir := t.TempDir()
@@ -56,7 +58,7 @@ func TestCompactProgressLifecycle(t *testing.T) {
 				}
 				return runner.Response{Status: 200}, nil
 			}), BuildInfo{})
-			command.compact = true
+			command.isTerminal = func(io.Writer) bool { return true }
 			command.SetOut(&out)
 			command.SetErr(&stderr)
 			args := []string{"test", dir}
@@ -108,7 +110,7 @@ func TestCompactProgressWriterFailures(t *testing.T) {
 					calls++
 					return runner.Response{Status: 503}, nil
 				}), BuildInfo{})
-				command.compact = true
+				command.isTerminal = func(io.Writer) bool { return true }
 				writer := &suiteWriter{allowed: allowed, short: short}
 				var out bytes.Buffer
 				command.SetOut(&out)
@@ -128,6 +130,7 @@ func TestCompactProgressWriterFailures(t *testing.T) {
 }
 
 func TestCompactFourthStepAndProtection(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	const secret = "fiction-progress-token"
 	dir := t.TempDir()
 	suiteFile(t, dir, "01.httpgo", "GET http://example.test/login\n[Captures]\ntoken: jsonpath \"$.token\"\nGET http://example.test/2\nGET http://example.test/3\nGET http://example.test/4\nHTTP 200\nGET http://example.test/blocked")
@@ -144,7 +147,7 @@ func TestCompactFourthStepAndProtection(t *testing.T) {
 		}
 		return runner.Response{Status: 200}, nil
 	}), BuildInfo{})
-	command.compact = true
+	command.isTerminal = func(io.Writer) bool { return true }
 	command.SetArgs([]string{"test", dir, "--secret", "token"})
 	command.SetOut(&out)
 	command.SetErr(&stderr)
