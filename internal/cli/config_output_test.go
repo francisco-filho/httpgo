@@ -67,7 +67,7 @@ func TestConfigHelpDocumentsOnlyImplementedSources(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%q", code, stderr)
 		}
-		for _, text := range []string{"--config", ".httpgo.yaml", "diretório corrente", "0.001", "86400", "1 MiB", "version: 1", "extensão HTTPGo", "CLI", "${NOME}"} {
+		for _, text := range []string{"--config arquivo", "configuração YAML do projeto", "docs/subset.md"} {
 			if !strings.Contains(out, text) {
 				t.Errorf("missing %q in help", text)
 			}

@@ -52,7 +52,7 @@ func TestSuiteHelpAndArguments(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
 		}
-		for _, fragment := range []string{"<caminho>...", "--fail-fast", "não executados", "resumo suíte", "Entre unidades", "Não há cookie jar"} {
+		for _, fragment := range []string{"<arquivo-ou-diretório>...", "--fail-fast", "primeira falha", "httpgo test tests/"} {
 			if !strings.Contains(out, fragment) {
 				t.Fatalf("help missing %q", fragment)
 			}

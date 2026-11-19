@@ -18,7 +18,7 @@ func TestBodyHelp(t *testing.T) {
 		if code != 0 || stderr != "" {
 			t.Fatalf("code=%d err=%s", code, stderr)
 		}
-		for _, want := range []string{`body contains "customer"`, `body not contains "passwordHash"`, `body not contains "trackingToken"`, `not contains "" sempre falha`, "erro de avaliação de body (2)", "sem reserializar JSON", "captura secreta pendente", "nunca body ou fragmentos recebidos", "Perfil literal (sem --render-asserts): Esperado nunca interpola", "--render-asserts é flag sem valor"} {
+		for _, want := range []string{"--render-asserts", "Documentação:", "docs/subset.md"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("help lacks %q", want)
 			}

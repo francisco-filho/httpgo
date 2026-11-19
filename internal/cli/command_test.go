@@ -56,7 +56,7 @@ func TestHelpVersionAndInvalidUsage(t *testing.T) {
 		want string
 	}{
 		{"help", []string{"--help"}, 0, "httpgo test health.httpgo"},
-		{"test help", []string{"test", "--help"}, 0, "HTTP 404"},
+		{"test help", []string{"test", "--help"}, 0, "httpgo test health.httpgo"},
 		{"version", []string{"--version"}, 0, "httpgo 1.0-test commit=abc123 date=2026-11-14"},
 		{"no args", nil, 2, "uso inválido"},
 		{"no file", []string{"test"}, 2, "uso inválido"},
@@ -200,7 +200,7 @@ func TestNoColorAndPlainOutput(t *testing.T) {
 		t.Run("NO_COLOR="+noColor, func(t *testing.T) {
 			t.Setenv("NO_COLOR", noColor)
 			code, out, err := execute(t, context.Background(), &fakeExecutor{}, "--help")
-			if code != 0 || err != "" || strings.Contains(out, "\x1b") || !strings.Contains(out, "não coloque segredos") {
+			if code != 0 || err != "" || strings.Contains(out, "\x1b") || !strings.Contains(out, "variável não sigilosa") {
 				t.Fatalf("code=%d,out=%q,err=%q", code, out, err)
 			}
 			file, errOpen := os.CreateTemp(t.TempDir(), "stdout")
