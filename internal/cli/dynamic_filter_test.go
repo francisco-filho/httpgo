@@ -38,7 +38,7 @@ func TestDynamicFilterInvocationIsolation(t *testing.T) {
 		cmd.SetOut(&out)
 		cmd.SetErr(&stderr)
 		cmd.SetArgs(args)
-		if code := cmd.ExecuteContext(context.Background()); code != want || enabled && !strings.Contains(out.String(), "sucessos=2") {
+		if code := cmd.ExecuteContext(context.Background()); code != want || enabled && !strings.Contains(out.String(), "Cenários executados: 2\n") {
 			t.Fatalf("enabled=%v code=%d out=%s err=%s", enabled, code, out.String(), stderr.String())
 		}
 	}

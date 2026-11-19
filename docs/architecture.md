@@ -1,4 +1,60 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38
+# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+
+## Progresso verboso e prévias JSON — US-42 / issue #90
+
+`cli/arguments.go` conta `arguments.verbosity` por invocação, com máximo de dois;
+rejeita formatos de relatório antes de HTTP/abertura de destinos. `command.go`
+seleciona `verboseProgress` de `cli/verbose.go` prioritariamente sobre compacto/
+legado apenas quando solicitado. Reutiliza `suite.Options.Loading` para anúncio
+antes da carga, callback terminal para ordinal/step e callback de arquivo para
+carga/parsing/não alcançados. Não usa `Loaded` para produzir barra ou step extra.
+`renderSuite` de `cli/summary.go` é compartilhado por todos os modos de texto;
+a detecção original de ambos TTY e NO_COLOR é reutilizada. O modo verboso funciona
+com pipes, sempre estático; só ambos TTY sem NO_COLOR permitem cores e nomes em
+negrito. `scenarioSummaryText` usa os contadores definitivos de `FileResult` para
+escrever o balanço de steps e separador após diagnóstico/prévias; não inventa
+steps em erro de carga/parsing ou balanço de arquivos pulados.
+
+`runner/terminal.go` prepara `EntryResult.Diagnostic` (`EntryDiagnostic`) com
+posição, fase, consulta e detalhe controlados; causas brutas continuam somente
+em `Result.Err`, nunca no callback. `progress_diagnostic.go` compartilha o bloco
+visual entre compacto/verboso, sem reavaliar ou reconstruir declarações. O callback
+por arquivo não repete o diagnóstico de step. Duração e callback único continuam
+em `polling.go`, abrangendo a entrada lógica antes da apresentação.
+
+Somente nível 2 ativa `runner.Options.DiagnosticBodies` →
+`runner.Request.DiagnosticBodies`. O executor retorna `Response.Diagnostics`
+(`HTTPDiagnostics`, `HTTPBody`): bytes e estado transitórios do request efetivo e
+da resposta completa do salto final. `transport/http.go` retém a resposta final
+completa nesse opt-in, inclusive em cenário só de status. Não retém intermediários.
+301/302/303 convertendo método descartam o body; 307/308 preservam bytes. Falha de
+consumo/close/prazo deixa resposta indisponível, nunca JSON parcial exibível.
+Falha de transporte sem resposta não comprova bytes enviados/recebimento.
+
+`runner/diagnostic.go` mantém `attemptBodies` local ao polling, substituído somente
+em nova chamada ao executor. Preparação posterior falha e espera cancelada não
+substituem a última tentativa por template. `extractCaptures` notifica extração
+bem-sucedida após proteger o valor; remove somente essa captura do conjunto
+pendente, sem mudar status → extração/Stage → assertions → confirmação. Qualquer
+secreta ainda não extraída omite a resposta inteira. A ocultação conservadora dos
+outros diagnósticos continua inalterada, mesmo após extração sem confirmação.
+
+Só na falha terminal, `prepareBodyPreviews` valida um JSON completo UTF-8, filtra
+conteúdo/MIME e usa `Session.Sanitize` com proteção acumulada/`SecretVariants`.
+Representação canônica JSON com `UseNumber` é usada quando necessária à proteção
+de escapes semanticamente equivalentes. Sanitização integral precede corte de
+16.384 bytes em fronteira UTF-8, com flag de truncamento. Whitespace CR externo
+é retirado da prévia para não criar atualizações de linha. Ausente, indisponível,
+omitido não JSON e omitido por proteção são estados explícitos. Sem conversão de
+charset ou erro bruto de decoder. Limite de exibição não limita consumo HTTP.
+
+Somente `BodyPreviews`/`BodyPreview` protegidas podem integrar `EntryResult.Bodies`;
+`safeEntry` continua sem bodies, fontes ou templates. Brutos saem de escopo após
+o desfecho; sucessos e opções zero não retêm prévias. `suite.FileResult` continua
+somente com contagens. Relatórios não habilitam diagnóstico nem ganham bodies.
+Writers protegidos preservam prioridade 2, interrupção síncrona e nenhuma nova
+escrita no stream falho. Não há novo pacote, dependência, goroutine, histórico ou
+mudança de Go, linguagem, orçamento HTTP, contagens ou persistência.
 
 ## Extensão padrão de cenários — US-38 / issue #79
 
@@ -1407,7 +1463,7 @@ Arquivos pulados não são carregados nem notificados para obter contagens.
 `cli.Command.ExecuteContext` detecta capacidades sobre os writers originais,
 antes de `protectedWriter`. `golang.org/x/term.IsTerminal` oferece detecção
 portátil real sobre `*os.File`, sem confundir dispositivo de caracteres com TTY.
-Somente formato texto com **ambos** stdout/stderr TTY seleciona `fileProgress`
+Sem verbosidade explícita, somente formato texto com **ambos** stdout/stderr TTY seleciona `fileProgress`
 em `internal/cli/progress.go`; capacidades são injetáveis nos testes. Ajuda,
 versão e relatórios continuam nos caminhos anteriores. A presença de `NO_COLOR`
 desliga cores, não as atualizações da linha.
@@ -1430,11 +1486,17 @@ antes do próximo arquivo; legado e relatórios conservam `renderDiagnostic` e
 `junitDiagnostic`. Linhas finalizadas não são reimpressas; nomes-base iguais não
 mudam identidade ou ordem da suíte.
 
-`renderCompactSuite` escreve somente em stdout e usa `Summary.Processed`,
-`Passed`, `Failed + Errors`, `Skipped` e `Duration`. Média é duração / processados,
-ou `não aplicável` se zero; pulados só aparecem se positivos. Campos estruturados,
-texto redirecionado e serializadores permanecem inalterados. Não há resumo para
-erro global anterior à execução ou falha de progresso.
+`renderSuite` em `internal/cli/summary.go` escreve em stdout o resumo compartilhado
+por compacto, legado e verboso. O grupo de cenários usa `Summary.Processed`,
+`Passed`, `Failed + Errors` e `Skipped`; o grupo de testes usa `Successful`,
+`AssertionFailures + RequestErrors` e sua soma, incluindo erros pré-HTTP e sem
+multiplicar retentativas. Cada média é `Duration` dividida pela contagem do grupo,
+ou `não aplicável` se zero; pulados só aparecem se positivos no primeiro grupo.
+`Tempo` fica por último. Somente `verboseProgress` escreve o balanço e separador de cada arquivo em
+stderr usando esses contadores de steps; compacto e legado não os acrescentam.
+Esse é um ajuste deliberado do contrato textual, inclusive redirecionado;
+campos estruturados e serializadores JUnit/HTML permanecem inalterados. Não há
+resumo para erro global anterior à execução ou falha de progresso.
 
 `executionProtection`, `sessionRenderer` e `protectedWriter` continuam cobrindo
 cada atualização e diagnóstico com proteção incremental e memória da primeira

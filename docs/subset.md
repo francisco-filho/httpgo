@@ -1,4 +1,73 @@
-# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38
+# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+
+## Progresso verboso — US-42 / issue #90
+
+```sh
+httpgo test tests/ -v
+httpgo test tests/ -vv
+```
+
+Contrato próprio de apresentação, sem nova sintaxe de cenário. `-v`/`--verbose`
+contam uma ocorrência; `-vv` conta duas. Formas curtas/longas somam, em qualquer
+ordem após `test`; `-v -v`, `--verbose --verbose` e `-v --verbose` equivalem ao
+nível 2. Mais de duas ou valores inline são uso inválido **2**, sem HTTP.
+Ambos os níveis são incompatíveis com `--output junit`/`html`: rejeição antes
+de abrir/alterar destinos. Sem flags, preserva-se a seleção US-41.
+
+Cada arquivo é anunciado em **stderr**, com nome-base e extensão, antes da carga.
+Nomes iguais não se agrupam. Cada step definitivo tem uma linha estática
+`[OK] MÉTODO URL (Nms)` ou `[ERRO] MÉTODO URL (Nms)`, sem barra ou atualização,
+inclusive com redirecionamento. A duração lógica inclui preparação, tentativas,
+validações/capturas e esperas, sem o tempo de apresentação. Polling produz uma
+única linha final. `[OK]` não inventa validações não declaradas.
+
+O bloco seguro de erro compartilhado com US-41 informa ordinal, linha/coluna,
+consulta/predicado e comparação ou causa disponíveis: `[status]`, `[assertion]`,
+`[captures]`, `[renderização]`, `[transporte]` ou `[parsing]`. Não há etapa de
+validação que não ocorreu, step/posição fictícios em erro de carga ou repetição
+do diagnóstico no fechamento do arquivo. O bloco precede o próximo arquivo.
+
+**Somente o nível 2** adiciona blocos `[request body]` e `[response body]` nas
+falhas/erros, nunca em sucesso, nível 1 ou relatórios. Exibe JSON completo UTF-8
+validado como um único valor antes da proteção/corte, incluindo arquivos externos,
+sem decodificar charsets. MIME ausente, JSON/`+json` e `text/plain` permitem JSON;
+binários, multipart, outros MIME ou conteúdo inválido são `omitido (conteúdo não JSON)`.
+Request sem body: `ausente`; arquivo externo vazio: conteúdo omitido. Falha antes
+do envio ou resposta incompleta: `indisponível/incompleto`. Nunca substituir por
+`{}` ou recuperar template/caminho operacional para montar uma prévia.
+
+Os dois bodies pertencem ao **salto final da última tentativa enviada**, sem
+histórico de redirects/tentativas. 301/302/303 que convertem POST em GET mostram
+request ausente; 307/308 preservam bytes. Falha de preparação posterior ou
+cancelamento na espera conserva a última tentativa enviada. Erro de transporte
+não comprova recebimento nem torna resposta parcial completa. Leitura, fechamento,
+timeout e cancelamento continuam sendo erros 2, inclusive com cenário só de status.
+
+Limite de **16.384 bytes (16 KiB) por prévia**, protegido integralmente antes de
+cortar, sem dividir UTF-8, com `[truncado: limite de 16384 bytes]` quando necessário.
+Variantes conhecidas e escapes JSON equivalentes são protegidos antes do corte;
+a representação pode ser normalizada para isso. Ocultação/truncamento podem
+invalidar a sintaxe exibida. Retenção transitória completa em `-vv` não impõe
+novo limite de consumo/aceitação HTTP; fora do opt-in a retenção sob demanda e o
+streaming atuais permanecem. Dados brutos não entram em callbacks/resultados.
+
+Havendo captura secreta ainda não extraída, toda a resposta fica `omitido por proteção`,
+sem avaliá-la antecipadamente. Cada extração bem-sucedida deixa de estar pendente,
+mesmo sem confirmação; qualquer outra secreta não extraída mantém a omissão total.
+Proteção é monotônica para segredos marcados/conhecidos/derivados, inclusive entre
+arquivos, nomes, URL e consulta. Não detecta segredos arbitrários não marcados ou
+toda codificação desconhecida, nem apaga saída anterior à descoberta do segredo.
+
+Detalhes/diagnósticos/bodies e o balanço de cada cenário ficam em stderr;
+**stdout** recebe o resumo compartilhado de cenários e testes descrito abaixo,
+mesmo em pipes. Após os detalhes, `Sucesso: N` acrescenta ` - Erro: N` somente
+quando há steps com falha/erro, seguido de 47 hífens. Nenhum balanço é inventado
+para arquivos pulados. Cores e nomes em negrito só com ambos os streams TTY e
+`NO_COLOR` ausente. Cancelamento, fail-fast, contagens e prioridade **2 > 1 > 0**
+não mudam. Não alcançados são identificados sem carregá-los para obter totais.
+Qualquer erro/short write interrompe antes de novos envios, sem nova escrita no
+writer falho. Esta é a exceção explícita às proibições históricas de body nos
+diagnósticos deste documento; não se estende aos relatórios nem headers completos.
 
 ## Extensão padrão dos cenários — US-38 / issue #79
 
@@ -1796,7 +1865,7 @@ diagnóstico seguro e retorna `1`; cancelamento na espera retorna `2`.
 resumo da ferramenta, uso (`httpgo test <arquivo-ou-diretório>... [opções]`),
 opções com explicações curtas, indicação da documentação e exemplos ao final.
 A lista inclui `--help`, `--version`, `--config arquivo`, `--env nome`,
-`--fail-fast`, `--output junit|html`, `--output-file caminho`, `--render-files`,
+`--fail-fast`, `--verbose` (`-v`/`-vv`), `--output junit|html`, `--output-file caminho`, `--render-files`,
 `--render-asserts`, `--var nome=valor` e `--secret nome`. Relatórios exigem destino;
 `--var` recebe apenas valores não sigilosos e `--secret` apenas marca nomes
 protegidos, sem fornecer valores secretos.
@@ -1891,8 +1960,9 @@ por timestamp, ambos descritos acima. `check` e configurações futuras não est
 
 O modo texto padrão é **compacto somente quando stdout e stderr originais são
 TTY**. Writers sem terminal reconhecido ou redirecionamento de qualquer um dos
-dois preservam integralmente o modo detalhado anterior, inclusive streams e
-contagens. A seleção ocorre antes dos wrappers de proteção. Ajuda, versão,
+dois selecionam o modo detalhado, mantendo os resultados e contadores por arquivo.
+O resumo final abaixo é compartilhado por todos os modos de texto, inclusive
+redirecionado; balanço e separador por cenário são exclusivos de `-v`/`-vv`. A seleção ocorre antes dos wrappers de proteção. Ajuda, versão,
 JUnit e HTML não usam progresso nem resumo compacto.
 
 Cada arquivo alcançado aparece em stderr antes de sua carga, com nome-base e
@@ -1933,40 +2003,57 @@ linha bruta do cenário, recuperar regex descartada ou acrescentar body/credenci
 O diagnóstico inteiro precede a apresentação do próximo arquivo, sem repetir o
 nome/caminho do cenário já identificado na linha principal.
 
-Progresso e diagnósticos vão a **stderr**, somente o resumo final a **stdout**,
-precedido por uma linha separadora de 47 hífens:
+Progresso e diagnósticos vão a **stderr**, sem balanço ou separador por cenário
+no modo compacto. `Sucesso: N [- Erro: N]` e 47 hífens por cenário são exclusivos
+dos modos verbosos. Nome-base em negrito somente quando cores estão habilitadas.
+Somente o resumo final vai a **stdout** no modo compacto; o mesmo resumo é usado
+no texto detalhado redirecionado e nos dois níveis verbosos:
 
 ```text
------------------------------------------------
-Testes executados: 3
-Tempo: 6s
-Tempo médio por teste: 2s
+Cenários executados: 3
+Tempo médio por Cenário: 2s
 Sucesso/erros: 2/1
+
+Testes executados: 6
+Tempo médio por Teste: 1s
+Sucesso/erros: 5/1
+
+Tempo: 6s
 ```
 
-- `Testes executados`: arquivos com carga tentada (`Processed`), inclusive falha
+- `Cenários executados`: arquivos com carga tentada (`Processed`), inclusive falha
   de leitura/parsing ou preparação sem envio; não equivale a `Executed`.
-- `Sucesso/erros`: aprovados (`Passed`) e não aprovados (`Failed + Errors`).
-- `Tempo`: duração já medida da suíte; média = duração / tentados, ou
-  `não aplicável` com zero tentados.
-- `Não executados: N`: somente quando `Skipped > 0`; excluídos dos tentados e da
-  média. Uso/configuração/descoberta inválidos continuam sem resumo.
+- Primeiro `Sucesso/erros`: cenários aprovados (`Passed`) e não aprovados
+  (`Failed + Errors`).
+- `Testes executados`: steps definitivos (`Successful + AssertionFailures +
+  RequestErrors`), inclusive erros pré-HTTP, transporte, captura e avaliação.
+  Retentativas não são testes adicionais; steps não alcançados não contam.
+  Falhas de carga/parsing contam como cenário com erro, sem inventar um step.
+- Segundo `Sucesso/erros`: steps aprovados (`Successful`) e com falha/erro
+  (`AssertionFailures + RequestErrors`). O balanço por cenário usa esses mesmos
+  contadores do arquivo, e não comparações de status aprovadas.
+- `Tempo`: duração já medida da suíte, sempre por último; cada média divide essa
+  duração pela respectiva contagem, ou é `não aplicável` se ela for zero.
+- `Não executados: N`: somente quando `Skipped > 0`, no grupo de cenários;
+  excluídos dos tentados e das médias. Uso/configuração/descoberta inválidos
+  continuam sem resumo. Arquivos pulados não ganham balanço fictício.
 
 Cores são habilitadas na ausência de `NO_COLOR`; sua presença, mesmo vazia,
-desativa cores, mas mantém rótulos, barra textual e atualização da linha.
+desativa cores e negrito, mas mantém rótulos, barra textual e atualização da linha.
 Proteção incremental cobre cada atualização, nome e diagnóstico; não acrescenta
 bodies/credenciais nem promete apagar texto anterior à descoberta do segredo.
 Falha/short write em carga, total, avanço, finalização, diagnóstico ou resumo é
 apresentação global: código 2, sem próximos envios ou novas tentativas no writer
 falho. Interrupção, continuação, fail-fast e cancelamento permanecem inalterados.
 
-A apresentação interativa é uma **mudança deliberada de contrato**; os contadores
-estruturados, JUnit/HTML, texto redirecionado e códigos 0/1/2 não mudam.
+A apresentação interativa e o resumo textual compartilhado são uma **mudança
+deliberada de contrato**, inclusive no texto redirecionado. Os contadores
+estruturados, JUnit/HTML e códigos 0/1/2 não mudam.
 
 ### Texto detalhado preservado por redirecionamento
 
 As linhas e contagens a seguir descrevem o **modo texto legado**, selecionado
-quando pelo menos um dos streams não é TTY.
+quando pelo menos um dos streams não é TTY e não há verbosidade explícita.
 
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
 resultado com o método declarado, URL segura e uma
@@ -2002,9 +2089,11 @@ A apresentação incremental não reimprime resultados no final.
 
 O resumo de cada arquivo é escrito uma única vez antes de iniciar o seguinte,
 inclusive quando houve divergência, captura, renderização, transporte ou cancelamento.
-Uma linha `resumo suíte:` agrega a invocação, também para arquivo único. Não há
-novo formato de saída: a evolução adiciona campos ao resumo por arquivo e uma
-linha agregada. Os contadores por arquivo em stdout continuam:
+Não acrescenta balanço de steps ou separador por cenário ao texto legado;
+esses elementos são exclusivos dos modos verbosos. O resumo final de cenários e
+testes acima agrega a invocação,
+inclusive arquivo único, **substituindo a antiga linha `resumo suíte:`**. JUnit e
+HTML não mudam. Os contadores detalhados por arquivo em stdout continuam:
 
 - `total`: entradas validadas pelo parser;
 - `iniciadas`: entradas com pelo menos uma chamada ao executor — **não comprova
@@ -2019,7 +2108,8 @@ linha agregada. Os contadores por arquivo em stdout continuam:
 - `respostas_completas`: total de respostas completamente consumidas/fechadas;
 - `status_comparados`: comparações numéricas realizadas, aprovadas ou divergentes.
 
-As três métricas novas também são somadas no resumo da suíte. Redirects não são
+As três métricas de tentativas continuam somadas no modelo estruturado da suíte,
+mas o novo resumo final textual não as exibe. Redirects não são
 novas tentativas; preparação falha não soma envio. Os contadores anteriores
 continuam contando uma entrada no máximo uma vez, pelos fatos da última tentativa
 enviada; cancelamento no intervalo é erro final sem apagar esses fatos HTTP.
@@ -2034,7 +2124,8 @@ inclusive para arquivos não executados; não se inventa zero como quantidade de
 requisições planejadas. Uso/configuração/descoberta inválidos impedem a execução
 inteira e não apresentam resumos.
 
-O agregado informa:
+O modelo estruturado agregado conserva os campos a seguir; eles **não são linhas
+do novo resumo textual**. A apresentação usa as equivalências descritas acima:
 
 - `arquivos`: selecionados após deduplicação; `processados`: carga tentada;
   `executados`: pelo menos uma requisição iniciada;
@@ -2086,7 +2177,8 @@ quoting para escapar caracteres de controle.
 Valores de headers comuns podem aparecer **somente** no diagnóstico de assertion,
 com quoting e sanitização. Valores de `Authorization`, `Proxy-Authorization`,
 `Cookie` e `Set-Cookie` nunca são apresentados, independentemente da caixa do nome,
-nem mesmo quando esperados literais. Bodies de requisição/resposta não são impressos. JSON/header malformado
+nem mesmo quando esperados literais. Bodies de requisição/resposta não são impressos
+por padrão; a exceção opt-in JSON protegido em `-vv` segue a seção US-42 acima. JSON/header malformado
 recebe diagnóstico controlado com arquivo/linha/coluna, sem ecoar entrada ou erro
 bruto do decoder/transporte. Isso evita vazamento também de credenciais em bodies.
 
@@ -2099,7 +2191,8 @@ flags. Formas brutas, strings JSON decodificadas e variantes conhecidas de escap
 JSON/Go/URL são protegidas também antes da construção do contexto. Constituintes
 de objetos/arrays secretos são protegidos sem disponibilizá-los como variáveis.
 Valores vazios não provocam substituição global. Coleções de headers e bodies
-permanecem ausentes das saídas; não é gerado body de diagnóstico. Codificações arbitrárias desconhecidas
+permanecem ausentes das saídas padrão/relatórios; somente `-vv` permite prévias JSON
+protegidas e limitadas conforme US-42. Codificações arbitrárias desconhecidas
 não têm garantia de detecção.
 
 **O restante do path permanece visível: não coloque segredos arbitrários nele.** Não é possível
@@ -2108,6 +2201,9 @@ nem proteger o conteúdo do arquivo em disco ou argumentos no histórico/process
 Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 
 ## Diferenças em relação ao Hurl
+
+- `-v`/`-vv` têm contrato próprio HTTPGo de progresso estático e prévias JSON
+  protegidas; não se promete equivalência com a verbosidade da CLI Hurl.
 
 - O subconjunto é menor: comentários inline, respostas com versão, body em GET,
   headers de enquadramento e demais métodos/seções são rejeitados, não ignorados.

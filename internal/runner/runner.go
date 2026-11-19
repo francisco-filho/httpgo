@@ -16,18 +16,20 @@ import (
 )
 
 type Request struct {
-	Timeout    time.Duration // Zero uses the executor's default; one budget for all redirects and response I/O.
-	Multipart  *MultipartBody
-	Method     string
-	URL        string
-	Headers    []parser.Header
-	Body       []byte
-	RetainBody bool
+	Timeout          time.Duration // Zero uses the executor's default; one budget for all redirects and response I/O.
+	Multipart        *MultipartBody
+	Method           string
+	URL              string
+	Headers          []parser.Header
+	Body             []byte
+	RetainBody       bool
+	DiagnosticBodies bool // Opt-in final-hop diagnostic data, never report data.
 }
 type Response struct {
-	Status  int
-	Body    []byte
-	Headers []query.HeaderValue
+	Status      int
+	Body        []byte
+	Headers     []query.HeaderValue
+	Diagnostics *HTTPDiagnostics // Transient operational data for the runner only.
 }
 
 // HTTPExecutor returns a response only after consuming and closing its body.
@@ -57,7 +59,16 @@ const (
 	RegexFailed    Outcome = "erro de avaliação regex"
 )
 
+// EntryDiagnostic carries only safe terminal error metadata, never raw causes.
+type EntryDiagnostic struct {
+	Position             parser.Position
+	Phase, Detail, Query string
+	Count                bool
+}
+
 type EntryResult struct {
+	Diagnostic    *EntryDiagnostic
+	Bodies        *BodyPreviews // Protected, bounded previews on terminal failures only.
 	Duration      time.Duration // Logical entry, including preparation, attempts and waits; excludes reporting.
 	Attempts      int
 	RegexFailure  *RegexFailure
@@ -141,9 +152,10 @@ func NewWithRenderer(executor HTTPExecutor, renderer Renderer, report func(Entry
 
 // Options applies to one execution only. The zero value preserves external bytes.
 type Options struct {
-	Timeout       time.Duration // Zero preserves the default ten-second transport policy.
-	RenderFiles   bool
-	RenderAsserts bool // Used by suite loading to select the matching parser profile.
+	Timeout          time.Duration // Zero preserves the default ten-second transport policy.
+	RenderFiles      bool
+	RenderAsserts    bool // Used by suite loading to select the matching parser profile.
+	DiagnosticBodies bool // Retain final bodies transiently to prepare safe failure previews.
 }
 
 func (r *Runner) Run(ctx context.Context, scenario parser.Scenario) Result {
@@ -175,7 +187,7 @@ func protectScenario(session template.Session, scenario parser.Scenario) {
 
 // runAttempt executes one entry without reporting. Resources are closed before
 // evaluation or waiting; only the polling decision publishes a terminal result.
-func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.Entry, options Options, session template.Session) Result {
+func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.Entry, options Options, session template.Session, last **attemptBodies) Result {
 	result := Result{Summary: Summary{Total: 1, NotStarted: 1}}
 	if err := ctx.Err(); err != nil {
 		result.Err, result.ErrorPosition = err, entry.Position
@@ -258,9 +270,13 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 		return result
 	}
 	request.Timeout = options.Timeout
+	request.DiagnosticBodies = options.DiagnosticBodies
 	result.Summary.Started++
 	result.Summary.NotStarted--
 	response, err := r.executor.Execute(ctx, request)
+	if options.DiagnosticBodies {
+		*last = newAttemptBodies(response.Diagnostics, session, entry)
+	}
 	if upload != nil {
 		if closeErr := upload.Close(); closeErr != nil {
 			err = errors.Join(err, fileFailure(entry.Multipart.Position, closeErr))
@@ -299,7 +315,11 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 	var batch []template.Capture
 	if err == nil && !result.Diverged && len(entry.Captures) > 0 {
 		var captureErr *CaptureError
-		batch, captureErr = extractCaptures(session, entry.Captures, response)
+		batch, captureErr = extractCaptures(session, entry.Captures, response, func(index int) {
+			if options.DiagnosticBodies {
+				delete((*last).pending, index)
+			}
+		})
 		if captureErr == nil {
 			var stageErr error
 			view, stageErr = session.Stage(batch)

@@ -75,6 +75,7 @@ func assertCompactProcessHelp(t *testing.T, out string) {
 		"--help": {"ajuda"}, "--version": {"versão", "commit", "data"},
 		"--config": {"arquivo", "YAML"}, "--env": {"nome", "ambiente"},
 		"--fail-fast": {"primeira falha"}, "--output": {"junit|html", "exige --output-file"},
+		"--verbose":        {"-v/-vv", "stderr", "repita", "JSON protegido", "16 KiB/body", "sem relatórios"},
 		"--output-file":    {"caminho", "destino", "requer --output"},
 		"--render-files":   {"arquivos externos", "templates JSON"},
 		"--render-asserts": {"valores esperados", "operandos"},

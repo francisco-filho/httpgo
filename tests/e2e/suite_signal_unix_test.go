@@ -61,7 +61,7 @@ func TestSuiteRealCancellationStopsLaterFiles(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("did not cancel")
 	}
-	if waitErr == nil || command.ProcessState.ExitCode() != 2 || hits.Load() != 1 || !strings.Contains(out.String(), "não_executados=1") || !strings.Contains(stderr.String(), "cancelada") {
+	if waitErr == nil || command.ProcessState.ExitCode() != 2 || hits.Load() != 1 || !strings.Contains(out.String(), "Não executados: 1\n") || !strings.Contains(stderr.String(), "cancelada") {
 		t.Fatalf("state=%v hits=%d out=%q stderr=%q", command.ProcessState, hits.Load(), out.String(), stderr.String())
 	}
 }

@@ -41,6 +41,7 @@ func TestCompactHelpContract(t *testing.T) {
 			"--config":         {"arquivo", "configuração YAML"},
 			"--env":            {"nome", "ambiente YAML"},
 			"--fail-fast":      {"primeira falha"},
+			"--verbose":        {"-v/-vv", "stderr", "repita", "JSON protegido", "16 KiB/body", "sem relatórios"},
 			"--output":         {"junit|html", "exige --output-file"},
 			"--output-file":    {"caminho", "destino", "requer --output"},
 			"--render-files":   {"bodies de arquivos externos", "templates JSON"},

@@ -156,7 +156,8 @@ Com stdout e stderr em terminal interativo, o progresso em stderr termina em
 `- exemplo.httpgo  OK  1/1`, e stdout recebe o resumo da suíte. O código é **0**.
 Se qualquer um dos streams for redirecionado, preserva-se o texto detalhado:
 stdout informa o GET, status 200 e resumo com uma requisição validada, sem
-diagnóstico de erro em stderr. A CLI não imprime o body.
+diagnóstico de erro em stderr. Por padrão, a CLI não imprime o body; `-vv`
+permite prévias JSON protegidas somente nos steps com falha, como explicado abaixo.
 Agora troque **somente** `HTTP 200` por `HTTP 201` no arquivo e repita o comando:
 o servidor continua respondendo 200, aparece **status divergente**, e `echo $?`
 mostra **1**. Restaure `HTTP 200` antes de prosseguir.
@@ -380,30 +381,107 @@ carga/parsing, preparação e HTTP usam `[parsing]`, `[renderização]` e `[tran
 Step, posição e expressão só aparecem quando existem metadados seguros disponíveis;
 não se recupera a linha bruta do cenário nem se imprime body para detalhar o erro.
 
-Somente o resumo final vai a stdout, precedido por uma linha separadora de
-hífens entre os testes e o resumo. Exemplo ilustrativo de uma suíte de dois
-arquivos concluídos em seis segundos:
+O modo compacto mantém somente a linha de progresso e os diagnósticos: **não**
+exibe balanço ou separador por cenário. Os nomes ficam em negrito quando ambos
+os streams são TTY e `NO_COLOR` está ausente.
+
+Somente o resumo final vai a stdout no modo compacto. **Todos os modos de texto**
+(compacto, detalhado redirecionado, `-v` e `-vv`) usam o mesmo resumo. Exemplo
+ilustrativo de dois cenários, cada um com um step, concluídos em seis segundos:
 
 ```text
------------------------------------------------
-Testes executados: 2
-Tempo: 6s
-Tempo médio por teste: 3s
+Cenários executados: 2
+Tempo médio por Cenário: 3s
 Sucesso/erros: 2/0
+
+Testes executados: 2
+Tempo médio por Teste: 3s
+Sucesso/erros: 2/0
+
+Tempo: 6s
 ```
 
-“Testes executados” conta arquivos cuja carga foi tentada, inclusive erro de
-leitura/parsing ou erro pré-envio. “Sucesso/erros” agrupa arquivos aprovados e não
-aprovados. A média divide o tempo total pelos tentados, ou é `não aplicável` com
-zero tentados. `Não executados: N` aparece só quando positivo, fora dessa divisão.
-Erros globais anteriores à execução não produzem resumo.
+“Cenários executados” conta arquivos cuja carga foi tentada, inclusive erro de
+leitura/parsing. “Testes executados” conta steps com desfecho definitivo, inclusive
+erros de preparação antes do HTTP, transporte, captura e validação. Polling conta
+um único teste; steps não alcançados e falhas de carga/parsing não inventam testes.
+Cada grupo tem seu próprio `Sucesso/erros`: cenários aprovados/não aprovados e
+steps aprovados/com falha ou erro. Cada média divide a duração total da suíte
+pela contagem correspondente, ou é `não aplicável` com zero. `Não executados: N`
+identifica somente cenários pulados, quando positivo. O tempo total vem por último.
+Erros globais anteriores à execução não produzem resumo; JUnit e HTML não mudam.
 
-**Redirecionar stdout ou stderr preserva integralmente o texto anterior**, sem
-atualização de linha, cores ou resumo compacto: resultados e resumos detalhados
-vão a stdout, diagnósticos a stderr. Essa substituição da apresentação apenas no
-terminal é uma mudança deliberada de contrato; execução e exit codes não
-mudam. A proteção incremental de segredos conhecidos/derivados cobre nomes e
-diagnósticos, mas não apaga texto exibido antes de um segredo ser conhecido.
+Redirecionar stdout ou stderr, sem verbosidade, mantém os resultados e contadores
+por arquivo detalhados em stdout e diagnósticos em stderr, sem atualização de linha
+ou cores. O resumo final acima é uma **mudança deliberada de contrato do texto**,
+inclusive redirecionado; execução e exit codes não mudam.
+A proteção incremental de segredos conhecidos/derivados cobre nomes e diagnósticos,
+mas não apaga texto exibido antes de um segredo ser conhecido.
+
+### Investigar falhas com progresso verboso
+
+```sh
+httpgo test suite/ --var base_url=http://localhost:8080 -v
+httpgo test suite/ --var base_url=http://localhost:8080 -vv
+```
+
+`-v` ou `--verbose` seleciona nível 1. `-vv`, `-v -v`, duas ocorrências de
+`--verbose` ou uma combinação curta/longa selecionam nível 2. Mais de duas
+ocorrências, valores como `--verbose=2` e combinação com `--output junit` ou
+`--output html` são uso inválido **2**, antes de HTTP ou criação de relatório.
+Sem essas flags, a seleção compacto/legado descrita acima permanece inalterada.
+
+Nos dois níveis, **stderr** anuncia cada nome-base e extensão antes de carregar
+o arquivo e apresenta uma linha estática por step definitivo, inclusive em pipes:
+
+```text
+01-health.httpgo
+[OK] GET http://localhost:8080/health (12ms)
+Sucesso: 1
+-----------------------------------------------
+02-produto.httpgo
+[ERRO] GET http://localhost:8080/products/1 (20ms)
+  step 1 - Linha 2:1
+  [status]
+  HTTP 200
+     expected 200 => received 503
+Sucesso: 0 - Erro: 1
+-----------------------------------------------
+```
+
+Os tempos são ilustrativos: incluem preparação, todas as tentativas e esperas.
+Polling não imprime divergências transitórias. `[OK]` exige concluir as capturas
+e validações declaradas, mas não inventa validação de status para `HTTP *` ou
+status ausente. Falhas de parsing, preparação, transporte, status, assertions e
+capturas conservam categoria/localização disponíveis, antes do próximo arquivo.
+Arquivos não alcançados aparecem como `NÃO EXECUTADO`, sem parsing antecipado.
+Somente o resumo final de cenários e testes vai a **stdout**, também com redirecionamento.
+**Somente nos modos verbosos**, o balanço de cada cenário fica em stderr, após
+seus diagnósticos/prévias, antes do próximo nome: `Sucesso: N`, acrescentando
+` - Erro: N` somente quando há steps com falha/erro, seguido de 47 hífens. Não há barra ou atualização de linha. Cores e nomes em negrito exigem
+ambos os streams TTY e `NO_COLOR` ausente; rótulos permanecem sem cores.
+
+**Exceção opt-in à ausência de bodies:** somente `-vv` acrescenta `[request body]`
+e `[response body]` no step com falha/erro. São prévias da última tentativa
+enviada e de seu salto final, sem histórico, releitura de arquivo ou template não
+enviado. 301/302/303 convertendo POST em GET mostram request ausente; 307/308
+preservam seu body. São exibidos apenas JSON completo UTF-8 (inline ou externo),
+sem conversão de charset. Binários, multipart e conteúdo não JSON são omitidos.
+Ausência é indicada como `ausente`; falha pré-envio ou resposta parcial como
+`indisponível/incompleto`, nunca como `{}` artificial.
+
+Cada prévia é protegida **antes** do limite de **16 KiB (16.384 bytes) por body**,
+com corte UTF-8 e indicação explícita de truncamento. A representação pode ser
+normalizada para proteger escapes JSON equivalentes, e ocultação/corte podem
+invalidar sua sintaxe exibida. Captura secreta ainda não extraída omite toda a
+resposta por proteção; extração bem-sucedida registra o segredo mesmo se o lote
+não for confirmado. A prévia não antecipa capturas nem altera os dados enviados.
+Marque segredos com `--secret`/YAML ou use referências ao ambiente: **não há
+promessa de detectar credenciais arbitrárias não marcadas ou codificações
+desconhecidas**. O opt-in pode reter transitoriamente o body final completo em
+memória; 16 KiB é limite de exibição, não de consumo HTTP. Sucessos, nível 1,
+modo padrão e relatórios continuam sem bodies. Falhas de escrita mantêm código
+**2**, sem novos envios ou repetição no writer falho.
 
 Nos comandos de relatório, stdout fica vazio: JUnit grava `target/test-results.xml`, substituindo destino existente;
 HTML gera `target/report-YYYYMMDDTHHMMSSmmmZ.html` em UTC, sem sobrescrever

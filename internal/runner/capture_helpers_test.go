@@ -8,7 +8,7 @@ import (
 // Direct extraction tests explicitly confirm their batch; production confirms
 // only after all assertions and the final cancellation barrier.
 func captureResponse(session template.Session, declarations []parser.Capture, response Response) *CaptureError {
-	batch, failure := extractCaptures(session, declarations, response)
+	batch, failure := extractCaptures(session, declarations, response, nil)
 	if failure != nil {
 		return failure
 	}

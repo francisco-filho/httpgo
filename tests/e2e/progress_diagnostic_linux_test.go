@@ -47,7 +47,11 @@ func TestCompactRealTTYMultilineDiagnostic(t *testing.T) {
 			}
 			block := "  step 7 - Linha 114:1\n  [assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n     " + message + "\n"
 			index := strings.Index(diagnostic, block)
-			next := strings.Index(diagnostic, "- 29-phase-seven-combos.hurl")
+			nextName := "29-phase-seven-combos.hurl"
+			if !noColor {
+				nextName = "\x1b[1m" + nextName + "\x1b[0m"
+			}
+			next := strings.Index(diagnostic, "- "+nextName)
 			if index < 0 || next < index+len(block) || !strings.Contains(diagnostic, "13/13\n") || strings.Contains(diagnostic, "private-body-allergen") || strings.Contains(diagnostic, "@.number==7") || strings.Contains(diagnostic, "execução interrompida") {
 				t.Fatalf("missing safe ordered block %q in %q", block, diagnostic)
 			}

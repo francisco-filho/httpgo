@@ -39,6 +39,7 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 		duration := max(time.Duration(0), r.now().Sub(begin))
 		for i := range execution.Entries {
 			execution.Entries[i].Duration = duration
+			execution.Entries[i].Diagnostic = terminalDiagnostic(execution, session, options)
 		}
 		result.Attempts.Started += execution.Attempts.Started
 		result.Attempts.Completed += execution.Attempts.Completed
@@ -65,11 +66,19 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 	return result
 }
 
-func (r *Runner) pollEntry(ctx context.Context, scenario parser.Scenario, entry parser.Entry, options Options, session template.Session) Result {
+func (r *Runner) pollEntry(ctx context.Context, scenario parser.Scenario, entry parser.Entry, options Options, session template.Session) (result Result) {
+	var last *attemptBodies
+	defer func() {
+		if options.DiagnosticBodies && (result.Err != nil || result.Diverged) {
+			for i := range result.Entries {
+				result.Entries[i].Bodies = prepareBodyPreviews(last, session)
+			}
+		}
+	}()
 	var metrics AttemptSummary
 	facts := Summary{Total: 1, NotStarted: 1}
 	for remaining := entry.Options.Retry; ; remaining-- {
-		current := r.runAttempt(ctx, scenario.OriginDir, entry, options, session)
+		current := r.runAttempt(ctx, scenario.OriginDir, entry, options, session, &last)
 		metrics.Started += current.Summary.Started
 		metrics.Completed += current.Summary.Completed
 		if current.Summary.Completed != 0 && entry.ExpectedStatus != nil {

@@ -63,7 +63,7 @@ func TestCompactSelectionAndColors(t *testing.T) {
 						if colored != (noColor == "absent") {
 							t.Fatalf("colors=%t err=%q", colored, stderr.String())
 						}
-					} else if !strings.Contains(out.String(), "resumo suíte:") || !strings.Contains(out.String(), "GET ") || stderr.Len() != 0 || strings.Contains(out.String(), "\x1b") {
+					} else if !strings.Contains(out.String(), "Cenários executados: 1\n") || !strings.Contains(out.String(), "GET ") || stderr.Len() != 0 || strings.Contains(out.String(), "\x1b") {
 						t.Fatalf("legacy changed: out=%q err=%q", out.String(), stderr.String())
 					}
 				})
@@ -78,15 +78,16 @@ func TestCompactSummaryCountsAndDuration(t *testing.T) {
 		summary suite.Summary
 		want    string
 	}{
-		{"mixed", suite.Summary{Processed: 3, Executed: 1, Passed: 1, Failed: 1, Errors: 1, Skipped: 2, Duration: 6 * time.Second}, "Testes executados: 3\nTempo: 6s\nTempo médio por teste: 2s\nSucesso/erros: 1/2\nNão executados: 2\n"},
-		{"zero", suite.Summary{Skipped: 2, Duration: time.Second}, "Testes executados: 0\nTempo: 1s\nTempo médio por teste: não aplicável\nSucesso/erros: 0/0\nNão executados: 2\n"},
-		{"pass", suite.Summary{Processed: 2, Passed: 2, Duration: 3 * time.Second}, "Testes executados: 2\nTempo: 3s\nTempo médio por teste: 1.5s\nSucesso/erros: 2/0\n"},
+		{"mixed", suite.Summary{Processed: 3, Executed: 1, Passed: 1, Failed: 1, Errors: 1, Skipped: 2, Successful: 2, AssertionFailures: 1, RequestErrors: 1, Duration: 6 * time.Second}, "Cenários executados: 3\nTempo médio por Cenário: 2s\nSucesso/erros: 1/2\nNão executados: 2\n\nTestes executados: 4\nTempo médio por Teste: 1.5s\nSucesso/erros: 2/2\n\nTempo: 6s\n"},
+		{"zero", suite.Summary{Skipped: 2, Duration: time.Second}, "Cenários executados: 0\nTempo médio por Cenário: não aplicável\nSucesso/erros: 0/0\nNão executados: 2\n\nTestes executados: 0\nTempo médio por Teste: não aplicável\nSucesso/erros: 0/0\n\nTempo: 1s\n"},
+		{"pass", suite.Summary{Processed: 2, Passed: 2, Successful: 6, Duration: 3 * time.Second}, "Cenários executados: 2\nTempo médio por Cenário: 1.5s\nSucesso/erros: 2/0\n\nTestes executados: 6\nTempo médio por Teste: 500ms\nSucesso/erros: 6/0\n\nTempo: 3s\n"},
+		{"load error", suite.Summary{Processed: 1, Errors: 1, Duration: time.Second}, "Cenários executados: 1\nTempo médio por Cenário: 1s\nSucesso/erros: 0/1\n\nTestes executados: 0\nTempo médio por Teste: não aplicável\nSucesso/erros: 0/0\n\nTempo: 1s\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var out bytes.Buffer
 			c := &Command{out: &out}
-			want := "-----------------------------------------------\n" + test.want
-			if err := c.renderCompactSuite(test.summary); err != nil || out.String() != want {
+			want := test.want
+			if err := c.renderSuite(test.summary); err != nil || out.String() != want {
 				t.Fatalf("out=%q want=%q err=%v", out.String(), want, err)
 			}
 		})
