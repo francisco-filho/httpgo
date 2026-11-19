@@ -80,7 +80,7 @@ func (c *Command) renderCompactSuite(s suite.Summary) error {
 	if s.Processed > 0 {
 		average = (s.Duration / time.Duration(s.Processed)).String()
 	}
-	text := fmt.Sprintf("Testes executados: %d\nTempo: %s\nTempo médio por teste: %s\nSucesso/erros: %d/%d\n", s.Processed, s.Duration, average, s.Passed, s.Failed+s.Errors)
+	text := fmt.Sprintf("-----------------------------------------------\nTestes executados: %d\nTempo: %s\nTempo médio por teste: %s\nSucesso/erros: %d/%d\n", s.Processed, s.Duration, average, s.Passed, s.Failed+s.Errors)
 	if s.Skipped > 0 {
 		text += fmt.Sprintf("Não executados: %d\n", s.Skipped)
 	}

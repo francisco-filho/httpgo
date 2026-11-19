@@ -16,6 +16,11 @@ retira cores sem retirar atualizações da linha. A dependência portátil
 `golang.org/x/term v0.48.0` (e `x/sys v0.50.0` indireta) foi adicionada só para
 identificação de TTY real; Go permanece `1.26.10`.
 
+Ajuste solicitado após o primeiro envio ao review: o resumo compacto agora é
+precedido por uma linha de 47 hífens em stdout, separando-o visualmente dos testes.
+O teste unitário confere a saída completa e o PTY real confere um único separador
+antes do resumo, com ou sem cores, e sua ausência no texto legado redirecionado.
+
 ### Evidência executada em Linux
 
 Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports` e golangci-lint existentes
