@@ -1417,9 +1417,18 @@ arquivo corrente. O callback terminal existente do runner incrementa o contador
 uma vez por entrada lógica, após polling, inclusive erro pré-envio; não infere
 avanço das métricas HTTP. Atualizações usam retorno de carro/limpeza da linha em
 stderr. O callback final classifica via `FileResult.State`, termina a linha e
-reutiliza `junitDiagnostic`/`renderDiagnostic` com prefixo ordinal, sem avaliar
-assertions ou reter cenários/respostas/sessões. Linhas finalizadas não são
-reimpressas; nomes-base iguais não mudam identidade ou ordem da suíte.
+chama o formatador `progressDiagnostic` de `internal/cli/progress_diagnostic.go`,
+sem avaliar assertions ou reter cenários/respostas/sessões. O bloco separa step e
+`Linha N:C`, fase, expressão segura disponível e mensagem; colore somente a
+mensagem final em vermelho quando permitido por NO_COLOR. A fase vem dos tipos
+de falha/erro existentes; transporte reutiliza `transportDiagnostic`. Esperados,
+consultas e descrições recebidas vêm exclusivamente dos metadados seguros do
+runner, sem reconstruir código-fonte, regex descartada ou valores de resposta.
+Campos não disponíveis são omitidos, sem posições/steps inventados; leitura e
+parsing usam a fase `parsing`. Escrita do bloco ocorre uma única vez, protegida,
+antes do próximo arquivo; legado e relatórios conservam `renderDiagnostic` e
+`junitDiagnostic`. Linhas finalizadas não são reimpressas; nomes-base iguais não
+mudam identidade ou ordem da suíte.
 
 `renderCompactSuite` escreve somente em stdout e usa `Summary.Processed`,
 `Passed`, `Failed + Errors`, `Skipped` e `Duration`. Média é duração / processados,

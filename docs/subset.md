@@ -1913,8 +1913,24 @@ mostram `NÃO EXECUTADO 0/?`, sem carga só para contar suas entradas.
 ```text
 - health.httpgo  OK  1/1
 - products.httpgo  ERRO  4/10
-  step 4, "products.httpgo":12:1: status divergente: esperado 200, recebido 503; execução interrompida
+  step 4 - Linha 12:1
+  [status]
+  HTTP 200
+  expected 200 => recebido 503
 ```
+
+O bloco usa uma linha para step/localização, outra para a etapa (`[assertion]`,
+`[captures]`, `[status]`, `[parsing]`, `[renderização]` ou `[transporte]`), uma
+expressão segura quando disponível e a mensagem final. Esta última fica vermelha
+quando as cores estão habilitadas. Falhas de assertions com esperado conhecido
+usam `expected ... => recebido ...`; predicados de tipo e consultas textuais
+preservam diagnósticos categóricos, sem inventar valores recebidos.
+Localização sem step mostra somente `Linha N:C`; sem posição disponível, omite
+essa parte. Erro de carga/parsing nunca recebe ordinal de step inventado. A
+expressão é montada exclusivamente dos metadados seguros existentes, sem ler a
+linha bruta do cenário, recuperar regex descartada ou acrescentar body/credenciais.
+O diagnóstico inteiro precede a apresentação do próximo arquivo, sem repetir o
+nome/caminho do cenário já identificado na linha principal.
 
 Progresso e diagnósticos vão a **stderr**, somente o resumo final a **stdout**,
 precedido por uma linha separadora de 47 hífens:

@@ -363,6 +363,23 @@ abaixo do erro, com step e posição disponíveis. Falha de carga/parsing tem to
 `?`; arquivos não alcançados mostram `NÃO EXECUTADO 0/?`, sem parsing antecipado.
 Nomes iguais em diretórios diferentes continuam em linhas distintas.
 
+Em erro, o bloco separa localização, etapa e expressão, sem repetir o caminho:
+
+```text
+- 27-phase-six-advanced-menu.httpgo  ERRO  7/15
+  step 7 - Linha 114:1
+  [assertion]
+  jsonpath "$.orders[?(@.number==[literal oculto])].items[0].allergens" contains
+  expected "SOY" => recebido tipo array
+- 29-phase-seven-combos.httpgo  OK  13/13
+```
+
+A última linha do diagnóstico fica vermelha quando as cores estão habilitadas.
+A etapa é `[assertion]`, `[captures]` ou `[status]`, conforme a falha; erros de
+carga/parsing, preparação e HTTP usam `[parsing]`, `[renderização]` e `[transporte]`.
+Step, posição e expressão só aparecem quando existem metadados seguros disponíveis;
+não se recupera a linha bruta do cenário nem se imprime body para detalhar o erro.
+
 Somente o resumo final vai a stdout, precedido por uma linha separadora de
 hífens entre os testes e o resumo. Exemplo ilustrativo de uma suíte de dois
 arquivos concluídos em seis segundos:
