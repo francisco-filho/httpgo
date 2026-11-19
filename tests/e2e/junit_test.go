@@ -86,7 +86,7 @@ func TestJUnitRealSuiteAndUnchangedRequests(t *testing.T) {
 			if code != wantCode || code != plainCode || hits.Load() != int32(calls) || plainHits != hits.Load() || out != "" || doc.Tests != 4 || len(doc.Cases) != 4 || doc.Failures != failures || doc.Errors != executionErrors || doc.Skipped != skipped || doc.Time < 0 {
 				t.Fatalf("mode=%s code=%d plain=%d hits=%d plainHits=%d out=%q stderr=%q XML=%s", mode, code, plainCode, hits.Load(), plainHits, out, stderr, raw)
 			}
-			if !strings.Contains(plainOut, "resumo suíte") || stderr != plainErr {
+			if !strings.Contains(plainOut, "Cenários executados:") || stderr != plainErr {
 				t.Fatalf("plain mode differs: out=%q err=%q JUnit err=%q", plainOut, plainErr, stderr)
 			}
 			if doc.Cases[0].Name != suiteDisplayPath(t, filepath.Join(dir, "01-ação & \"aspas\" <ok>.hurl")) || doc.Cases[0].Failure != nil || doc.Cases[0].Error != nil || doc.Cases[0].Skipped != nil {

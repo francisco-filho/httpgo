@@ -29,11 +29,11 @@ func captureFailure(session template.Session, declaration parser.Capture, pos pa
 	return &CaptureError{Position: pos, Query: session.Sanitize(declaration.Path.RedactLiterals(declaration.Query)), Count: declaration.Count, Detail: session.Sanitize(detail)}
 }
 
-func extractCaptures(session template.Session, declarations []parser.Capture, response Response) ([]template.Capture, *CaptureError) {
+func extractCaptures(session template.Session, declarations []parser.Capture, response Response, extracted func(int)) ([]template.Capture, *CaptureError) {
 	batch := make([]template.Capture, 0, len(declarations))
 	var text string
 	textDecoded := false
-	for _, declaration := range declarations {
+	for index, declaration := range declarations {
 		fail := func(detail string) *CaptureError {
 			return captureFailure(session, declaration, declaration.QueryPosition, detail)
 		}
@@ -89,6 +89,9 @@ func extractCaptures(session template.Session, declarations []parser.Capture, re
 			return nil, fail("não foi possível serializar valor da captura")
 		}
 		session.ProtectCapture(declaration.Name, raw)
+		if extracted != nil {
+			extracted(index)
+		}
 		batch = append(batch, template.Capture{Name: declaration.Name, Value: raw})
 	}
 	return batch, nil

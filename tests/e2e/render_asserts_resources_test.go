@@ -61,7 +61,7 @@ func TestRenderAssertsSuiteIsolationByBinary(t *testing.T) {
 	first := scenario(t, "GET {{base}}/capture\nHTTP 200\n[Captures]\nsaved: jsonpath \"$\"\nGET {{base}}/check\nHTTP 200\n[Asserts]\njsonpath \"$\" == {{saved}}")
 	second := scenario(t, "GET {{base}}/isolated\nHTTP 200\n[Asserts]\njsonpath \"$\" == {{saved}}")
 	code, out, stderr := run(t, "test", first, second, "--render-asserts", "--var", "base="+server.URL)
-	if code != 2 || hits.Load() != 3 || !strings.Contains(stderr, "variável ausente") || !strings.Contains(out, "sucessos=1") || !strings.Contains(out, "erros=1") {
+	if code != 2 || hits.Load() != 3 || !strings.Contains(stderr, "variável ausente") || !strings.Contains(out, "Cenários executados: 2\n") || !strings.Contains(out, "Sucesso/erros: 1/1\n") {
 		t.Fatalf("code=%d hits=%d out=%s err=%s", code, hits.Load(), out, stderr)
 	}
 }

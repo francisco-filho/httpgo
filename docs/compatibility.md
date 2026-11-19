@@ -1,4 +1,36 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+
+## Verbosidade da CLI — US-42 / issue #90
+
+`-v`/`--verbose` e duas ocorrências (`-vv`, curtas/longas combinadas) são
+**contrato próprio de apresentação HTTPGo**, não promessa de equivalência com
+flags, streams, bodies ou diagnósticos do Hurl. Funcionam em terminal e pipes:
+progresso estático, diagnósticos e balanço por cenário em stderr; resumo de
+cenários e testes em stdout, compartilhado com compacto e legado. Mais de
+duas ocorrências ou combinação com JUnit/HTML são uso inválido 2 antes de HTTP
+ou alteração de destinos. Sem flags, preserva-se a seleção compacto/legado;
+JUnit/HTML ficam inalterados. Os nomes ficam em negrito só com ambos TTY e sem
+NO_COLOR. O balanço/separador por cenário é exclusivo de `-v`/`-vv`; compacto
+e legado não o exibem. O resumo final é uma **mudança deliberada do contrato de
+texto**, inclusive redirecionado: `Cenários executados` conta cargas tentadas e
+`Testes executados` conta steps definitivos, inclusive erros pré-HTTP, sem contar
+retentativas nem inventar steps em falhas de parsing. Médias usam o tempo da suíte
+dividido pela contagem do respectivo grupo, e `Tempo` vem por último.
+
+A exceção de prévias JSON em `-vv` é restrita às falhas e à última tentativa
+enviada/salto final, com proteção antes do limite de 16 KiB por body e omissão
+total da resposta enquanto houver captura secreta não extraída. Não inclui
+histórico, headers completos, conteúdo não JSON ou bodies em relatórios. Não
+muda a linguagem, ordem transacional, políticas de redirects/polling ou códigos
+0/1/2. YAML hierárquico/interpolação externa continuam extensões HTTPGo.
+
+O corpus `testdata/compatibility/` permanece inalterado: nenhuma observação foi
+regenerada para acomodar apresentação. O gate Hurl **8.0.0** verifica a execução
+compartilhada; TTY, pipes, proteção, limite, escrita e opção de diagnóstico são
+verificados separadamente nos testes HTTPGo, sem inferir equivalência de CLI ou
+detecção universal de segredos. [Contrato](subset.md#progresso-verboso--us-42--issue-90),
+[arquitetura](architecture.md#progresso-verboso-e-prévias-json--us-42--issue-90) e
+[evidência](validation.md#us-42--issue-90--história-042).
 
 <a id="extensões-de-arquivo"></a>
 
@@ -838,7 +870,8 @@ Os fixtures próprios estão em `testdata/suites/basic/`, fora do corpus diferen
 
 Caminhos exibidos passam a relativos normalizados (fallback absoluto entre
 unidades); resumos por arquivo preservam contadores e acrescentam estado/duração,
-e `resumo suíte:` agrega inclusive arquivo único. Arquivo sem parsing completo
+e o resumo agregado inclui arquivo único. Na US-42, o bloco compartilhado de
+cenários e testes substitui a antiga linha `resumo suíte:`. Arquivo sem parsing completo
 não recebe contagem planejada inventada. Exit codes próprios continuam 0/1/2,
 com 2 prevalecendo sobre 1; itens não executados nunca são aprovados. Configuração
 única, sessão/capturas novas por arquivo e ausência de cookie jar continuam

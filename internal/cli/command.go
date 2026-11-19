@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,9 @@ type Command struct {
 	out, err   io.Writer
 	protection *executionProtection
 	timeout    time.Duration
+	isTerminal func(io.Writer) bool
+	compact    bool // Selected on original streams, before protection wrappers.
+	color      bool
 }
 
 func NewRootCommand(executor runner.HTTPExecutor, build BuildInfo) *Command {
@@ -42,6 +46,13 @@ func (c *Command) SetErr(err io.Writer)  { c.err = err }
 
 func (c *Command) ExecuteContext(ctx context.Context) int {
 	local := *c
+	detect := c.isTerminal
+	if detect == nil {
+		detect = terminalWriter
+	}
+	local.compact = detect(c.out) && detect(c.err)
+	_, noColor := os.LookupEnv("NO_COLOR")
+	local.color = !noColor
 	local.protection = &executionProtection{initial: argumentProtection(c.args)}
 	var outFailure, errFailure error
 	local.out = protectedWriter{writer: c.out, protect: local.protection.sanitize, failure: &outFailure}
@@ -83,6 +94,19 @@ func (c *Command) executeContext(ctx context.Context) int {
 	fileReporter := c.renderFile
 	var diagnostics []string
 	var htmlDetails []report.HTMLFile
+	options := suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout, DiagnosticBodies: args.verbosity == 2}, FailFast: args.failFast}
+	if args.verbosity > 0 {
+		// Explicit verbosity is static even on redirected streams. Colors retain
+		// the same both-TTY and NO_COLOR policy as compact presentation.
+		c.color = c.color && c.compact
+		progress := &verboseProgress{command: c}
+		entryReporter, fileReporter = progress.entry, progress.finish
+		options.Loading = progress.loading
+	} else if c.compact && args.output == "" {
+		progress := &fileProgress{command: c}
+		entryReporter, fileReporter = progress.entry, progress.finish
+		options.Loading, options.Loaded = progress.loading, progress.loaded
+	}
 	if args.output == "junit" || args.output == "html" {
 		entryReporter = nil
 		fileReporter = func(_ suite.FileResult, run runner.Result, loadErr error) error {
@@ -104,7 +128,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if err != nil {
 		return c.fail(err.Error())
 	}
-	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}, fileReporter)
+	result := execution.Run(ctx, files, options, fileReporter)
 	if args.output == "junit" {
 		if err := c.writeJUnit(args.outputFile, result, diagnostics); err != nil {
 			return c.fail(fmt.Sprintf("não foi possível gravar relatório JUnit em %q; verifique o destino e as permissões de escrita", args.outputFile))
@@ -230,11 +254,6 @@ func (c *Command) renderFile(file suite.FileResult, result runner.Result, loadEr
 		return err
 	}
 	return c.renderDiagnostic(result)
-}
-
-func (c *Command) renderSuite(s suite.Summary) error {
-	_, err := fmt.Fprintf(c.out, "resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d falhas_assertion=%d erros=%d não_executados=%d requisições_conhecidas=%d arquivos_contagem_desconhecida=%d iniciadas=%d concluídas=%d validadas=%d sem_validação=%d não_iniciadas=%d requisições_sucesso=%d requisições_falha_assertion=%d requisições_erro=%d duração=%s tentativas_iniciadas=%d respostas_completas=%d status_comparados=%d\n", s.Files, s.Processed, s.Executed, s.Passed, s.Failed, s.Errors, s.Skipped, s.Requests.Total, s.UnknownFiles, s.Requests.Started, s.Requests.Completed, s.Requests.Validated, s.Requests.WithoutValidation, s.Requests.NotStarted, s.Successful, s.AssertionFailures, s.RequestErrors, s.Duration, s.Attempts.Started, s.Attempts.Completed, s.Attempts.StatusChecks)
-	return err
 }
 
 func (c *Command) renderDiagnostic(result runner.Result) error {
@@ -406,6 +425,7 @@ Opções:
   --config arquivo         Seleciona a configuração YAML do projeto.
   --env nome               Seleciona um ambiente YAML nomeado.
   --fail-fast              Interrompe a suíte após a primeira falha.
+  --verbose (-v/-vv)        Progresso em stderr; repita para JSON protegido nas falhas (16 KiB/body); sem relatórios.
   --output junit|html       Gera relatório no formato indicado; exige --output-file.
   --output-file caminho    Define o destino do relatório (requer --output).
   --render-files           Interpola bodies de arquivos externos como templates JSON.

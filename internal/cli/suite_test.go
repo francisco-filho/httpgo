@@ -30,7 +30,7 @@ func suiteFile(t *testing.T, dir, name, text string) string {
 
 func prevalidationSummary(out string) bool {
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-	return len(lines) == 2 && strings.HasPrefix(lines[0], "resumo ") && strings.Contains(lines[0], "total=desconhecido iniciadas=0 concluídas=0") && strings.Contains(lines[0], "resultado=erro") && strings.HasPrefix(lines[1], "resumo suíte: arquivos=1 processados=1 executados=0 sucessos=0 falhas_assertion=0 erros=1")
+	return len(lines) == 10 && strings.HasPrefix(lines[0], "resumo ") && strings.Contains(lines[0], "total=desconhecido iniciadas=0 concluídas=0") && strings.Contains(lines[0], "resultado=erro") && lines[1] == "Cenários executados: 1" && lines[3] == "Sucesso/erros: 0/1" && lines[5] == "Testes executados: 0" && lines[6] == "Tempo médio por Teste: não aplicável" && lines[7] == "Sucesso/erros: 0/0"
 }
 
 func shownPath(t *testing.T, path string) string {
@@ -126,7 +126,7 @@ func TestSuitePolicyAndIncrementalPresentation(t *testing.T) {
 					t.Fatalf("code=%d out=%q err=%q", code, out.String(), stderr.String())
 				}
 				if fast && mode != "success" {
-					if strings.Contains(strings.Join(calls, " "), "/last") || !strings.Contains(out.String(), "resultado=não executado") || !strings.Contains(out.String(), "não_executados=1") {
+					if strings.Contains(strings.Join(calls, " "), "/last") || !strings.Contains(out.String(), "resultado=não executado") || !strings.Contains(out.String(), "Não executados: 1\n") {
 						t.Fatalf("calls=%v out=%q", calls, out.String())
 					}
 				} else if calls[len(calls)-1] != "http://example.test/last" {
@@ -219,7 +219,7 @@ func TestSuiteDiscoveryAndConfiguration(t *testing.T) {
 		fake := &fakeExecutor{statuses: []int{200, 200, 200}}
 		args := append([]string{"test", "--var", "base=http://example.test"}, paths...)
 		code, out, stderr := execute(t, context.Background(), fake, args...)
-		if code != 0 || stderr != "" || !reflect.DeepEqual(fake.calls, []string{"http://example.test/a", "http://example.test/c", "http://example.test/b"}) || strings.Count(out, "resumo ") != 4 {
+		if code != 0 || stderr != "" || !reflect.DeepEqual(fake.calls, []string{"http://example.test/a", "http://example.test/c", "http://example.test/b"}) || strings.Count(out, "resumo ") != 3 || !strings.Contains(out, "Cenários executados: 3\n") {
 			t.Fatalf("code=%d out=%q err=%q calls=%v", code, out, stderr, fake.calls)
 		}
 	}
