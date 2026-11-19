@@ -50,6 +50,10 @@ type Result struct {
 type Options struct {
 	Request  runner.Options
 	FailFast bool
+	// Loading runs before opening a reached file; Loaded runs only after a
+	// complete parse and close, before the runner or any executor call.
+	Loading func(name string) error
+	Loaded  func(name string, total int) error
 }
 
 // Run reports each file synchronously, before opening or sending the next one.
@@ -70,9 +74,18 @@ func (s *Suite) Run(ctx context.Context, files []File, options Options, report f
 		var loadErr error
 		if !stopped {
 			begin := s.now()
-			execution, loadErr = s.RunFile(ctx, file, options.Request)
+			var notificationErr error
+			if options.Loading != nil {
+				notificationErr = options.Loading(s.protect(file.Name))
+			}
+			if notificationErr != nil {
+				execution.ReportErr = notificationErr
+				execution.ErrorPosition = parser.Position{File: s.protect(file.Name)}
+			} else {
+				execution, loadErr = s.runFile(ctx, file, options.Request, options.Loaded)
+			}
 			current.Duration = max(time.Duration(0), s.now().Sub(begin))
-			current.Known = loadErr == nil
+			current.Known = loadErr == nil && notificationErr == nil
 			current.Requests = execution.Summary
 			current.Attempts = execution.Attempts
 			current.State = classify(execution, loadErr)

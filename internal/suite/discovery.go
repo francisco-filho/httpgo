@@ -206,9 +206,18 @@ func (s *Suite) discover(ctx context.Context, cwd, path string, explicit bool, f
 // RunFile loads and closes the entire scenario before calling the runner. A
 // partial parse, including a late read/close failure, never reaches HTTP.
 func (s *Suite) RunFile(ctx context.Context, file File, options runner.Options) (runner.Result, error) {
+	return s.runFile(ctx, file, options, nil)
+}
+
+func (s *Suite) runFile(ctx context.Context, file File, options runner.Options, loaded func(string, int) error) (runner.Result, error) {
 	scenario, err := s.load(ctx, file, parser.ParseOptions{RenderAsserts: options.RenderAsserts})
 	if err != nil {
 		return runner.Result{}, s.protectError(err)
+	}
+	if loaded != nil {
+		if err := loaded(s.protect(file.Name), len(scenario.Entries)); err != nil {
+			return runner.Result{Summary: runner.Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}, ReportErr: err, ErrorPosition: parser.Position{File: s.protect(file.Name)}}, nil
+		}
 	}
 	result := s.runner.RunWithOptions(ctx, scenario, options)
 	result.ErrorPosition.File = s.protect(result.ErrorPosition.File)
