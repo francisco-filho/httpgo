@@ -381,30 +381,42 @@ carga/parsing, preparação e HTTP usam `[parsing]`, `[renderização]` e `[tran
 Step, posição e expressão só aparecem quando existem metadados seguros disponíveis;
 não se recupera a linha bruta do cenário nem se imprime body para detalhar o erro.
 
-Somente o resumo final vai a stdout, precedido por uma linha separadora de
-hífens entre os testes e o resumo. Exemplo ilustrativo de uma suíte de dois
-arquivos concluídos em seis segundos:
+O modo compacto mantém somente a linha de progresso e os diagnósticos: **não**
+exibe balanço ou separador por cenário. Os nomes ficam em negrito quando ambos
+os streams são TTY e `NO_COLOR` está ausente.
+
+Somente o resumo final vai a stdout no modo compacto. **Todos os modos de texto**
+(compacto, detalhado redirecionado, `-v` e `-vv`) usam o mesmo resumo. Exemplo
+ilustrativo de dois cenários, cada um com um step, concluídos em seis segundos:
 
 ```text
------------------------------------------------
-Testes executados: 2
-Tempo: 6s
-Tempo médio por teste: 3s
+Cenários executados: 2
+Tempo médio por Cenário: 3s
 Sucesso/erros: 2/0
+
+Testes executados: 2
+Tempo médio por Teste: 3s
+Sucesso/erros: 2/0
+
+Tempo: 6s
 ```
 
-“Testes executados” conta arquivos cuja carga foi tentada, inclusive erro de
-leitura/parsing ou erro pré-envio. “Sucesso/erros” agrupa arquivos aprovados e não
-aprovados. A média divide o tempo total pelos tentados, ou é `não aplicável` com
-zero tentados. `Não executados: N` aparece só quando positivo, fora dessa divisão.
-Erros globais anteriores à execução não produzem resumo.
+“Cenários executados” conta arquivos cuja carga foi tentada, inclusive erro de
+leitura/parsing. “Testes executados” conta steps com desfecho definitivo, inclusive
+erros de preparação antes do HTTP, transporte, captura e validação. Polling conta
+um único teste; steps não alcançados e falhas de carga/parsing não inventam testes.
+Cada grupo tem seu próprio `Sucesso/erros`: cenários aprovados/não aprovados e
+steps aprovados/com falha ou erro. Cada média divide a duração total da suíte
+pela contagem correspondente, ou é `não aplicável` com zero. `Não executados: N`
+identifica somente cenários pulados, quando positivo. O tempo total vem por último.
+Erros globais anteriores à execução não produzem resumo; JUnit e HTML não mudam.
 
-**Redirecionar stdout ou stderr preserva integralmente o texto anterior**, sem
-atualização de linha, cores ou resumo compacto: resultados e resumos detalhados
-vão a stdout, diagnósticos a stderr. Essa substituição da apresentação apenas no
-terminal é uma mudança deliberada de contrato; execução e exit codes não
-mudam. A proteção incremental de segredos conhecidos/derivados cobre nomes e
-diagnósticos, mas não apaga texto exibido antes de um segredo ser conhecido.
+Redirecionar stdout ou stderr, sem verbosidade, mantém os resultados e contadores
+por arquivo detalhados em stdout e diagnósticos em stderr, sem atualização de linha
+ou cores. O resumo final acima é uma **mudança deliberada de contrato do texto**,
+inclusive redirecionado; execução e exit codes não mudam.
+A proteção incremental de segredos conhecidos/derivados cobre nomes e diagnósticos,
+mas não apaga texto exibido antes de um segredo ser conhecido.
 
 ### Investigar falhas com progresso verboso
 
@@ -425,12 +437,16 @@ o arquivo e apresenta uma linha estática por step definitivo, inclusive em pipe
 ```text
 01-health.httpgo
 [OK] GET http://localhost:8080/health (12ms)
+Sucesso: 1
+-----------------------------------------------
 02-produto.httpgo
 [ERRO] GET http://localhost:8080/products/1 (20ms)
   step 1 - Linha 2:1
   [status]
   HTTP 200
      expected 200 => received 503
+Sucesso: 0 - Erro: 1
+-----------------------------------------------
 ```
 
 Os tempos são ilustrativos: incluem preparação, todas as tentativas e esperas.
@@ -439,9 +455,11 @@ e validações declaradas, mas não inventa validação de status para `HTTP *` 
 status ausente. Falhas de parsing, preparação, transporte, status, assertions e
 capturas conservam categoria/localização disponíveis, antes do próximo arquivo.
 Arquivos não alcançados aparecem como `NÃO EXECUTADO`, sem parsing antecipado.
-Somente o resumo por arquivos tentados vai a **stdout**, também com redirecionamento.
-Não há barra ou atualização de linha. Cores exigem ambos os streams TTY e
-`NO_COLOR` ausente; rótulos permanecem sem cores.
+Somente o resumo final de cenários e testes vai a **stdout**, também com redirecionamento.
+**Somente nos modos verbosos**, o balanço de cada cenário fica em stderr, após
+seus diagnósticos/prévias, antes do próximo nome: `Sucesso: N`, acrescentando
+` - Erro: N` somente quando há steps com falha/erro, seguido de 47 hífens. Não há barra ou atualização de linha. Cores e nomes em negrito exigem
+ambos os streams TTY e `NO_COLOR` ausente; rótulos permanecem sem cores.
 
 **Exceção opt-in à ausência de bodies:** somente `-vv` acrescenta `[request body]`
 e `[response body]` no step com falha/erro. São prévias da última tentativa

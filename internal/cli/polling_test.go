@@ -29,7 +29,7 @@ func TestPollingCLIAndSuite(t *testing.T) {
 			if code != wantCode || calls != 4 || strings.Count(out, "GET ") != map[bool]int{true: 2, false: 1}[ready] || !strings.Contains(out, "tentativas_iniciadas=4 respostas_completas=4 status_comparados=4") {
 				t.Fatalf("code=%d calls=%d out=%s err=%s", code, calls, out, stderr)
 			}
-			if ready && (stderr != "" || strings.Contains(out, "PENDING") || !strings.Contains(out, "iniciadas=2 concluídas=2 validadas=2") || !strings.Contains(out, "requisições_falha_assertion=0")) {
+			if ready && (stderr != "" || strings.Contains(out, "PENDING") || !strings.Contains(out, "iniciadas=2 concluídas=2 validadas=2") || !strings.Contains(out, "Testes executados: 2\n")) {
 				t.Fatalf("out=%s err=%s", out, stderr)
 			}
 			if !ready && (!strings.Contains(out, "[tentativas=4]") || !strings.Contains(stderr, "PENDING") || !strings.Contains(out, "não_iniciadas=1")) {

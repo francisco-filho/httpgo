@@ -4,13 +4,13 @@
 
 Plano backend da issue #90 executado sem planner, em três tasks autoaprovadas
 na fila `042`. Task 1: `129bc56` (seleção e progresso estático por step);
-Task 2: `ee24662` (prévias JSON protegidas opt-in); Task 3: esta alteração
+Task 2: `ee24662` (prévias JSON protegidas opt-in); Task 3: `bdf17e2`
 (binário real, PTY/pipes, ajuda, documentação e gates integrados).
 Somente backend, sem frontend/estáticos, nova linguagem, pacote, dependência,
 versão de Go, workflow ou alteração do corpus `testdata/compatibility/`.
 
 `-v`/`--verbose` e suas duas ocorrências selecionam apresentação própria HTTPGo,
-mesmo com redirecionamento; detalhes em stderr, resumo US-41 em stdout, sem
+mesmo com redirecionamento; detalhes em stderr, resumo de cenários e testes em stdout, sem
 barra/atualização. Somente `-vv` habilita retenção transitória/prévias JSON nas
 falhas, limitadas e protegidas antes do corte. A exceção não atinge relatórios.
 
@@ -49,6 +49,43 @@ Nas duas primeiras tasks passaram `make fmt lint test` (lint **0 issues** e
 - A categoria segura de transporte é copiada via `Error.SafeDiagnostic`, sem
   causa bruta no callback; TLS e falhas de read/close são testadas também no opt-in
   só de status. O erro operacional conserva sua causa para inspeção.
+
+### Ajustes de apresentação solicitados após o envio ao review
+
+Escopo confirmado pelo usuário: resumo final em **todos os modos de texto**,
+sem mudar JUnit/HTML; contar todo step com desfecho definitivo, inclusive qualquer
+erro pré-HTTP. **Balanço e separador por cenário somente em `-v`/`-vv`**, nunca
+no compacto ou legado. Nomes em negrito somente com ambos TTY e sem NO_COLOR.
+O novo resumo substitui deliberadamente a antiga linha `resumo suíte:` no legado:
+primeiro cenários (cargas tentadas), depois testes (steps definitivos), cada grupo
+com média e sucesso/erros próprios; duração total por último. A média divide o
+tempo da suíte pela respectiva contagem, sem contar retries como novos testes,
+inventar steps de parsing ou aprovar arquivos não alcançados.
+
+Regressões acrescentadas/atualizadas:
+
+- `TestTextSummariesCountAllTerminalStepsAcrossModes`: quatro modos, fail-fast,
+  múltiplos steps, status ausente/HTTP *, retry esgotado, falhas de renderização,
+  payload externo, captura, transporte, assertion e parsing; contagens distintas
+  de cenários/steps, prioridade 2 > 1 > 0 e balanço ausente fora do verboso.
+- `TestTextSummaryRealAllModes`: binário real, HTTP local, TTY/pipes, parsing e
+  erro pré-HTTP, polling recuperado sem step extra, médias e ordem exatas.
+- `TestCompactSummaryCountsMeansAndOrder`: resumo exato, médias diferentes por
+  grupo, zero/nenhum step e cenários não executados.
+- `TestScenarioSummaryHasNoInventedOrSkippedSteps` e
+  `TestVerboseScenarioSummaryWriteFailureStopsNextFile`: erro omitido se zero,
+  sem step inventado, sem balanço de arquivo pulado, erro/short write no balanço
+  impedindo próximo arquivo/HTTP e nova escrita no writer falho.
+- Matriz `TestVerboseRealTTYAndPipes` verifica negrito condicionado aos dois TTY e
+  NO_COLOR; `TestCompactRealTTYSelection` exige ausência de balanço/separador.
+- O teste de streaming drena as linhas enquanto o processo termina, sem depender
+  da capacidade de um buffer fixo para acomodar o resumo final multilinha.
+
+Nesta revisão passaram novamente `make fmt lint test` (0 issues, `-race -cover`),
+`go vet ./...`, `go build ./...`, `make build e2e`, `make compatibility` (**476
+pares**, Hurl 8.0.0) e dez execuções com race da seleção TTY/pipes, dos novos
+resumos e do modo verboso pendente/cancelado. Cobertura CLI observada: **97,6%**.
+Sem mudanças de corpus, dependências, Go, workflows, relatórios ou execução HTTP.
 
 ### Rastreabilidade GO-539–GO-556
 

@@ -52,7 +52,7 @@ func TestResultsAreWrittenBeforeTheNextRequest(t *testing.T) {
 	if code := command.ExecuteContext(context.Background()); code != 0 || calls != total || stderr.Len() != 0 {
 		t.Fatalf("code=%d,calls=%d,stdout=%q,stderr=%q", code, calls, out.String(), stderr.String())
 	}
-	if strings.Count(out.String(), "GET ") != total || strings.Count(out.String(), "resumo ") != 2 || !strings.Contains(out.String(), "validadas=20 sem_validação=20 não_iniciadas=0") {
+	if strings.Count(out.String(), "GET ") != total || strings.Count(out.String(), "resumo ") != 1 || strings.Count(out.String(), "Cenários executados: 1\n") != 1 || !strings.Contains(out.String(), "Testes executados: 40\n") || !strings.Contains(out.String(), "validadas=20 sem_validação=20 não_iniciadas=0") {
 		t.Fatalf("incorrect results or final summary: %q", out.String())
 	}
 	for _, secret := range []string{"url-user", "url-password", "query-secret", "fragment-secret"} {

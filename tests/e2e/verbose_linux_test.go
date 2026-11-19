@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,7 +38,7 @@ func TestVerboseRealTTYAndPipes(t *testing.T) {
 						}
 						out, stderr := p.out.text(), p.stderr.text()
 						color := outTTY && errTTY && !noColor
-						if strings.Contains(out+stderr, "\r") || strings.Contains(out, "\x1b") || strings.Contains(stderr, "\x1b[2K") || strings.Contains(stderr, "\x1b") != color || !strings.Contains(out, "Sucesso/erros: 0/1") || strings.Contains(out, "POST") || strings.Contains(stderr, "Testes executados:") || strings.Contains(stderr, "[response body]") != (level == "-vv") {
+						if strings.Contains(out+stderr, "\r") || strings.Contains(out, "\x1b") || strings.Contains(stderr, "\x1b[2K") || strings.Contains(stderr, "\x1b") != color || strings.Contains(stderr, "\x1b[1m"+filepath.Base(file)+"\x1b[0m") != color || !strings.Contains(out, "Sucesso/erros: 0/1") || strings.Contains(out, "POST") || strings.Contains(stderr, "Testes executados:") || strings.Contains(stderr, "[response body]") != (level == "-vv") {
 							t.Fatalf("out=%q err=%q", out, stderr)
 						}
 					})

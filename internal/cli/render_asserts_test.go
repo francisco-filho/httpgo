@@ -42,7 +42,7 @@ func TestRenderAssertsInvocationIsolation(t *testing.T) {
 		cmd.SetOut(&out)
 		cmd.SetErr(&stderr)
 		cmd.SetArgs(args)
-		if code := cmd.ExecuteContext(context.Background()); code != 0 || stderr.Len() != 0 || !strings.Contains(out.String(), "sucessos=2") {
+		if code := cmd.ExecuteContext(context.Background()); code != 0 || stderr.Len() != 0 || !strings.Contains(out.String(), "Sucesso/erros: 2/0\n") {
 			t.Fatalf("enabled=%v code=%d out=%s err=%s", enabled, code, out.String(), stderr.String())
 		}
 	}

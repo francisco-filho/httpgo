@@ -5,9 +5,17 @@
 `-v`/`--verbose` e duas ocorrências (`-vv`, curtas/longas combinadas) são
 **contrato próprio de apresentação HTTPGo**, não promessa de equivalência com
 flags, streams, bodies ou diagnósticos do Hurl. Funcionam em terminal e pipes:
-progresso estático e diagnósticos em stderr, resumo da US-41 em stdout. Mais de
+progresso estático, diagnósticos e balanço por cenário em stderr; resumo de
+cenários e testes em stdout, compartilhado com compacto e legado. Mais de
 duas ocorrências ou combinação com JUnit/HTML são uso inválido 2 antes de HTTP
-ou alteração de destinos. Sem flags, preservam-se compacto/legado e relatórios.
+ou alteração de destinos. Sem flags, preserva-se a seleção compacto/legado;
+JUnit/HTML ficam inalterados. Os nomes ficam em negrito só com ambos TTY e sem
+NO_COLOR. O balanço/separador por cenário é exclusivo de `-v`/`-vv`; compacto
+e legado não o exibem. O resumo final é uma **mudança deliberada do contrato de
+texto**, inclusive redirecionado: `Cenários executados` conta cargas tentadas e
+`Testes executados` conta steps definitivos, inclusive erros pré-HTTP, sem contar
+retentativas nem inventar steps em falhas de parsing. Médias usam o tempo da suíte
+dividido pela contagem do respectivo grupo, e `Tempo` vem por último.
 
 A exceção de prévias JSON em `-vv` é restrita às falhas e à última tentativa
 enviada/salto final, com proteção antes do limite de 16 KiB por body e omissão
@@ -862,7 +870,8 @@ Os fixtures próprios estão em `testdata/suites/basic/`, fora do corpus diferen
 
 Caminhos exibidos passam a relativos normalizados (fallback absoluto entre
 unidades); resumos por arquivo preservam contadores e acrescentam estado/duração,
-e `resumo suíte:` agrega inclusive arquivo único. Arquivo sem parsing completo
+e o resumo agregado inclui arquivo único. Na US-42, o bloco compartilhado de
+cenários e testes substitui a antiga linha `resumo suíte:`. Arquivo sem parsing completo
 não recebe contagem planejada inventada. Exit codes próprios continuam 0/1/2,
 com 2 prevalecendo sobre 1; itens não executados nunca são aprovados. Configuração
 única, sessão/capturas novas por arquivo e ausência de cookie jar continuam

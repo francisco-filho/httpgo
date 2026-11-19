@@ -14,7 +14,7 @@ import (
 
 func prevalidationSummary(out string) bool {
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-	return len(lines) == 2 && strings.HasPrefix(lines[0], "resumo ") && strings.Contains(lines[0], "total=desconhecido iniciadas=0 concluídas=0") && strings.Contains(lines[0], "resultado=erro") && strings.HasPrefix(lines[1], "resumo suíte: arquivos=1 processados=1 executados=0 sucessos=0 falhas_assertion=0 erros=1")
+	return len(lines) == 10 && strings.HasPrefix(lines[0], "resumo ") && strings.Contains(lines[0], "total=desconhecido iniciadas=0 concluídas=0") && strings.Contains(lines[0], "resultado=erro") && lines[1] == "Cenários executados: 1" && lines[3] == "Sucesso/erros: 0/1" && lines[5] == "Testes executados: 0" && lines[6] == "Tempo médio por Teste: não aplicável" && lines[7] == "Sucesso/erros: 0/0"
 }
 
 func suiteDisplayPath(t *testing.T, path string) string {
@@ -96,13 +96,13 @@ func TestSuiteDemoAndFailurePrecedence(t *testing.T) {
 				if (!fast || mode == "success") && mode != "mixed" {
 					expectedPaths = append(expectedPaths, "/profile")
 				}
-				if code != expectedCode || !reflect.DeepEqual(got, expectedPaths) || !strings.Contains(out, "resumo suíte:") {
+				if code != expectedCode || !reflect.DeepEqual(got, expectedPaths) || !strings.Contains(out, "Cenários executados:") {
 					t.Fatalf("code=%d out=%q err=%q paths=%v want=%v", code, out, stderr, got, expectedPaths)
 				}
 				if mode == "assertion" {
-					want := "sucessos=2 falhas_assertion=1 erros=0 não_executados=0"
+					want := "Sucesso/erros: 2/1\n\nTestes executados: 3\n"
 					if fast {
-						want = "sucessos=1 falhas_assertion=1 erros=0 não_executados=1"
+						want = "Sucesso/erros: 1/1\nNão executados: 1\n\nTestes executados: 2\n"
 					}
 					if !strings.Contains(out, want) {
 						t.Fatalf("summary=%q want=%q", out, want)
@@ -140,7 +140,7 @@ func TestSuiteDiscoveryRealHTTP(t *testing.T) {
 		mu.Lock()
 		got := append([]string(nil), paths...)
 		mu.Unlock()
-		if code != 0 || stderr != "" || !reflect.DeepEqual(got, []string{"/a", "/c", "/b"}) || strings.Count(out, "resumo ") != 4 {
+		if code != 0 || stderr != "" || !reflect.DeepEqual(got, []string{"/a", "/c", "/b"}) || strings.Count(out, "resumo ") != 3 || !strings.Contains(out, "Cenários executados: 3\n") {
 			t.Fatalf("code=%d out=%q err=%q paths=%v", code, out, stderr, got)
 		}
 	}

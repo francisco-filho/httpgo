@@ -101,10 +101,11 @@ func TestResultsAndSecretRedaction(t *testing.T) {
 			if code != tc.code || len(fake.calls) != tc.calls {
 				t.Fatalf("code=%d,out=%q,err=%q,calls=%v", code, out, err, fake.calls)
 			}
-			for _, line := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
-				if strings.HasPrefix(line, "resumo ") {
-					continue
-				}
+			requestLines := strings.Split(strings.SplitN(out, "\nresumo ", 2)[0], "\n")
+			if len(requestLines) != tc.calls {
+				t.Fatalf("request lines=%v want=%d", requestLines, tc.calls)
+			}
+			for _, line := range requestLines {
 				prefix := "GET "
 				if tc.code != 0 {
 					prefix = fmt.Sprintf("%q:1:1: GET ", shownPath(t, file))

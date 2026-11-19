@@ -60,7 +60,7 @@ func TestBodyCLI(t *testing.T) {
 					t.Fatalf("unexpected %q in %s %s", forbidden, out, stderr)
 				}
 			}
-			if tc.code == 1 && !strings.Contains(out, "requisições_falha_assertion=1 requisições_erro=0") {
+			if tc.code == 1 && !strings.Contains(out, "Sucesso/erros: 0/1\n") {
 				t.Fatal(out)
 			}
 		})

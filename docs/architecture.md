@@ -8,8 +8,12 @@ seleciona `verboseProgress` de `cli/verbose.go` prioritariamente sobre compacto/
 legado apenas quando solicitado. Reutiliza `suite.Options.Loading` para anúncio
 antes da carga, callback terminal para ordinal/step e callback de arquivo para
 carga/parsing/não alcançados. Não usa `Loaded` para produzir barra ou step extra.
-`renderCompactSuite`, detecção original de ambos TTY e NO_COLOR são compartilhados.
-O modo verboso funciona com pipes, sempre estático; só ambos TTY permitem cores.
+`renderSuite` de `cli/summary.go` é compartilhado por todos os modos de texto;
+a detecção original de ambos TTY e NO_COLOR é reutilizada. O modo verboso funciona
+com pipes, sempre estático; só ambos TTY sem NO_COLOR permitem cores e nomes em
+negrito. `scenarioSummaryText` usa os contadores definitivos de `FileResult` para
+escrever o balanço de steps e separador após diagnóstico/prévias; não inventa
+steps em erro de carga/parsing ou balanço de arquivos pulados.
 
 `runner/terminal.go` prepara `EntryResult.Diagnostic` (`EntryDiagnostic`) com
 posição, fase, consulta e detalhe controlados; causas brutas continuam somente
@@ -1482,11 +1486,17 @@ antes do próximo arquivo; legado e relatórios conservam `renderDiagnostic` e
 `junitDiagnostic`. Linhas finalizadas não são reimpressas; nomes-base iguais não
 mudam identidade ou ordem da suíte.
 
-`renderCompactSuite` escreve somente em stdout e usa `Summary.Processed`,
-`Passed`, `Failed + Errors`, `Skipped` e `Duration`. Média é duração / processados,
-ou `não aplicável` se zero; pulados só aparecem se positivos. Campos estruturados,
-texto redirecionado e serializadores permanecem inalterados. Não há resumo para
-erro global anterior à execução ou falha de progresso.
+`renderSuite` em `internal/cli/summary.go` escreve em stdout o resumo compartilhado
+por compacto, legado e verboso. O grupo de cenários usa `Summary.Processed`,
+`Passed`, `Failed + Errors` e `Skipped`; o grupo de testes usa `Successful`,
+`AssertionFailures + RequestErrors` e sua soma, incluindo erros pré-HTTP e sem
+multiplicar retentativas. Cada média é `Duration` dividida pela contagem do grupo,
+ou `não aplicável` se zero; pulados só aparecem se positivos no primeiro grupo.
+`Tempo` fica por último. Somente `verboseProgress` escreve o balanço e separador de cada arquivo em
+stderr usando esses contadores de steps; compacto e legado não os acrescentam.
+Esse é um ajuste deliberado do contrato textual, inclusive redirecionado;
+campos estruturados e serializadores JUnit/HTML permanecem inalterados. Não há
+resumo para erro global anterior à execução ou falha de progresso.
 
 `executionProtection`, `sessionRenderer` e `protectedWriter` continuam cobrindo
 cada atualização e diagnóstico com proteção incremental e memória da primeira

@@ -108,6 +108,12 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			default:
 			}
 			close(releaseSecond)
+			// Drain concurrently with the child: the shared summary is multiline
+			// and must not depend on a fixed channel buffer to let Wait complete.
+			var remaining []string
+			for line := range lines {
+				remaining = append(remaining, line)
+			}
 			select {
 			case <-done:
 			case <-ctx.Done():
@@ -121,11 +127,7 @@ func TestResultsStreamWhileNextRequestIsPending(t *testing.T) {
 			if readErr != nil || command.ProcessState.ExitCode() != tc.code || (waitErr == nil) != (tc.code == 0) {
 				t.Fatalf("exit=%v,wait=%v,read=%v,stderr=%q", command.ProcessState, waitErr, readErr, stderr.String())
 			}
-			var remaining []string
-			for line := range lines {
-				remaining = append(remaining, line)
-			}
-			if len(remaining) != 3 || !strings.HasPrefix(remaining[2], "resumo suíte:") || !strings.Contains(remaining[0], "/second: "+tc.outcome) || !strings.HasPrefix(remaining[1], "resumo ") || !strings.Contains(remaining[1], tc.completed) {
+			if len(remaining) != 11 || remaining[2] != "Cenários executados: 1" || remaining[6] != "Testes executados: 2" || !strings.HasPrefix(remaining[10], "Tempo:") || !strings.Contains(remaining[0], "/second: "+tc.outcome) || !strings.HasPrefix(remaining[1], "resumo ") || !strings.Contains(remaining[1], tc.completed) {
 				t.Fatalf("remaining output = %q", remaining)
 			}
 			prefix := "POST "

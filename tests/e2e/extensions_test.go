@@ -31,7 +31,7 @@ func TestScenarioExtensionsDemo(t *testing.T) {
 	}{{[]string{a}, 1}, {[]string{b}, 1}, {[]string{dir}, 2}, {[]string{b, dir, a, dir}, 2}} {
 		hits.Store(0)
 		code, out, stderr := run(t, append([]string{"test"}, tc.paths...)...)
-		if code != 0 || stderr != "" || int(hits.Load()) != tc.files || !strings.Contains(out, fmt.Sprintf("resumo suíte: arquivos=%d processados=%d executados=%d sucessos=%d", tc.files, tc.files, tc.files, tc.files)) {
+		if code != 0 || stderr != "" || int(hits.Load()) != tc.files || !strings.Contains(out, fmt.Sprintf("Cenários executados: %d\n", tc.files)) {
 			t.Fatalf("paths=%v code=%d out=%q stderr=%q hits=%d", tc.paths, code, out, stderr, hits.Load())
 		}
 		if tc.files == 2 && strings.Index(out, "01-health.httpgo") >= strings.Index(out, "02-health.hurl") {
@@ -90,7 +90,7 @@ func TestScenarioOnlyHTTPGoRecursiveAndExplicitExtensions(t *testing.T) {
 	}{{[]string{dir}, 2}, {explicit, 2}, {append([]string{dir}, explicit...), 4}} {
 		hits.Store(0)
 		code, out, stderr := run(t, append([]string{"test"}, tc.paths...)...)
-		if code != 0 || stderr != "" || int(hits.Load()) != tc.sends || !strings.Contains(out, fmt.Sprintf("sucessos=%d", tc.sends)) {
+		if code != 0 || stderr != "" || int(hits.Load()) != tc.sends || !strings.Contains(out, fmt.Sprintf("Sucesso/erros: %d/0\n", tc.sends)) {
 			t.Fatalf("paths=%v code=%d out=%q stderr=%q hits=%d", tc.paths, code, out, stderr, hits.Load())
 		}
 	}

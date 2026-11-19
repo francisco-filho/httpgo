@@ -320,33 +320,38 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			wantCode := 0
 			wantCalls := int32(12)
 			wantFinal := "OK  10/10"
-			wantCount := "Testes executados: 3\n"
+			wantCount := "Cenários executados: 3\n"
+			wantTests := 12
 			wantStates := "Sucesso/erros: 3/0\n"
 			switch mode {
 			case "fourth failure":
 				wantCode = 1
 				wantCalls = 5
 				wantFinal = "ERRO  4/10\n  step 4 - Linha"
-				wantCount = "Testes executados: 2\n"
+				wantTests = 5
+				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			case "retry pass":
+				wantTests = 3
 				wantCalls = 4
 				wantFinal = "OK  1/1"
 			case "retry exhausted":
 				wantCode = 1
 				wantCalls = 3
 				wantFinal = "ERRO  1/1\n  step 1 - Linha"
-				wantCount = "Testes executados: 2\n"
+				wantTests = 2
+				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			case "cancel":
 				wantCode = 2
 				wantCalls = 2
 				wantFinal = "ERRO  1/10\n  step 1 - Linha"
-				wantCount = "Testes executados: 2\n"
+				wantTests = 2
+				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			}
 			out, diagnostic := p.out.text(), p.stderr.text()
-			if code != wantCode || calls.Load() != wantCalls || !strings.Contains(diagnostic, wantFinal) || !strings.Contains(out, wantCount) || !strings.Contains(out, wantStates) {
+			if code != wantCode || calls.Load() != wantCalls || !strings.Contains(diagnostic, wantFinal) || !strings.Contains(out, wantCount) || !strings.Contains(out, fmt.Sprintf("Testes executados: %d\n", wantTests)) || !strings.Contains(out, wantStates) {
 				t.Fatalf("code=%d calls=%d out=%q err=%q", code, calls.Load(), out, diagnostic)
 			}
 			if strings.Contains(diagnostic, "\x1b[32m") || strings.Contains(out, "\x1b") || strings.Contains(diagnostic, "status validado") || strings.Count(diagnostic, "- same.httpgo  OK  1/1\n") < 1 {
@@ -373,10 +378,10 @@ func TestCompactRealTTYSelection(t *testing.T) {
 					}
 					out, diagnostic := p.out.text(), p.stderr.text()
 					if outTTY && errTTY {
-						if !strings.HasPrefix(out, "-----------------------------------------------\nTestes executados: 1\n") || strings.Count(out, "-----------------------------------------------\n") != 1 || !strings.Contains(diagnostic, "\x1b[2K") || strings.Contains(diagnostic, "\x1b[32m") == noColor {
+						if !strings.HasPrefix(out, "Cenários executados: 1\n") || !strings.Contains(out, "Testes executados: 1\n") || strings.Contains(out+diagnostic, "Sucesso: ") || strings.Contains(out+diagnostic, "-----------------------------------------------") || !strings.Contains(diagnostic, "\x1b[2K") || strings.Contains(diagnostic, "\x1b[32m") == noColor {
 							t.Fatalf("out=%q err=%q", out, diagnostic)
 						}
-					} else if !strings.Contains(out, "GET ") || !strings.Contains(out, "resumo suíte:") || diagnostic != "" || strings.Contains(out, "\x1b") || strings.Contains(out, "-----------------------------------------------") {
+					} else if !strings.Contains(out, "GET ") || !strings.Contains(out, "Cenários executados: 1\n") || !strings.Contains(out, "Testes executados: 1\n") || diagnostic != "" || strings.Contains(out, "\x1b") || strings.Contains(out, "Sucesso: ") || strings.Contains(out, "-----------------------------------------------") {
 						t.Fatalf("legacy out=%q err=%q", out, diagnostic)
 					}
 				})
@@ -403,7 +408,7 @@ func TestCompactRealTTYLoadErrorsAndProtection(t *testing.T) {
 	p := startTerminalProcess(t, true, true, true, "test", dir, "--secret", "token")
 	code := p.wait(t)
 	out, diagnostic := p.out.text(), p.stderr.text()
-	if code != 2 || calls.Load() != 2 || !strings.Contains(out, "Testes executados: 4\n") || !strings.Contains(out, "Sucesso/erros: 1/3\n") || !strings.Contains(diagnostic, "ERRO  0/?\n") || !strings.Contains(diagnostic, "step 1 - Linha") || !strings.Contains(diagnostic, "[oculto]") || strings.Contains(out+diagnostic, secret) || strings.Contains(out, "Não executados:") {
+	if code != 2 || calls.Load() != 2 || !strings.Contains(out, "Cenários executados: 4\n") || !strings.Contains(out, "Testes executados: 3\n") || !strings.Contains(out, "Sucesso/erros: 1/3\n") || !strings.Contains(out, "Sucesso/erros: 1/2\n") || !strings.Contains(diagnostic, "ERRO  0/?\n") || !strings.Contains(diagnostic, "step 1 - Linha") || !strings.Contains(diagnostic, "[oculto]") || strings.Contains(out+diagnostic, secret) || strings.Contains(out, "Não executados:") {
 		t.Fatalf("code=%d calls=%d out=%q err=%q", code, calls.Load(), out, diagnostic)
 	}
 }

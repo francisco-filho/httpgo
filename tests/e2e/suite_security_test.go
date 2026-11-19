@@ -112,7 +112,7 @@ func TestSuiteRealIsolationProtectionAndPayloadOrigins(t *testing.T) {
 	mu.Lock()
 	got := strings.Join(paths, " ")
 	mu.Unlock()
-	if err == nil || command.ProcessState == nil || command.ProcessState.ExitCode() != 2 || got != "/login /json/a /multipart /json/b /echo" || !strings.Contains(stderr.String(), "variável ausente") || !strings.Contains(stderr.String(), "HEAD") || !strings.Contains(out.String(), "sucessos=2 falhas_assertion=1 erros=2") {
+	if err == nil || command.ProcessState == nil || command.ProcessState.ExitCode() != 2 || got != "/login /json/a /multipart /json/b /echo" || !strings.Contains(stderr.String(), "variável ausente") || !strings.Contains(stderr.String(), "HEAD") || !strings.Contains(out.String(), "Sucesso/erros: 2/3\n") {
 		t.Fatalf("state=%v err=%v paths=%v out=%q stderr=%q", command.ProcessState, err, got, out.String(), stderr.String())
 	}
 	for _, secret := range []string{token, cookie, initial, "prefix-"} {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"capimgrosso.com/httpgo/internal/runner"
 	"capimgrosso.com/httpgo/internal/suite"
@@ -60,7 +59,9 @@ func (p *fileProgress) draw(state string, final bool) error {
 	if final {
 		ending = "\n"
 	}
+	name := p.name
 	if p.command.color {
+		name = "\x1b[1m" + name + "\x1b[0m"
 		color := "\x1b[36m"
 		switch state {
 		case "OK":
@@ -71,20 +72,7 @@ func (p *fileProgress) draw(state string, final bool) error {
 		state = color + state + "\x1b[0m"
 	}
 	// The protected writer sanitizes the complete update before it reaches stderr.
-	_, err := fmt.Fprintf(p.command.err, "\r\x1b[2K- %s  %s  %d/%s%s", p.name, state, p.done, total, ending)
-	return err
-}
-
-func (c *Command) renderCompactSuite(s suite.Summary) error {
-	average := "não aplicável"
-	if s.Processed > 0 {
-		average = (s.Duration / time.Duration(s.Processed)).String()
-	}
-	text := fmt.Sprintf("-----------------------------------------------\nTestes executados: %d\nTempo: %s\nTempo médio por teste: %s\nSucesso/erros: %d/%d\n", s.Processed, s.Duration, average, s.Passed, s.Failed+s.Errors)
-	if s.Skipped > 0 {
-		text += fmt.Sprintf("Não executados: %d\n", s.Skipped)
-	}
-	_, err := io.WriteString(c.out, text)
+	_, err := fmt.Fprintf(p.command.err, "\r\x1b[2K- %s  %s  %d/%s%s", name, state, p.done, total, ending)
 	return err
 }
 

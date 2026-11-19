@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -18,7 +19,11 @@ type verboseProgress struct {
 
 func (p *verboseProgress) loading(name string) error {
 	p.done = 0
-	_, err := fmt.Fprintln(p.command.err, filepath.Base(filepath.FromSlash(name)))
+	name = filepath.Base(filepath.FromSlash(name))
+	if p.command.color {
+		name = "\x1b[1m" + name + "\x1b[0m"
+	}
+	_, err := fmt.Fprintln(p.command.err, name)
 	return err
 }
 
@@ -105,8 +110,11 @@ func (p *verboseProgress) finish(file suite.FileResult, run runner.Result, loadE
 	if loadErr != nil || (p.done == 0 && run.Err != nil) {
 		diagnostic, ok := p.command.progressDiagnostic(run, loadErr)
 		if ok {
-			return p.command.writeProgressDiagnostic(diagnostic, 0)
+			if err := p.command.writeProgressDiagnostic(diagnostic, 0); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	_, err := io.WriteString(p.command.err, scenarioSummaryText(file))
+	return err
 }
