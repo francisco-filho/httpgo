@@ -1916,14 +1916,15 @@ mostram `NÃO EXECUTADO 0/?`, sem carga só para contar suas entradas.
   step 4 - Linha 12:1
   [status]
   HTTP 200
-  expected 200 => recebido 503
+     expected 200 => received 503
 ```
 
 O bloco usa uma linha para step/localização, outra para a etapa (`[assertion]`,
 `[captures]`, `[status]`, `[parsing]`, `[renderização]` ou `[transporte]`), uma
 expressão segura quando disponível e a mensagem final. Esta última fica vermelha
 quando as cores estão habilitadas. Falhas de assertions com esperado conhecido
-usam `expected ... => recebido ...`; predicados de tipo e consultas textuais
+usam `expected ... => received ...`, com cinco espaços de recuo na mensagem final;
+predicados de tipo e consultas textuais
 preservam diagnósticos categóricos, sem inventar valores recebidos.
 Localização sem step mostra somente `Linha N:C`; sem posição disponível, omite
 essa parte. Erro de carga/parsing nunca recebe ordinal de step inventado. A

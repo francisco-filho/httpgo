@@ -41,11 +41,11 @@ func TestCompactRealTTYMultilineDiagnostic(t *testing.T) {
 				t.Fatalf("code=%d sends=%d err=%q", code, calls.Load(), p.stderr.text())
 			}
 			diagnostic := p.stderr.text()
-			message := `expected "SOY" => recebido tipo array`
+			message := `expected "SOY" => received tipo array`
 			if !noColor {
 				message = "\x1b[31m" + message + "\x1b[0m"
 			}
-			block := "  step 7 - Linha 114:1\n  [assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n  " + message + "\n"
+			block := "  step 7 - Linha 114:1\n  [assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n     " + message + "\n"
 			index := strings.Index(diagnostic, block)
 			next := strings.Index(diagnostic, "- 29-phase-seven-combos.hurl")
 			if index < 0 || next < index+len(block) || !strings.Contains(diagnostic, "13/13\n") || strings.Contains(diagnostic, "private-body-allergen") || strings.Contains(diagnostic, "@.number==7") || strings.Contains(diagnostic, "execução interrompida") {
