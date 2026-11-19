@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -29,7 +30,9 @@ type Command struct {
 	out, err   io.Writer
 	protection *executionProtection
 	timeout    time.Duration
-	compact    bool // Invocation-local selection; injectable until terminal detection.
+	isTerminal func(io.Writer) bool
+	compact    bool // Selected on original streams, before protection wrappers.
+	color      bool
 }
 
 func NewRootCommand(executor runner.HTTPExecutor, build BuildInfo) *Command {
@@ -43,6 +46,13 @@ func (c *Command) SetErr(err io.Writer)  { c.err = err }
 
 func (c *Command) ExecuteContext(ctx context.Context) int {
 	local := *c
+	detect := c.isTerminal
+	if detect == nil {
+		detect = terminalWriter
+	}
+	local.compact = detect(c.out) && detect(c.err)
+	_, noColor := os.LookupEnv("NO_COLOR")
+	local.color = !noColor
 	local.protection = &executionProtection{initial: argumentProtection(c.args)}
 	var outFailure, errFailure error
 	local.out = protectedWriter{writer: c.out, protect: local.protection.sanitize, failure: &outFailure}
@@ -142,7 +152,11 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if args.output == "junit" || args.output == "html" {
 		return result.Code
 	}
-	if err := c.renderSuite(result.Summary); err != nil {
+	renderSummary := c.renderSuite
+	if c.compact {
+		renderSummary = c.renderCompactSuite
+	}
+	if err := renderSummary(result.Summary); err != nil {
 		return c.fail("não foi possível escrever o resumo da suíte")
 	}
 	return result.Code
