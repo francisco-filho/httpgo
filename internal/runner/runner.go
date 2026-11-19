@@ -315,9 +315,9 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 	var batch []template.Capture
 	if err == nil && !result.Diverged && len(entry.Captures) > 0 {
 		var captureErr *CaptureError
-		batch, captureErr = extractCaptures(session, entry.Captures, response, func(name string) {
+		batch, captureErr = extractCaptures(session, entry.Captures, response, func(index int) {
 			if options.DiagnosticBodies {
-				delete((*last).pending, name)
+				delete((*last).pending, index)
 			}
 		})
 		if captureErr == nil {

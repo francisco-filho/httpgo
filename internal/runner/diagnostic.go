@@ -43,17 +43,17 @@ type BodyPreviews struct{ Request, Response BodyPreview }
 
 type attemptBodies struct {
 	data    HTTPDiagnostics
-	pending map[string]bool
+	pending map[int]bool
 }
 
 func newAttemptBodies(data *HTTPDiagnostics, session template.Session, entry parser.Entry) *attemptBodies {
-	result := &attemptBodies{data: HTTPDiagnostics{Request: HTTPBody{State: BodyUnavailable}, Response: HTTPBody{State: BodyUnavailable}}, pending: make(map[string]bool)}
+	result := &attemptBodies{data: HTTPDiagnostics{Request: HTTPBody{State: BodyUnavailable}, Response: HTTPBody{State: BodyUnavailable}}, pending: make(map[int]bool)}
 	if data != nil {
 		result.data = *data
 	}
-	for _, capture := range entry.Captures {
+	for index, capture := range entry.Captures {
 		if session.IsSecret(capture.Name) || capture.Path.HasProtectedReference(session.IsSecret) {
-			result.pending[capture.Name] = true
+			result.pending[index] = true
 		}
 	}
 	return result

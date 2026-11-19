@@ -81,7 +81,7 @@ func TestBodyPreviewProtectsBeforeCutAndNormalizesEscapes(t *testing.T) {
 }
 
 func TestDiagnosticSecretCapturePendingTracksExtractionNotCommit(t *testing.T) {
-	for _, mode := range []string{"status", "partial", "extracted then partial public", "assertion", "stage conflict"} {
+	for _, mode := range []string{"status", "partial", "duplicate secret pending", "extracted then partial public", "assertion", "stage conflict"} {
 		t.Run(mode, func(t *testing.T) {
 			captures := "token: jsonpath \"$.token\""
 			secrets := []string{"token"}
@@ -92,6 +92,8 @@ func TestDiagnosticSecretCapturePendingTracksExtractionNotCommit(t *testing.T) {
 			case "partial":
 				captures += "\nother: jsonpath \"$.missing\""
 				secrets = append(secrets, "other")
+			case "duplicate secret pending":
+				captures += "\ntoken: jsonpath \"$.missing\""
 			case "extracted then partial public":
 				captures += "\npublic: jsonpath \"$.missing\""
 			case "stage conflict":
@@ -115,7 +117,7 @@ func TestDiagnosticSecretCapturePendingTracksExtractionNotCommit(t *testing.T) {
 					t.Fatal("missing previews")
 				}
 				preview := entry.Bodies.Response
-				pending := mode == "status" || mode == "partial"
+				pending := mode == "status" || mode == "partial" || mode == "duplicate secret pending"
 				if pending && (preview.State != BodyProtected || preview.Text != "") || !pending && (preview.State != BodyJSON || strings.Contains(preview.Text, "fiction-private-token") || !strings.Contains(preview.Text, "[oculto]")) {
 					t.Fatalf("mode=%s preview=%+v", mode, preview)
 				}

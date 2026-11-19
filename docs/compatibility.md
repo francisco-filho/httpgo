@@ -1,4 +1,28 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+
+## Verbosidade da CLI — US-42 / issue #90
+
+`-v`/`--verbose` e duas ocorrências (`-vv`, curtas/longas combinadas) são
+**contrato próprio de apresentação HTTPGo**, não promessa de equivalência com
+flags, streams, bodies ou diagnósticos do Hurl. Funcionam em terminal e pipes:
+progresso estático e diagnósticos em stderr, resumo da US-41 em stdout. Mais de
+duas ocorrências ou combinação com JUnit/HTML são uso inválido 2 antes de HTTP
+ou alteração de destinos. Sem flags, preservam-se compacto/legado e relatórios.
+
+A exceção de prévias JSON em `-vv` é restrita às falhas e à última tentativa
+enviada/salto final, com proteção antes do limite de 16 KiB por body e omissão
+total da resposta enquanto houver captura secreta não extraída. Não inclui
+histórico, headers completos, conteúdo não JSON ou bodies em relatórios. Não
+muda a linguagem, ordem transacional, políticas de redirects/polling ou códigos
+0/1/2. YAML hierárquico/interpolação externa continuam extensões HTTPGo.
+
+O corpus `testdata/compatibility/` permanece inalterado: nenhuma observação foi
+regenerada para acomodar apresentação. O gate Hurl **8.0.0** verifica a execução
+compartilhada; TTY, pipes, proteção, limite, escrita e opção de diagnóstico são
+verificados separadamente nos testes HTTPGo, sem inferir equivalência de CLI ou
+detecção universal de segredos. [Contrato](subset.md#progresso-verboso--us-42--issue-90),
+[arquitetura](architecture.md#progresso-verboso-e-prévias-json--us-42--issue-90) e
+[evidência](validation.md#us-42--issue-90--história-042).
 
 <a id="extensões-de-arquivo"></a>
 

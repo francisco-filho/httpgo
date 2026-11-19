@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"capimgrosso.com/httpgo/internal/template"
 )
@@ -15,6 +16,10 @@ func terminalDiagnostic(result Result, session template.Session, options Options
 		return nil
 	}
 	d := &EntryDiagnostic{Position: result.ErrorPosition, Phase: "transporte", Detail: "falha de transporte; verifique conexão, TLS e redirecionamentos"}
+	var safe interface{ SafeDiagnostic() string }
+	if errors.As(result.Err, &safe) {
+		d.Detail = safe.SafeDiagnostic()
+	}
 	var render *RenderError
 	var file *FileError
 	var capture *CaptureError
@@ -42,7 +47,7 @@ func terminalDiagnostic(result Result, session template.Session, options Options
 	case errors.Is(result.Err, context.DeadlineExceeded):
 		timeout := options.Timeout
 		if timeout == 0 {
-			timeout = 10_000_000_000
+			timeout = 10 * time.Second
 		}
 		d.Detail = fmt.Sprintf("timeout da requisição (limite total de %g segundos)", timeout.Seconds())
 	}

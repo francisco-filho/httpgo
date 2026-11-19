@@ -1,4 +1,70 @@
-# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38
+# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+
+## Progresso verboso — US-42 / issue #90
+
+```sh
+httpgo test tests/ -v
+httpgo test tests/ -vv
+```
+
+Contrato próprio de apresentação, sem nova sintaxe de cenário. `-v`/`--verbose`
+contam uma ocorrência; `-vv` conta duas. Formas curtas/longas somam, em qualquer
+ordem após `test`; `-v -v`, `--verbose --verbose` e `-v --verbose` equivalem ao
+nível 2. Mais de duas ou valores inline são uso inválido **2**, sem HTTP.
+Ambos os níveis são incompatíveis com `--output junit`/`html`: rejeição antes
+de abrir/alterar destinos. Sem flags, preserva-se a seleção US-41.
+
+Cada arquivo é anunciado em **stderr**, com nome-base e extensão, antes da carga.
+Nomes iguais não se agrupam. Cada step definitivo tem uma linha estática
+`[OK] MÉTODO URL (Nms)` ou `[ERRO] MÉTODO URL (Nms)`, sem barra ou atualização,
+inclusive com redirecionamento. A duração lógica inclui preparação, tentativas,
+validações/capturas e esperas, sem o tempo de apresentação. Polling produz uma
+única linha final. `[OK]` não inventa validações não declaradas.
+
+O bloco seguro de erro compartilhado com US-41 informa ordinal, linha/coluna,
+consulta/predicado e comparação ou causa disponíveis: `[status]`, `[assertion]`,
+`[captures]`, `[renderização]`, `[transporte]` ou `[parsing]`. Não há etapa de
+validação que não ocorreu, step/posição fictícios em erro de carga ou repetição
+do diagnóstico no fechamento do arquivo. O bloco precede o próximo arquivo.
+
+**Somente o nível 2** adiciona blocos `[request body]` e `[response body]` nas
+falhas/erros, nunca em sucesso, nível 1 ou relatórios. Exibe JSON completo UTF-8
+validado como um único valor antes da proteção/corte, incluindo arquivos externos,
+sem decodificar charsets. MIME ausente, JSON/`+json` e `text/plain` permitem JSON;
+binários, multipart, outros MIME ou conteúdo inválido são `omitido (conteúdo não JSON)`.
+Request sem body: `ausente`; arquivo externo vazio: conteúdo omitido. Falha antes
+do envio ou resposta incompleta: `indisponível/incompleto`. Nunca substituir por
+`{}` ou recuperar template/caminho operacional para montar uma prévia.
+
+Os dois bodies pertencem ao **salto final da última tentativa enviada**, sem
+histórico de redirects/tentativas. 301/302/303 que convertem POST em GET mostram
+request ausente; 307/308 preservam bytes. Falha de preparação posterior ou
+cancelamento na espera conserva a última tentativa enviada. Erro de transporte
+não comprova recebimento nem torna resposta parcial completa. Leitura, fechamento,
+timeout e cancelamento continuam sendo erros 2, inclusive com cenário só de status.
+
+Limite de **16.384 bytes (16 KiB) por prévia**, protegido integralmente antes de
+cortar, sem dividir UTF-8, com `[truncado: limite de 16384 bytes]` quando necessário.
+Variantes conhecidas e escapes JSON equivalentes são protegidos antes do corte;
+a representação pode ser normalizada para isso. Ocultação/truncamento podem
+invalidar a sintaxe exibida. Retenção transitória completa em `-vv` não impõe
+novo limite de consumo/aceitação HTTP; fora do opt-in a retenção sob demanda e o
+streaming atuais permanecem. Dados brutos não entram em callbacks/resultados.
+
+Havendo captura secreta ainda não extraída, toda a resposta fica `omitido por proteção`,
+sem avaliá-la antecipadamente. Cada extração bem-sucedida deixa de estar pendente,
+mesmo sem confirmação; qualquer outra secreta não extraída mantém a omissão total.
+Proteção é monotônica para segredos marcados/conhecidos/derivados, inclusive entre
+arquivos, nomes, URL e consulta. Não detecta segredos arbitrários não marcados ou
+toda codificação desconhecida, nem apaga saída anterior à descoberta do segredo.
+
+Detalhes/diagnósticos/bodies ficam em stderr; **stdout** recebe o mesmo resumo
+por arquivos tentados da US-41, mesmo em pipes. Cores só com ambos os streams
+TTY e `NO_COLOR` ausente. Cancelamento, fail-fast, contagens e prioridade **2 > 1 > 0**
+não mudam. Não alcançados são identificados sem carregá-los para obter totais.
+Qualquer erro/short write interrompe antes de novos envios, sem nova escrita no
+writer falho. Esta é a exceção explícita às proibições históricas de body nos
+diagnósticos deste documento; não se estende aos relatórios nem headers completos.
 
 ## Extensão padrão dos cenários — US-38 / issue #79
 
@@ -1796,7 +1862,7 @@ diagnóstico seguro e retorna `1`; cancelamento na espera retorna `2`.
 resumo da ferramenta, uso (`httpgo test <arquivo-ou-diretório>... [opções]`),
 opções com explicações curtas, indicação da documentação e exemplos ao final.
 A lista inclui `--help`, `--version`, `--config arquivo`, `--env nome`,
-`--fail-fast`, `--output junit|html`, `--output-file caminho`, `--render-files`,
+`--fail-fast`, `--verbose` (`-v`/`-vv`), `--output junit|html`, `--output-file caminho`, `--render-files`,
 `--render-asserts`, `--var nome=valor` e `--secret nome`. Relatórios exigem destino;
 `--var` recebe apenas valores não sigilosos e `--secret` apenas marca nomes
 protegidos, sem fornecer valores secretos.
@@ -1966,7 +2032,7 @@ estruturados, JUnit/HTML, texto redirecionado e códigos 0/1/2 não mudam.
 ### Texto detalhado preservado por redirecionamento
 
 As linhas e contagens a seguir descrevem o **modo texto legado**, selecionado
-quando pelo menos um dos streams não é TTY.
+quando pelo menos um dos streams não é TTY e não há verbosidade explícita.
 
 Cada entrada iniciada (ou que falha na renderização pré-envio) tem uma linha de
 resultado com o método declarado, URL segura e uma
@@ -2086,7 +2152,8 @@ quoting para escapar caracteres de controle.
 Valores de headers comuns podem aparecer **somente** no diagnóstico de assertion,
 com quoting e sanitização. Valores de `Authorization`, `Proxy-Authorization`,
 `Cookie` e `Set-Cookie` nunca são apresentados, independentemente da caixa do nome,
-nem mesmo quando esperados literais. Bodies de requisição/resposta não são impressos. JSON/header malformado
+nem mesmo quando esperados literais. Bodies de requisição/resposta não são impressos
+por padrão; a exceção opt-in JSON protegido em `-vv` segue a seção US-42 acima. JSON/header malformado
 recebe diagnóstico controlado com arquivo/linha/coluna, sem ecoar entrada ou erro
 bruto do decoder/transporte. Isso evita vazamento também de credenciais em bodies.
 
@@ -2099,7 +2166,8 @@ flags. Formas brutas, strings JSON decodificadas e variantes conhecidas de escap
 JSON/Go/URL são protegidas também antes da construção do contexto. Constituintes
 de objetos/arrays secretos são protegidos sem disponibilizá-los como variáveis.
 Valores vazios não provocam substituição global. Coleções de headers e bodies
-permanecem ausentes das saídas; não é gerado body de diagnóstico. Codificações arbitrárias desconhecidas
+permanecem ausentes das saídas padrão/relatórios; somente `-vv` permite prévias JSON
+protegidas e limitadas conforme US-42. Codificações arbitrárias desconhecidas
 não têm garantia de detecção.
 
 **O restante do path permanece visível: não coloque segredos arbitrários nele.** Não é possível
@@ -2108,6 +2176,9 @@ nem proteger o conteúdo do arquivo em disco ou argumentos no histórico/process
 Esta sanitização não é um mecanismo de entrada segura de segredos por flags.
 
 ## Diferenças em relação ao Hurl
+
+- `-v`/`-vv` têm contrato próprio HTTPGo de progresso estático e prévias JSON
+  protegidas; não se promete equivalência com a verbosidade da CLI Hurl.
 
 - O subconjunto é menor: comentários inline, respostas com versão, body em GET,
   headers de enquadramento e demais métodos/seções são rejeitados, não ignorados.

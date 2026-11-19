@@ -156,7 +156,8 @@ Com stdout e stderr em terminal interativo, o progresso em stderr termina em
 `- exemplo.httpgo  OK  1/1`, e stdout recebe o resumo da suíte. O código é **0**.
 Se qualquer um dos streams for redirecionado, preserva-se o texto detalhado:
 stdout informa o GET, status 200 e resumo com uma requisição validada, sem
-diagnóstico de erro em stderr. A CLI não imprime o body.
+diagnóstico de erro em stderr. Por padrão, a CLI não imprime o body; `-vv`
+permite prévias JSON protegidas somente nos steps com falha, como explicado abaixo.
 Agora troque **somente** `HTTP 200` por `HTTP 201` no arquivo e repita o comando:
 o servidor continua respondendo 200, aparece **status divergente**, e `echo $?`
 mostra **1**. Restaure `HTTP 200` antes de prosseguir.
@@ -404,6 +405,65 @@ vão a stdout, diagnósticos a stderr. Essa substituição da apresentação ape
 terminal é uma mudança deliberada de contrato; execução e exit codes não
 mudam. A proteção incremental de segredos conhecidos/derivados cobre nomes e
 diagnósticos, mas não apaga texto exibido antes de um segredo ser conhecido.
+
+### Investigar falhas com progresso verboso
+
+```sh
+httpgo test suite/ --var base_url=http://localhost:8080 -v
+httpgo test suite/ --var base_url=http://localhost:8080 -vv
+```
+
+`-v` ou `--verbose` seleciona nível 1. `-vv`, `-v -v`, duas ocorrências de
+`--verbose` ou uma combinação curta/longa selecionam nível 2. Mais de duas
+ocorrências, valores como `--verbose=2` e combinação com `--output junit` ou
+`--output html` são uso inválido **2**, antes de HTTP ou criação de relatório.
+Sem essas flags, a seleção compacto/legado descrita acima permanece inalterada.
+
+Nos dois níveis, **stderr** anuncia cada nome-base e extensão antes de carregar
+o arquivo e apresenta uma linha estática por step definitivo, inclusive em pipes:
+
+```text
+01-health.httpgo
+[OK] GET http://localhost:8080/health (12ms)
+02-produto.httpgo
+[ERRO] GET http://localhost:8080/products/1 (20ms)
+  step 1 - Linha 2:1
+  [status]
+  HTTP 200
+     expected 200 => received 503
+```
+
+Os tempos são ilustrativos: incluem preparação, todas as tentativas e esperas.
+Polling não imprime divergências transitórias. `[OK]` exige concluir as capturas
+e validações declaradas, mas não inventa validação de status para `HTTP *` ou
+status ausente. Falhas de parsing, preparação, transporte, status, assertions e
+capturas conservam categoria/localização disponíveis, antes do próximo arquivo.
+Arquivos não alcançados aparecem como `NÃO EXECUTADO`, sem parsing antecipado.
+Somente o resumo por arquivos tentados vai a **stdout**, também com redirecionamento.
+Não há barra ou atualização de linha. Cores exigem ambos os streams TTY e
+`NO_COLOR` ausente; rótulos permanecem sem cores.
+
+**Exceção opt-in à ausência de bodies:** somente `-vv` acrescenta `[request body]`
+e `[response body]` no step com falha/erro. São prévias da última tentativa
+enviada e de seu salto final, sem histórico, releitura de arquivo ou template não
+enviado. 301/302/303 convertendo POST em GET mostram request ausente; 307/308
+preservam seu body. São exibidos apenas JSON completo UTF-8 (inline ou externo),
+sem conversão de charset. Binários, multipart e conteúdo não JSON são omitidos.
+Ausência é indicada como `ausente`; falha pré-envio ou resposta parcial como
+`indisponível/incompleto`, nunca como `{}` artificial.
+
+Cada prévia é protegida **antes** do limite de **16 KiB (16.384 bytes) por body**,
+com corte UTF-8 e indicação explícita de truncamento. A representação pode ser
+normalizada para proteger escapes JSON equivalentes, e ocultação/corte podem
+invalidar sua sintaxe exibida. Captura secreta ainda não extraída omite toda a
+resposta por proteção; extração bem-sucedida registra o segredo mesmo se o lote
+não for confirmado. A prévia não antecipa capturas nem altera os dados enviados.
+Marque segredos com `--secret`/YAML ou use referências ao ambiente: **não há
+promessa de detectar credenciais arbitrárias não marcadas ou codificações
+desconhecidas**. O opt-in pode reter transitoriamente o body final completo em
+memória; 16 KiB é limite de exibição, não de consumo HTTP. Sucessos, nível 1,
+modo padrão e relatórios continuam sem bodies. Falhas de escrita mantêm código
+**2**, sem novos envios ou repetição no writer falho.
 
 Nos comandos de relatório, stdout fica vazio: JUnit grava `target/test-results.xml`, substituindo destino existente;
 HTML gera `target/report-YYYYMMDDTHHMMSSmmmZ.html` em UTC, sem sobrescrever

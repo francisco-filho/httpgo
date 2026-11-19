@@ -434,6 +434,7 @@ Opções:
   --config arquivo         Seleciona a configuração YAML do projeto.
   --env nome               Seleciona um ambiente YAML nomeado.
   --fail-fast              Interrompe a suíte após a primeira falha.
+  --verbose (-v/-vv)        Progresso em stderr; repita para JSON protegido nas falhas (16 KiB/body); sem relatórios.
   --output junit|html       Gera relatório no formato indicado; exige --output-file.
   --output-file caminho    Define o destino do relatório (requer --output).
   --render-files           Interpola bodies de arquivos externos como templates JSON.

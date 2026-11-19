@@ -1,4 +1,80 @@
-# Validação — US-01 a US-17, US-20 a US-41
+# Validação — US-01 a US-17, US-20 a US-42
+
+## US-42 — issue #90 / história 042
+
+Plano backend da issue #90 executado sem planner, em três tasks autoaprovadas
+na fila `042`. Task 1: `129bc56` (seleção e progresso estático por step);
+Task 2: `ee24662` (prévias JSON protegidas opt-in); Task 3: esta alteração
+(binário real, PTY/pipes, ajuda, documentação e gates integrados).
+Somente backend, sem frontend/estáticos, nova linguagem, pacote, dependência,
+versão de Go, workflow ou alteração do corpus `testdata/compatibility/`.
+
+`-v`/`--verbose` e suas duas ocorrências selecionam apresentação própria HTTPGo,
+mesmo com redirecionamento; detalhes em stderr, resumo US-41 em stdout, sem
+barra/atualização. Somente `-vv` habilita retenção transitória/prévias JSON nas
+falhas, limitadas e protegidas antes do corte. A exceção não atinge relatórios.
+
+### Evidências das tasks de implementação
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, ferramentas já existentes no PATH.
+Nas duas primeiras tasks passaram `make fmt lint test` (lint **0 issues** e
+`go test ./... -race -cover`) e `go vet ./...`. Testes específicos sem cache:
+
+- Task 1: `go test ./internal/cli ./internal/runner ./internal/suite -count=1`.
+- Task 2: `go test ./internal/runner ./internal/transport ./internal/template ./internal/cli -count=1`.
+
+### Gates integrados efetivamente executados
+
+- `go test ./tests/e2e -count=1` e `make build e2e`: binário real compilado uma
+  vez por suíte, HTTP local, streams separados e códigos 0/1/2 conferidos.
+- `make fmt lint test`, `go vet ./...` e `go build ./...`: sucesso; lint com
+  **0 issues**, testes com **-race -cover**. Coberturas observadas: CLI **97,7%**,
+  runner **94,9%**, suite **95,3%**, transport **90,3%**, template **96,1%**.
+- `make compatibility`: **476 pares**, Hurl **8.0.0** já disponível em
+  `/usr/local/bin/hurl`, sem skip, instalação ou atualização de goldens. O aviso
+  de metadados libcurl não impediu identificação/execução. Não houve consulta,
+  cópia, tradução ou adaptação de código-fonte Hurl.
+- `go test ./tests/e2e -run '^TestVerboseReal(TTY|Output)' -race -count=10`:
+  dez execuções da matriz PTY/pipes, HTTP pendente, SIGINT e `/dev/full`, sem
+  sleeps, falhas ou data races. Writers falsos cobrem adicionalmente short writes
+  em cada fronteira síncrona, inclusive os dois blocos de body.
+- Fuzzers existentes, executados separadamente com 20 segundos e dois workers:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**13.121** execuções), equivalentes em `./internal/template` para
+  `FuzzRender` (**4.960**) e `FuzzRenderJSON` (**27.967**), todos sem crash/falha.
+- A integração acrescentou regressão para declarações secretas duplicadas: pendência
+  é rastreada **por declaração**, não só pelo nome, para que a primeira extração
+  não libere a resposta enquanto uma segunda declaração secreta não foi extraída.
+  O erro de captura e o descarte transacional continuam preservados.
+- A categoria segura de transporte é copiada via `Error.SafeDiagnostic`, sem
+  causa bruta no callback; TLS e falhas de read/close são testadas também no opt-in
+  só de status. O erro operacional conserva sua causa para inspeção.
+
+### Rastreabilidade GO-539–GO-556
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-539–540 | `TestVerboseArguments`, `TestVerboseSelectionReuseAndColors`, `TestVerboseReportsRejectedBeforeEffects`, `TestVerboseRealFlagFormsAndPreflight`: formas curtas/longas/mistas, isolamento, excesso e incompatibilidade antes de HTTP/alteração de destinos |
+| GO-541 | regressões compactas/legadas/JUnit/HTML e ajuda/versão existentes; testes de ajuda atualizados para a nova flag sem remover verificações |
+| GO-542–543 | `TestVerboseLifecycleAndDiagnostics`, `TestVerboseRealFailureCategoriesAndInterruption`, `TestVerboseRealTTYPendingAndCancellation`: nomes/ordem, sem status/HTTP *, categorias e posições disponíveis, sem duplicação/steps fictícios |
+| GO-544 | `TestLogicalEntryDurationIncludesPreparationRetriesAndWait` com relógio controlado; ciclos CLI/processo de polling: somente um terminal, sem divergência transitória |
+| GO-545–547 | `TestVerboseBodySelectionEffectivePayloads`, `TestVerboseRealBodiesFilesRedirectsAndOmissions`, `TestDiagnosticBodiesAreFinalRedirectHop`: inline/externo/renderizado, salto final 301/302/303/307/308, multipart/não JSON/binário/malformado omitidos |
+| GO-548 | `TestVerboseRealTTYAndPipes`: níveis 1/2, dois PTYs/pipes independentes, redirecionamentos parciais e NO_COLOR, cores somente quando permitido, sem atualização de linha |
+| GO-549 | `TestDiagnosticBeforeSendAndTransportFailureNeverEchoTemplate`, validação/prévias CLI/processo e resposta incompleta: ausente, arquivo vazio, indisponível/incompleto e omitido distintos |
+| GO-550 | `TestBodyPreviewValidationAndLimit`, `TestBodyPreviewProtectsBeforeCutAndNormalizesEscapes`: exatamente no limite, acima dele, UTF-8 multibyte e segredo escapado cruzando fronteira, sanitização integral antes do corte |
+| GO-551 | `TestVerboseBodyInvocationProtectionAcrossFiles`, `TestBodyPreviewProtectsBeforeCutAndNormalizesEscapes`, `TestDiagnosticPollingProtectsLastBytesAtFinalization`, processo de captura secreta: valores protegidos em callbacks/resultados/streams e HTTP intacto |
+| GO-552 | `TestDiagnosticSecretCapturePendingTracksExtractionNotCommit`, `TestVerboseRealSecretCapturePreviews`: status antes da extração, falha parcial secreta/pública, declaração secreta duplicada pendente, stage reprovado e assertion após extração, sem confirmação do lote |
+| GO-553 | `TestDiagnosticPollingKeepsOnlyLastSentAttempt`, `TestVerboseRealPollingUsesLastSentFile`: alteração de payload, falha de preparação posterior e espera cancelada conservam último envio; proteção aplicada no desfecho |
+| GO-554 | ciclos CLI/processo com fail-fast e SIGINT real Linux durante HTTP pendente, arquivos não alcançados e prioridade 2; sem novos envios/aprovação fictícia |
+| GO-555 | `TestVerboseWritersAndFailFast`, `TestVerboseBodyWriterFailures`: erro/short write em anúncio, step, diagnóstico, cada bloco de body e resumo; `TestVerboseRealOutputFailure` usa `/dev/full` para impedir primeiro HTTP por stderr ou falhar no resumo por stdout |
+| GO-556 | `TestDiagnosticStatusOnlyConsumesCompleteResponse`, `TestDiagnosticRetentionOptInAndRunnerSafety`, `TestDiagnosticReadAndCloseBeforeReturning`, `TestDiagnosticSafeTransportCategory`: consumo completo/retido opt-in, falha parcial, timeout/cancelamento, categoria TLS segura; regressões de recursos/close existentes preservadas |
+
+Evidência de execução Linux local, não de APIs externas, publicação de CI/checks
+GitHub ou execução nativa macOS/Windows. O workflow JUnit e consumidores/contagens
+permanecem intactos. Não houve análise SonarQube pelo backdev. Proteção não detecta
+todos os segredos arbitrários não marcados/codificações desconhecidas nem redige
+retroativamente dados exibidos antes de serem conhecidos. O limite é de exibição,
+não de consumo/aceitação HTTP; `-vv` pode reter transitoriamente o body final completo.
 
 ## US-41 — issue #88 / história 041
 

@@ -41,7 +41,11 @@ type Error struct {
 }
 
 func (e *Error) Error() string { return string(e.Kind) }
-func (e *Error) Unwrap() error { return e.cause }
+
+// SafeDiagnostic exposes the controlled category without carrying its raw cause
+// into the runner's terminal presentation metadata.
+func (e *Error) SafeDiagnostic() string { return string(e.Kind) }
+func (e *Error) Unwrap() error          { return e.cause }
 
 type NetHTTPExecutor struct {
 	transport *http.Transport
