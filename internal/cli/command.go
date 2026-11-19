@@ -29,6 +29,7 @@ type Command struct {
 	out, err   io.Writer
 	protection *executionProtection
 	timeout    time.Duration
+	compact    bool // Invocation-local selection; injectable until terminal detection.
 }
 
 func NewRootCommand(executor runner.HTTPExecutor, build BuildInfo) *Command {
@@ -83,6 +84,12 @@ func (c *Command) executeContext(ctx context.Context) int {
 	fileReporter := c.renderFile
 	var diagnostics []string
 	var htmlDetails []report.HTMLFile
+	options := suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}
+	if c.compact && args.output == "" {
+		progress := &fileProgress{command: c}
+		entryReporter, fileReporter = progress.entry, progress.finish
+		options.Loading, options.Loaded = progress.loading, progress.loaded
+	}
 	if args.output == "junit" || args.output == "html" {
 		entryReporter = nil
 		fileReporter = func(_ suite.FileResult, run runner.Result, loadErr error) error {
@@ -104,7 +111,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if err != nil {
 		return c.fail(err.Error())
 	}
-	result := execution.Run(ctx, files, suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}, fileReporter)
+	result := execution.Run(ctx, files, options, fileReporter)
 	if args.output == "junit" {
 		if err := c.writeJUnit(args.outputFile, result, diagnostics); err != nil {
 			return c.fail(fmt.Sprintf("não foi possível gravar relatório JUnit em %q; verifique o destino e as permissões de escrita", args.outputFile))
