@@ -1,7 +1,6 @@
 name: JUnit contract
 
 on:
-  push:
   pull_request:
   workflow_dispatch:
 
