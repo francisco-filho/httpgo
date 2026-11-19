@@ -38,7 +38,7 @@ func TestCompactProgressLifecycle(t *testing.T) {
 				if calls == 1 && (!strings.Contains(text, "same.httpgo") || !strings.Contains(text, "0/")) {
 					t.Fatalf("not visible before send: %q", text)
 				}
-				if strings.HasSuffix(req.URL, "/last") && mode == "mismatch" && !strings.Contains(text, "step 1,") {
+				if strings.HasSuffix(req.URL, "/last") && mode == "mismatch" && !strings.Contains(text, "step 1 - Linha") {
 					t.Fatalf("diagnostic not before next send: %q", text)
 				}
 				if mode == "read" && calls == 1 {
@@ -82,8 +82,8 @@ func TestCompactProgressLifecycle(t *testing.T) {
 				t.Fatalf("detailed success/path leaked: out=%q err=%q", out.String(), text)
 			}
 			for _, fragment := range map[string][]string{
-				"pass": {"OK  2/2", "OK  1/1"}, "mismatch": {"ERRO  1/2", "step 1,", "status divergente"},
-				"pre-send": {"ERRO  1/2", "step 1,", "NÃO EXECUTADO  0/?"}, "parse": {"ERRO  0/?", "NÃO EXECUTADO  0/?"},
+				"pass": {"OK  2/2", "OK  1/1"}, "mismatch": {"ERRO  1/2", "step 1 - Linha", "[status]", "expected 200 => recebido 503"},
+				"pre-send": {"ERRO  1/2", "step 1 - Linha", "[renderização]", "NÃO EXECUTADO  0/?"}, "parse": {"ERRO  0/?", "NÃO EXECUTADO  0/?"},
 				"retry": {"OK  1/1"}, "cancel": {"ERRO  1/2", "NÃO EXECUTADO  0/?"}, "read": {"ERRO  0/?"},
 			}[mode] {
 				if !strings.Contains(text, fragment) {
@@ -185,7 +185,7 @@ func TestCompactFourthStepAndProtection(t *testing.T) {
 		t.Fatalf("code=%d calls=%d err=%q", code, calls, stderr.String())
 	}
 	text := stderr.String()
-	if !strings.Contains(text, "ERRO  4/5\n  step 4,") || !strings.Contains(text, "[oculto]") || strings.Contains(text+out.String(), secret) {
+	if !strings.Contains(text, "ERRO  4/5\n  step 4 - Linha") || !strings.Contains(text, "[oculto]") || strings.Contains(text+out.String(), secret) {
 		t.Fatalf("out=%q err=%q", out.String(), text)
 	}
 }

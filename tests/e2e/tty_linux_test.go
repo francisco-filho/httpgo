@@ -326,7 +326,7 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			case "fourth failure":
 				wantCode = 1
 				wantCalls = 5
-				wantFinal = "ERRO  4/10\n  step 4,"
+				wantFinal = "ERRO  4/10\n  step 4 - Linha"
 				wantCount = "Testes executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			case "retry pass":
@@ -335,13 +335,13 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			case "retry exhausted":
 				wantCode = 1
 				wantCalls = 3
-				wantFinal = "ERRO  1/1\n  step 1,"
+				wantFinal = "ERRO  1/1\n  step 1 - Linha"
 				wantCount = "Testes executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			case "cancel":
 				wantCode = 2
 				wantCalls = 2
-				wantFinal = "ERRO  1/10\n  step 1,"
+				wantFinal = "ERRO  1/10\n  step 1 - Linha"
 				wantCount = "Testes executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			}
@@ -403,7 +403,7 @@ func TestCompactRealTTYLoadErrorsAndProtection(t *testing.T) {
 	p := startTerminalProcess(t, true, true, true, "test", dir, "--secret", "token")
 	code := p.wait(t)
 	out, diagnostic := p.out.text(), p.stderr.text()
-	if code != 2 || calls.Load() != 2 || !strings.Contains(out, "Testes executados: 4\n") || !strings.Contains(out, "Sucesso/erros: 1/3\n") || !strings.Contains(diagnostic, "ERRO  0/?\n") || !strings.Contains(diagnostic, "step 1,") || !strings.Contains(diagnostic, "[oculto]") || strings.Contains(out+diagnostic, secret) || strings.Contains(out, "Não executados:") {
+	if code != 2 || calls.Load() != 2 || !strings.Contains(out, "Testes executados: 4\n") || !strings.Contains(out, "Sucesso/erros: 1/3\n") || !strings.Contains(diagnostic, "ERRO  0/?\n") || !strings.Contains(diagnostic, "step 1 - Linha") || !strings.Contains(diagnostic, "[oculto]") || strings.Contains(out+diagnostic, secret) || strings.Contains(out, "Não executados:") {
 		t.Fatalf("code=%d calls=%d out=%q err=%q", code, calls.Load(), out, diagnostic)
 	}
 }

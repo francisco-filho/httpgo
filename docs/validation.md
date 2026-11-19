@@ -21,6 +21,19 @@ precedido por uma linha de 47 hífens em stdout, separando-o visualmente dos tes
 O teste unitário confere a saída completa e o PTY real confere um único separador
 antes do resumo, com ou sem cores, e sua ausência no texto legado redirecionado.
 
+Segundo ajuste solicitado: diagnósticos compactos em bloco com `step N - Linha L:C`,
+fase entre colchetes, expressão segura disponível e mensagem final (vermelha se
+NO_COLOR estiver ausente). Erros de leitura/parsing, preparação e HTTP também usam
+o bloco, sem inventar step/posição/expressão. `TestCompactDiagnosticBlocks` cobre
+status, JSON/count/tipo/ausência, header, body, regex, captures e os erros tipados.
+`TestCompactDiagnosticColorsAndUnknownLocation` verifica cores, posições ausentes
+e silêncio em sucesso; `TestCompactEvaluationExpressionUsesOnlySafeMetadata`
+verifica a expressão em erros de avaliação sem recuperar esperados operacionais.
+`TestCompactRealTTYMultilineDiagnostic` reproduz erro no step 7/15, linha 114:1,
+com filtro JSONPath literal oculto e recebido descrito como tipo array, seguido
+do próximo arquivo com 13/13, com e sem cores. O corpo privado não é exibido.
+Legado, JUnit/HTML e classificação/execução permanecem inalterados.
+
 ### Evidência executada em Linux
 
 Linux amd64, Go `go1.26.10-X:nodwarf5`; `goimports` e golangci-lint existentes

@@ -105,14 +105,5 @@ func (p *fileProgress) finish(file suite.FileResult, run runner.Result, loadErr 
 	if err := p.draw(state, true); err != nil {
 		return err
 	}
-	text := p.command.junitDiagnostic(run, loadErr)
-	if text == "" {
-		return nil
-	}
-	prefix := "  "
-	if loadErr == nil && p.done > 0 {
-		prefix += fmt.Sprintf("step %d, ", p.done)
-	}
-	_, err := io.WriteString(p.command.err, prefix+text)
-	return err
+	return p.diagnostic(run, loadErr)
 }
