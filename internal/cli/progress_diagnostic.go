@@ -45,9 +45,9 @@ func (p *fileProgress) diagnostic(run runner.Result, loadErr error) error {
 		fmt.Fprintf(&text, "  %s\n", diagnostic.expression)
 	}
 	if p.command.color {
-		fmt.Fprintf(&text, "  \x1b[31m%s\x1b[0m\n", diagnostic.message)
+		fmt.Fprintf(&text, "     \x1b[31m%s\x1b[0m\n", diagnostic.message)
 	} else {
-		fmt.Fprintf(&text, "  %s\n", diagnostic.message)
+		fmt.Fprintf(&text, "     %s\n", diagnostic.message)
 	}
 	_, err := io.WriteString(p.command.err, text.String())
 	return err
@@ -85,9 +85,9 @@ func (c *Command) progressDiagnostic(run runner.Result, loadErr error) (progress
 		diagnostic.expression = jsonProgressExpression(failure.Query, string(failure.Operator), failure.Count)
 		actual := jsonProgressActual(failure.Actual, failure.Present)
 		if failure.Operator.TypePredicate() {
-			diagnostic.message = "recebido " + actual + "; condição falsa"
+			diagnostic.message = "received " + actual + "; condição falsa"
 		} else {
-			diagnostic.message = fmt.Sprintf("expected %s => recebido %s", failure.Expected, actual)
+			diagnostic.message = fmt.Sprintf("expected %s => received %s", failure.Expected, actual)
 		}
 		if failure.Detail != "" {
 			diagnostic.message += "; " + failure.Detail
@@ -106,7 +106,7 @@ func (c *Command) progressDiagnostic(run runner.Result, loadErr error) (progress
 		} else if failure.Actual == "[oculto]" {
 			actual = "[oculto] (ausente)"
 		}
-		diagnostic.message = fmt.Sprintf("expected %s => recebido %s", expected, actual)
+		diagnostic.message = fmt.Sprintf("expected %s => received %s", expected, actual)
 	case entry.BodyFailure != nil:
 		failure := entry.BodyFailure
 		diagnostic.position = failure.Position
@@ -120,7 +120,7 @@ func (c *Command) progressDiagnostic(run runner.Result, loadErr error) (progress
 		if !failure.Present {
 			actual = "grupo ausente"
 		}
-		diagnostic.message = fmt.Sprintf("expected %q => recebido %s", failure.Expected, actual)
+		diagnostic.message = fmt.Sprintf("expected %q => received %s", failure.Expected, actual)
 	default:
 		diagnostic.phase = "status"
 		diagnostic.position = entry.Entry.ExpectedPosition
@@ -128,7 +128,7 @@ func (c *Command) progressDiagnostic(run runner.Result, loadErr error) (progress
 		if entry.Entry.ExpectedStatus != nil {
 			expected := *entry.Entry.ExpectedStatus
 			diagnostic.expression = fmt.Sprintf("HTTP %d", expected)
-			diagnostic.message = fmt.Sprintf("expected %d => recebido %d", expected, entry.Status)
+			diagnostic.message = fmt.Sprintf("expected %d => received %d", expected, entry.Status)
 		}
 	}
 	return diagnostic, true

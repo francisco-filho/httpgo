@@ -82,7 +82,7 @@ func TestCompactProgressLifecycle(t *testing.T) {
 				t.Fatalf("detailed success/path leaked: out=%q err=%q", out.String(), text)
 			}
 			for _, fragment := range map[string][]string{
-				"pass": {"OK  2/2", "OK  1/1"}, "mismatch": {"ERRO  1/2", "step 1 - Linha", "[status]", "expected 200 => recebido 503"},
+				"pass": {"OK  2/2", "OK  1/1"}, "mismatch": {"ERRO  1/2", "step 1 - Linha", "[status]", "expected 200 => received 503"},
 				"pre-send": {"ERRO  1/2", "step 1 - Linha", "[renderização]", "NÃO EXECUTADO  0/?"}, "parse": {"ERRO  0/?", "NÃO EXECUTADO  0/?"},
 				"retry": {"OK  1/1"}, "cancel": {"ERRO  1/2", "NÃO EXECUTADO  0/?"}, "read": {"ERRO  0/?"},
 			}[mode] {

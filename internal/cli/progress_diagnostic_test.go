@@ -22,32 +22,32 @@ func TestCompactDiagnosticBlocks(t *testing.T) {
 		err, loadErr error
 		want         string
 	}{
-		{name: "membership", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.orders[?(@.number==[literal oculto])].items[0].allergens", Operator: "contains", Expected: `"SOY"`, Actual: "tipo array; contagem=2", Present: true}}, want: "[assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n  expected \"SOY\" => recebido tipo array\n"},
-		{name: "json count", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.items", Operator: "==", Count: true, Expected: "3", Actual: "2", Present: true}}, want: "[assertion]\n  jsonpath \"$.items\" count ==\n  expected 3 => recebido 2\n"},
-		{name: "json absent", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "==", Expected: "1"}}, want: "[assertion]\n  jsonpath \"$.item\" ==\n  expected 1 => recebido ausente\n"},
-		{name: "json concealed absence", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "==", Expected: "[oculto]", Actual: "[oculto]"}}, want: "[assertion]\n  jsonpath \"$.item\" ==\n  expected [oculto] => recebido [oculto] (ausente)\n"},
-		{name: "type predicate", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "isString", Actual: "tipo number", Present: true}}, want: "[assertion]\n  jsonpath \"$.item\" isString\n  recebido tipo number; condição falsa\n"},
-		{name: "json reason", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "matches", Expected: `"pattern"`, Actual: "tipo array", Present: true, Detail: "matches exige string"}}, want: "[assertion]\n  jsonpath \"$.item\" matches\n  expected \"pattern\" => recebido tipo array; matches exige string\n"},
-		{name: "header", entry: runner.EntryResult{HeaderFailure: &runner.HeaderFailure{Position: pos, Name: "X-Test", Operator: "==", Expected: "yes", Actual: "no", Present: true}}, want: "[assertion]\n  header \"X-Test\" ==\n  expected \"yes\" => recebido \"no\"\n"},
-		{name: "header absent", entry: runner.EntryResult{HeaderFailure: &runner.HeaderFailure{Position: pos, Name: "X-Test", Operator: "exists"}}, want: "[assertion]\n  header \"X-Test\" exists\n  expected presente => recebido ausente\n"},
-		{name: "header concealed absence", entry: runner.EntryResult{HeaderFailure: &runner.HeaderFailure{Position: pos, Name: "X-Test", Operator: "==", Expected: "[oculto]", Actual: "[oculto]"}}, want: "[assertion]\n  header \"X-Test\" ==\n  expected \"[oculto]\" => recebido [oculto] (ausente)\n"},
-		{name: "body", entry: runner.EntryResult{BodyFailure: &runner.BodyFailure{Position: pos, Operator: "contains", Expected: "safe-literal"}}, want: "[assertion]\n  body contains\n  expected \"safe-literal\" => condição falsa\n"},
-		{name: "regex", entry: runner.EntryResult{RegexFailure: &runner.RegexFailure{Position: pos, Pattern: "id=(.*)", Operator: "==", Expected: "safe-id", Present: true}}, want: "[assertion]\n  regex \"id=(.*)\" ==\n  expected \"safe-id\" => recebido grupo presente; condição falsa\n"},
-		{name: "regex absent", entry: runner.EntryResult{RegexFailure: &runner.RegexFailure{Position: pos, Pattern: "id=(.*)", Operator: "==", Expected: "safe-id"}}, want: "[assertion]\n  regex \"id=(.*)\" ==\n  expected \"safe-id\" => recebido grupo ausente\n"},
-		{name: "status", entry: runner.EntryResult{Entry: parser.Entry{ExpectedStatus: &status, ExpectedPosition: pos}, Status: 503}, want: "[status]\n  HTTP 200\n  expected 200 => recebido 503\n"},
-		{name: "capture", err: &runner.CaptureError{Position: pos, Query: "$.items", Detail: "consulta não encontrou valor"}, want: "[captures]\n  jsonpath \"$.items\"\n  consulta não encontrou valor\n"},
-		{name: "count capture", err: &runner.CaptureError{Position: pos, Query: "$.items", Count: true, Detail: "count exige array"}, want: "[captures]\n  jsonpath \"$.items\" count\n  count exige array\n"},
-		{name: "capture without expression", err: &runner.CaptureError{Position: pos, Detail: "consulta não encontrou valor"}, want: "[captures]\n  consulta não encontrou valor\n"},
-		{name: "json evaluation", err: &runner.JSONError{Position: pos, Query: "$.items", Detail: "consulta exige objeto"}, want: "[assertion]\n  jsonpath \"$.items\"\n  consulta exige objeto\n"},
-		{name: "header evaluation", err: &runner.HeaderError{Position: pos, Name: "X-Test", Detail: "esperado textual inválido"}, want: "[assertion]\n  header \"X-Test\"\n  esperado textual inválido\n"},
-		{name: "body evaluation", err: &runner.BodyError{Position: pos, Operator: "contains", Detail: "charset desconhecido"}, want: "[assertion]\n  body contains\n  charset desconhecido\n"},
-		{name: "regex evaluation", err: &runner.RegexError{Position: pos, Operator: "matches", Detail: "padrão matches inválido"}, want: "[assertion]\n  regex matches\n  padrão matches inválido\n"},
-		{name: "render", err: &runner.RenderError{Position: pos, Detail: "variável ausente"}, want: "[renderização]\n  erro de renderização: variável ausente\n"},
-		{name: "external file", err: &runner.FileError{Position: pos, Detail: "arquivo ausente"}, want: "[renderização]\n  erro de arquivo externo: arquivo ausente\n"},
-		{name: "transport", err: errors.New("raw-private-body-and-credentials"), want: "[transporte]\n  falha de transporte; verifique conexão, TLS e redirecionamentos\n"},
-		{name: "cancel", err: context.Canceled, want: "[transporte]\n  requisição cancelada\n"},
-		{name: "parse", loadErr: &parser.Error{Position: pos, Category: "sintaxe inválida", Detail: "resposta esperada inválida"}, want: "[parsing]\n  sintaxe inválida: resposta esperada inválida\n"},
-		{name: "read", loadErr: &suite.Error{File: pos.File, Detail: "não foi possível abrir o cenário"}, want: "[parsing]\n  não foi possível abrir o cenário\n"},
+		{name: "membership", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.orders[?(@.number==[literal oculto])].items[0].allergens", Operator: "contains", Expected: `"SOY"`, Actual: "tipo array; contagem=2", Present: true}}, want: "[assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n     expected \"SOY\" => received tipo array\n"},
+		{name: "json count", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.items", Operator: "==", Count: true, Expected: "3", Actual: "2", Present: true}}, want: "[assertion]\n  jsonpath \"$.items\" count ==\n     expected 3 => received 2\n"},
+		{name: "json absent", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "==", Expected: "1"}}, want: "[assertion]\n  jsonpath \"$.item\" ==\n     expected 1 => received ausente\n"},
+		{name: "json concealed absence", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "==", Expected: "[oculto]", Actual: "[oculto]"}}, want: "[assertion]\n  jsonpath \"$.item\" ==\n     expected [oculto] => received [oculto] (ausente)\n"},
+		{name: "type predicate", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "isString", Actual: "tipo number", Present: true}}, want: "[assertion]\n  jsonpath \"$.item\" isString\n     received tipo number; condição falsa\n"},
+		{name: "json reason", entry: runner.EntryResult{JSONFailure: &runner.JSONFailure{Position: pos, Query: "$.item", Operator: "matches", Expected: `"pattern"`, Actual: "tipo array", Present: true, Detail: "matches exige string"}}, want: "[assertion]\n  jsonpath \"$.item\" matches\n     expected \"pattern\" => received tipo array; matches exige string\n"},
+		{name: "header", entry: runner.EntryResult{HeaderFailure: &runner.HeaderFailure{Position: pos, Name: "X-Test", Operator: "==", Expected: "yes", Actual: "no", Present: true}}, want: "[assertion]\n  header \"X-Test\" ==\n     expected \"yes\" => received \"no\"\n"},
+		{name: "header absent", entry: runner.EntryResult{HeaderFailure: &runner.HeaderFailure{Position: pos, Name: "X-Test", Operator: "exists"}}, want: "[assertion]\n  header \"X-Test\" exists\n     expected presente => received ausente\n"},
+		{name: "header concealed absence", entry: runner.EntryResult{HeaderFailure: &runner.HeaderFailure{Position: pos, Name: "X-Test", Operator: "==", Expected: "[oculto]", Actual: "[oculto]"}}, want: "[assertion]\n  header \"X-Test\" ==\n     expected \"[oculto]\" => received [oculto] (ausente)\n"},
+		{name: "body", entry: runner.EntryResult{BodyFailure: &runner.BodyFailure{Position: pos, Operator: "contains", Expected: "safe-literal"}}, want: "[assertion]\n  body contains\n     expected \"safe-literal\" => condição falsa\n"},
+		{name: "regex", entry: runner.EntryResult{RegexFailure: &runner.RegexFailure{Position: pos, Pattern: "id=(.*)", Operator: "==", Expected: "safe-id", Present: true}}, want: "[assertion]\n  regex \"id=(.*)\" ==\n     expected \"safe-id\" => received grupo presente; condição falsa\n"},
+		{name: "regex absent", entry: runner.EntryResult{RegexFailure: &runner.RegexFailure{Position: pos, Pattern: "id=(.*)", Operator: "==", Expected: "safe-id"}}, want: "[assertion]\n  regex \"id=(.*)\" ==\n     expected \"safe-id\" => received grupo ausente\n"},
+		{name: "status", entry: runner.EntryResult{Entry: parser.Entry{ExpectedStatus: &status, ExpectedPosition: pos}, Status: 503}, want: "[status]\n  HTTP 200\n     expected 200 => received 503\n"},
+		{name: "capture", err: &runner.CaptureError{Position: pos, Query: "$.items", Detail: "consulta não encontrou valor"}, want: "[captures]\n  jsonpath \"$.items\"\n     consulta não encontrou valor\n"},
+		{name: "count capture", err: &runner.CaptureError{Position: pos, Query: "$.items", Count: true, Detail: "count exige array"}, want: "[captures]\n  jsonpath \"$.items\" count\n     count exige array\n"},
+		{name: "capture without expression", err: &runner.CaptureError{Position: pos, Detail: "consulta não encontrou valor"}, want: "[captures]\n     consulta não encontrou valor\n"},
+		{name: "json evaluation", err: &runner.JSONError{Position: pos, Query: "$.items", Detail: "consulta exige objeto"}, want: "[assertion]\n  jsonpath \"$.items\"\n     consulta exige objeto\n"},
+		{name: "header evaluation", err: &runner.HeaderError{Position: pos, Name: "X-Test", Detail: "esperado textual inválido"}, want: "[assertion]\n  header \"X-Test\"\n     esperado textual inválido\n"},
+		{name: "body evaluation", err: &runner.BodyError{Position: pos, Operator: "contains", Detail: "charset desconhecido"}, want: "[assertion]\n  body contains\n     charset desconhecido\n"},
+		{name: "regex evaluation", err: &runner.RegexError{Position: pos, Operator: "matches", Detail: "padrão matches inválido"}, want: "[assertion]\n  regex matches\n     padrão matches inválido\n"},
+		{name: "render", err: &runner.RenderError{Position: pos, Detail: "variável ausente"}, want: "[renderização]\n     erro de renderização: variável ausente\n"},
+		{name: "external file", err: &runner.FileError{Position: pos, Detail: "arquivo ausente"}, want: "[renderização]\n     erro de arquivo externo: arquivo ausente\n"},
+		{name: "transport", err: errors.New("raw-private-body-and-credentials"), want: "[transporte]\n     falha de transporte; verifique conexão, TLS e redirecionamentos\n"},
+		{name: "cancel", err: context.Canceled, want: "[transporte]\n     requisição cancelada\n"},
+		{name: "parse", loadErr: &parser.Error{Position: pos, Category: "sintaxe inválida", Detail: "resposta esperada inválida"}, want: "[parsing]\n     sintaxe inválida: resposta esperada inválida\n"},
+		{name: "read", loadErr: &suite.Error{File: pos.File, Detail: "não foi possível abrir o cenário"}, want: "[parsing]\n     não foi possível abrir o cenário\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var output bytes.Buffer
@@ -81,7 +81,7 @@ func TestCompactDiagnosticColorsAndUnknownLocation(t *testing.T) {
 			if color {
 				message = "\x1b[31m" + message + "\x1b[0m"
 			}
-			want := "  [transporte]\n  " + message + "\n"
+			want := "  [transporte]\n     " + message + "\n"
 			if output.String() != want {
 				t.Fatalf("output=%q want=%q", output.String(), want)
 			}

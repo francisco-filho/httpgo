@@ -33,6 +33,8 @@ verifica a expressão em erros de avaliação sem recuperar esperados operaciona
 com filtro JSONPath literal oculto e recebido descrito como tipo array, seguido
 do próximo arquivo com 13/13, com e sem cores. O corpo privado não é exibido.
 Legado, JUnit/HTML e classificação/execução permanecem inalterados.
+A redação final solicitada usa `expected ... => received ...` e cinco espaços
+antes da mensagem, verificados na comparação exata do teste unitário e do PTY.
 
 ### Evidência executada em Linux
 

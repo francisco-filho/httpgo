@@ -370,7 +370,7 @@ Em erro, o bloco separa localização, etapa e expressão, sem repetir o caminho
   step 7 - Linha 114:1
   [assertion]
   jsonpath "$.orders[?(@.number==[literal oculto])].items[0].allergens" contains
-  expected "SOY" => recebido tipo array
+     expected "SOY" => received tipo array
 - 29-phase-seven-combos.httpgo  OK  13/13
 ```
 
