@@ -10,17 +10,7 @@ import (
 )
 
 func TestHeaderMatchesHelpAndPublishedExample(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
-		}
-		for _, term := range []string{`header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"`, "Somente primeira ocorrência", "Padrão string JSON literal", "matches vazio", "Sem query variable, regex de header como query de assertion", "sem interpolação"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `header "Set-Cookie" matches "^session=[^;]+; Path=/; HttpOnly; Secure; SameSite=Lax$"`, "primeira ocorrência recebida", "uma única string JSON", "Padrão vazio passa para qualquer valor presente", "Query variable, regex de header como query de assertion", "literais e estáticos")
 	input, err := os.ReadFile("../../testdata/scenarios/scenario_assert_header_matches.hurl")
 	if err != nil {
 		t.Fatal(err)

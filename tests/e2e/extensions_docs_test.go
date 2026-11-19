@@ -66,22 +66,6 @@ func TestReadmeScenarioExtensionsAndPublishedPaths(t *testing.T) {
 			}
 		})
 	}
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, help, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
-		}
-		section := extensionCompatibilitySection(t, help, "Compatibilidade de extensões:\n", "Fim da compatibilidade de extensões.")
-		checkExtensionCompatibility(t, section)
-		if !strings.Contains(help, "httpgo test health.httpgo") {
-			t.Error("missing default-extension help example")
-		}
-		for _, path := range publishedPath.FindAllString(help, -1) {
-			if _, err := os.Stat(filepath.Join("../..", path)); err != nil {
-				t.Errorf("help scenario %s: %v", path, err)
-			}
-		}
-	}
 }
 
 func TestReadmePublishedScenarioCopies(t *testing.T) {

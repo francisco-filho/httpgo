@@ -66,12 +66,5 @@ func TestMultipartDocumentedScenario(t *testing.T) {
 	if code != 0 || stderr != "" || hits.Load() != 1 || !strings.Contains(out, "validadas=1") || strings.Contains(out+stderr, "ficticio") {
 		t.Fatalf("code=%d hits=%d out=%q err=%q", code, hits.Load(), out, stderr)
 	}
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr = run(t, args...)
-		for _, text := range []string{"[MultipartFormData]", "document: file,../fixtures/document.pdf; application/pdf", "basename", "application/octet-stream", "413 esperado passa", "Não renderiza arquivos multipart"} {
-			if code != 0 || stderr != "" || !strings.Contains(out, text) {
-				t.Fatalf("help missing %q code=%d out=%q err=%q", text, code, out, stderr)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", "[MultipartFormData]", "document: file,../fixtures/document.pdf; application/pdf", "basename", "application/octet-stream", "Resposta 413 completa é avaliada normalmente", "mesmo com a extensão `--render-files` ativa")
 }

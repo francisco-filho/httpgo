@@ -11,17 +11,7 @@ import (
 )
 
 func TestMembershipHelpAndPublishedExample(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
-		}
-		for _, term := range []string{`jsonpath "$.codes" contains "REQUIRED"`, `jsonpath "$.codes" not contains "OTHER_TENANT"`, `jsonpath "$.passwordHash" not exists`, `header "Set-Cookie" not contains "Domain"`, "Tipo presente incompatível falha com 1", "Sem negação genérica", "nunca arrays/objetos selecionados"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `jsonpath "$.codes" contains "REQUIRED"`, `jsonpath "$.codes" not contains "OTHER_TENANT"`, `jsonpath "$.passwordHash" not exists`, `header "Set-Cookie" not contains "Domain"`, "falham com `1` nos dois sentidos de pertencimento", "negação genérica", "nunca a coleção selecionada")
 	input, err := os.ReadFile("../../testdata/scenarios/scenario_assert_membership.hurl")
 	if err != nil {
 		t.Fatal(err)

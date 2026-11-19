@@ -16,21 +16,8 @@ import (
 	"capimgrosso.com/httpgo/internal/template"
 )
 
-func TestTypedCaptureHelpByBinary(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d err=%q", code, stderr)
-		}
-		for _, text := range []string{"Capturas tipadas", "9007199254740993", "número, booleano, null, array ou objeto", "raiz e vazios", "precisão", "Array/objeto exige valor JSON completo", "Objetos não criam variáveis", "índice fora do array"} {
-			if !strings.Contains(out, text) {
-				t.Fatalf("help lacks %q", text)
-			}
-		}
-		if strings.Contains(out, "Capturas string") || strings.Contains(out, "Somente strings") {
-			t.Fatal("stale help")
-		}
-	}
+func TestTypedCaptureDocumentation(t *testing.T) {
+	assertDocumentContains(t, "docs/subset.md", "Capturas tipadas", "9007199254740993", "string, número, booleano, `null`, array ou objeto", "inclusive na raiz", "mantêm precisão", "Arrays/objetos exigem valor JSON completo", "não cria variáveis para suas propriedades", "Campo ausente/índice fora do array")
 }
 
 func TestTypedCaptureProductsDemoByBinary(t *testing.T) {

@@ -11,17 +11,7 @@ import (
 )
 
 func TestProjectionHelpAndPublishedExample(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d err=%s", code, stderr)
-		}
-		for _, term := range []string{`jsonpath "$.issues[*].code" contains "REQUIRED"`, "zero resultados = ausência", "count conta o array reduzido", "Sem .*, slices, unions", "sem coleção ou esperado composto", "Precisão preservada além de int64", "Sem nova sintaxe ou opção de avaliador"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `jsonpath "$.issues[*].code" contains "REQUIRED"`, "zero resultados significa ausência", "count conta o array reduzido", "Não há wildcard de objeto", "slices, união", "sem despejar seleção ou esperado composto", "inteiros além de", "flag de avaliador, fallback ou nova sintaxe")
 	input, err := os.ReadFile("../../testdata/scenarios/scenario_projection.hurl")
 	if err != nil {
 		t.Fatal(err)

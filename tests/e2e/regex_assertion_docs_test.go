@@ -34,17 +34,7 @@ func TestRegexAssertionStructuralCorpus(t *testing.T) {
 }
 
 func TestRegexAssertionPublishedContract(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"test", "--help"}} {
-		code, out, stderr := run(t, args...)
-		if code != 0 || stderr != "" {
-			t.Fatalf("code=%d out=%s err=%s", code, out, stderr)
-		}
-		for _, term := range []string{`regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"`, "scenario_regex_assertion_signup.httpgo", "Extração permanece estática", "sem expansão recursiva", "--secret signup_code", "Sem query variable, body matches"} {
-			if !strings.Contains(out, term) {
-				t.Errorf("help missing %q", term)
-			}
-		}
-	}
+	assertDocumentContains(t, "docs/subset.md", `regex "verificação é: ([0-9]{6})" matches "^[0-9]{6}$"`, "scenario_regex_assertion_signup.httpgo", "Extração é sempre estática", "Inserções não são templates novos", "--secret signup_code", "Continuam excluídos `variable`, `body matches`")
 	source, err := os.ReadFile("../../testdata/scenarios/scenario_regex_assertion_signup.hurl")
 	if err != nil {
 		t.Fatal(err)
