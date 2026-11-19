@@ -95,7 +95,14 @@ func (c *Command) executeContext(ctx context.Context) int {
 	var diagnostics []string
 	var htmlDetails []report.HTMLFile
 	options := suite.Options{Request: runner.Options{RenderFiles: args.renderFiles, RenderAsserts: args.renderAsserts, Timeout: settings.Timeout}, FailFast: args.failFast}
-	if c.compact && args.output == "" {
+	if args.verbosity > 0 {
+		// Explicit verbosity is static even on redirected streams. Colors retain
+		// the same both-TTY and NO_COLOR policy as compact presentation.
+		c.color = c.color && c.compact
+		progress := &verboseProgress{command: c}
+		entryReporter, fileReporter = progress.entry, progress.finish
+		options.Loading = progress.loading
+	} else if c.compact && args.output == "" {
 		progress := &fileProgress{command: c}
 		entryReporter, fileReporter = progress.entry, progress.finish
 		options.Loading, options.Loaded = progress.loading, progress.loaded
@@ -153,7 +160,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 		return result.Code
 	}
 	renderSummary := c.renderSuite
-	if c.compact {
+	if c.compact || args.verbosity > 0 {
 		renderSummary = c.renderCompactSuite
 	}
 	if err := renderSummary(result.Summary); err != nil {

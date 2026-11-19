@@ -57,7 +57,15 @@ const (
 	RegexFailed    Outcome = "erro de avaliação regex"
 )
 
+// EntryDiagnostic carries only safe terminal error metadata, never raw causes.
+type EntryDiagnostic struct {
+	Position             parser.Position
+	Phase, Detail, Query string
+	Count                bool
+}
+
 type EntryResult struct {
+	Diagnostic    *EntryDiagnostic
 	Duration      time.Duration // Logical entry, including preparation, attempts and waits; excludes reporting.
 	Attempts      int
 	RegexFailure  *RegexFailure

@@ -11,6 +11,7 @@ import (
 )
 
 type arguments struct {
+	verbosity          int
 	renderFiles        bool
 	renderAsserts      bool
 	failFast           bool
@@ -31,6 +32,14 @@ func parseArguments(args []string) (arguments, error) {
 		arg := args[i]
 		name, value, inline := strings.Cut(arg, "=")
 		switch name {
+		case "-v", "-vv", "--verbose":
+			if inline {
+				invalid = true
+			}
+			result.verbosity++
+			if name == "-vv" {
+				result.verbosity++
+			}
 		case "--fail-fast":
 			if inline {
 				invalid = true
@@ -97,6 +106,12 @@ func parseArguments(args []string) (arguments, error) {
 	}
 	if environmentIssue != "" {
 		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
+	}
+	if result.verbosity > 2 {
+		return result, fmt.Errorf("verbosidade aceita no máximo duas ocorrências; use -v ou -vv")
+	}
+	if result.verbosity > 0 && outputSeen {
+		return result, fmt.Errorf("verbosidade não pode ser combinada com --output junit ou html")
 	}
 	if outputSeen != outputFileSeen {
 		if result.output == "html" {

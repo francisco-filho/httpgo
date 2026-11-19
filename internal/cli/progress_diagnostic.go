@@ -23,10 +23,18 @@ func (p *fileProgress) diagnostic(run runner.Result, loadErr error) error {
 	if !ok {
 		return nil
 	}
+	ordinal := p.done
+	if loadErr != nil {
+		ordinal = 0
+	}
+	return p.command.writeProgressDiagnostic(diagnostic, ordinal)
+}
+
+func (c *Command) writeProgressDiagnostic(diagnostic progressDiagnostic, ordinal int) error {
 	var text strings.Builder
 	location := ""
-	if loadErr == nil && p.done > 0 {
-		location = fmt.Sprintf("step %d", p.done)
+	if ordinal > 0 {
+		location = fmt.Sprintf("step %d", ordinal)
 	}
 	if diagnostic.position.Line > 0 {
 		if location != "" {
@@ -44,12 +52,12 @@ func (p *fileProgress) diagnostic(run runner.Result, loadErr error) error {
 	if diagnostic.expression != "" {
 		fmt.Fprintf(&text, "  %s\n", diagnostic.expression)
 	}
-	if p.command.color {
+	if c.color {
 		fmt.Fprintf(&text, "     \x1b[31m%s\x1b[0m\n", diagnostic.message)
 	} else {
 		fmt.Fprintf(&text, "     %s\n", diagnostic.message)
 	}
-	_, err := io.WriteString(p.command.err, text.String())
+	_, err := io.WriteString(c.err, text.String())
 	return err
 }
 

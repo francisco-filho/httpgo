@@ -39,6 +39,7 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 		duration := max(time.Duration(0), r.now().Sub(begin))
 		for i := range execution.Entries {
 			execution.Entries[i].Duration = duration
+			execution.Entries[i].Diagnostic = terminalDiagnostic(execution, session, options)
 		}
 		result.Attempts.Started += execution.Attempts.Started
 		result.Attempts.Completed += execution.Attempts.Completed
