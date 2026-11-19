@@ -67,12 +67,12 @@ jobs:
           - runner: ubuntu-24.04-arm
             system: Linux
             machine: aarch64
-          - runner: macos-15-intel
-            system: Darwin
-            machine: x86_64
-          - runner: macos-15
-            system: Darwin
-            machine: arm64
+          # - runner: macos-15-intel
+          #   system: Darwin
+          #   machine: x86_64
+          # - runner: macos-15
+          #   system: Darwin
+          #   machine: arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
