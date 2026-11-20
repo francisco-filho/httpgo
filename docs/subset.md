@@ -1858,6 +1858,13 @@ sem expansão/execução. Isso não amplia a gramática JSON dos bodies/assertio
 Polling reutiliza a atribuição, sem reaplicá-la entre tentativas; somente capturas
 confirmadas podem renová-la. A configuração inicial continua sendo validada antes
 da execução, inclusive referências obrigatórias ao ambiente do processo.
+Marcações de segredo e proteção de valores anteriores/substitutos persistem.
+Todos os literais de nomes marcados são protegidos antes da apresentação,
+inclusive os descartados no mesmo bloco e os de entradas futuras; isso não os
+torna resolvíveis antecipadamente. Declarações operacionais não integram resultados
+ou callbacks. A proteção conhecida acompanha a invocação, não o valor resolvível
+entre arquivos. Não há descoberta automática de credenciais: use as fontes
+secretas autorizadas, não flags nem literais versionados para credenciais reais.
 A opção não habilita a query de assertion `variable`, que continua não suportada.
 
 <a id="polling-local-por-entrada"></a>

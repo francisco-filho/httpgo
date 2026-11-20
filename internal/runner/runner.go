@@ -183,6 +183,14 @@ func protectScenario(session template.Session, scenario parser.Scenario) {
 			}
 		}
 	}
+	// Collect after all static secret declarations, including sensitive captures
+	// in later entries. Protection does not make future values resolvable and
+	// must include discarded declarations, not just the effective batch.
+	for _, entry := range scenario.Entries {
+		for _, declaration := range entry.Options.Variables {
+			session.ProtectCapture(declaration.Name, declaration.Value)
+		}
+	}
 }
 
 // runAttempt executes one entry without reporting. Resources are closed before
