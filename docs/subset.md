@@ -1824,6 +1824,42 @@ metadados protegidos e captura secreta pendente seguem a ocultação existente.
 string/array também pode ser validado por `== ""`/`count == 0`. Não há schema,
 coerção, outros tipos ou negação genérica.
 
+## Atribuições literais por entrada — US-44 / issue #95
+
+```hurl
+POST {{base_url}}/produtos
+[Options]
+variable: tipo_validacao=1
+variable: cliente_externo=false
+{"tipoValidacao":{{tipo_validacao}},"clienteExterno":{{cliente_externo}}}
+HTTP 201
+```
+
+`variable: nome=valor` aceita nomes `[A-Za-z_][A-Za-z0-9_]*`, sem pontos.
+O último valor do mesmo nome no bloco prevalece. As atribuições substituem
+iniciais e capturas antes da própria URL, headers e body; persistem até outra
+atribuição/captura no arquivo. Outro arquivo reinicia com a configuração inicial.
+Não há seção global, `[Variables]`, restauração automática ou headers adicionais.
+Conflitos ancestral/descendente continuam erros de preparação (2), sem publicação
+parcial. Toda declaração é validada, mesmo substituída; sintaxe inválida tardia
+impede todo HTTP do arquivo, sem ecoar a linha ou valor bruto.
+
+Literais: números decimais sem expoente (sinal opcional, sem zeros iniciais),
+`true`, `false`, `null` e texto. Aspas duplas forçam string, inclusive `"123"` e
+`""`; valor vazio também é string vazia. Números preservam precisão sem float64.
+Strings aceitam escapes `\\b`, `\\f`, `\\n`, `\\r`, `\\t`, `\\\\`, `\\#`,
+`\\"` entre aspas e `\\:` fora delas; Unicode usa `\\u{hex}`. `#` não escapado
+fora de aspas inicia comentário; aspas simples são caracteres comuns.
+Arrays/objetos são texto, não coleções. `{{outra}}`, `${NOME}` e funções são texto
+sem expansão/execução. Isso não amplia a gramática JSON dos bodies/assertions.
+
+`--render-files` continua obrigatório para interpolar payload externo;
+`--render-asserts` continua obrigatório para esperados e consultas dinâmicos.
+Polling reutiliza a atribuição, sem reaplicá-la entre tentativas; somente capturas
+confirmadas podem renová-la. A configuração inicial continua sendo validada antes
+da execução, inclusive referências obrigatórias ao ambiente do processo.
+A opção não habilita a query de assertion `variable`, que continua não suportada.
+
 <a id="polling-local-por-entrada"></a>
 
 ## Polling local por entrada — US-26 / issue #50
@@ -1840,8 +1876,8 @@ jsonpath "$.status" == "READY"
 
 `retry` é a quantidade de novas tentativas após a inicial (default `0`);
 `retry-interval` é inteiro em milissegundos (default `1000`, zero sem espera
-deliberada). Opções estáticas não negativas, sem duplicação, ilimitado ou overflow;
-qualquer outra opção é rejeitada antes de todo HTTP do arquivo. A seção pertence
+deliberada). Opções de polling estáticas não negativas, sem duplicação, ilimitado ou overflow;
+além delas, somente `variable` (US-44, abaixo) é aceita antes de todo HTTP do arquivo. A seção pertence
 à requisição e não pode seguir a resposta nem ser duplicada.
 
 Somente divergências de status/assertions (`1`) permitem repetir. Transporte,
