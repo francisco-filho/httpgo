@@ -1,0 +1,78 @@
+{
+  "response_sequence": [
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"rejected\",\"ready\":false}"
+    },
+    {
+      "status": 200,
+      "response_json": "{\"id\":\"accepted\",\"ready\":true}"
+    }
+  ],
+  "variables": [
+    "id=initial"
+  ],
+  "classification": "US-44: HTTPGo mantém assigned nos retries e confirma somente accepted; Hurl 8.0.0 reenvia rejected da captura reprovada, sem reaplicar a opção",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"assigned\"}",
+        "content_type": "application/json",
+        "probe": "assigned"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"assigned\"}",
+        "content_type": "application/json",
+        "probe": "assigned"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/poll",
+      "/poll",
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"assigned\"}",
+        "content_type": "application/json",
+        "probe": "assigned"
+      },
+      {
+        "uri": "/poll",
+        "method": "POST",
+        "body": "{\"id\":\"rejected\"}",
+        "content_type": "application/json",
+        "probe": "rejected"
+      },
+      {
+        "uri": "/health",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "accepted"
+      }
+    ]
+  }
+}

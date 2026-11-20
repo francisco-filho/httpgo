@@ -1,4 +1,31 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-44
+
+## Atribuições literais na sessão — US-44 / issue #95
+
+`parser/options.go` aceita `variable` repetível junto às opções de polling.
+`EntryOptions.Variables` retém `OptionVariable` com nome, JSON escalar normalizado
+e posição de **cada** declaração, inclusive substituídas. `option_variable.go`
+valida nomes simples e literais sem usar a inferência CLI: coleções aparentes e
+referências são strings opacas, números não passam por float64. Toda declaração
+é validada no parsing integral; não há execução parcial de arquivo inválido.
+
+`runner/polling.go` aplica `runEntry` dentro da medição de duração, depois de
+verificar cancelamento. Consolida o último valor de cada nome na ordem do texto,
+publica um lote pela `template.Session.Publish` e só então chama `pollEntry`.
+Conflito retorna `RenderError` localizado de preparação, resultado `RenderFailed`,
+sem envio ou lote parcial, nunca erro de captura de resposta. Tentativas usam a
+mesma sessão confirmada, sem reaplicar opções; captura continua extração → Stage
+→ assertions → Publish conforme US-34. Não se altera contexto inicial compartilhado,
+configuração, transporte ou política de suíte. Não se antecipam entradas futuras.
+
+`protectScenario` primeiro reúne marcas estáticas de segredo, depois registra
+**todos** os literais marcados, inclusive descartados/futuros, sem publicá-los.
+`invocationSession` propaga apenas proteção entre arquivos; resolução fica isolada.
+`safeEntry` remove `Options.Variables` antes de resultado/callback; relatórios
+recebem metadados seguros, não declarações. Permanecem writers protegidos,
+prioridade 2 e interrupção síncrona. Sem pacote, dependência, flag, goroutine,
+cache ou persistência novos. Veja [contrato](subset.md#atribuições-literais-por-entrada--us-44--issue-95)
+e [diferenças observadas](compatibility.md#atribuições-literais--us-44--issue-95).
 
 ## Progresso verboso e prévias JSON — US-42 / issue #90
 

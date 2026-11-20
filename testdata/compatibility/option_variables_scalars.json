@@ -1,0 +1,31 @@
+{
+  "classification": "US-44: escalares, string numérica/vazia, escapes e arrays/objetos como texto no recorte compartilhado Hurl 8.0.0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"n\":42,\"decimal\":1.25,\"flag\":false,\"nil\":null,\"code\":\"123\",\"empty\":\"\",\"text\":\"escaped\\n雪\\\"\",\"array\":\"[1,true]\",\"object\":\"{\\\"a\\\":1}\"}",
+        "content_type": "application/json",
+        "probe": "123"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"n\":42,\"decimal\":1.25,\"flag\":false,\"nil\":null,\"code\":\"123\",\"empty\":\"\",\"text\":\"escaped\\n雪\\\"\",\"array\":\"[1,true]\",\"object\":\"{\\\"a\\\":1}\"}",
+        "content_type": "application/json",
+        "probe": "123"
+      }
+    ]
+  }
+}

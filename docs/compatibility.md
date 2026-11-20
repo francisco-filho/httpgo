@@ -1,4 +1,34 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-44
+
+## Atribuições literais — US-44 / issue #95
+
+Suporte limitado a `variable: nome=literal` em `[Options]` por requisição, junto
+a `retry`/`retry-interval`. Não implica suporte integral às opções Hurl, seção
+`[Variables]`, nomes pontuados nessa opção, expressões ou query `variable`.
+O [perfil normativo](subset.md#atribuições-literais-por-entrada--us-44--issue-95)
+descreve literais, escopo e flags. Configuração YAML hierárquica e interpolação
+externa continuam extensões explícitas HTTPGo, não parte de Hurl.
+
+**Adição de contrato ao corpus:** seis pares `option_variables_*` foram
+acrescentados, sem regenerar pares anteriores. Hurl **8.0.0** é a referência
+observável; cada executável usa servidor/estado de sequência reiniciado.
+
+| Par | Observação |
+|---|---|
+| `option_variables_flow` | Ambos retornam 0; última declaração alimenta request, captura renova e nova atribuição persiste |
+| `option_variables_scalars` | Ambos retornam 0: número, decimal, booleano, null, string numérica/vazia, escapes e compostos aparentes textuais; strings usadas dentro de aspas JSON no recorte comum |
+| `option_variables_invalid_late` | Ambos retornam 2 sem HTTP, inclusive literal inválido depois substituído |
+| `option_variables_polling` | Ambos retornam 0, mas HTTPGo reenvia `assigned`; Hurl reenvia `rejected` da captura não aprovada. Só `accepted` é confirmado pelo HTTPGo |
+| `option_variables_precision` | Ambos retornam 0; HTTPGo envia decimal exato `1.000000000000000001`, Hurl envia `1.0`; não há equivalência integral de precisão/renderização |
+| `option_variables_nonrecursive` | Ambos retornam 0; HTTPGo mantém `{{other}}` literal na atribuição, Hurl resolve `resolved`. `${NAME}` e `newUuid()` escritos são texto em ambos |
+
+Diferenças deliberadas: não há interpolação nas atribuições HTTPGo; tipos/precisão
+e inserção de string em valor JSON completo seguem o renderer HTTPGo, não uma
+promessa de equivalência byte a byte com Hurl. Arrays/objetos escritos na opção
+são texto, não coleções tipadas. Polling mantém confirmação transacional US-34.
+Isolamento de suíte, proteção, cancelamento e escrita são testados separadamente
+com CLI/binário e sessões/writers controlados; não inferir equivalência entre
+as CLIs ou descoberta universal de segredos desses pares.
 
 ## Verbosidade da CLI — US-42 / issue #90
 

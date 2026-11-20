@@ -26,8 +26,13 @@ func TestOptionVariableSecretOutputs(t *testing.T) {
 				calls := 0
 				fake := executorFunc(func(_ context.Context, req runner.Request) (runner.Response, error) {
 					calls++
-					want := []string{"assigned-private", "", "initial-private"}[calls-1]
-					if req.URL != "http://example.test/"+want && calls != 2 {
+					want := "http://example.test/initial-private"
+					if calls == 1 {
+						want = "http://example.test/assigned-private"
+					} else if success && calls == 2 {
+						want = "http://example.test"
+					}
+					if req.URL != want {
 						t.Fatalf("request=%+v", req)
 					}
 					if calls == 1 && !success {

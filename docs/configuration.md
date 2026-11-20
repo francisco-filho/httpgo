@@ -165,6 +165,22 @@ valores são texto; `--var 'code="001"'` força string. Objetos CLI são opacos:
 `--var 'item={"id":1}'` define só `item`, não `item.id`. Nomes com conflito
 ancestral/descendente são rejeitados nas duas direções.
 
+### Atribuições durante o fluxo — US-44
+
+A precedência acima compõe apenas o **estado inicial**. `[Options]` pode declarar
+`variable: nome=literal` na requisição, com nome simples sem pontos; ao alcançar a
+entrada, substitui o mesmo nome inicial ou capturado e persiste até nova
+atribuição/captura no arquivo. Repetições no bloco usam o último valor; não
+relaxam as duplicações/conflitos da configuração inicial. Outro arquivo ou
+invocação parte novamente da composição inicial, sem herdar atribuições.
+
+A opção não resolve `${NOME}` nem `{{outra}}`, não executa funções e não converte
+arrays/objetos em coleções. Referências de processo ainda efetivas na configuração
+continuam obrigatórias **antes** de executar, mesmo se o cenário atribuir o nome.
+Marcas secretas e valores anteriores/substitutos permanecem protegidos; não use
+literais versionados ou flags para credenciais reais. Veja
+[gramática, tipos e exemplo](subset.md#atribuições-literais-por-entrada--us-44--issue-95).
+
 ## Referências ao ambiente do processo e segredos
 
 Ambiente YAML nomeado **não é** ambiente do processo. `${NOME}` é uma referência

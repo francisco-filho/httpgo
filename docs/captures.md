@@ -44,6 +44,24 @@ descarta a captura e impede o GET. Se o POST responder `{}`, a captura ausente
 falha com **2**, antes de qualquer assertion, sem GET. A CLI não imprime o valor
 capturado nem o body. Encerre o dummy com Ctrl+C ao terminar.
 
+## Atribuição literal e renovação
+
+Para fornecer um valor do próprio fluxo, em vez de extraí-lo da resposta,
+use `[Options]` com `variable: id=inicial` antes do body/`HTTP`. A opção aplica
+antes de renderizar a própria requisição e permanece nas seguintes do arquivo.
+Uma captura `id: jsonpath "$.id"` pode renová-lo, inclusive mudando o tipo;
+as assertions da resposta enxergam o lote provisório, mas só aprovação completa
+confirma a captura. Divergência/cancelamento preserva o valor atribuído e polling
+reenvia com esse valor, sem influência das capturas rejeitadas.
+
+Atribuições usam nomes simples, sem pontos, ao contrário das capturas. A última
+atribuição do mesmo nome em `[Options]` prevalece, mas capturas duplicadas no lote
+e conflitos hierárquicos continuam erros **2**. Sem `--render-asserts`, a opção
+não habilita consultas dinâmicas nem esperados interpolados. Proteção de nomes e
+valores antigos/novos continua monotônica; arquivos não compartilham resolução.
+Veja o [perfil literal](subset.md#atribuições-literais-por-entrada--us-44--issue-95).
+A query `variable` permanece não suportada: não é a opção `variable:`.
+
 ## Catálogo de capturas
 
 Uma seção `[Captures]` não pode ser órfã, duplicada na entrada ou vazia. Ela

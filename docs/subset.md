@@ -1824,6 +1824,8 @@ metadados protegidos e captura secreta pendente seguem a ocultação existente.
 string/array também pode ser validado por `== ""`/`count == 0`. Não há schema,
 coerção, outros tipos ou negação genérica.
 
+<a id="atribuicoes-literais"></a>
+
 ## Atribuições literais por entrada — US-44 / issue #95
 
 ```hurl

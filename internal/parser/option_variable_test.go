@@ -15,7 +15,8 @@ func TestOptionVariableLiterals(t *testing.T) {
 		{`[1,true]`, `"[1,true]"`}, {`{"x":1}`, `"{\"x\":1}"`},
 		{`{{other}}`, `"{{other}}"`}, {`${NAME}`, `"${NAME}"`}, {`newUuid()`, `"newUuid()"`},
 		{`'single'`, `"'single'"`}, {`"a\n\t\u{96ea}\"\\\#"`, `"a\n\t雪\"\\#"`},
-		{`a\:b\#c # comment`, `"a:b#c"`},
+		{`a\:b\#c # comment`, `"a:b#c"`}, {`\u{31}`, `"1"`}, {`t\u{72}ue`, `"true"`},
+		{`a\t # comment`, `"a\t"`}, {`42 # comment`, `42`},
 	} {
 		t.Run(tc.literal, func(t *testing.T) {
 			s, err := Parse("literal.hurl", strings.NewReader("POST http://example.test\n[Options]\nvariable: _name2="+tc.literal+"\nretry: 1\nretry-interval: 0\n{}\nHTTP 200"))

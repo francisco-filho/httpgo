@@ -46,19 +46,22 @@ func optionLiteral(source string) (json.RawMessage, bool) {
 		return nil, false
 	}
 	if !quoted {
-		switch text {
+		// Infer the lexical token, never the decoded string: \\u{31} is
+		// the string "1", not the number 1, just as quoted digits are text.
+		literal := strings.TrimSpace(source[:len(source)-len(tail)])
+		switch literal {
 		case "true", "false", "null":
-			return json.RawMessage(text), true
+			return json.RawMessage(literal), true
 		}
-		if text != "" && (text[0] >= '0' && text[0] <= '9' || text[0] == '+' || text[0] == '-') {
-			number := strings.TrimPrefix(text, "+")
+		if literal != "" && (literal[0] >= '0' && literal[0] <= '9' || literal[0] == '+' || literal[0] == '-') {
+			number := strings.TrimPrefix(literal, "+")
 			if !json.Valid([]byte(number)) || strings.ContainsAny(number, "eE") {
 				return nil, false
 			}
 			return json.RawMessage(number), true
 		}
 		for _, keyword := range []string{"true", "false", "null"} {
-			if strings.HasPrefix(text, keyword) {
+			if strings.HasPrefix(literal, keyword) {
 				return nil, false
 			}
 		}
@@ -80,8 +83,16 @@ func optionString(source string, quoted bool) (string, string, bool) {
 		if quoted && c == '"' {
 			return out.String(), source[i+1:], true
 		}
-		if !quoted && c == '#' {
-			return strings.TrimRight(out.String(), " \t"), source[i:], true
+		if !quoted {
+			if c == '#' {
+				return out.String(), source[i:], true
+			}
+			if c == ' ' || c == '\t' {
+				tail := strings.TrimLeft(source[i:], " \t")
+				if tail == "" || strings.HasPrefix(tail, "#") {
+					return out.String(), source[i:], true
+				}
+			}
 		}
 		if c != '\\' {
 			out.WriteByte(c)

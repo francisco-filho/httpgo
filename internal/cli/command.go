@@ -447,6 +447,13 @@ Consulta ${NOME}: processo (inclusive vazio) > arquivo, após base < ambiente < 
 Destinos continuam secretos após override; nunca forneça credenciais em flags.
 --env seleciona somente YAML; --env-file não importa variáveis nem opções.
 
+[Options] por requisição aceita variable: nome=literal (sem pontos), retry e
+retry-interval. A última atribuição substitui iniciais/capturas antes do request e
+persiste no arquivo; outro arquivo reinicia com a configuração inicial. Valores
+são escalares literais, sem expansão; arrays/objetos são texto. Marcas de segredo
+persistem. --render-files e --render-asserts continuam opt-ins independentes.
+Não há seção global [Variables] nem query de assertion variable.
+
 Documentação: README.md e docs/subset.md em
   https://github.com/francisco-filho/httpgo
 
