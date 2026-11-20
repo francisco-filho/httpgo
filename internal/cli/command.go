@@ -69,6 +69,10 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	args, argumentErr := parseArguments(c.args)
 	settings, loadErr := config.LoadEnvironment(ctx, args.config, args.environment)
+	var envFileErr error
+	if args.envFile != "" {
+		settings, envFileErr = settings.WithEnvFile(ctx, args.envFile)
+	}
 	settings, resolveErr := settings.Resolve(ctx, args.variables)
 	initial := c.protection.initial
 	configured := settings.Protection(args.variables, args.secrets)
@@ -78,6 +82,9 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	if loadErr != nil {
 		return c.fail(loadErr.Error())
+	}
+	if envFileErr != nil {
+		return c.fail(envFileErr.Error())
 	}
 	if resolveErr != nil {
 		return c.fail(resolveErr.Error())

@@ -35,6 +35,8 @@ type Settings struct {
 	sources    []map[string]json.RawMessage
 	references map[string]processReference
 	lookupEnv  func(string) (string, bool)
+	envFile    string
+	envValues  map[string]string
 	resolveErr error
 }
 

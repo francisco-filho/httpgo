@@ -18,6 +18,7 @@ type arguments struct {
 	files              []string
 	config             string
 	environment        string
+	envFile            string
 	output, outputFile string
 	variables, secrets []string
 }
@@ -25,7 +26,8 @@ type arguments struct {
 func parseArguments(args []string) (arguments, error) {
 	var result arguments
 	invalid := len(args) == 0 || args[0] != "test"
-	environmentSeen := false
+	environmentSeen, envFileSeen := false, false
+	envFileIssue := ""
 	outputSeen, outputFileSeen := false, false
 	environmentIssue := ""
 	for i := 1; i < len(args); i++ {
@@ -55,10 +57,13 @@ func parseArguments(args []string) (arguments, error) {
 				invalid = true
 			}
 			result.renderFiles = true
-		case "--config", "--env", "--var", "--secret", "--output", "--output-file":
+		case "--config", "--env", "--env-file", "--var", "--secret", "--output", "--output-file":
 			if !inline {
-				if i+1 == len(args) {
+				if i+1 == len(args) || (name == "--env-file" && strings.HasPrefix(args[i+1], "--")) {
 					invalid = true
+					if name == "--env-file" {
+						envFileIssue = "--env-file exige um caminho não vazio"
+					}
 					if name == "--env" {
 						environmentIssue = "--env exige um nome de ambiente"
 					}
@@ -91,6 +96,14 @@ func parseArguments(args []string) (arguments, error) {
 				}
 				environmentSeen = true
 				result.environment = value
+			case "--env-file":
+				if envFileSeen {
+					envFileIssue = "--env-file pode ser informado somente uma vez"
+				} else if value == "" {
+					envFileIssue = "--env-file exige um caminho não vazio"
+				}
+				envFileSeen = true
+				result.envFile = value
 			case "--var":
 				result.variables = append(result.variables, value)
 			case "--secret":
@@ -103,6 +116,9 @@ func parseArguments(args []string) (arguments, error) {
 				result.files = append(result.files, arg)
 			}
 		}
+	}
+	if envFileIssue != "" {
+		return result, fmt.Errorf("%s; use httpgo --help", envFileIssue)
 	}
 	if environmentIssue != "" {
 		return result, fmt.Errorf("%s; use httpgo --help", environmentIssue)
