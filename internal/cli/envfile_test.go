@@ -79,7 +79,7 @@ func TestEnvFileInvalidBeforeHTTP(t *testing.T) {
 func TestEnvFileFlagValidation(t *testing.T) {
 	path := writeEnvFile(t, "A=fiction")
 	for _, flags := range [][]string{
-		{"--env-file"}, {"--env-file="}, {"--env-file", ""}, {"--env-file", "--fail-fast"},
+		{"--env-file"}, {"--env-file="}, {"--env-file", ""}, {"--env-file", "--fail-fast"}, {"--env-file", "-v"},
 		{"--env-file", path, "--env-file", path}, {"--env-file=" + path, "--env-file", path}, {"--env-file=" + path, "--env-file=" + path},
 	} {
 		fake := &fakeExecutor{}

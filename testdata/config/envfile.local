@@ -1,0 +1,3 @@
+# Somente valores fictícios; nenhuma carga automática.
+API_URL=http://localhost:8080
+OWNER_TOKEN=token-de-demonstracao

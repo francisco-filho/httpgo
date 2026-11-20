@@ -59,7 +59,7 @@ func parseArguments(args []string) (arguments, error) {
 			result.renderFiles = true
 		case "--config", "--env", "--env-file", "--var", "--secret", "--output", "--output-file":
 			if !inline {
-				if i+1 == len(args) || (name == "--env-file" && strings.HasPrefix(args[i+1], "--")) {
+				if i+1 == len(args) || (name == "--env-file" && strings.HasPrefix(args[i+1], "-")) {
 					invalid = true
 					if name == "--env-file" {
 						envFileIssue = "--env-file exige um caminho não vazio"

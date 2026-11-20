@@ -946,7 +946,7 @@ HTTP; vazio presente e literais numéricos/boolean/null permanecem strings. Cont
 recebido não é expandido novamente. Destinos são marcados antes de overrides,
 acumulando `secrets`/`--secret`; protege valores conhecidos, substitutos e derivados
 nos resultados/assertions/callbacks/streams. Credenciais reais em flags continuam
-proibidas. Sem dotenv, stdin, overrides `HTTPGO_*` ou cofres. A US-17 reutiliza
+proibidas. Sem carga automática de `.env`, stdin, overrides `HTTPGO_*` ou cofres. A US-17 reutiliza
 esta proteção no relatório JUnit.
 
 `TestProcess*` em config, CLI, runner e E2E comprova o contrato separadamente,
@@ -957,6 +957,28 @@ cenário `scenario_process_profile.hurl`. Os **116 pares existentes** de
 `testdata/compatibility/` permanecem inalterados: sem regenerar observações,
 passar YAML/flags próprias ao Hurl ou copiar/adaptar fontes Hurl. O diferencial
 continua exigindo **Hurl 8.0.0**, sem skip.
+
+## Extensão US-43 — fonte local explícita (issue #93)
+
+`--env-file arquivo`/`--env-file=arquivo` é **extensão HTTPGo**, separada do
+formato Hurl e de `--env` (seleção YAML). Aceita uma ocorrência, caminho relativo
+ao cwd, cenário/suíte. Sem descoberta automática. Fornece somente fallback a
+`${NOME}` efetivo após base < ambiente < CLI: processo (inclusive vazio) >
+arquivo. Valores são strings literais, sem escapes, expansão ou execução; nomes
+ASCII, atribuições, comentários de linha inteira e aspas delimitadoras conforme
+[perfil publicado](configuration.md#arquivo-local-explícito--extensão-httpgo).
+Não oferece o perfil ampliado de bibliotecas dotenv nem importação de opções.
+
+Valida o arquivo inteiro, inclusive chaves não usadas/substituídas. Rejeição,
+falha de I/O ou referência ausente retorna 2 antes de HTTP; mensagens controladas
+sem conteúdo. Proteção, overrides, isolamento e apresentação da US-13/suítes
+permanecem intactos. Não altera o processo, serializadores ou mascaramento.
+
+`TestEnvFile*` em config/CLI/E2E cobre contrato e falhas de recursos com fakes,
+HTTP/binário reais, strings, precedência, literais, relatórios e códigos 0/1/2.
+Fixtures `.env`/YAML ficam fora do corpus diferencial. Não se fornece
+`--env-file` ao Hurl; nenhum par/observação de `testdata/compatibility/` foi
+alterado ou regenerado. O gate continua exigindo Hurl **8.0.0**, sem skip.
 
 ## Extensão US-12 — ambientes nomeados (issue #29)
 

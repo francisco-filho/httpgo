@@ -876,9 +876,48 @@ Runner já sanitiza operandos de headers/JSON e metadados antes de callback/cole
 sem reavaliar assertions ou criar report/sanitizador novo. As sessões conservam
 proteção dinâmica de capturas/derivados e isolamento, timeout e prioridade de
 falha de escrita. Contexto é checado durante preparação e antes do envio; não há
-goroutine, enumeração de ambiente, dotenv, stdin ou promessa de interromper I/O
+goroutine, enumeração de ambiente, carga automática de `.env`, stdin ou promessa de interromper I/O
 local bloqueado. Testes `TestProcess*` cobrem GO-161–GO-178; YAML continua extensão
 HTTPGo fora do diferencial Hurl.
+
+## Fonte literal explícita de referências — US-43
+
+`cli.arguments.envFile` recebe uma única seleção `--env-file`/`--env-file=`,
+rejeitando repetição/ausência/vazio sem ecoar argumentos. Após
+`config.LoadEnvironment` e antes de `Settings.Resolve`, a CLI chama
+`Settings.WithEnvFile(ctx, path)`. Sem flag não há I/O dessa fonte. O caminho
+é passado como selecionado: relativo ao cwd, sem mudar a raiz do YAML ou dos
+payloads. A fonte é carregada antes de descobrir/executar a suíte.
+
+`internal/config/envfile.go` usa biblioteca padrão, sem decoder YAML, biblioteca
+dotenv, shell ou pacote novo. `bufio.Reader.ReadString` evita limites implícitos
+de token e não herda `config.MaxBytes`. Valida cada linha literal (LF/CRLF),
+nomes ASCII únicos, atribuições e delimitadores de aspas; conteúdo nunca passa
+pelo renderer. O ponto privado `withEnvFile` recebe função de abertura para
+falhas determinísticas de open/read/close e cancelamento. Fecha o arquivo antes
+de publicar `Settings.envValues`; erro descarta todo mapa e conserva causa em
+`config.Error`/`errors.Join`, com mensagens controladas sem conteúdo bruto.
+Cancelamento é checado entre linhas, na conclusão e antes da execução; não há
+promessa de interromper leitura local bloqueada pelo SO.
+
+`Settings.envValues` é mapa privado de strings, separado de `Variables`, e
+`envFile` registra a seleção para o diagnóstico de ausência. `Resolve` mantém
+`lookupEnv`/`os.LookupEnv` primeiro e consulta o mapa somente na ausência,
+nunca em presença vazia. Continua descartando referências substituídas antes
+da consulta e serializando o resultado como string JSON. `Compose` permanece
+compatível para consumidores diretos e sem segunda expansão. Não usa Setenv,
+Environ ou chaves extras como opções/variáveis implícitas.
+
+A preparação continua conectando `Settings.Protection` antes de qualquer
+diagnóstico: valores efetivos disponíveis, substitutos e marcas pré-override
+seguem SecretVariants/Protector, executionProtection, sessões e writers
+existentes. Nenhuma classificação, sanitizador, serializer ou política de
+mascaramento nova. Parser, runner, transporte e relatórios não conhecem `.env`.
+Uma carga local por invocação alimenta sessões independentes da suíte; reutilizar
+o comando recarrega a fonte e não retém valores, marcas ou capturas. Testes
+`TestEnvFile*` em config/CLI/E2E cobrem GO-557–GO-570, incluindo falhas de I/O
+injetadas, callbacks protegidos e writers falhos/curtos. Extensão fora do corpus
+Hurl; dependências, versão de Go, CI e budgets permanecem inalterados.
 
 ## Arquivos externos — US-09
 
@@ -1072,7 +1111,8 @@ texto vazio. Valores conhecidos e variantes escapadas também são removidos dos
 streams. Isso não é detecção universal de credenciais ou codificações arbitrárias.
 `--secret` não fornece valor, e a CLI proíbe credenciais reais em argumentos na
 documentação: credenciais iniciais podem vir de referências explícitas ao ambiente
-do processo (US-13); stdin permanece não implementado.
+do processo (US-13) ou de arquivo explicitamente selecionado (US-43); stdin
+permanece não implementado.
 
 ## Sessão e capturas
 
