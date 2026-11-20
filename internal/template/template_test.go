@@ -54,6 +54,9 @@ func TestSyntaxAndOffsets(t *testing.T) {
 }
 
 func FuzzRender(f *testing.F) {
+	for _, value := range []string{`"[1,true]"`, `"{\"a\":1}"`, `"${NAME}"`, `"newUuid()"`, `""`, `"123"`, `1.000000000000000001`} {
+		f.Add("option={{x}}", value)
+	}
 	// US-36: expected strings, including provisional values and nonrecursive regex.
 	for _, value := range []string{`"123456"`, `"{{missing}}"`, `"(a)?b"`, `"["`, `"雪\\\""`, `null`, `[]`} {
 		f.Add("^otp-{{captured}}-{{x}}$", value)

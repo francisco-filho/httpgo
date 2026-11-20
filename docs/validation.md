@@ -1,4 +1,59 @@
-# Validação — US-01 a US-17, US-20 a US-43
+# Validação — US-01 a US-17, US-20 a US-44
+
+## US-44 — issue #95 / história 044
+
+Plano da issue #95 executado em três tasks backend autoaprovadas na fila `044`.
+Task 1: `2c979d6` (parser, literais e publicação por arquivo);
+Task 2: `f48fee2` (proteção monotônica, polling, interrupção e apresentação);
+Task 3: processo real, corpus diferencial, ajuda, documentação e validação integrada.
+Sem frontend/estáticos, novo pacote, dependência, toolchain, workflow ou budgets.
+
+### Evidências efetivamente executadas
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, ferramentas existentes no PATH.
+Em cada task passaram `make fmt lint test` (lint **0 issues**, testes completos
+com `-race -cover`), `go vet ./...` e `go build ./...`; formatação conferida com
+`gofmt -l` nos arquivos Go alterados. Comandos específicos sem cache:
+
+- Task 1: `go test ./internal/parser ./internal/template ./internal/runner ./internal/cli ./internal/suite -count=1`.
+- Task 2: `go test ./internal/template ./internal/runner ./internal/cli ./internal/suite ./internal/report -count=1`.
+- Task 3: `go test ./tests/e2e -count=1`, `make build e2e` e
+  `bash -n scripts/package-release.sh install.sh`.
+- `make compatibility`: **482 pares** com Hurl **8.0.0**, sem skip. Acrescentados
+  somente seis pares `option_variables_*`; geração `-update` restrita aos novos
+  pares e observações revisadas. Pares preexistentes não foram regenerados.
+  Diferenças de precisão, placeholders e confirmação no polling estão na
+  [matriz](compatibility.md#atribuições-literais--us-44--issue-95).
+- Fuzzers executados separadamente, com `-run '^$'`, `-fuzztime=20s` e `-parallel=2`:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**71.102** execuções); equivalentes em `./internal/template` para
+  `FuzzRender` (**10.910**) e `FuzzRenderJSON` (**35.880**). Todos passaram.
+- Coberturas observadas: parser **96,4%**, template **96,1%**, runner **94,9%**,
+  CLI **97,7%**, suite **95,3%**, report **97,1%**, transport **90,3%**.
+  Sem análise Sonar pelo desenvolvedor; sem testes nativos macOS/Windows.
+  Nenhum código-fonte Hurl consultado/copiado/adaptado: documentação pública e
+  comportamento do executável foram usados como referência.
+
+### Rastreabilidade GO-571–GO-585
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-571 | `TestOptionVariablesDirectory` e `TestOptionVariablesDirectoryByBinary`: base 5, ambiente 7, CLI 9; arquivos enviam 1/false, 3/true e 9 |
+| GO-572 | `TestOptionVariableFlow`: URL/header/body, captura renovada, redefinição persistente e contexto inicial imutável em execuções repetidas |
+| GO-573 | Fluxo e corpus `option_variables_flow`: duplicação usa último literal, sem headers/parâmetros adicionais |
+| GO-574 | `TestOptionVariableLiterals`, `TestOptionVariableTypedJSON`, `TestOptionVariableLiteralsByBinary`: escalares, vazio, aspas e precisão; escapes não mudam string em tipo escalar |
+| GO-575 | Mesmos testes e par `option_variables_nonrecursive`: compostos/referências/funções permanecem texto, sem expansão |
+| GO-576 | `TestOptionVariablesExternalAndAssertionOptIn`, processo `TestOptionVariableLiteralsByBinary`: bytes externos literais sem flag, renderizados com flag |
+| GO-577 | `TestOptionVariableFlow`, `TestOptionVariableDynamicQuery`, opt-in e processo: consultas/esperados e renovação conforme US-34 |
+| GO-578 | `TestOptionVariablePollingConfirmation`, `TestOptionVariablesPollingByBinary`: uma atribuição por entrada, tentativas usam valor atribuído e só captura aprovada renova; métricas lógicas/reais |
+| GO-579 | Parser, `TestOptionVariableInvalidLateCLI`, `TestOptionVariableRejectionsByBinary` e fixtures: erro tardio mesmo substituído, opção/query/seção não suportadas, duplicações; zero HTTP |
+| GO-580 | `TestOptionVariableConflict` e proteção antes dos callbacks: conflito com inicial/captura, posição segura, preparação 2, nenhum lote parcial; processo cobre conflito com inicial |
+| GO-581 | `TestOptionVariablesNotAnticipated`, `TestOptionVariableDoesNotRepairMissingConfiguration`: sem antecipação nem dispensa de referência obrigatória |
+| GO-582 | `TestOptionVariableProtectionBeforeCallbacks`, `TestOptionVariableSecretOutputs`, `TestOptionVariableProtectionByBinary`: antigos/novos/descartados/futuros, derivados, texto/verboso/JUnit/HTML e fronteira sem declarações |
+| GO-583 | `TestOptionVariableSuiteFailureAndReuse`: continuidade/fail-fast e reutilização do root; `TestOptionVariableSecretOutputs`: erro 2 continua sem contaminar resolução do arquivo seguinte |
+| GO-584 | `TestOptionVariablePollingConfirmation`, `TestOptionVariablesCancelledBeforePublication`: cancelamento antes de publicação, no intervalo e antes da próxima entrada, sem envios/capturas posteriores |
+| GO-585 | `TestOptionVariableWriterFailures`: writers de resultado/diagnóstico com erro/short write, código 2, sem próximo envio nem repetição; regressões transacionais/de recursos existentes também passaram |
+
 
 ## US-43 — issue #93 / história 043
 

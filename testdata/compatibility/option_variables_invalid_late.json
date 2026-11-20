@@ -1,0 +1,11 @@
+{
+  "classification": "US-44: literal inválido tardio mesmo substituído impede todo HTTP; recorte compartilhado Hurl 8.0.0",
+  "httpgo": {
+    "exit": 2,
+    "paths": null
+  },
+  "hurl": {
+    "exit": 2,
+    "paths": null
+  }
+}

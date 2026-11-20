@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"capimgrosso.com/httpgo/internal/parser"
@@ -35,7 +36,7 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 			return result
 		}
 		begin := r.now()
-		execution := r.pollEntry(ctx, scenario, entry, options, session)
+		execution := r.runEntry(ctx, scenario, entry, options, session)
 		duration := max(time.Duration(0), r.now().Sub(begin))
 		for i := range execution.Entries {
 			execution.Entries[i].Duration = duration
@@ -64,6 +65,40 @@ func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, o
 		}
 	}
 	return result
+}
+
+// runEntry publishes once, before preparing any polling attempt. Keep only the
+// last declaration per name, in source order, without mutating the scenario.
+func (r *Runner) runEntry(ctx context.Context, scenario parser.Scenario, entry parser.Entry, options Options, session template.Session) Result {
+	declarations := entry.Options.Variables
+	last := make(map[string]int, len(declarations))
+	for i, declaration := range declarations {
+		last[declaration.Name] = i
+	}
+	var batch []template.Capture
+	var positions []parser.Position
+	for i, declaration := range declarations {
+		if last[declaration.Name] == i {
+			batch = append(batch, template.Capture{Name: declaration.Name, Value: declaration.Value})
+			positions = append(positions, declaration.Position)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return Result{Err: err, ErrorPosition: entry.Position}
+	}
+	if len(batch) > 0 {
+		if err := session.Publish(batch); err != nil {
+			pos := positions[0]
+			var conflict *template.ConflictError
+			if errors.As(err, &conflict) && conflict.Index >= 0 && conflict.Index < len(positions) {
+				pos = positions[conflict.Index]
+			}
+			pos.File = session.Sanitize(pos.File)
+			failure := &RenderError{Position: pos, Detail: "não foi possível atribuir variável de [Options]; verifique nomes em conflito ancestral/descendente", cause: err}
+			return Result{Err: failure, ErrorPosition: pos, Entries: []EntryResult{{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}}}
+		}
+	}
+	return r.pollEntry(ctx, scenario, entry, options, session)
 }
 
 func (r *Runner) pollEntry(ctx context.Context, scenario parser.Scenario, entry parser.Entry, options Options, session template.Session) (result Result) {

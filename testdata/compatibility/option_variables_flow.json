@@ -1,0 +1,85 @@
+{
+  "response_json": "{\"id\":\"renewed\"}",
+  "variables": [
+    "id=initial"
+  ],
+  "classification": "US-44: atribuições antes do request, última declaração, persistência e renovação por captura; recorte compartilhado Hurl 8.0.0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/renewed",
+      "/final",
+      "/final"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "POST",
+        "body": "{\"id\":\"assigned\",\"count\":3}",
+        "content_type": "application/json",
+        "probe": "assigned"
+      },
+      {
+        "uri": "/renewed",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "renewed"
+      },
+      {
+        "uri": "/final",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "final"
+      },
+      {
+        "uri": "/final",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "final"
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/capture",
+      "/renewed",
+      "/final",
+      "/final"
+    ],
+    "requests": [
+      {
+        "uri": "/capture",
+        "method": "POST",
+        "body": "{\"id\":\"assigned\",\"count\":3}",
+        "content_type": "application/json",
+        "probe": "assigned"
+      },
+      {
+        "uri": "/renewed",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "renewed"
+      },
+      {
+        "uri": "/final",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "final"
+      },
+      {
+        "uri": "/final",
+        "method": "GET",
+        "body": "",
+        "content_type": "",
+        "probe": "final"
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "classification": "US-44: divergência deliberada de precisão decimal; HTTPGo preserva representação exata sem float64, não implica equivalência numérica integral com Hurl 8.0.0",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"n\":9007199254740993,\"decimal\":1.000000000000000001}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "body": "{\"n\":9007199254740993,\"decimal\":1.0}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

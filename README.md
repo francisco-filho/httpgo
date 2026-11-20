@@ -296,6 +296,40 @@ use captures, explicadas a seguir. Credenciais reais vêm do
 [ambiente do processo](docs/configuration.md#referências-ao-ambiente-do-processo-e-segredos)
 ou de [arquivo local explícito](docs/configuration.md#arquivo-local-explícito--extensão-httpgo), nunca de flags.
 
+### Valores próprios no cenário
+
+`[Options]` permite atribuir literais antes da própria URL, headers e body:
+
+```hurl
+POST {{base_url}}/produtos
+Content-Type: application/json
+[Options]
+variable: tipo_validacao=1
+variable: cliente_externo=false
+{"tipoValidacao": {{tipo_validacao}}, "clienteExterno": {{cliente_externo}}}
+HTTP 201
+```
+
+Salve como `tests/01-etl.httpgo`; crie `tests/02-iagen.httpgo` com o mesmo
+conteúdo, trocando as atribuições por `tipo_validacao=3` e `cliente_externo=true`.
+Com uma API que responda **201** em `POST /produtos`, execute:
+
+```sh
+httpgo test tests/ --var base_url=http://localhost:8080 --var tipo_validacao=9
+```
+
+O primeiro arquivo envia `1/false`, o segundo `3/true`; um terceiro sem atribuição
+usa o `9` inicial. As atribuições persistem nas próximas requisições **do arquivo**
+até outra atribuição/captura, sem restauração automática. Repetir o nome no bloco
+usa o último valor; isso não torna permitidas duplicações em `--var`/YAML.
+
+Nomes simples, sem pontos; números, booleanos, `null` e strings, inclusive vazias.
+Arrays/objetos e `{{outra}}`, `${NOME}` ou funções escritos no valor são **texto**,
+sem expansão. `--render-files`/`--render-asserts` continuam necessários nos seus
+usos respectivos; segredos e proteção anterior não são removidos. Credenciais
+reais não devem ser gravadas nesses literais. Veja o
+[perfil literal e limites](docs/subset.md#atribuicoes-literais).
+
 ## Assertions e captures
 
 **Assertion valida** uma propriedade da resposta; **capture extrai** um valor

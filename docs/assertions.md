@@ -370,7 +370,15 @@ são erro estático sem a flag.
 `--render-asserts` é um **opt-in HTTPGo por invocação**, sem valor. Ele resolve
 esperados de **todos os operadores que recebem operando** do catálogo, mantendo
 suas restrições; predicados sem operando continuam sem operando. Pode usar
-iniciais, confirmados anteriores e capturas provisórias válidas da resposta atual.
+iniciais, confirmados anteriores, atribuições literais de `[Options]` já alcançadas
+e capturas provisórias válidas da resposta atual.
+
+`variable: nome=literal` aplica antes da própria requisição, persiste no arquivo
+e pode ser renovada por captura confirmada. Não habilita renderização sozinha:
+sem `--render-asserts`, esperados continuam literais e filtros dinâmicos falham
+antes de HTTP. O valor atribuído não é expandido recursivamente; arrays/objetos
+escritos na opção são strings. A query de assertion `variable` continua não
+suportada. Veja [atribuições e tipos](subset.md#atribuições-literais-por-entrada--us-44--issue-95).
 
 | Contexto esperado | Exemplo com opt-in | Tipo exigido |
 |---|---|---|

@@ -1,0 +1,36 @@
+{
+  "variables": [
+    "other=resolved"
+  ],
+  "classification": "US-44: divergência deliberada; HTTPGo mantém referências aparentes literais na atribuição, Hurl 8.0.0 resolve placeholder; processo e funções escritos permanecem texto",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"ref\":\"{{other}}\",\"env\":\"${NAME}\",\"function\":\"newUuid()\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ],
+    "requests": [
+      {
+        "uri": "/health",
+        "method": "POST",
+        "body": "{\"ref\":\"resolved\",\"env\":\"${NAME}\",\"function\":\"newUuid()\"}",
+        "content_type": "application/json",
+        "probe": ""
+      }
+    ]
+  }
+}

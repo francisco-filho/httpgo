@@ -8,6 +8,7 @@ import (
 
 // EntryOptions is local to an entry. Nil interval means the default, not zero.
 type EntryOptions struct {
+	Variables     []OptionVariable
 	Retry         int
 	RetryInterval *time.Duration
 	Position      Position
@@ -26,8 +27,17 @@ func parseOption(text string, pos Position, options *EntryOptions, seen map[stri
 	if !colon || strings.TrimSpace(name) != name || name == "" {
 		return fail("sintaxe inválida", "opção exige nome: inteiro não negativo")
 	}
+	if name == "variable" {
+		declaration, err := parseOptionVariable(raw, pos)
+		if err != nil {
+			return err
+		}
+		options.Variables = append(options.Variables, declaration)
+		seen[name] = true
+		return nil
+	}
 	if name != "retry" && name != "retry-interval" {
-		return fail("construção não suportada", "opção não suportada em [Options]; somente retry e retry-interval são aceitos")
+		return fail("construção não suportada", "opção não suportada em [Options]; somente variable, retry e retry-interval são aceitos")
 	}
 	if seen[name] {
 		return fail("sintaxe inválida", "opção "+name+" duplicada")

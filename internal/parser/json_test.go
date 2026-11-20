@@ -60,6 +60,11 @@ func TestHeadersOnGETAndBodylessMethods(t *testing.T) {
 }
 
 func FuzzParse(f *testing.F) {
+	for _, literal := range []string{"", `"001"`, `9007199254740993`, `1.000000000000000001`, `false`, `null`, `[1]`, `{"x":1}`, `{{other}}`, `${NAME}`, `"\\u{96ea}"`, `"bad\\q"`, `01`} {
+		for _, nl := range []string{"\n", "\r\n"} {
+			f.Add(strings.ReplaceAll("POST http://example.test\n[Options]\nvariable: x="+literal+"\nvariable: x=last\nretry: 1\nretry-interval: 0\n{{x}}\nHTTP 200", "\n", nl))
+		}
+	}
 	// US-36: extraction remains static in both profiles, predicates consume all input.
 	for _, line := range []string{`regex "id=(\\d+)" == "123"`, `regex "({{x}})" matches "^{{x}}$"`, `regex "(a)?b" exists`, `regex "(a*)b" not contains ""`, `regex "no-group" exists`, `regex "private[" exists`, `regex "(?=x)" exists`, `regex "(x)" == "\\x41"`, `regex "(x)" exists extra`, `regex "(x)" regex "(y)" exists`} {
 		for _, nl := range []string{"\n", "\r\n"} {
