@@ -1,0 +1,5 @@
+version: 1
+variables:
+  base_url: ${API_URL}
+  auth:
+    token: ${OWNER_TOKEN}

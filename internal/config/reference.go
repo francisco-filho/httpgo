@@ -82,8 +82,15 @@ func (s Settings) Resolve(ctx context.Context, assignments []string) (resolved S
 		}
 		value, present := lookup(reference.name)
 		if !present {
+			value, present = s.envValues[reference.name]
+		}
+		if !present {
 			if firstErr == nil {
-				firstErr = failure(reference.file, position, fmt.Sprintf("referência ${%s} ausente para variables.%s; forneça a variável no ambiente do processo", reference.name, key), nil)
+				sources := "no ambiente do processo"
+				if s.envFile != "" {
+					sources += " ou no arquivo selecionado por --env-file"
+				}
+				firstErr = failure(reference.file, position, fmt.Sprintf("referência ${%s} ausente para variables.%s; forneça a variável %s", reference.name, key, sources), nil)
 			}
 			continue
 		}

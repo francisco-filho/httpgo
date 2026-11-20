@@ -1,4 +1,56 @@
-# Validação — US-01 a US-17, US-20 a US-42
+# Validação — US-01 a US-17, US-20 a US-43
+
+## US-43 — issue #93 / história 043
+
+Plano backend da issue #93 executado sem planner, com três tasks autoaprovadas
+na fila `043`. Task 1: `de47863` (fonte explícita/literal e execução);
+Task 2: `16aea78` (proteção, isolamento e apresentação);
+Task 3: contrato público, ajuda, fixtures, documentação e gates integrados.
+Somente backend: sem frontend/estáticos, pacote novo, dependências, versão Go,
+workflows, budgets ou alterações em `testdata/compatibility/`.
+
+### Evidências efetivamente executadas
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, ferramentas já disponíveis no PATH.
+Em cada task passaram `make fmt lint test` (**0 issues**, `go test ./... -race
+-cover`) e `go vet ./...`; formatação dos arquivos alterados conferida com
+`gofmt -l`. Testes específicos sem cache:
+
+- Task 1: `go test ./internal/config ./internal/cli -count=1` e
+  `go test ./tests/e2e -count=1`.
+- Task 2: `go test ./internal/config ./internal/cli ./internal/suite ./internal/report -count=1`.
+- Task 3: `go test ./internal/cli ./tests/e2e -count=1`, `go build ./...`,
+  `make build e2e` e `bash -n scripts/package-release.sh install.sh`.
+- `make compatibility`: **476 pares**, Hurl **8.0.0**, sem skip ou regeneração.
+  O aviso de metadados libcurl não impediu identificação/execução. Nenhuma flag
+  própria passada ao Hurl; nenhum código-fonte Hurl consultado/copiado/adaptado.
+- Fuzzers executados separadamente, todos com 20 segundos e dois workers:
+  `go test ./internal/parser -run '^$' -fuzz '^FuzzParse$' -fuzztime=20s -parallel=2`
+  (**111.937** execuções), equivalente em `./internal/template` para
+  `FuzzRender` (**16.991**) e `FuzzRenderJSON` (**65.686**). Todos passaram.
+- Coberturas observadas: config **96,5%**, CLI **97,7%**, suite **95,3%**,
+  report **97,1%**, runner **94,9%**, template **96,1%**, transport **90,3%**.
+  Cross-builds e execução nativa macOS/Windows não realizados nesta história.
+
+### Rastreabilidade GO-557–GO-570
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-557 | `TestEnvFileRequestAndSuite`, `TestEnvFileDemonstration`, `TestEnvFileStringsAndLiteralContract`, `TestEnvFileGuideFixturesAndReports`: URL/header/JSON operacionais corretos e strings `123`/`true`/`null` |
+| GO-558 | `TestEnvFileReferencePrecedence` com consulta falsa contada; demonstração de processo prioritário e JSON com presença vazia no filho |
+| GO-559 | `TestEnvFileReferencePrecedence`, `TestEnvFileEarlyProtection`, `TestEnvFilePresentationProtection`, `TestEnvFilePrecedenceExtrasAndFreshProcess`: overrides descartam consultas, não marcas; arquivo inválido continua falhando |
+| GO-560 | `TestEnvFileLiteralProfile`, `TestEnvFileStringsAndLiteralContract`: espaços, aspas, LF/CRLF, `#`, `=`, barras e placeholders/comandos literais, incluindo linha maior que 1 MiB sem teto do YAML/scanner |
+| GO-561 | `TestEnvFileInvalid`, `TestEnvFileInvalidBeforeHTTP`, `TestEnvFileInvalidProcessContract`: repetição, sintaxe, nomes, export, aspas e multilinha; erro tardio/valor substituído não libera HTTP |
+| GO-562 | `TestEnvFileFlagValidation`, `TestEnvFileInvalidProcessContract`: formas inline/separada/mistas, repetição, vazio e ausência, sem HTTP/relatório |
+| GO-563 | `TestEnvFileReferencePrecedence`, `TestEnvFileExtrasNotVariables`, `TestEnvFileRequestAndSuite`, `TestEnvFilePrecedenceExtrasAndFreshProcess`: extras não criam variáveis/opções nem mutação do processo |
+| GO-564 | `TestEnvFileDemonstration`, `TestEnvFilePrecedenceExtrasAndFreshProcess`: cwd relativo/absoluto com cenário/base externos, ausência da flag e `.env` inválido no cwd/ancestral ignorado |
+| GO-565 | `TestEnvFileHelp`, contratos compactos CLI/E2E/TTY atualizados sem remover checks; guia e fixtures executados pelo binário em `TestEnvFileGuideFixturesAndReports` |
+| GO-566 | `TestEnvFileLiteralProfile`, `TestEnvFileMissingReference`, testes JSON/vazio e contrato de processo para arquivo vazio/só comentários e referência efetiva obrigatória não usada |
+| GO-567 | `TestEnvFileResources`: open/read parcial/close, erro sintático com falha de close, cancelamento, fechamento e nenhuma publicação parcial; `errors.Is` preservado sem causa bruta. CLI/E2E: caminho inexistente/diretório ilegível como arquivo, sem depender de permissões do executor |
+| GO-568 | `TestEnvFileProtectionAndSnapshots`, `TestEnvFileEarlyProtection`, `TestEnvFileResultsProtectedBeforePresentation`, `TestEnvFilePresentationProtection`, `TestEnvFileTransportCauseIsPrivate`, E2E de relatórios: valores/variantes, derivados e substitutos protegidos antes de apresentação sem mudar dados operacionais |
+| GO-569 | `TestEnvFileReloadAndSuiteIsolation` e `TestEnvFileSuiteReload`: uma carga por suíte mesmo se arquivo mudar, capturas independentes, recarga com arquivo alterado/outro/sem flag, sem proteção residual ou Setenv |
+| GO-570 | `TestEnvFileWriterFailures`, `TestEnvFileRealOutputFailure` (Linux `/dev/full`): falha/short write retorna 2, interrompe envios e não insiste no writer; texto/verboso/JUnit/HTML e erros globais preservam streams, sanitização e artefatos |
+
 
 ## US-42 — issue #90 / história 042
 

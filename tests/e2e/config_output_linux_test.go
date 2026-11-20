@@ -25,6 +25,10 @@ func TestProcessEnvironmentRealOutputFailure(t *testing.T) {
 	testConfiguredProcessOutput(t, "process")
 }
 
+func TestEnvFileRealOutputFailure(t *testing.T) {
+	testConfiguredProcessOutput(t, "env-file")
+}
+
 func testConfiguredProcessOutput(t *testing.T, source string) {
 	t.Helper()
 	for _, stream := range []string{"stdout", "stderr"} {
@@ -50,8 +54,12 @@ func testConfiguredProcessOutput(t *testing.T, source string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			args := []string{"test", file}
-			if source == "process" {
+			if source == "process" || source == "env-file" {
 				configFile(t, dir, ".httpgo.yaml", "version: 1\nvariables: {token: '${OWNER_TOKEN}'}")
+			}
+			if source == "env-file" {
+				configFile(t, dir, "output.env", "OWNER_TOKEN=fake-output-token")
+				args = append(args, "--env-file", "output.env")
 			}
 			if source == "environment" {
 				environmentFile(t, dir, "local", "variables: {token: fake-output-token}\nsecrets: []")
@@ -59,9 +67,12 @@ func testConfiguredProcessOutput(t *testing.T, source string) {
 			}
 			command := exec.CommandContext(ctx, binary(t), args...)
 			command.Dir = dir
-			if source == "process" {
+			switch source {
+			case "process":
 				token := "fake-output-token"
 				command.Env = childEnvironment(map[string]*string{"OWNER_TOKEN": &token})
+			case "env-file":
+				command.Env = childEnvironment(map[string]*string{"OWNER_TOKEN": nil})
 			}
 			var out, stderr bytes.Buffer
 			command.Stdout = &out

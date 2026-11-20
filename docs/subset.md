@@ -1048,12 +1048,56 @@ header comum/JSON. Sessão continua protegendo capturas e derivados em URL, head
 JSON inline/externo opt-in e campos multipart, sem alterar bytes de arquivo.
 A US-17 reutiliza a mesma política no relatório JUnit.
 
-Cada invocação lê seu próprio ambiente, sem cache global, dotenv ou herança de
+Cada invocação lê seu próprio ambiente, sem cache global, carga automática de `.env` ou herança de
 valores/marcas/capturas da execução anterior. Cancelamento é verificado na preparação
 e antes do envio, sem novo timeout de resolução nem promessa de interromper I/O
 local bloqueado. Falha de saída/short write continua prioritária (2), sem retry ou
 próximo envio. Não há stdin, cofres, composição parcial, referências em listas ou
 identificação garantida de segredos desconhecidos/transformações arbitrárias.
+
+## Extensão HTTPGo: arquivo de referências explícito — US-43 (issue #93)
+
+`httpgo test tests/profile.httpgo --env-file .env.local` (ou
+`--env-file=.env.local`) seleciona um único arquivo para referências `${NOME}`
+da configuração base/ambiente. Funciona em cenário e suíte. Não é sintaxe Hurl;
+`--env` continua selecionando somente YAML. Caminho relativo parte do cwd,
+independentemente da base/cenário. Sem flag, não abre nem procura `.env` em
+nenhum diretório. Exemplo completo e perfil em
+[configuration.md](configuration.md#arquivo-local-explícito--extensão-httpgo).
+
+Aplica base < ambiente YAML < CLI, depois consulta processo > arquivo para cada
+referência efetiva. Presença vazia no processo prevalece; todo valor é string,
+sem segunda expansão. Chaves extras não publicam variáveis, `HTTPGO_*` ou
+opções (`NO_COLOR` inclusive), nem alteram o ambiente do processo. Referências
+substituídas não exigem valor, mas o arquivo inteiro é sempre validado.
+
+Aceita `NOME=valor` com `[A-Za-z_][A-Za-z0-9_]*`, removendo espaços externos ao
+nome/valor; aspas simples/duplas envolvendo o valor preservam espaços internos.
+Arquivo vazio, linhas vazias, LF/CRLF, comentários de linha inteira `#` e valor
+vazio são válidos. Somente o primeiro `=` separa campos. `#` após `=` é texto.
+`${OUTRA}`, `$()`, `{{outra}}` e `\n` são literais: sem escapes, expansão ou
+execução. Rejeita nomes repetidos mesmo iguais, nomes inválidos, linhas sem
+atribuição, aspas abertas ou com sufixo, `export` e valores multilinha.
+Não aplica teto de scanner nem o limite próprio do YAML.
+
+Flag repetida/sem valor/vazia, I/O inválido, sintaxe inválida ou referência
+efetiva ausente em ambas as fontes retorna **2**, antes de HTTP e sem relatório
+global de preparação. Erros indicam causa controlada e arquivo/linha/coluna
+quando disponíveis, nunca linhas/valores ou causas brutas. Não publica mapa
+parcial; fecha o arquivo antes de usar a fonte. Cancelamento, orçamento HTTP,
+interrupção por falha de escrita/short write e streams permanecem vigentes.
+
+Preserva integralmente a proteção US-13: marca automática de destinos antes de
+overrides, substitutos/variantes/derivados protegidos em resultados, texto,
+verbosidade e relatórios JUnit/HTML. Sem nova classificação de sensibilidade ou
+exceções de mascaramento; credenciais em flags continuam proibidas. O arquivo
+explícito pode fornecer credenciais, sujeito à proteção no disco e aos limites
+já documentados. Uma carga por invocação, sessões independentes por cenário e
+nova carga na próxima invocação; sem estado residual ou mutação do processo.
+Fora do suporte: descoberta automática, múltiplos arquivos, shell, expansão
+recursiva e importação automática. Fixtures fictícias:
+`testdata/config/envfile_base.yaml`, `testdata/config/envfile.local` e
+`testdata/scenarios/scenario_envfile_profile.httpgo`.
 
 <a id="variáveis-tipadas-e-templates"></a>
 

@@ -293,7 +293,8 @@ navegação de propriedades de objetos CLI ou nomes de headers/chaves JSON
 dinâmicos. Consulte [variáveis e templates](docs/subset.md#variáveis-tipadas-e-templates).
 Para encadear valores **recebidos** da API, em vez de fornecidos inicialmente,
 use captures, explicadas a seguir. Credenciais reais vêm do
-[ambiente do processo](docs/configuration.md#referências-ao-ambiente-do-processo-e-segredos), nunca de flags.
+[ambiente do processo](docs/configuration.md#referências-ao-ambiente-do-processo-e-segredos)
+ou de [arquivo local explícito](docs/configuration.md#arquivo-local-explícito--extensão-httpgo), nunca de flags.
 
 ## Assertions e captures
 
@@ -322,8 +323,49 @@ HTTPGo**. O [guia de configuração](docs/configuration.md) reúne os arquivos
 completos, a precedência base → ambiente → CLI, schema, limites e overrides.
 Ele demonstra `httpgo test exemplo.httpgo --env local --var base_url=http://localhost:9090`
 e distingue ambientes nomeados de referências explícitas `${NOME}` ao processo.
-Credenciais reais vêm do ambiente do processo, **nunca de argumentos**; consulte
-no guia as fontes disponíveis, proteção preservada após override e seus limites.
+Credenciais reais vêm do ambiente do processo ou de arquivo local explícito,
+**nunca de argumentos**; consulte no guia a proteção após override e seus limites.
+
+### Reutilizar um arquivo `.env` explicitamente
+
+**Extensão HTTPGo**, independente de `--env`: salve `.env.local` com valores
+fictícios e `local.yaml` com referências explícitas:
+
+```dotenv
+API_URL=http://localhost:8080
+OWNER_TOKEN=token-de-demonstracao
+```
+
+```yaml
+version: 1
+variables:
+  base_url: ${API_URL}
+  auth:
+    token: ${OWNER_TOKEN}
+```
+
+Em `profile.httpgo`:
+
+```hurl
+GET {{base_url}}/profile
+Authorization: Bearer {{auth.token}}
+HTTP 200
+```
+
+```sh
+httpgo test profile.httpgo --config local.yaml --env-file .env.local
+```
+
+Com uma API que responda 200 em `/profile`, envia URL/header e retorna **0**.
+O dummy fornece `/health`, não `/profile`. Processo prevalece sobre arquivo,
+inclusive se o valor estiver vazio; base < ambiente YAML < CLI continua intacto.
+Somente `${NOME}` consulta a fonte: chaves extras não viram variáveis/opções.
+Caminho relativo parte do cwd; aceita uma ocorrência, também em suítes. Sem flag,
+**não carrega `.env` automaticamente**. São atribuições literais, sem escapes,
+expansão, `export` ou valores multilinha. Arquivo inválido falha integralmente
+antes de HTTP (**2**), sem ecoar conteúdo. Destinos continuam secretos após
+override; não versione credenciais reais. Veja o
+[perfil literal e exemplos completos](docs/configuration.md#arquivo-local-explícito--extensão-httpgo).
 
 ### Executar uma suíte e gerar relatórios
 

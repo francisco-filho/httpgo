@@ -74,6 +74,7 @@ func assertCompactProcessHelp(t *testing.T, out string) {
 	expected := map[string][]string{
 		"--help": {"ajuda"}, "--version": {"versão", "commit", "data"},
 		"--config": {"arquivo", "YAML"}, "--env": {"nome", "ambiente"},
+		"--env-file":  {"arquivo", "${NOME}", "uma ocorrência", "cwd"},
 		"--fail-fast": {"primeira falha"}, "--output": {"junit|html", "exige --output-file"},
 		"--verbose":        {"-v/-vv", "stderr", "repita", "JSON protegido", "16 KiB/body", "sem relatórios"},
 		"--output-file":    {"caminho", "destino", "requer --output"},
@@ -104,7 +105,7 @@ func assertCompactProcessHelp(t *testing.T, out string) {
 			t.Errorf("missing docs %q", term)
 		}
 	}
-	if !strings.HasSuffix(out, "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/ --output junit --output-file target/results.xml\n") {
+	if !strings.HasSuffix(out, "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/profile.httpgo --env-file .env.local\n  httpgo test tests/ --output junit --output-file target/results.xml\n") {
 		t.Errorf("examples are not final: %q", out)
 	}
 	for _, term := range []string{"[Captures]", "[Asserts]", "GET http", "HTTP 200", "version: 1", "--var token=", "--var password=", "\x1b"} {

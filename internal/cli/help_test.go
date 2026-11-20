@@ -40,6 +40,7 @@ func TestCompactHelpContract(t *testing.T) {
 			"--version":        {"versão", "commit", "data"},
 			"--config":         {"arquivo", "configuração YAML"},
 			"--env":            {"nome", "ambiente YAML"},
+			"--env-file":       {"arquivo", "${NOME}", "uma ocorrência", "cwd"},
 			"--fail-fast":      {"primeira falha"},
 			"--verbose":        {"-v/-vv", "stderr", "repita", "JSON protegido", "16 KiB/body", "sem relatórios"},
 			"--output":         {"junit|html", "exige --output-file"},
@@ -73,7 +74,7 @@ func TestCompactHelpContract(t *testing.T) {
 				t.Errorf("missing documentation %q", term)
 			}
 		}
-		examples := "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/ --output junit --output-file target/results.xml\n"
+		examples := "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/profile.httpgo --env-file .env.local\n  httpgo test tests/ --output junit --output-file target/results.xml\n"
 		if !strings.HasSuffix(out, examples) {
 			t.Errorf("examples are not final: %q", out)
 		}

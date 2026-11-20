@@ -169,7 +169,7 @@ ancestral/descendente são rejeitados nas duas direções.
 
 Ambiente YAML nomeado **não é** ambiente do processo. `${NOME}` é uma referência
 **explícita**, não override automático nem camada de precedência. Não há
-mapeamento automático `HTTPGO_*`, dotenv, entrada por stdin, hooks ou integração
+mapeamento automático `HTTPGO_*`, carga automática de `.env`, entrada por stdin, hooks ou integração
 direta com cofres nesta versão.
 
 Para exercitar o exemplo seguinte com o dummy ativo em 8080, configure
@@ -234,6 +234,98 @@ Conteúdo `${OUTRA}` ou `{{outra}}` não é reinterpretado.
 - Use permissões `0600` para arquivos sensíveis e `0700` para diretórios em POSIX;
   no Windows restrinja ACLs de modo equivalente. Prefira não gravar credenciais
   reais no YAML. Cada invocação tem configuração/contexto novos.
+
+## Arquivo local explícito — extensão HTTPGo
+
+`--env-file <arquivo>` ou `--env-file=arquivo` adiciona uma fonte **somente para
+referências explícitas `${NOME}`** na base ou no ambiente YAML. Aceita uma única
+ocorrência em `test`, para cenário individual ou suíte. O caminho relativo parte
+sempre do **diretório corrente**, independentemente de `--config`, `--env` ou do
+cenário; caminhos absolutos também são aceitos. `--env` continua selecionando
+somente um ambiente YAML. Sem `--env-file`, nenhum `.env` é carregado ou procurado,
+nem no cwd, nem em ancestrais.
+
+Salve `.env.local` (somente valores fictícios neste exemplo):
+
+```dotenv
+API_URL=http://localhost:8080
+OWNER_TOKEN=token-de-demonstracao
+```
+
+Salve `local.yaml`:
+
+```yaml
+version: 1
+variables:
+  base_url: ${API_URL}
+  auth:
+    token: ${OWNER_TOKEN}
+```
+
+Salve `profile.httpgo`:
+
+```hurl
+GET {{base_url}}/profile
+Authorization: Bearer {{auth.token}}
+HTTP 200
+```
+
+```sh
+httpgo test profile.httpgo --config local.yaml --env-file .env.local
+httpgo test tests/ --config local.yaml --env-file=.env.local
+```
+
+Com uma API `GET /profile` que retorna 200, o primeiro comando envia URL e header
+e retorna **0**. O segundo usa a mesma fonte inicial em todos os arquivos da
+suíte, mantendo capturas independentes. O dummy não implementa `/profile`; para
+exercitar injeção com ele, use `/health` (não comprova autenticação).
+
+Após base < ambiente YAML < CLI, cada referência ainda efetiva consulta primeiro
+o **ambiente do processo**, depois o arquivo. Presença no processo **inclusive
+vazia** prevalece: vazio não ativa fallback. Referência substituída por YAML/CLI
+não exige valor nas fontes. Todo resultado é string, inclusive `123`, `true` e
+`null`, sem segunda expansão. Chaves extras não criam variáveis de cenário,
+`HTTPGO_*` ou opções como `NO_COLOR`. A carga não altera o ambiente do processo.
+
+### Perfil literal aceito
+
+- Nome ASCII `[A-Za-z_][A-Za-z0-9_]*`, seguido de `=` e valor; somente o primeiro
+  `=` separa nome/valor. Espaços externos são removidos; vazio é válido.
+- Linhas vazias e comentários de linha inteira iniciados por `#` são aceitos.
+  LF e CRLF são terminadores. Arquivo vazio/só comentários é válido.
+- Aspas simples ou duplas podem delimitar **todo** o valor; somente os
+  delimitadores são removidos, preservando espaços internos.
+- Não há escapes, expansão, shell ou comandos: `#` após `=` é texto,
+  `${OUTRA}`, `{{outra}}`, `$()` e `\n` são literais. Por exemplo,
+  `TEXT='  a=b#c\n  '` conserva o conteúdo e seus espaços internos.
+- Nomes repetidos (mesmo com valor igual), nomes inválidos, linha sem atribuição,
+  aspas não fechadas, texto após a aspa final, prefixo `export` e valores
+  multilinha são rejeitados. Não é o perfil ampliado de bibliotecas dotenv.
+
+Arquivo solicitado inexistente/ilegível/inválido e flag repetida/sem argumento/
+vazia retornam **2 antes de HTTP**. Todo o arquivo é validado, mesmo se valores
+forem substituídos pelo processo ou não utilizados. Não há publicação parcial.
+Referência efetiva ausente em ambas as fontes também falha antes de HTTP.
+Diagnósticos mostram causa controlada e arquivo/linha quando disponíveis, nunca
+valores, linhas do arquivo ou erros brutos de I/O. O limite de 1 MiB do YAML não
+é aplicado a essa fonte; não há teto de tamanho definido para `.env`.
+
+### Segredos e isolamento
+
+A proteção da US-13 é preservada integralmente: destinos de `${NOME}` são
+marcados automaticamente antes de overrides; substitutos e derivados conhecidos
+continuam protegidos em resultados, texto, verbosidade, JUnit e HTML. Esta fonte
+não classifica segredos novos nem amplia os limites de detecção. Credenciais
+reais continuam proibidas em flags/`--var`; podem vir do processo ou deste arquivo
+explicitamente selecionado. Não versione arquivos com credenciais reais e use
+permissões `0600`/diretórios `0700` (ACLs equivalentes em Windows). Sanitização de
+saídas não protege arquivos no disco, argumentos ou transformações desconhecidas.
+
+O arquivo é carregado uma vez por invocação e fechado antes de HTTP. Próxima
+invocação recarrega a fonte, sem cache de valores, proteção ou capturas anteriores.
+Cancelamento é verificado durante preparação; não promete interromper I/O local
+bloqueado pelo SO. Sem descoberta automática, múltiplos arquivos por invocação,
+importação automática, sintaxe shell ou expansão recursiva.
 
 ## Resultados e referências
 

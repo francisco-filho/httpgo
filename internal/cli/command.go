@@ -69,6 +69,10 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	args, argumentErr := parseArguments(c.args)
 	settings, loadErr := config.LoadEnvironment(ctx, args.config, args.environment)
+	var envFileErr error
+	if args.envFile != "" {
+		settings, envFileErr = settings.WithEnvFile(ctx, args.envFile)
+	}
 	settings, resolveErr := settings.Resolve(ctx, args.variables)
 	initial := c.protection.initial
 	configured := settings.Protection(args.variables, args.secrets)
@@ -78,6 +82,9 @@ func (c *Command) executeContext(ctx context.Context) int {
 	}
 	if loadErr != nil {
 		return c.fail(loadErr.Error())
+	}
+	if envFileErr != nil {
+		return c.fail(envFileErr.Error())
 	}
 	if resolveErr != nil {
 		return c.fail(resolveErr.Error())
@@ -424,6 +431,7 @@ Opções:
   --version                Exibe versão, commit e data de build.
   --config arquivo         Seleciona a configuração YAML do projeto.
   --env nome               Seleciona um ambiente YAML nomeado.
+  --env-file arquivo       Fonte explícita de ${NOME}; uma ocorrência, caminho relativo ao cwd.
   --fail-fast              Interrompe a suíte após a primeira falha.
   --verbose (-v/-vv)        Progresso em stderr; repita para JSON protegido nas falhas (16 KiB/body); sem relatórios.
   --output junit|html       Gera relatório no formato indicado; exige --output-file.
@@ -433,12 +441,19 @@ Opções:
   --var nome=valor         Define variável não sigilosa (opção repetível).
   --secret nome            Marca nome protegido, sem fornecer valor secreto (repetível).
 
+Extensão HTTPGo --env-file: atribuições NOME=valor literais, comentários # de linha
+inteira e aspas simples/duplas; sem escapes, export, expansão ou carga automática.
+Consulta ${NOME}: processo (inclusive vazio) > arquivo, após base < ambiente < CLI.
+Destinos continuam secretos após override; nunca forneça credenciais em flags.
+--env seleciona somente YAML; --env-file não importa variáveis nem opções.
+
 Documentação: README.md e docs/subset.md em
   https://github.com/francisco-filho/httpgo
 
 Exemplos:
   httpgo test health.httpgo
   httpgo test tests/ --env local
+  httpgo test tests/profile.httpgo --env-file .env.local
   httpgo test tests/ --output junit --output-file target/results.xml
 `
 }
