@@ -85,6 +85,10 @@ func FuzzRender(f *testing.F) {
 	for _, value := range []string{`"001"`, `"line\n雪"`, `null`, `true`, `9007199254740993123456789`, `[]`, `{"x":1}`} {
 		f.Add("{{x}}", value)
 	}
+	// US-45: built-in functions resolve wherever variables are accepted.
+	for _, seed := range []string{"{{newDate}}", "{{ newUuid }}", "{{newUuid}}-{{newUuid}}", `{"id":{{newUuid}}}`, `{"label":"a-{{newDate}}"}`, "[{{newUuid}}]"} {
+		f.Add(seed, "value")
+	}
 	f.Fuzz(func(t *testing.T, source, value string) {
 		c, err := New([]string{"x=" + value}, []string{"x"})
 		if err != nil {

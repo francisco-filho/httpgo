@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Error exposes controlled text and a byte offset, never source values or names.
@@ -99,13 +100,25 @@ type Context struct {
 	captures  map[string]variable
 	secrets   map[string]bool
 	protected []string
+	now       func() time.Time
 }
 
 func New(assignments, secrets []string) (*Context, error) {
-	c := &Context{values: make(map[string]variable), secrets: make(map[string]bool)}
+	return NewWithClock(assignments, secrets, time.Now)
+}
+
+// NewWithClock injects the clock used by built-in functions; nil keeps time.Now.
+func NewWithClock(assignments, secrets []string, now func() time.Time) (*Context, error) {
+	if now == nil {
+		now = time.Now
+	}
+	c := &Context{values: make(map[string]variable), secrets: make(map[string]bool), now: now}
 	for _, name := range secrets {
 		if !ValidName(name) {
 			return nil, fmt.Errorf("nome inválido em --secret")
+		}
+		if ReservedFunction(name) {
+			return nil, fmt.Errorf("--secret: %s", ReservedDetail)
 		}
 		c.secrets[name] = true
 	}
@@ -116,6 +129,9 @@ func New(assignments, secrets []string) (*Context, error) {
 		}
 		if !ValidName(name) {
 			return nil, fmt.Errorf("nome inválido em --var")
+		}
+		if ReservedFunction(name) {
+			return nil, fmt.Errorf("--var: %s", ReservedDetail)
 		}
 		for existing := range c.values {
 			if NamesConflict(name, existing) {
@@ -137,7 +153,14 @@ func (c *Context) Render(source string) (Text, error) {
 	for _, ref := range refs {
 		text, ok := c.lookup(ref.Name)
 		if !ok {
-			return Text{}, &Error{ref.Start, "variável ausente; forneça seu valor com --var"}
+			generated, isFunction, err := c.functionValue(ref.Name)
+			if err != nil {
+				return Text{}, &Error{ref.Start, "não foi possível gerar valor da função embutida"}
+			}
+			if !isFunction {
+				return Text{}, &Error{ref.Start, "variável ausente; forneça seu valor com --var"}
+			}
+			text = variable{text: generated, original: generated}
 		}
 		if text.composite {
 			return Text{}, &Error{ref.Start, "array ou objeto exige posição de valor JSON completo"}
@@ -155,6 +178,14 @@ func (c *Context) Render(source string) (Text, error) {
 	value.WriteString(source[last:])
 	display.WriteString(source[last:])
 	return Text{Value: value.String(), Display: c.Sanitize(display.String())}, nil
+}
+
+// clock never leaves the context without a source, even when built by hand.
+func (c *Context) clock() time.Time {
+	if c.now == nil {
+		return time.Now()
+	}
+	return c.now()
 }
 
 // Sanitize protects known representations as well as provenance-based display.

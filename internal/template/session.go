@@ -37,13 +37,21 @@ type ConflictError struct{ Index int }
 func (e *ConflictError) Error() string {
 	return "nome de captura inválido, repetido ou em conflito ancestral/descendente"
 }
+
+// ReservedError identifies a capture using a reserved built-in function name.
+type ReservedError struct{ Index int }
+
+func (e *ReservedError) Error() string {
+	return "nome de captura reservado para função embutida (newDate, newUuid)"
+}
 func NamesConflict(a, b string) bool {
 	return a == b || strings.HasPrefix(a, b+".") || strings.HasPrefix(b, a+".")
 }
 
-// NewSession shares immutable initial values; secret declarations are session-local.
+// NewSession shares immutable initial values and the function clock; secret
+// declarations are session-local.
 func (c *Context) NewSession() Session {
-	return &Context{values: c.values, secrets: maps.Clone(c.secrets), captures: make(map[string]variable), protected: append([]string(nil), c.protected...)}
+	return &Context{values: c.values, secrets: maps.Clone(c.secrets), captures: make(map[string]variable), protected: append([]string(nil), c.protected...), now: c.now}
 }
 func (c *Context) lookup(name string) (variable, bool) {
 	if v, ok := c.captures[name]; ok {
@@ -93,6 +101,9 @@ func (c *Context) captureValues(batch []Capture) ([]variable, error) {
 		values[i] = parseVariable(string(capture.Value))
 		if !ValidName(capture.Name) {
 			return nil, &ConflictError{Index: i}
+		}
+		if ReservedFunction(capture.Name) {
+			return nil, &ReservedError{Index: i}
 		}
 		for existing := range c.values {
 			if capture.Name != existing && NamesConflict(capture.Name, existing) {
@@ -147,7 +158,7 @@ func (c *Context) Stage(batch []Capture) (Session, error) {
 	for i, capture := range batch {
 		captures[capture.Name] = values[i]
 	}
-	return &provisional{Session: c, view: &Context{values: c.values, captures: captures, secrets: c.secrets}}, nil
+	return &provisional{Session: c, view: &Context{values: c.values, captures: captures, secrets: c.secrets, now: c.now}}, nil
 }
 
 // Publish confirms a complete validated batch atomically.
