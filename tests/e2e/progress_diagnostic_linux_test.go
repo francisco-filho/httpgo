@@ -45,7 +45,7 @@ func TestCompactRealTTYMultilineDiagnostic(t *testing.T) {
 			if !noColor {
 				message = "\x1b[31m" + message + "\x1b[0m"
 			}
-			block := "  step 7 - Linha 114:1\n  [assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n     " + message + "\n"
+			block := "  GET " + server.URL + "/first/7 -> step 7 - Linha 114:1\n  [assertion]\n  jsonpath \"$.orders[?(@.number==[literal oculto])].items[0].allergens\" contains\n     " + message + "\n"
 			index := strings.Index(diagnostic, block)
 			nextName := "29-phase-seven-combos.hurl"
 			if !noColor {

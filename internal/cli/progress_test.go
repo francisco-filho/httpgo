@@ -185,7 +185,7 @@ func TestCompactFourthStepAndProtection(t *testing.T) {
 		t.Fatalf("code=%d calls=%d err=%q", code, calls, stderr.String())
 	}
 	text := stderr.String()
-	if !strings.Contains(text, "ERRO  4/5\n  step 4 - Linha") || !strings.Contains(text, "[oculto]") || strings.Contains(text+out.String(), secret) {
+	if !strings.Contains(text, "ERRO  4/5\n  GET http://example.test/4 -> step 4 - Linha") || !strings.Contains(text, "[oculto]") || strings.Contains(text+out.String(), secret) {
 		t.Fatalf("out=%q err=%q", out.String(), text)
 	}
 }

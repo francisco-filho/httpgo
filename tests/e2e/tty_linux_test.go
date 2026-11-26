@@ -327,7 +327,7 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			case "fourth failure":
 				wantCode = 1
 				wantCalls = 5
-				wantFinal = "ERRO  4/10\n  step 4 - Linha"
+				wantFinal = "ERRO  4/10\n  GET " + server.URL + "/4 -> step 4 - Linha"
 				wantTests = 5
 				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
@@ -338,14 +338,14 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			case "retry exhausted":
 				wantCode = 1
 				wantCalls = 3
-				wantFinal = "ERRO  1/1\n  step 1 - Linha"
+				wantFinal = "ERRO  1/1\n  GET " + server.URL + "/hold -> step 1 - Linha"
 				wantTests = 2
 				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			case "cancel":
 				wantCode = 2
 				wantCalls = 2
-				wantFinal = "ERRO  1/10\n  step 1 - Linha"
+				wantFinal = "ERRO  1/10\n  GET " + server.URL + "/hold -> step 1 - Linha"
 				wantTests = 2
 				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"

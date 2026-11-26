@@ -23,10 +23,7 @@ func (c *Command) htmlEntries(run runner.Result) []report.HTMLEntry {
 		local.out = &text
 		// The same safe formatter as text mode, without retaining parser entries.
 		_ = local.renderEntry(entry)
-		url := displayURL(entry.DisplayURL)
-		if entry.Outcome == runner.RenderFailed {
-			url = "[URL não renderizada]"
-		}
+		url := displayEntryURL(entry)
 		entries = append(entries, report.HTMLEntry{
 			Number: i + 1, Method: c.protection.sanitize(entry.Entry.Method),
 			URL: c.protection.sanitize(url), Outcome: c.protection.sanitize(string(entry.Outcome)),
