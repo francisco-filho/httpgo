@@ -110,5 +110,13 @@ func captureBatchFailure(session template.Session, declarations []parser.Capture
 		declaration = declarations[invalid.Index]
 		pos = declaration.QueryPosition
 	}
+	var reserved *template.ReservedError
+	if errors.As(err, &reserved) {
+		if reserved.Index >= 0 && reserved.Index < len(declarations) {
+			declaration = declarations[reserved.Index]
+			pos = declaration.Position
+		}
+		return captureFailure(session, declaration, pos, template.ReservedDetail)
+	}
 	return captureFailure(session, declaration, pos, "não foi possível publicar captura; verifique os valores e nomes inválidos, repetidos ou em conflito ancestral/descendente")
 }
