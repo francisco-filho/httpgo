@@ -31,7 +31,8 @@ passaram `gofmt -l` (nenhum arquivo), `make lint` (**0 issues**), `go vet ./...`
 - Task 4/final: `make fmt lint test` (**0 issues**, suíte completa com `-race
   -cover`), `go vet ./...`, `make build`, `make e2e` e
   `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s`
-  (**136.142** execuções, sem falha).
+  (**136.142** execuções na primeira passagem e **73.010** na repetição final,
+  ambas sem falha).
 - `make compatibility`: **483 pares** com Hurl **8.0.0**, sem skip nem regeneração
   de pares preexistentes; acrescentado somente `functions_generated`. Hurl 8.0.0
   oficial foi obtido para o gate porque o binário local era 8.0.1 e o alvo exige
