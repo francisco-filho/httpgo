@@ -1,4 +1,4 @@
-# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-45
+# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-46
 
 <a id="funcoes-embutidas"></a>
 
@@ -90,8 +90,9 @@ inclusive com redirecionamento. A duração lógica inclui preparação, tentati
 validações/capturas e esperas, sem o tempo de apresentação. Polling produz uma
 única linha final. `[OK]` não inventa validações não declaradas.
 
-O bloco seguro de erro compartilhado com US-41 informa ordinal, linha/coluna,
-consulta/predicado e comparação ou causa disponíveis: `[status]`, `[assertion]`,
+O bloco seguro de erro compartilhado com US-41/46 informa ordinal, linha/coluna,
+consulta/predicado e comparação ou causa disponíveis. Nos modos verbosos, o
+endpoint já aparece na linha `[ERRO]` e não é repetido no bloco: `[status]`, `[assertion]`,
 `[captures]`, `[renderização]`, `[transporte]` ou `[parsing]`. Não há etapa de
 validação que não ocorreu, step/posição fictícios em erro de carga ou repetição
 do diagnóstico no fechamento do arquivo. O bloco precede o próximo arquivo.
@@ -2114,7 +2115,7 @@ compartilhamento implícito de login, cenário/segredos por stdin ou outras flag
 `--output junit --output-file <caminho>` seleciona o relatório US-17;
 `--output html --output-file <caminho>` seleciona HTML US-35, com nomeação própria
 por timestamp, ambos descritos acima. `check` e configurações futuras não estão implementados ou anunciados.
-### Progresso interativo — US-41 / issue #88
+### Progresso interativo — US-41 / US-46 / issue #88
 
 O modo texto padrão é **compacto somente quando stdout e stderr originais são
 TTY**. Writers sem terminal reconhecido ou redirecionamento de qualquer um dos
@@ -2138,16 +2139,28 @@ arquivo, com ordinal do step e posição quando disponíveis. Falha de leitura o
 parsing não inventa step nem total: mostra `ERRO 0/?`. Arquivos não alcançados
 mostram `NÃO EXECUTADO 0/?`, sem carga só para contar suas entradas.
 
+No modo compacto, o bloco começa pelo método e pela URL efetiva da requisição
+que falhou, seguidos de ` -> ` e da localização: `[MÉTODO] [URL] -> step N -
+Linha L:C`. Método e URL vêm dos metadados seguros do runner; a URL é a da última
+tentativa do step, na mesma forma protegida de `-v`, com consulta oculta e valores
+sensíveis mascarados. Falha de preparação antes do envio mostra o método com
+`[URL não renderizada]`, nunca uma URL inventada; falha de carga/parsing não tem
+step nem endpoint e mantém apenas `Linha L:C` quando disponível. Steps aprovados
+continuam sem linha de requisição. O acréscimo vale **somente** para a apresentação
+compacta em texto: redirecionamento, `-v`/`-vv`, JUnit/HTML, streams, cores,
+contagens e códigos permanecem como antes.
+
 ```text
 - health.httpgo  OK  1/1
 - products.httpgo  ERRO  4/10
-  step 4 - Linha 12:1
+  POST http://localhost:8080/catalogo/ativos -> step 4 - Linha 12:1
   [status]
   HTTP 200
      expected 200 => received 503
 ```
 
-O bloco usa uma linha para step/localização, outra para a etapa (`[assertion]`,
+O bloco usa uma linha inicial para endpoint e step/localização (ou somente
+step/localização quando não há endpoint), outra para a etapa (`[assertion]`,
 `[captures]`, `[status]`, `[parsing]`, `[renderização]` ou `[transporte]`), uma
 expressão segura quando disponível e a mensagem final. Esta última fica vermelha
 quando as cores estão habilitadas. Falhas de assertions com esperado conhecido

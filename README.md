@@ -468,21 +468,30 @@ abaixo do erro, com step e posição disponíveis. Falha de carga/parsing tem to
 `?`; arquivos não alcançados mostram `NÃO EXECUTADO 0/?`, sem parsing antecipado.
 Nomes iguais em diretórios diferentes continuam em linhas distintas.
 
-Em erro, o bloco separa localização, etapa e expressão, sem repetir o caminho:
+Em erro, o bloco começa pelo método e pela URL protegida da requisição que
+falhou, seguidos de ` -> ` e da localização; depois vêm etapa, expressão e
+mensagem, sem repetir o caminho:
 
 ```text
 - 27-phase-six-advanced-menu.httpgo  ERRO  7/15
-  step 7 - Linha 114:1
+  POST http://localhost:8080/catalogo/ativos -> step 7 - Linha 114:1
   [assertion]
   jsonpath "$.orders[?(@.number==[literal oculto])].items[0].allergens" contains
      expected "SOY" => received tipo array
 - 29-phase-seven-combos.httpgo  OK  13/13
 ```
 
+A URL é a da última tentativa do step, com consulta oculta e valores sensíveis
+mascarados; falha antes do envio mostra `[URL não renderizada]`, e falha de
+carga/parsing não exibe endpoint nem step inventado. Steps aprovados continuam
+sem linha de requisição. Esse acréscimo vale somente para o modo compacto em
+texto: redirecionamento, `-v`/`-vv` (que já mostram método e URL na linha
+`[ERRO]`), JUnit/HTML, streams, cores, contagens e códigos não mudam.
+
 A última linha do diagnóstico fica vermelha quando as cores estão habilitadas.
 A etapa é `[assertion]`, `[captures]` ou `[status]`, conforme a falha; erros de
 carga/parsing, preparação e HTTP usam `[parsing]`, `[renderização]` e `[transporte]`.
-Step, posição e expressão só aparecem quando existem metadados seguros disponíveis;
+Método, URL, step, posição e expressão só aparecem quando existem metadados seguros disponíveis;
 não se recupera a linha bruta do cenário nem se imprime body para detalhar o erro.
 
 O modo compacto mantém somente a linha de progresso e os diagnósticos: **não**

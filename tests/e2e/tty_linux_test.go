@@ -411,6 +411,16 @@ func TestCompactRealTTYLoadErrorsAndProtection(t *testing.T) {
 	if code != 2 || calls.Load() != 2 || !strings.Contains(out, "Cenários executados: 4\n") || !strings.Contains(out, "Testes executados: 3\n") || !strings.Contains(out, "Sucesso/erros: 1/3\n") || !strings.Contains(out, "Sucesso/erros: 1/2\n") || !strings.Contains(diagnostic, "ERRO  0/?\n") || !strings.Contains(diagnostic, "step 1 - Linha") || !strings.Contains(diagnostic, "[oculto]") || strings.Contains(out+diagnostic, secret) || strings.Contains(out, "Não executados:") {
 		t.Fatalf("code=%d calls=%d out=%q err=%q", code, calls.Load(), out, diagnostic)
 	}
+	for _, endpoint := range []string{"  GET " + server.URL + " -> step 1 - Linha", "  GET [URL não renderizada] -> step 1 - Linha"} {
+		if !strings.Contains(diagnostic, endpoint) {
+			t.Fatalf("missing endpoint %q in %q", endpoint, diagnostic)
+		}
+	}
+	// The rejected scenario keeps its parsing block without an endpoint line.
+	parse := diagnostic[strings.Index(diagnostic, "03.httpgo"):strings.Index(diagnostic, "04.httpgo")]
+	if !strings.Contains(parse, "[parsing]") || strings.Contains(parse, " -> step") {
+		t.Fatalf("parse block invented endpoint: %q", parse)
+	}
 }
 
 func TestCompactRealTTYReportsAndStaticCommands(t *testing.T) {
