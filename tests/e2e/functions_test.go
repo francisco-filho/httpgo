@@ -147,3 +147,68 @@ func TestFunctionsStaticScenarioUnchangedByBinary(t *testing.T) {
 		t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
 	}
 }
+
+// GO-592 / GO-593 / CA-06: the versioned corpus drives the real binary.
+func TestFunctionsScenarioCorpusByBinary(t *testing.T) {
+	var mu sync.Mutex
+	var bodies []string
+	hits := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		if r.Method == "POST" {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Errorf("body: %v", err)
+			}
+			mu.Lock()
+			bodies = append(bodies, string(body))
+			mu.Unlock()
+			w.WriteHeader(201)
+			return
+		}
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+	generated := "../../testdata/scenarios/scenario_functions_generated.httpgo"
+	if code, out, stderr := run(t, "test", generated, "--var", "api.baseUrl="+server.URL); code != 0 || stderr != "" || !strings.Contains(out, "validadas=1") {
+		t.Fatalf("code=%d out=%q err=%q", code, out, stderr)
+	}
+	mu.Lock()
+	if len(bodies) != 1 {
+		mu.Unlock()
+		t.Fatalf("bodies=%q", bodies)
+	}
+	body := bodies[0]
+	hits = 0
+	mu.Unlock()
+	var decoded struct {
+		RequestID string `json:"requestId"`
+		CreatedAt string `json:"createdAt"`
+		Label     string `json:"label"`
+	}
+	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
+		t.Fatalf("body=%s err=%v", body, err)
+	}
+	if !e2eFunctionUUID.MatchString(decoded.RequestID) || decoded.CreatedAt == "" || !strings.HasPrefix(decoded.Label, "pedido-") {
+		t.Fatalf("body=%+v", decoded)
+	}
+	for _, tc := range []struct{ file, detail string }{
+		{"../../testdata/scenarios/scenario_functions_reserved_capture.hurl", "nome reservado para função embutida (newDate, newUuid)"},
+		{"../../testdata/scenarios/scenario_functions_reserved_variable.hurl", "nome reservado para função embutida (newDate, newUuid)"},
+		{"../../testdata/scenarios/scenario_functions_unknown_placeholder.hurl", "variável ausente"},
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			mu.Lock()
+			hits = 0
+			mu.Unlock()
+			code, _, stderr := run(t, "test", tc.file, "--var", "api.baseUrl="+server.URL)
+			mu.Lock()
+			defer mu.Unlock()
+			if code != 2 || hits != 0 || !strings.Contains(stderr, tc.detail) {
+				t.Fatalf("code=%d hits=%d stderr=%q", code, hits, stderr)
+			}
+		})
+	}
+}

@@ -1,4 +1,23 @@
-# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-44
+# Matriz de compatibilidade — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-45
+
+## Funções embutidas — US-45 / issue #98
+
+`{{newDate}}` e `{{newUuid}}` sem argumentos são aceitos nos mesmos contextos das
+variáveis e resolvidos a cada ocorrência em ambos os executáveis. Hurl **8.0.0** é
+a referência observável; não há equivalência de formato de data nem de valor
+gerado. Nomes reservados e validação final de URL/headers são contrato HTTPGo.
+
+| Par | Observação |
+|---|---|
+| `functions_generated` | Ambos retornam 0 e alcançam `/health`; os valores não são comparados porque variam entre execuções. Só a execução compartilhada é observada |
+
+Diferenças deliberadas: `newDate` do HTTPGo usa precisão de segundos e o offset
+do fuso da máquina (ex.: `2025-11-16T09:34:56-03:00`), enquanto o Hurl 8.0.0 usa
+frações de segundo e UTC (`Z`). `newUuid` é UUID v4 canônico minúsculo em ambos.
+O HTTPGo rejeita `--var`/`--secret`/captura/`[Options] variable` com os nomes
+reservados antes de qualquer envio; não há promessa de mesma mensagem ou mesmo
+código em Hurl. Nenhuma saída é determinística ou injetável e não há equivalência
+byte a byte.
 
 ## Atribuições literais — US-44 / issue #95
 

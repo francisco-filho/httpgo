@@ -1,4 +1,36 @@
-# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-44
+# Arquitetura implementada — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-45
+
+## Funções embutidas — US-45 / issue #98
+
+`template/functions.go` registra dois nomes exatos, `newDate` e `newUuid`,
+resolvidos no mesmo ponto das variáveis. `Context` ganhou um relógio injetável
+(`NewWithClock`, padrão `time.Now`), propagado para `NewSession`, `Stage`/`provisional`
+e compartilhado com a CLI por `Settings.ComposeWithClock`. O UUID v4 vem de
+`crypto/rand` e é formatado em minúsculas; a data usa `time.RFC3339` no fuso da
+máquina. Não há pacote, dependência, flag, cache ou semente novos.
+
+`Render` resolve cada ocorrência quando não encontra valor, gerando um valor novo
+por placeholder; nomes não registrados mantêm o erro de ausência. `RenderJSON`
+trata a função sempre como texto: valor completo vira string JSON e conteúdo de
+string é escapado uma vez. `ReservedFunction`/`ReservedDetail` concentram a
+reserva exata: `New` recusa atribuições e `--secret` reservados e
+`captureValues` recusa capturas reservadas (`ReservedError` indexa o lote),
+antes de qualquer publicação. `NewSession`/`Stage` preservam o relógio, sem
+compartilhar resolução nem cache.
+
+`runner/render.go` separa preparo e tentativa: `prepareEntry` renderiza URL,
+headers, corpo inline e campos textuais de multipart **uma vez por entrada** e
+`runAttempt` reutiliza esse `preparedRequest`, mantendo a leitura de arquivo
+externo e a abertura do arquivo de multipart por tentativa (duração, descritores
+e erros de arquivo continuam por tentativa). `pollEntry` só inicia o laço depois
+do preparo; falha de preparo preserva resultados anteriores, mantém `Started=0`,
+nenhuma tentativa fictícia e prioridade de erro 2, e cancelamento durante o
+preparo continua classificado como `Cancelled`. `reservedDeclaration` recusa
+capturas e `[Options]` reservados no início do `RunWithOptions`, então nenhuma
+requisição é enviada; `captureBatchFailure` e a publicação de `[Options]`
+detalham o diagnóstico pelo tipo do erro. `transport`, `parser` e `assertion`
+não mudam. Veja o [contrato](subset.md#funções-embutidas--us-45--issue-98) e a
+[matriz](compatibility.md#funções-embutidas--us-45--issue-98).
 
 ## Atribuições literais na sessão — US-44 / issue #95
 

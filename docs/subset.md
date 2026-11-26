@@ -1,4 +1,73 @@
-# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38, US-41 e US-42
+# Subconjunto suportado e extensões — US-01 a US-17, US-20 a US-36, US-38, US-41 a US-45
+
+<a id="funcoes-embutidas"></a>
+
+## Funções embutidas — US-45 / issue #98
+
+`{{newDate}}` e `{{newUuid}}` geram valores a cada ocorrência, sem `--var`, cache
+ou valor fixo compartilhado. Aceitam os mesmos espaços internos das variáveis
+(`{{ newDate }}`) e são sensíveis a maiúsculas/minúsculas. Nome não registrado
+continua tratado como variável, com a falha de ausência já existente.
+
+| Função | Valor gerado |
+|---|---|
+| `newDate` | data e hora atuais em RFC 3339, precisão de segundos, com o offset do fuso da máquina, como `2025-11-16T09:34:56-03:00` |
+| `newUuid` | UUID versão 4 aleatório (`crypto/rand`), canônico minúsculo, como `6f1c2a9e-6d2b-4b6e-9f3a-1c2d3e4f5a6b` |
+
+Valem nos mesmos contextos das variáveis: URL, valores de headers, corpo JSON
+inline, arquivo JSON externo com `--render-files`, campos textuais de multipart e
+operandos de query/assertion com `--render-asserts`. Combinam com texto e com
+variáveis; o conteúdo gerado não é reinterpretado como template. Repetir a mesma
+função no arquivo produz valores diferentes, e uma nova execução produz valores
+novos.
+
+Em corpo JSON a função ocupa posição de string: sem aspas
+(`"requestId":{{newUuid}}`) entra como string JSON válida; dentro de string o
+valor é escapado uma vez. Em URL e headers o valor é inserido como texto e passa
+pelas validações finais existentes (URL absoluta, ausência de percent-encoding
+implícito, rejeição de CR/LF). Retries e polling renderizam URL, headers, corpo
+inline e campos textuais **uma vez por entrada**: todas as tentativas reenviam os
+mesmos valores. Arquivos externos e o arquivo de multipart continuam lidos/abertos
+por tentativa.
+
+Os nomes são reservados: `--var newDate=...`, `--secret newUuid`, variável vinda
+de configuração/ambiente, `[Options] variable: newDate=literal` ou captura com
+qualquer dos dois nomes falham com código **2**, diagnóstico localizado e sem
+qualquer envio, sem precedência silenciosa. Caminhos descendentes (`newDate.x`)
+continuam variáveis comuns. Valores gerados não são secretos, não recebem
+proteção e não substituem `--secret`; use o formato esperado apenas como
+validação planejada, nunca como valor fixo confiável.
+
+```hurl
+POST {{ api.baseUrl }}/products
+Content-Type: application/json
+{"requestId":"{{newUuid}}","createdAt":"{{newDate}}","label":"pedido-{{newUuid}}"}
+HTTP 201
+```
+
+```sh
+httpgo test products.httpgo --var api.baseUrl=http://localhost:8080
+```
+
+Com uma API que responda **201**, o resultado é **0**: `requestId` e `label`
+recebem UUIDs diferentes e `createdAt` a data/hora da execução. Cenário
+versionado e exercitado:
+[scenario_functions_generated.httpgo](../testdata/scenarios/scenario_functions_generated.httpgo).
+Um nome reservado no mesmo padrão é rejeitado em
+[scenario_functions_reserved_capture.httpgo](../testdata/scenarios/scenario_functions_reserved_capture.httpgo)
+(erro 2 antes de qualquer envio).
+
+Diferença em relação ao Hurl **8.0.0**: a sintaxe e os contextos são os mesmos,
+mas `newDate` do Hurl usa frações de segundo e UTC (`Z`), enquanto o HTTPGo usa
+precisão de segundos e o offset da máquina; os valores de `newUuid` são UUID v4
+canônicos em ambos. Não há promessa de equivalência byte a byte nem de saída
+determinística. Veja a
+[matriz](compatibility.md#funções-embutidas--us-45--issue-98).
+
+Fora do suporte: outras funções, argumentos, formatos configuráveis, expressões,
+filtros, semente/injeção de relógio pelo usuário, uso em configuração/ambientes
+YAML, uso em nomes de headers, chaves JSON ou nomes de variáveis, e marcação de
+segredo para valores gerados.
 
 ## Progresso verboso — US-42 / issue #90
 

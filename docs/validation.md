@@ -1,4 +1,64 @@
-# Validação — US-01 a US-17, US-20 a US-44
+# Validação — US-01 a US-17, US-20 a US-45
+
+## US-45 — issue #98 / história 0045
+
+Plano da issue #98 executado sem planner, com quatro tasks backend autoaprovadas
+na fila `0045`. Task 1: `ea3a5cb` (funções e reserva no `internal/template`);
+Task 2: `742c507` (preparo único por entrada no `internal/runner`);
+Task 3: `c661396` (relógio injetável na CLI, ajuda e processo real);
+Task 4: contrato público, corpus, matriz diferencial e validação integrada.
+Somente backend: sem frontend/estáticos, pacote, dependência, versão Go, workflow
+ou budget novos. Nenhum código-fonte do Hurl foi consultado/copiado/adaptado;
+comportamento observável e documentação pública foram a referência.
+
+### Evidências efetivamente executadas
+
+Linux amd64, Go `go1.26.10-X:nodwarf5`, ferramentas do PATH. Em cada task
+passaram `gofmt -l` (nenhum arquivo), `make lint` (**0 issues**), `go vet ./...` e
+`go build ./...`; os testes rodaram com `-race -cover`.
+
+- Task 1: `go test ./internal/template -race` (funções, escape, por ocorrência,
+  relógio fixo em fuso não UTC, UUID v4, reserva em `New`/`Stage`/`Publish`,
+  nomes não registrados). `FuzzRender` ampliado com `newDate`/`newUuid`.
+- Task 2: `go test ./internal/runner -race` (reuso entre tentativas de retry e
+  após divergência, multipart textual, falha de preparo sem envio, reserva antes
+  de qualquer requisição, operandos de query/assertion, proteção inalterada) e
+  `go test ./internal/runner ./internal/suite ./internal/cli ./internal/transport -race`
+  para a rede de segurança de duração, cancelamento, multipart e body externo.
+- Task 3: `go test ./internal/cli -race` (demonstração, valores novos por
+  ocorrência/execução, rejeições com código 2 sem HTTP, validação final de URL,
+  regressões de proteção) e `go test ./tests/e2e -count=1` com binário real.
+- Task 4/final: `make fmt lint test` (**0 issues**, suíte completa com `-race
+  -cover`), `go vet ./...`, `make build`, `make e2e` e
+  `go test ./internal/template -run '^$' -fuzz '^FuzzRender$' -fuzztime=20s`
+  (**136.142** execuções, sem falha).
+- `make compatibility`: **483 pares** com Hurl **8.0.0**, sem skip nem regeneração
+  de pares preexistentes; acrescentado somente `functions_generated`. Hurl 8.0.0
+  oficial foi obtido para o gate porque o binário local era 8.0.1 e o alvo exige
+  8.0.0 exatamente. O novo par compara execução compartilhada (código 0 e
+  `/health`), nunca valores gerados.
+- Coberturas observadas: parser **96,4%**, template **95,4%**, runner **93,9%**,
+  CLI **97,7%**, suite **95,3%**, config **96,5%**, assertion **96,9%**, query
+  **89,0%**, report **97,1%**, transport **90,3%**.
+- Sem análise Sonar pelo desenvolvedor. Validação nativa macOS/Windows segue
+  opcional nesta história; o gate foi cumprido em Linux.
+
+### Rastreabilidade GO-586–GO-596
+
+| Cenário | Evidência automatizada |
+|---|---|
+| GO-586 | `TestFunctionDemonstrationEndToEnd` (CLI com streams injetados) e `TestFunctionDemonstrationByBinary` (processo real com `httptest`): UUID e RFC 3339 recebidos, 201 validado, código 0, sem eco na saída |
+| GO-587 | `TestFunctionValuesAreFreshPerOccurrenceAndRun`, `TestFunctionsResolveEveryOccurrence` e `TestFunctionValuesChangeBetweenExecutionsByBinary`: valores distintos entre ocorrências e execuções, composição com texto e variáveis |
+| GO-588 | `TestFunctionsResolveJSONContexts`, `TestFunctionsResolveTextContexts` e `TestFunctionsResolveOncePerMultipartEntry`: URL, header, string e valor JSON completo, arquivo externo (`--render-files`) e campo textual multipart, JSON válido antes do envio |
+| GO-589 | `TestFunctionDateKeepsLocalOffsetAndSeconds` (relógio fixo em `-03`, `+05:30` e UTC) e `TestFunctionsResolveEveryOccurrence` (UUID v4 canônico, versão e variante) |
+| GO-590 | `TestFunctionsResolveOncePerEntryForRetries`, `TestFunctionsResolveOncePerEntryAfterDivergence` e `TestFunctionsResolveOncePerMultipartEntry`: tentativas reenviam URL/body/campos idênticos; durações e contadores inalterados |
+| GO-591 | `TestFunctionsResolveInQueryOperands` e `TestFunctionsResolveInQueryOperands` (runner/CLI): mesmo ponto de resolução de variável em operando de query/assertion, com tipo e posição equivalentes |
+| GO-592 | `TestReservedFunctionNamesAreRejected` (template), `TestReservedFunctionNamesAreRejectedBeforeSend`, `TestReservedFunctionNamesFailWithCodeTwo` e `TestFunctionsRejectionsByBinary`: `--var`, `--secret`, configuração, `[Options] variable` e captura falham com 2, diagnóstico localizado e nenhum envio |
+| GO-593 | `TestUnknownFunctionLikeNamesRemainVariables`, corpus `scenario_functions_unknown_placeholder` e `TestFunctionsScenarioCorpusByBinary`: `{{newFoo}}`, placeholder malformado e variável ausente preservam as falhas existentes |
+| GO-594 | `TestFunctionGeneratedValuesKeepFinalValidation` e `TestFunctionsRejectionsByBinary`: URL relativa/porta inválida impedem envio, sem percent-encoding implícito e sem alcançar a entrada seguinte; header composto permanece texto válido |
+| GO-595 | `TestFunctionsPreparationFailureNeverStarts`, `TestFunctionsResolveOncePerMultipartEntry` e testes existentes de body externo/multipart: falha de preparo mantém `Started=0`, resultado anterior, posição na origem e código 2 |
+| GO-596 | `TestFunctionsAreNotSecret`, `TestFunctionSecurityRegressions`, `TestFunctionsStaticScenarioUnchangedByBinary` e suíte completa: cenários estáticos, segredos marcados e proteção inalterados; valores gerados não viram segredo nem são ocultados; nome reservado em captura no corpus |
+
 
 ## US-44 — issue #95 / história 044
 
