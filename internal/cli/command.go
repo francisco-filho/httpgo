@@ -30,6 +30,7 @@ type Command struct {
 	out, err   io.Writer
 	protection *executionProtection
 	timeout    time.Duration
+	now        func() time.Time // Injected clock for built-in template functions; nil uses time.Now.
 	isTerminal func(io.Writer) bool
 	compact    bool // Selected on original streams, before protection wrappers.
 	color      bool
@@ -89,7 +90,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 	if resolveErr != nil {
 		return c.fail(resolveErr.Error())
 	}
-	renderer, err := settings.Compose(args.variables, args.secrets)
+	renderer, err := settings.ComposeWithClock(args.variables, args.secrets, c.clock())
 	if err != nil {
 		return c.fail(err.Error())
 	}
@@ -420,6 +421,14 @@ func (c *Command) fail(message string) int {
 	return 2
 }
 
+// clock exposes the injected clock without giving functions a new flag.
+func (c *Command) clock() func() time.Time {
+	if c.now != nil {
+		return c.now
+	}
+	return time.Now
+}
+
 func help() string {
 	return `httpgo — executa cenários de teste HTTP e valida respostas
 
@@ -454,6 +463,10 @@ são escalares literais, sem expansão; arrays/objetos são texto. Marcas de seg
 persistem. --render-files e --render-asserts continuam opt-ins independentes.
 Não há seção global [Variables] nem query de assertion variable.
 
+Funções embutidas {{newDate}} (data/hora local RFC 3339) e {{newUuid}} (UUID v4)
+geram valor novo a cada ocorrência, sem cache. Os nomes são reservados: declará-los
+como variável ou captura é erro 2 antes de qualquer envio.
+
 Documentação: README.md e docs/subset.md em
   https://github.com/francisco-filho/httpgo
 
@@ -462,5 +475,6 @@ Exemplos:
   httpgo test tests/ --env local
   httpgo test tests/profile.httpgo --env-file .env.local
   httpgo test tests/ --output junit --output-file target/results.xml
+  httpgo test products.httpgo --var api.baseUrl=http://localhost:8080
 `
 }

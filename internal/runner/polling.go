@@ -26,10 +26,37 @@ func waitInterval(ctx context.Context, interval time.Duration) error {
 	}
 }
 
+// reservedDeclaration reports the first capture or [Options] variable that uses
+// an exact built-in function name, before any entry is prepared or executed.
+func reservedDeclaration(scenario parser.Scenario) *parser.Position {
+	for _, entry := range scenario.Entries {
+		for _, capture := range entry.Captures {
+			if template.ReservedFunction(capture.Name) {
+				pos := capture.Position
+				return &pos
+			}
+		}
+		for _, declaration := range entry.Options.Variables {
+			if template.ReservedFunction(declaration.Name) {
+				pos := declaration.Position
+				return &pos
+			}
+		}
+	}
+	return nil
+}
+
 func (r *Runner) RunWithOptions(ctx context.Context, scenario parser.Scenario, options Options) Result {
 	result := Result{Summary: Summary{Total: len(scenario.Entries), NotStarted: len(scenario.Entries)}}
 	session := r.renderer.NewSession()
 	protectScenario(session, scenario)
+	// Reserved function names are rejected before any entry, so no request is
+	// ever sent with a declaration that could never be resolved.
+	if reserved := reservedDeclaration(scenario); reserved != nil {
+		failure := &RenderError{Position: *reserved, Detail: template.ReservedDetail}
+		result.Err, result.ErrorPosition = failure, failure.Position
+		return result
+	}
 	for _, entry := range scenario.Entries {
 		if err := ctx.Err(); err != nil {
 			result.Err, result.ErrorPosition = err, entry.Position
@@ -89,16 +116,37 @@ func (r *Runner) runEntry(ctx context.Context, scenario parser.Scenario, entry p
 	if len(batch) > 0 {
 		if err := session.Publish(batch); err != nil {
 			pos := positions[0]
+			detail := "não foi possível atribuir variável de [Options]; verifique nomes em conflito ancestral/descendente"
 			var conflict *template.ConflictError
 			if errors.As(err, &conflict) && conflict.Index >= 0 && conflict.Index < len(positions) {
 				pos = positions[conflict.Index]
 			}
+			var reserved *template.ReservedError
+			if errors.As(err, &reserved) {
+				if reserved.Index >= 0 && reserved.Index < len(positions) {
+					pos = positions[reserved.Index]
+				}
+				detail = template.ReservedDetail
+			}
 			pos.File = session.Sanitize(pos.File)
-			failure := &RenderError{Position: pos, Detail: "não foi possível atribuir variável de [Options]; verifique nomes em conflito ancestral/descendente", cause: err}
+			failure := &RenderError{Position: pos, Detail: detail, cause: err}
 			return Result{Err: failure, ErrorPosition: pos, Entries: []EntryResult{{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}}}
 		}
 	}
 	return r.pollEntry(ctx, scenario, entry, options, session)
+}
+
+// attemptlessResult shapes a failure that never reached an executor call: no
+// attempt is invented and the entry keeps its terminal classification.
+func attemptlessResult(session template.Session, entry parser.Entry, failure Result) Result {
+	if len(failure.Entries) == 0 && failure.Err != nil {
+		failure.Entries = []EntryResult{{Entry: safeEntry(session, entry), Outcome: Cancelled}}
+	}
+	failure.Summary = Summary{Total: 1, NotStarted: 1}
+	for i := range failure.Entries {
+		failure.Entries[i].Attempts = 0
+	}
+	return failure
 }
 
 func (r *Runner) pollEntry(ctx context.Context, scenario parser.Scenario, entry parser.Entry, options Options, session template.Session) (result Result) {
@@ -110,10 +158,22 @@ func (r *Runner) pollEntry(ctx context.Context, scenario parser.Scenario, entry 
 			}
 		}
 	}()
+	if err := ctx.Err(); err != nil {
+		return attemptlessResult(session, entry, Result{Err: err, ErrorPosition: entry.Position})
+	}
+	prepared, failure := prepareEntry(session, entry)
+	// Cancellation during preparation is terminal, not a render failure.
+	if err := ctx.Err(); err != nil {
+		return attemptlessResult(session, entry, Result{Err: err, ErrorPosition: entry.Position})
+	}
+	if failure != nil {
+		current := Result{Err: failure, ErrorPosition: failure.Position, Entries: []EntryResult{{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}}}
+		return attemptlessResult(session, entry, current)
+	}
 	var metrics AttemptSummary
 	facts := Summary{Total: 1, NotStarted: 1}
 	for remaining := entry.Options.Retry; ; remaining-- {
-		current := r.runAttempt(ctx, scenario.OriginDir, entry, options, session, &last)
+		current := r.runAttempt(ctx, scenario.OriginDir, entry, options, session, prepared, &last)
 		metrics.Started += current.Summary.Started
 		metrics.Completed += current.Summary.Completed
 		if current.Summary.Completed != 0 && entry.ExpectedStatus != nil {

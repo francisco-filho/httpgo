@@ -1,0 +1,15 @@
+{
+  "classification": "Ambos aceitam newDate/newUuid sem argumentos, resolvidos a cada ocorrência; valores não são comparados porque variam entre execuções. Formatos diferem: HTTPGo usa precisão de segundos com offset do fuso da máquina, Hurl 8.0.0 usa frações de segundo e UTC",
+  "httpgo": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ]
+  },
+  "hurl": {
+    "exit": 0,
+    "paths": [
+      "/health"
+    ]
+  }
+}

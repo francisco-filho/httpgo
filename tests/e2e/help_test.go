@@ -105,7 +105,7 @@ func assertCompactProcessHelp(t *testing.T, out string) {
 			t.Errorf("missing docs %q", term)
 		}
 	}
-	if !strings.HasSuffix(out, "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/profile.httpgo --env-file .env.local\n  httpgo test tests/ --output junit --output-file target/results.xml\n") {
+	if !strings.HasSuffix(out, "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/profile.httpgo --env-file .env.local\n  httpgo test tests/ --output junit --output-file target/results.xml\n  httpgo test products.httpgo --var api.baseUrl=http://localhost:8080\n") {
 		t.Errorf("examples are not final: %q", out)
 	}
 	for _, term := range []string{"[Captures]", "[Asserts]", "GET http", "HTTP 200", "version: 1", "--var token=", "--var password=", "\x1b"} {

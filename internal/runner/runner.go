@@ -193,26 +193,38 @@ func protectScenario(session template.Session, scenario parser.Scenario) {
 	}
 }
 
-// runAttempt executes one entry without reporting. Resources are closed before
-// evaluation or waiting; only the polling decision publishes a terminal result.
-func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.Entry, options Options, session template.Session, last **attemptBodies) Result {
-	result := Result{Summary: Summary{Total: 1, NotStarted: 1}}
-	if err := ctx.Err(); err != nil {
-		result.Err, result.ErrorPosition = err, entry.Position
-		return result
+// preparedRequest is the entry-scoped rendering every attempt reuses. Payload
+// files stay outside it: reading and opening remain per attempt.
+type preparedRequest struct {
+	request Request
+	display string
+}
+
+// prepareEntry resolves URL, headers, inline body and multipart text once, so
+// retries and polling resend identical values. It never calls the executor.
+func prepareEntry(session template.Session, entry parser.Entry) (preparedRequest, *RenderError) {
+	request, display, failure := render(session, entry)
+	if failure != nil {
+		return preparedRequest{}, failure
 	}
-	request, display, renderErr := render(session, entry)
-	if renderErr != nil {
-		result.Err, result.ErrorPosition = renderErr, renderErr.Position
-		current := EntryResult{Entry: safeEntry(session, entry), Outcome: RenderFailed, DisplayURL: "[URL não renderizada]"}
-		result.Entries = append(result.Entries, current)
-		return result
-	}
+	// Values resolved once must stay protected for every attempt and diagnostic.
 	for _, header := range request.Headers {
 		if sensitiveHeader(header.Name) {
 			session.ProtectValue(header.Value)
 		}
 	}
+	return preparedRequest{request: request, display: display}, nil
+}
+
+// runAttempt executes one entry without reporting. Resources are closed before
+// evaluation or waiting; only the polling decision publishes a terminal result.
+func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.Entry, options Options, session template.Session, prepared preparedRequest, last **attemptBodies) Result {
+	result := Result{Summary: Summary{Total: 1, NotStarted: 1}}
+	if err := ctx.Err(); err != nil {
+		result.Err, result.ErrorPosition = err, entry.Position
+		return result
+	}
+	request, display := prepared.request, prepared.display
 	if entry.ExternalBody != nil {
 		path := entry.ExternalBody.Path
 		if !filepath.IsAbs(path) {
@@ -251,7 +263,7 @@ func (r *Runner) runAttempt(ctx context.Context, originDir string, entry parser.
 	var upload io.Closer
 	if entry.Multipart != nil {
 		var err error
-		upload, err = r.prepareMultipart(ctx, session, entry, originDir, &request)
+		upload, err = r.openMultipart(ctx, entry, originDir, &request)
 		if err != nil {
 			pos, outcome := entry.Multipart.Position, FileFailed
 			var fileErr *FileError

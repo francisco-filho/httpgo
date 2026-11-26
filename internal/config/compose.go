@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"capimgrosso.com/httpgo/internal/template"
 )
@@ -12,6 +13,12 @@ import (
 // Compose validates CLI declarations independently, then replaces exact names.
 // It never merges opaque CLI objects or permits ancestor/descendant collisions.
 func (s Settings) Compose(assignments, secrets []string) (*template.Context, error) {
+	return s.ComposeWithClock(assignments, secrets, time.Now)
+}
+
+// ComposeWithClock injects the clock behind built-in template functions; nil
+// keeps time.Now. Composition and validation rules are unchanged.
+func (s Settings) ComposeWithClock(assignments, secrets []string, now func() time.Time) (*template.Context, error) {
 	resolved, err := s.Resolve(context.Background(), assignments)
 	if err != nil {
 		return nil, err
@@ -35,7 +42,7 @@ func (s Settings) Compose(assignments, secrets []string) (*template.Context, err
 	for name, value := range values {
 		effective = append(effective, name+"="+value)
 	}
-	context, err := template.New(effective, append(append([]string(nil), s.Secrets...), secrets...))
+	context, err := template.NewWithClock(effective, append(append([]string(nil), s.Secrets...), secrets...), now)
 	if err != nil {
 		return nil, err
 	}

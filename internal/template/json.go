@@ -196,7 +196,22 @@ func (c *Context) RenderJSON(source []byte) ([]byte, error) {
 	for _, ref := range plan.References {
 		v, ok := c.lookup(ref.Name)
 		if !ok {
-			return nil, jsonError(ref.Start, "variável ausente; forneça seu valor com --var")
+			generated, isFunction, err := c.functionValue(ref.Name)
+			if err != nil {
+				return nil, jsonError(ref.Start, "não foi possível gerar valor da função embutida")
+			}
+			if !isFunction {
+				return nil, jsonError(ref.Start, "variável ausente; forneça seu valor com --var")
+			}
+			// A function is always text: complete value becomes a JSON string and
+			// string content is escaped exactly once.
+			encoded, _ := json.Marshal(generated)
+			if ref.InString {
+				replacements[ref.Start] = string(encoded[1 : len(encoded)-1])
+			} else {
+				replacements[ref.Start] = string(encoded)
+			}
+			continue
 		}
 		if ref.InString {
 			if v.composite {

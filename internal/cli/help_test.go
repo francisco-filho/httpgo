@@ -74,7 +74,7 @@ func TestCompactHelpContract(t *testing.T) {
 				t.Errorf("missing documentation %q", term)
 			}
 		}
-		examples := "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/profile.httpgo --env-file .env.local\n  httpgo test tests/ --output junit --output-file target/results.xml\n"
+		examples := "Exemplos:\n  httpgo test health.httpgo\n  httpgo test tests/ --env local\n  httpgo test tests/profile.httpgo --env-file .env.local\n  httpgo test tests/ --output junit --output-file target/results.xml\n  httpgo test products.httpgo --var api.baseUrl=http://localhost:8080\n"
 		if !strings.HasSuffix(out, examples) {
 			t.Errorf("examples are not final: %q", out)
 		}

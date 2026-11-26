@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -34,17 +35,17 @@ type uploadFile interface {
 
 func openUpload(path string) (uploadFile, error) { return os.Open(path) }
 
-func (r *Runner) prepareMultipart(ctx context.Context, session template.Session, entry parser.Entry, origin string, request *Request) (io.Closer, error) {
+// renderMultipart resolves textual fields and static metadata once per entry.
+// Values follow the same template rules as headers and URLs.
+func renderMultipart(session template.Session, entry parser.Entry, headers []parser.Header) (*MultipartBody, *RenderError) {
 	form := entry.Multipart
 	body := &MultipartBody{}
-	var reference *parser.FileBody
 	for _, declaration := range form.Parts {
 		part := MultipartPart{Name: declaration.Name, File: declaration.File != nil, MIME: declaration.MIME}
 		if declaration.File != nil {
-			reference = declaration.File
-			part.Filename = filepath.Base(reference.Path)
+			part.Filename = filepath.Base(declaration.File.Path)
 			if !utf8.ValidString(part.Filename) || strings.ContainsFunc(part.Filename, unicode.IsControl) {
-				return nil, &RenderError{Position: reference.Position, Detail: "filename de multipart inválido"}
+				return nil, &RenderError{Position: declaration.File.Position, Detail: "filename de multipart inválido"}
 			}
 			if part.MIME == "" {
 				part.MIME = multipartMIME(part.Filename)
@@ -61,7 +62,7 @@ func (r *Runner) prepareMultipart(ctx context.Context, session template.Session,
 		}
 		body.Parts = append(body.Parts, part)
 	}
-	for i, header := range request.Headers {
+	for i, header := range headers {
 		if strings.EqualFold(header.Name, "Content-Type") {
 			if err := parser.ValidateMultipartContentType(header.Value); err != nil {
 				pos := form.Position
@@ -71,6 +72,21 @@ func (r *Runner) prepareMultipart(ctx context.Context, session template.Session,
 				return nil, &RenderError{Position: pos, Detail: err.Error(), cause: err}
 			}
 		}
+	}
+	return body, nil
+}
+
+// openMultipart opens the single file part per attempt and keeps the rendered
+// text fields from the entry preparation. Execute must consume the returned file.
+func (r *Runner) openMultipart(ctx context.Context, entry parser.Entry, origin string, request *Request) (io.Closer, error) {
+	var reference *parser.FileBody
+	for _, declaration := range entry.Multipart.Parts {
+		if declaration.File != nil {
+			reference = declaration.File
+		}
+	}
+	if reference == nil {
+		return nil, &RenderError{Position: entry.Multipart.Position, Detail: "multipart exige exatamente um arquivo"}
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, fileFailure(reference.Position, err)
@@ -93,7 +109,6 @@ func (r *Runner) prepareMultipart(ctx context.Context, session template.Session,
 	if err != nil {
 		return nil, fileFailure(reference.Position, errors.Join(err, file.Close()))
 	}
-	body.Source, body.Size = file, info.Size()
-	request.Multipart = body
+	request.Multipart = &MultipartBody{Parts: slices.Clone(request.Multipart.Parts), Source: file, Size: info.Size()}
 	return file, nil
 }

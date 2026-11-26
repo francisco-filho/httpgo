@@ -100,5 +100,13 @@ func render(session template.Session, entry parser.Entry) (Request, string, *Ren
 	for _, declaration := range entry.Assertions {
 		retainBody = retainBody || declaration.JSON != nil || declaration.Body != nil || declaration.Regex != nil
 	}
-	return Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: retainBody}, url.Display, nil
+	request := Request{Method: entry.Method, URL: url.Value, Headers: headers, Body: body, RetainBody: retainBody}
+	if entry.Multipart != nil {
+		form, failure := renderMultipart(session, entry, headers)
+		if failure != nil {
+			return Request{}, "", failure
+		}
+		request.Multipart = form
+	}
+	return request, url.Display, nil
 }

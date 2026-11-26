@@ -296,6 +296,34 @@ use captures, explicadas a seguir. Credenciais reais vêm do
 [ambiente do processo](docs/configuration.md#referências-ao-ambiente-do-processo-e-segredos)
 ou de [arquivo local explícito](docs/configuration.md#arquivo-local-explícito--extensão-httpgo), nunca de flags.
 
+### Funções embutidas
+
+`{{newDate}}` e `{{newUuid}}` geram valores a cada ocorrência, sem `--var`:
+data/hora local em RFC 3339 com precisão de segundos e UUID v4 canônico minúsculo.
+Funcionam como as variáveis em URL, headers, corpo JSON, arquivo externo com
+`--render-files`, campos textuais de multipart e operandos com `--render-asserts`.
+Cada ocorrência gera um valor novo, inclusive entre execuções; não há cache nem
+valor fixo. Uma nova execução produz outro UUID e outra data.
+
+```hurl
+POST {{api.baseUrl}}/products
+Content-Type: application/json
+{"requestId":"{{newUuid}}","createdAt":"{{newDate}}","label":"pedido-{{newUuid}}"}
+HTTP 201
+```
+
+```sh
+httpgo test products.httpgo --var api.baseUrl=http://localhost:8080
+```
+
+A API recebe dois UUIDs diferentes e a data da execução; a resposta 201 mantém o
+resultado **0**. Em JSON, `"requestId":{{newUuid}}` também é aceito sem aspas e
+entra como string. Os nomes são reservados: `--var newDate=...`, captura ou
+`[Options] variable` com esses nomes é erro **2** antes de qualquer envio, e
+`newDate.x` continua uma variável comum. Valores gerados não são secretos. Veja
+[funções embutidas](docs/subset.md#funcoes-embutidas) e o
+[cenário versionado](testdata/scenarios/scenario_functions_generated.httpgo).
+
 ### Valores próprios no cenário
 
 `[Options]` permite atribuir literais antes da própria URL, headers e body:
