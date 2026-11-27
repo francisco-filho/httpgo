@@ -46,10 +46,7 @@ func (p *verboseProgress) entry(entry runner.EntryResult) error {
 		}
 		state = color + state + "\x1b[0m"
 	}
-	url := displayURL(entry.DisplayURL)
-	if entry.Outcome == runner.RenderFailed || entry.DisplayURL == "" {
-		url = "[URL não renderizada]"
-	}
+	url := displayEntryURL(entry)
 	if _, err := fmt.Fprintf(p.command.err, "%s %s %s (%dms)\n", state, entry.Entry.Method, url, entry.Duration.Milliseconds()); err != nil {
 		return err
 	}

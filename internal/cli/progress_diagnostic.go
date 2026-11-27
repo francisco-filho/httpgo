@@ -14,6 +14,9 @@ import (
 // progressDiagnostic uses only the runner's safe presentation metadata. Never
 // reconstruct a declaration from scenario source or inspect response contents.
 type progressDiagnostic struct {
+	// endpoint carries "method URL" of the failed step for the compact form only.
+	// The verbose form already shows it on the [ERRO] line and leaves it empty.
+	endpoint                   string
 	position                   parser.Position
 	phase, expression, message string
 }
@@ -26,8 +29,23 @@ func (p *fileProgress) diagnostic(run runner.Result, loadErr error) error {
 	ordinal := p.done
 	if loadErr != nil {
 		ordinal = 0
+	} else if len(run.Entries) > 0 {
+		diagnostic.endpoint = progressEndpoint(run.Entries[len(run.Entries)-1])
 	}
 	return p.command.writeProgressDiagnostic(diagnostic, ordinal)
+}
+
+// progressEndpoint names the request that produced the terminal outcome. A
+// preparation failure never sent a request, so no URL is invented for it.
+func progressEndpoint(entry runner.EntryResult) string {
+	if entry.Entry.Method == "" {
+		return ""
+	}
+	url := displayEntryURL(entry)
+	if entry.Outcome == runner.FileFailed {
+		url = "[URL não renderizada]"
+	}
+	return entry.Entry.Method + " " + url
 }
 
 func (c *Command) writeProgressDiagnostic(diagnostic progressDiagnostic, ordinal int) error {
@@ -45,7 +63,12 @@ func (c *Command) writeProgressDiagnostic(diagnostic progressDiagnostic, ordinal
 			location += fmt.Sprintf(":%d", diagnostic.position.Column)
 		}
 	}
-	if location != "" {
+	switch {
+	case diagnostic.endpoint != "" && location != "":
+		fmt.Fprintf(&text, "  %s -> %s\n", diagnostic.endpoint, location)
+	case diagnostic.endpoint != "":
+		fmt.Fprintf(&text, "  %s\n", diagnostic.endpoint)
+	case location != "":
 		fmt.Fprintf(&text, "  %s\n", location)
 	}
 	fmt.Fprintf(&text, "  [%s]\n", diagnostic.phase)

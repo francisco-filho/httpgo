@@ -327,7 +327,7 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			case "fourth failure":
 				wantCode = 1
 				wantCalls = 5
-				wantFinal = "ERRO  4/10\n  step 4 - Linha"
+				wantFinal = "ERRO  4/10\n  GET " + server.URL + "/4 -> step 4 - Linha"
 				wantTests = 5
 				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
@@ -338,14 +338,14 @@ func TestCompactRealTTYPendingAndOutcomes(t *testing.T) {
 			case "retry exhausted":
 				wantCode = 1
 				wantCalls = 3
-				wantFinal = "ERRO  1/1\n  step 1 - Linha"
+				wantFinal = "ERRO  1/1\n  GET " + server.URL + "/hold -> step 1 - Linha"
 				wantTests = 2
 				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
 			case "cancel":
 				wantCode = 2
 				wantCalls = 2
-				wantFinal = "ERRO  1/10\n  step 1 - Linha"
+				wantFinal = "ERRO  1/10\n  GET " + server.URL + "/hold -> step 1 - Linha"
 				wantTests = 2
 				wantCount = "Cenários executados: 2\n"
 				wantStates = "Sucesso/erros: 1/1\nNão executados: 1\n"
@@ -410,6 +410,16 @@ func TestCompactRealTTYLoadErrorsAndProtection(t *testing.T) {
 	out, diagnostic := p.out.text(), p.stderr.text()
 	if code != 2 || calls.Load() != 2 || !strings.Contains(out, "Cenários executados: 4\n") || !strings.Contains(out, "Testes executados: 3\n") || !strings.Contains(out, "Sucesso/erros: 1/3\n") || !strings.Contains(out, "Sucesso/erros: 1/2\n") || !strings.Contains(diagnostic, "ERRO  0/?\n") || !strings.Contains(diagnostic, "step 1 - Linha") || !strings.Contains(diagnostic, "[oculto]") || strings.Contains(out+diagnostic, secret) || strings.Contains(out, "Não executados:") {
 		t.Fatalf("code=%d calls=%d out=%q err=%q", code, calls.Load(), out, diagnostic)
+	}
+	for _, endpoint := range []string{"  GET " + server.URL + " -> step 1 - Linha", "  GET [URL não renderizada] -> step 1 - Linha"} {
+		if !strings.Contains(diagnostic, endpoint) {
+			t.Fatalf("missing endpoint %q in %q", endpoint, diagnostic)
+		}
+	}
+	// The rejected scenario keeps its parsing block without an endpoint line.
+	parse := diagnostic[strings.Index(diagnostic, "03.httpgo"):strings.Index(diagnostic, "04.httpgo")]
+	if !strings.Contains(parse, "[parsing]") || strings.Contains(parse, " -> step") {
+		t.Fatalf("parse block invented endpoint: %q", parse)
 	}
 }
 

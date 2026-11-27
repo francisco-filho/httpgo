@@ -174,10 +174,7 @@ func (c *Command) executeContext(ctx context.Context) int {
 }
 
 func (c *Command) renderEntry(entry runner.EntryResult) error {
-	shownURL := displayURL(entry.DisplayURL)
-	if entry.Outcome == runner.RenderFailed {
-		shownURL = "[URL não renderizada]"
-	}
+	shownURL := displayEntryURL(entry)
 	line := fmt.Sprintf("%s %s: %s", entry.Entry.Method, shownURL, entry.Outcome)
 	switch entry.Outcome {
 	case runner.Passed, runner.Mismatch:
@@ -377,6 +374,15 @@ func headerDiagnostic(failure *runner.HeaderFailure) string {
 		expected = "presente"
 	}
 	return fmt.Sprintf("assertion header %q %s: esperado %s, recebido %s", failure.Name, failure.Operator, expected, actual)
+}
+
+// displayEntryURL is the single safe URL form for every presentation: the
+// session already protected values, and the query/userinfo stay hidden.
+func displayEntryURL(entry runner.EntryResult) string {
+	if entry.Outcome == runner.RenderFailed || entry.DisplayURL == "" {
+		return "[URL não renderizada]"
+	}
+	return displayURL(entry.DisplayURL)
 }
 
 func displayURL(raw string) string {
